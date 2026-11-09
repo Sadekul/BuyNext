@@ -6,6 +6,8 @@
 .main-nav__list {
   display: flex;
   gap: var(--space-1);
+  /* Pull links left by their own padding so the first label lines up with the logo. */
+  padding-inline: calc(var(--container-gutter) - var(--space-4));
 }
 
 .main-nav__link {

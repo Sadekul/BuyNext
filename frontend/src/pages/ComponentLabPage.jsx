@@ -71,12 +71,13 @@ function ComponentLabPage() {
           </LabCard>
           <LabCard title={`ErrorMessage (retried ${retryCount}×)`}>
             <ErrorMessage
+              titleAs="h4"
               message="We couldn't load products. Check your connection."
               onRetry={() => setRetryCount((count) => count + 1)}
             />
           </LabCard>
           <LabCard title="EmptyState">
-            <EmptyState title="Your cart is empty" message="Add products to see them here." />
+            <EmptyState titleAs="h4" title="Your cart is empty" message="Add products to see them here." />
           </LabCard>
         </div>
       </section>

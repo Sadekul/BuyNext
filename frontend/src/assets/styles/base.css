@@ -57,8 +57,8 @@ a {
   text-decoration: none;
 }
 
-ul[class],
-ol[class] {
+/* :where() has zero specificity, so any class (e.g. .container) can override this. */
+:where(ul[class], ol[class]) {
   padding: 0;
   list-style: none;
 }

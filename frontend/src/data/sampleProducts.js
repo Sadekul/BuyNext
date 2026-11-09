@@ -319,6 +319,41 @@ export const sampleProducts = [
     brand: "Apple",
     thumbnail: "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-magsafe-battery-pack/thumbnail.webp",
     availabilityStatus: "Low Stock"
+  },
+  {
+    id: 161,
+    title: "Samsung Galaxy Tab White",
+    category: "tablets",
+    price: 349.99,
+    discountPercentage: 18.2,
+    rating: 3.72,
+    stock: 92,
+    brand: "Samsung",
+    thumbnail: "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/thumbnail.webp",
+    availabilityStatus: "In Stock"
+  },
+  {
+    id: 172,
+    title: "Blue Women's Handbag",
+    category: "womens-bags",
+    price: 49.99,
+    discountPercentage: 17.88,
+    rating: 2.92,
+    stock: 76,
+    brand: "Fashionista",
+    thumbnail: "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/thumbnail.webp",
+    availabilityStatus: "In Stock"
+  },
+  {
+    id: 150,
+    title: "Metal Baseball Bat",
+    category: "sports-accessories",
+    price: 29.99,
+    discountPercentage: 19.51,
+    rating: 4.66,
+    stock: 16,
+    thumbnail: "https://cdn.dummyjson.com/product-images/sports-accessories/metal-baseball-bat/thumbnail.webp",
+    availabilityStatus: "In Stock"
   }
 ]
 
