@@ -61,15 +61,15 @@ frontend/
 │   │   ├── layout/         # Page chrome: AnnouncementBar, Header, navigation, Footer
 │   │   ├── home/           # Homepage sections: HeroBanner, PromoBanner, ProductSection…
 │   │   ├── product/        # ProductCard, ProductGrid, ProductBadge, RatingStars, CategoryCard
-│   │   ├── cart/           # Cart UI (Phase 6)
+│   │   ├── cart/           # CartDrawer, CartLineItem, CartSummary, CouponForm, FreeShippingProgress
 │   │   ├── forms/          # Forms: Newsletter (auth and checkout forms later)
 │   │   └── ui/             # Generic building blocks: Button, Modal, Loader, Toast…
 │   ├── pages/              # One component per route (HomePage, NotFoundPage…)
 │   ├── layouts/            # Shared page shells rendered around routes (MainLayout)
 │   ├── routes/             # Route table (AppRoutes)
 │   ├── hooks/              # Custom hooks: useFetch, useCatalogProducts, useCategories, useToast
-│   ├── context/            # React Context providers: cart, wishlist, auth (Phases 6–9)
-│   ├── reducers/           # useReducer logic, e.g. the cart reducer (Phase 6)
+│   ├── context/            # Context objects + providers (CartProvider; wishlist and auth next)
+│   ├── reducers/           # Pure reducers (cartReducer)
 │   ├── services/           # API layer: apiClient, product/category services, adapters/
 │   ├── utils/              # Pure helpers: pricing, catalog filter/sort/paginate, formatters, cn
 │   ├── constants/          # App-wide constants: routes, nav links, store settings
@@ -96,7 +96,8 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `/categories/:categorySlug` | ProductListingPage for one category | Live API |
 | `/deals` | ProductListingPage sorted by biggest discount | Live API |
 | `/products/:productId` | ProductDetailsPage: gallery, pricing, stock, quantity, specs, reviews, related | Live API |
-| `/cart` | Cart | Placeholder until Phase 6 |
+| `/cart` | CartPage: lines, quantities, coupon, shipping estimate, price/stock re-check | Done (localStorage) |
+| `/checkout` | Checkout | Placeholder until Phase 10 |
 | `/wishlist` | Wishlist | Placeholder until Phase 7 |
 | `/account` | Account | Placeholder until Phase 9 |
 | `*` | NotFoundPage | Done |
@@ -133,6 +134,9 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `Loader` / `ErrorMessage` / `EmptyState` | Loading, error (with retry), and empty states |
 | `Modal` | Accessible dialog built on native `<dialog>` (center or drawer) |
 | `Toast` | Auto-dismissing status message |
+| `CartDrawer` | Slide-out mini cart (opens on add) |
+| `CartLineItem` | Cart row: image, price, quantity selector, remove, notices |
+| `CartSummary` / `CouponForm` | Totals, savings, shipping estimate, discount code |
 
 ## API layer
 
@@ -160,6 +164,17 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
 
 DummyJSON quirks we handle: unknown categories return `200` with an empty list (we check against the category list), unknown `sortBy` values are silently ignored (we only send whitelisted sort options), and there is a rate limit of about 100 requests per time window.
+
+## State management
+
+| State | Where | Why |
+| --- | --- | --- |
+| Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
+| Cart | `CartProvider` (Context + `useReducer`), saved in `localStorage` (`buynest.cart.v1`) | Needed across the whole app; rules live in one pure reducer |
+| URL state (search, sort) | `useSearchParams` | Shareable and bookmarkable |
+| Local UI state (menu, filters, gallery image) | `useState` in the component | Only one component cares |
+
+The cart is a client-side convenience: prices, stock, coupons, shipping, and totals must be re-validated by the backend at checkout.
 
 ## Sample data vs real data
 

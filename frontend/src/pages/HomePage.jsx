@@ -5,10 +5,9 @@ import PromoBanner from '../components/home/PromoBanner'
 import BenefitsSection from '../components/home/BenefitsSection'
 import Newsletter from '../components/forms/Newsletter'
 import ErrorMessage from '../components/ui/ErrorMessage'
-import Toast from '../components/ui/Toast'
 import { useFetch } from '../hooks/useFetch'
 import { useCategories } from '../hooks/useCategories'
-import { useToast } from '../hooks/useToast'
+import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
 import { customerBenefits, featuredCategories, heroContent, homeCollectionIds, promoBanners } from '../data/homeContent'
 import { ALL_PRODUCTS, getProducts } from '../services/productService'
@@ -33,7 +32,7 @@ async function fetchHomeCollections(signal) {
 function HomePage() {
   const collectionsRequest = useFetch('home-collections', fetchHomeCollections)
   const categoriesRequest = useCategories()
-  const toast = useToast()
+  const { addItem } = useCart()
 
   const collections = collectionsRequest.data ?? EMPTY_COLLECTIONS
   const isLoadingProducts = collectionsRequest.isLoading
@@ -46,10 +45,8 @@ function HomePage() {
     }))
     .filter((category) => category.name)
 
-  // Passed down as a function prop. The real cart replaces this in Phase 6.
-  function handleAddToCart(product) {
-    toast.show(`"${product.title}" will go into your cart once the cart is built in Phase 6.`)
-  }
+  // Passed down as a function prop: ProductCard reports the click, the cart handles it.
+  const handleAddToCart = (product) => addItem(product)
 
   const productsUnavailable = collectionsRequest.error && (
     <section className="section section--muted" aria-label="Products">
@@ -128,7 +125,6 @@ function HomePage() {
       )}
 
       <Newsletter />
-      <Toast message={toast.message} onDismiss={toast.dismiss} />
     </>
   )
 }

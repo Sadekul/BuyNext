@@ -1,0 +1,121 @@
+.cart-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.cart-line__image {
+  width: 6rem;
+  height: 6rem;
+  padding: var(--space-2);
+  object-fit: contain;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.cart-line__info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cart-line__title {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cart-line__title a:hover {
+  color: var(--color-primary);
+}
+
+.cart-line__brand {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.cart-line__unit-price {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.cart-line__unit-price s {
+  color: var(--color-text-muted);
+}
+
+.cart-line__notice {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-warning);
+}
+
+.cart-line__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.cart-line__remove {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+}
+
+.cart-line__remove:hover {
+  color: var(--color-sale);
+}
+
+.cart-line__total {
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.cart-line--compact {
+  gap: var(--space-3);
+}
+
+.cart-line--compact .cart-line__image {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.cart-line--compact .cart-line__title {
+  font-size: var(--text-sm);
+}
+
+.cart-line--unavailable .cart-line__image,
+.cart-line--unavailable .cart-line__unit-price {
+  opacity: 0.5;
+}
+
+.cart-line--unavailable .cart-line__notice {
+  color: var(--color-sale);
+}
+
+@media (max-width: 479px) {
+  .cart-line:not(.cart-line--compact) {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cart-line:not(.cart-line--compact) .cart-line__total {
+    grid-column: 2;
+  }
+
+  .cart-line:not(.cart-line--compact) .cart-line__image {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+}

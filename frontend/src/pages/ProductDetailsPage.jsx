@@ -16,11 +16,13 @@ import Loader from '../components/ui/Loader'
 import Toast from '../components/ui/Toast'
 import { useFetch } from '../hooks/useFetch'
 import { useToast } from '../hooks/useToast'
+import { useCart } from '../hooks/useCart'
 import { getProductById, getProductsByCategory } from '../services/productService'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { formatPrice, formatSlug } from '../utils/formatters'
 import { getProductPricing } from '../utils/pricing'
+import { getPurchaseLimits } from '../utils/inventory'
 import './ProductDetailsPage.css'
 
 const RELATED_LIMIT = 4
@@ -75,9 +77,9 @@ function ProductDetails({ product }) {
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
+  const { addItem } = useCart()
 
-  const minQuantity = product.minimumOrderQuantity
-  const canBuy = product.stock > 0 && product.stock >= minQuantity
+  const { min: minQuantity, canBuy } = getPurchaseLimits(product)
   const [quantity, setQuantity] = useState(minQuantity)
 
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
@@ -105,7 +107,7 @@ function ProductDetails({ product }) {
   ].filter(([, value]) => value) // only show what the API actually provided
 
   function handleAddToCart() {
-    toast.show(`${quantity} × "${product.title}" will go into your cart once the cart is built in Phase 6.`)
+    addItem(product, quantity)
   }
 
   return (

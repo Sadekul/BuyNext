@@ -16,6 +16,7 @@ import Toast from '../components/ui/Toast'
 import { useCatalogProducts } from '../hooks/useCatalogProducts'
 import { useCategories } from '../hooks/useCategories'
 import { useToast } from '../hooks/useToast'
+import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
 import { PRODUCTS_PER_PAGE, getSortOption } from '../constants/catalog'
 import {
@@ -106,6 +107,7 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
   const [areFiltersOpen, setAreFiltersOpen] = useState(false)
   const [quickViewProduct, setQuickViewProduct] = useState(null)
   const toast = useToast()
+  const { addItem } = useCart()
   const toolbarRef = useRef(null) // scroll target when changing page
 
   // Derived state: computed from state + props on every render, never stored.
@@ -138,7 +140,8 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
   }
 
   function handleAddToCart(product) {
-    toast.show(`"${product.title}" will go into your cart once the cart is built in Phase 6.`)
+    setQuickViewProduct(null) // close quick view first, so the cart drawer isn't stacked on it
+    addItem(product)
   }
 
   function handleToggleWishlist(product) {

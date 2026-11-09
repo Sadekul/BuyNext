@@ -1,11 +1,16 @@
 import AppRoutes from './routes/AppRoutes'
+import CartProvider from './context/CartProvider'
 
 /**
- * Root component. Kept intentionally thin: app-wide providers
- * (cart, wishlist, auth) will wrap <AppRoutes /> here in later phases.
+ * Root component: app-wide providers wrap the routes, so every page can
+ * read shared state (cart now; wishlist and auth in later phases).
  */
 function App() {
-  return <AppRoutes />
+  return (
+    <CartProvider>
+      <AppRoutes />
+    </CartProvider>
+  )
 }
 
 export default App

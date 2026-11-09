@@ -9,6 +9,7 @@ import { getProductById } from '../../services/productService'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
+import { getPurchaseLimits } from '../../utils/inventory'
 import './QuickViewModal.css'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
@@ -37,7 +38,7 @@ function QuickViewContent({ product, onAddToCart }) {
 
   const details = request.data
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(details)
-  const isOutOfStock = details.stock === 0
+  const { canBuy } = getPurchaseLimits(details)
 
   return (
     <div className="quick-view">
@@ -74,9 +75,9 @@ function QuickViewContent({ product, onAddToCart }) {
         {details.description && <p className="quick-view__description">{details.description}</p>}
 
         <div className="quick-view__actions">
-          <Button onClick={() => onAddToCart(details)} disabled={isOutOfStock}>
+          <Button onClick={() => onAddToCart(details)} disabled={!canBuy}>
             <LuShoppingBag aria-hidden="true" />
-            {isOutOfStock ? 'Sold out' : 'Add to cart'}
+            {canBuy ? 'Add to cart' : 'Unavailable'}
           </Button>
           <Button to={ROUTES.productDetails(details.id)} variant="outline">
             View full details

@@ -3,6 +3,7 @@ import AnnouncementBar from '../components/layout/AnnouncementBar'
 import Header from '../components/layout/Header'
 import Footer from '../components/layout/Footer'
 import ScrollToTop from '../components/common/ScrollToTop'
+import CartDrawer from '../components/cart/CartDrawer'
 import { ANNOUNCEMENTS, MAIN_NAV_LINKS } from '../constants/site'
 
 /**
@@ -22,6 +23,7 @@ function MainLayout() {
         <Outlet />
       </main>
       <Footer />
+      <CartDrawer />
     </>
   )
 }

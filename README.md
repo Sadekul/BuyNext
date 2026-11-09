@@ -42,8 +42,8 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 3 | External API integration | Done |
 | 4 | Product listing and catalog | Done |
 | 5 | Product details page | Done |
-| 6 | Shopping cart | Next |
-| 7 | Wishlist | Planned |
+| 6 | Shopping cart | Done |
+| 7 | Wishlist | Next |
 | 8 | Search, filtering, and sorting | Planned |
 | 9 | User registration and authentication | Planned |
 | 10 | Checkout and order management | Planned |

@@ -59,3 +59,13 @@
 - `Link` vs `NavLink` vs `useNavigate` (`navigate(-1)`, `location.key`)
 - React 19 `<title>` in components for per-page document titles
 - Real business rules from data (minimum order quantity vs stock); not inventing variants
+
+## Phase 6: Shopping cart
+
+- Lifting state, prop drilling, and when to switch to Context
+- Context API (`createContext`, React 19 `<Context value>`, `useContext` in a guarded custom hook)
+- `useReducer` with action types; a pure reducer that enforces all quantity rules
+- Immutable updates for nested arrays/objects (`map`, `filter`, spread)
+- Lazy state initialization, `localStorage` sync in an effect, validation of stored data, cross-tab `storage` events
+- `useMemo`/`useCallback` to keep a context value stable
+- Money in integer cents; explicit shipping and coupon rules; why the backend must re-validate

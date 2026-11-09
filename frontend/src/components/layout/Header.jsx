@@ -6,6 +6,7 @@ import SearchBar from '../common/SearchBar'
 import MainNavigation from './MainNavigation'
 import MobileNavigation from './MobileNavigation'
 import { ROUTES } from '../../constants/routes'
+import { useCart } from '../../hooks/useCart'
 import './Header.css'
 
 /**
@@ -13,11 +14,12 @@ import './Header.css'
  * Owns the `isMenuOpen` state because both the menu button (opens) and the
  * mobile drawer (closes) need it — the closest common parent holds the state.
  *
- * cartCount / wishlistCount are props for now; Phases 6–7 feed them from
- * shared cart and wishlist state.
+ * The cart count comes from shared cart state (useCart); wishlistCount
+ * is still a prop until the wishlist is built in Phase 7.
  */
-function Header({ navLinks, cartCount = 0, wishlistCount = 0 }) {
+function Header({ navLinks, wishlistCount = 0 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { totals, openCart } = useCart()
 
   return (
     <header className="site-header">
@@ -45,7 +47,16 @@ function Header({ navLinks, cartCount = 0, wishlistCount = 0 }) {
             <span className="site-header__action-label">Account</span>
           </Link>
           <HeaderCountLink to={ROUTES.wishlist} icon={LuHeart} label="Wishlist" count={wishlistCount} />
-          <HeaderCountLink to={ROUTES.cart} icon={LuShoppingBag} label="Cart" count={cartCount} />
+          <button
+            type="button"
+            className="site-header__icon-button"
+            onClick={openCart}
+            aria-haspopup="dialog"
+            aria-label={`Cart, ${totals.itemCount} items`}
+          >
+            <LuShoppingBag aria-hidden="true" />
+            <CountBadge count={totals.itemCount} />
+          </button>
         </nav>
       </div>
 
@@ -69,12 +80,18 @@ function HeaderCountLink({ to, icon: Icon, label, count }) {
   return (
     <Link to={to} className="site-header__icon-button" aria-label={`${label}, ${count} items`}>
       <Icon aria-hidden="true" />
-      {count > 0 && (
-        <span className="site-header__badge" aria-hidden="true">
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
+      <CountBadge count={count} />
     </Link>
+  )
+}
+
+/** Small numeric badge; hidden from screen readers (the parent's label has the count). */
+function CountBadge({ count }) {
+  if (count <= 0) return null
+  return (
+    <span className="site-header__badge" aria-hidden="true">
+      {count > 99 ? '99+' : count}
+    </span>
   )
 }
 

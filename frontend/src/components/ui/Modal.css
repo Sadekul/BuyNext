@@ -10,6 +10,14 @@
   backdrop-filter: blur(2px);
 }
 
+.modal--drawer-right {
+  width: min(26rem, 92vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0 0 0 auto;
+}
+
 .modal--center {
   width: min(40rem, calc(100% - 2rem));
   margin: auto;
@@ -69,12 +77,21 @@
   overflow-y: auto;
 }
 
+.modal__footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
 .modal[open] .modal__panel {
   animation: modal-fade-in var(--transition-base);
 }
 
 .modal--drawer[open] .modal__panel {
   animation: modal-slide-in var(--transition-base);
+}
+
+.modal--drawer-right[open] .modal__panel {
+  animation: modal-slide-in-right var(--transition-base);
 }
 
 @keyframes modal-fade-in {
@@ -87,5 +104,11 @@
 @keyframes modal-slide-in {
   from {
     transform: translateX(-100%);
+  }
+}
+
+@keyframes modal-slide-in-right {
+  from {
+    transform: translateX(100%);
   }
 }

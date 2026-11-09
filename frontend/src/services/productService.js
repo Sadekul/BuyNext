@@ -13,6 +13,7 @@ const PRODUCT_CARD_FIELDS = [
   'brand',
   'thumbnail',
   'availabilityStatus',
+  'minimumOrderQuantity', // needed to add the right quantity from a card
 ].join(',')
 
 /** DummyJSON returns every product when `limit` is 0. */

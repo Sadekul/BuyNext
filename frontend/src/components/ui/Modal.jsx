@@ -8,9 +8,10 @@ import './Modal.css'
  * focus trapping, Escape-to-close, and a backdrop for free.
  *
  * The parent owns the open/closed state (`isOpen`) and passes `onClose`.
- * Variants: "center" (classic dialog) or "drawer" (slides in from the left).
+ * Variants: "center" (classic dialog), "drawer" (slides in from the left),
+ * or "drawer-right" (slides in from the right, used by the cart).
  */
-function Modal({ isOpen, onClose, title, variant = 'center', children }) {
+function Modal({ isOpen, onClose, title, variant = 'center', footer, children }) {
   const dialogRef = useRef(null)
   const titleId = useId()
 
@@ -51,6 +52,7 @@ function Modal({ isOpen, onClose, title, variant = 'center', children }) {
           </button>
         </header>
         <div className="modal__body">{children}</div>
+        {footer && <footer className="modal__footer">{footer}</footer>}
       </div>
     </dialog>
   )

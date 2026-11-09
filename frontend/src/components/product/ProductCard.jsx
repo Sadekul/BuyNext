@@ -8,6 +8,7 @@ import { STORE_SETTINGS } from '../../constants/store'
 import { cn } from '../../utils/classNames'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
+import { getPurchaseLimits } from '../../utils/inventory'
 import './ProductCard.css'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
@@ -22,6 +23,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onToggleWishlist, 
   const { id, title, brand, category, thumbnail, rating, stock, availabilityStatus } = product
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
   const isOutOfStock = stock === 0
+  const { canBuy } = getPurchaseLimits(product)
   const productUrl = ROUTES.productDetails(id)
 
   return (
@@ -92,15 +94,15 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onToggleWishlist, 
 
         {onAddToCart && (
           <Button
-            variant={isOutOfStock ? 'outline' : 'primary'}
+            variant={canBuy ? 'primary' : 'outline'}
             size="sm"
             fullWidth={layout === 'grid'}
-            disabled={isOutOfStock}
+            disabled={!canBuy}
             onClick={() => onAddToCart(product)}
             className="product-card__action"
           >
             <LuShoppingBag aria-hidden="true" />
-            {isOutOfStock ? 'Sold out' : 'Add to cart'}
+            {isOutOfStock ? 'Sold out' : canBuy ? 'Add to cart' : 'Unavailable'}
           </Button>
         )}
       </div>
