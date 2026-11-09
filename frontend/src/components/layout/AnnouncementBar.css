@@ -17,7 +17,7 @@
   display: none;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .announcement-bar__item:not(:first-child) {
     display: block;
   }

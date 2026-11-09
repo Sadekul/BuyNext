@@ -11,7 +11,7 @@ import './SearchBar.css'
  *
  * `onSearch` is optional — the mobile menu uses it to close itself.
  */
-function SearchBar({ placeholder = 'Search products, brands and more…', onSearch }) {
+function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
   const inputId = useId()

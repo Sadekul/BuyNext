@@ -62,10 +62,14 @@
   color: var(--color-primary);
 }
 
+/* A square box sized independently of the column, so the blob can't overflow it. */
 .hero__visual {
   position: relative;
   display: grid;
   place-items: center;
+  width: min(100%, 26rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
 }
 
 .hero__blob {
@@ -79,7 +83,7 @@
 
 .hero__image {
   position: relative;
-  width: min(100%, 30rem);
+  width: 90%;
   height: auto;
   filter: drop-shadow(0 24px 32px rgb(15 23 42 / 0.25));
 }
@@ -88,5 +92,9 @@
   .hero__inner {
     grid-template-columns: 1.1fr 1fr;
     padding-block: var(--space-16);
+  }
+
+  .hero__visual {
+    width: min(100%, 32rem);
   }
 }
