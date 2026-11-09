@@ -1,11 +1,10 @@
 /*
- * SAMPLE DATA — real DummyJSON product records, snapshotted on 2026-11-09 from
+ * OFFLINE FIXTURE — real DummyJSON product records, snapshotted on 2026-11-09 from
  * https://dummyjson.com/products?select=id,title,category,price,discountPercentage,rating,stock,brand,thumbnail,availabilityStatus
  *
- * Field names and values are copied unchanged, so components built against
- * this data will keep working when Phase 3 swaps it for live API requests.
- * Note: some products (e.g. sports accessories) have no `brand` field in the
- * API; we leave it missing rather than inventing one.
+ * The app now loads live data from the API (Phase 3). This snapshot is kept
+ * for tests in Phase 13, which must not depend on a live, changing API.
+ * Some products (e.g. sports accessories) have no `brand`; we don't invent one.
  */
 
 export const sampleProducts = [
@@ -357,14 +356,3 @@ export const sampleProducts = [
   }
 ]
 
-/*
- * Editorial collections for the homepage. DummyJSON has no "featured",
- * "new arrival", or "best seller" flags, so these are hand-picked IDs —
- * NOT real sales or recency data. A real backend would supply these lists
- * (e.g. admin-managed featured products, sales reports).
- */
-export const homeCollectionIds = {
-  featured: [123, 78, 100, 173, 90, 7, 160, 14],
-  newArrivals: [133, 101, 186, 154, 79, 175, 88, 132],
-  bestSellers: [99, 80, 95, 152, 103, 11, 130, 194],
-}

@@ -9,6 +9,7 @@ import RatingStars from '../components/product/RatingStars'
 import RatingStarsClass from '../learning/RatingStarsClass'
 import QuantityCounter from '../learning/QuantityCounter'
 import QuantityCounterClass from '../learning/QuantityCounterClass'
+import ApiPlayground from '../learning/ApiPlayground'
 import './ComponentLabPage.css'
 
 /**
@@ -80,6 +81,11 @@ function ComponentLabPage() {
             <EmptyState titleAs="h4" title="Your cart is empty" message="Add products to see them here." />
           </LabCard>
         </div>
+      </section>
+
+      <section aria-labelledby="lab-api">
+        <h2 id="lab-api">API playground: HTTP methods with fetch vs Axios</h2>
+        <ApiPlayground />
       </section>
 
       <section aria-labelledby="lab-modal">

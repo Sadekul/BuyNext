@@ -46,7 +46,7 @@ function ProductCard({ product, onAddToCart }) {
         <h3 className="product-card__title">
           <Link to={productUrl}>{title}</Link>
         </h3>
-        <RatingStars rating={rating} />
+        {rating !== null && <RatingStars rating={rating} />}
 
         <p className="product-card__price">
           <span className="visually-hidden">{hasDiscount ? 'Sale price:' : 'Price:'}</span>

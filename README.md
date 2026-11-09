@@ -39,7 +39,8 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | --- | --- | --- |
 | 1 | Environment and project setup | Done |
 | 2 | Components and frontend template | Done |
-| 3 | External API integration | Next |
-| 4–14 | Catalog, details, cart, wishlist, search, auth, checkout, advanced React, backend, testing, deployment | Planned |
+| 3 | External API integration | Done |
+| 4 | Product listing and catalog | Next |
+| 5–14 | Details, cart, wishlist, search, auth, checkout, advanced React, backend, testing, deployment | Planned |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md).

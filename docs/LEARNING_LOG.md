@@ -24,3 +24,19 @@
 - `useEffect` with cleanup (`Toast` timer), `useRef` (`Modal`'s dialog), `useId` (unique form ids), `useCallback` (stable `onDismiss`)
 - React Router basics: `BrowserRouter`, nested `Route`s with `Outlet`, `Link` vs `NavLink`, `useNavigate`
 - How React updates the DOM: render → compare with the previous output → patch only what changed
+
+## Phase 3: External API integration
+
+- REST, JSON, HTTP methods (GET/POST/PUT/PATCH/DELETE) and status codes (200, 201, 400, 404, 429, 5xx)
+- `fetch()`: it resolves on 4xx/5xx, so we check `response.ok`; it rejects only on network failure or abort
+- Promises, `async`/`await`, `try`/`catch`, and response parsing with `response.json()`
+- Request headers (`Accept`, `Content-Type`), query parameters with `URLSearchParams`, and where auth headers will go
+- CORS: DummyJSON returns `Access-Control-Allow-Origin`, so the browser allows our requests
+- `AbortController` and `AbortSignal.timeout`/`AbortSignal.any`: cancel stale requests and enforce timeouts
+- A service layer + an adapter (normalization) layer, so components don't depend on one API's shape
+- Custom hooks (`useFetch`, `useProductList`): loading, error, empty, retry, and load-more states
+- `useEffect` cleanup to prevent stale responses from overwriting newer ones; StrictMode's double effect in development
+- `useEffectEvent`: read the latest values in an effect without making them dependencies
+- Event-driven fetching (playground buttons, "load more") vs effect-driven fetching (data a page needs to show)
+- Server-side search, category, sorting, and pagination; URL search params as state (`useSearchParams`)
+- Fetch vs Axios: Axios adds `baseURL`, automatic JSON, throwing on 4xx/5xx, timeouts, and interceptors

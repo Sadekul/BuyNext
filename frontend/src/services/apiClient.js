@@ -1,0 +1,104 @@
+/*
+ * apiClient — the ONLY place that talks to the network.
+ * Every service (products, categories, later auth/orders) goes through it,
+ * so base URL, headers, timeouts, and error handling are defined once.
+ */
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
+
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_BASE_URL is not set. Copy frontend/.env.example to frontend/.env.local.')
+}
+
+const DEFAULT_TIMEOUT_MS = 15_000
+
+const STATUS_MESSAGES = {
+  400: 'The request was invalid.',
+  401: 'Please sign in to continue.',
+  403: "You don't have permission to do that.",
+  404: "We couldn't find what you were looking for.",
+  429: 'Too many requests. Please wait a moment and try again.',
+}
+
+/** Error thrown for failed requests. `status` is 0 for network/timeout failures. */
+export class ApiError extends Error {
+  constructor(message, { status = 0, data = null } = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
+/** True when a request was cancelled on purpose (e.g. the component unmounted). */
+export function isAbortError(error) {
+  return error?.name === 'AbortError'
+}
+
+/** Builds `${base}${path}?a=1&b=2`, skipping empty parameters. */
+function buildUrl(path, params = {}) {
+  const url = new URL(`${API_BASE_URL}${path}`)
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  }
+  return url
+}
+
+async function request(path, { method = 'GET', params, body, headers, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  // Cancel when the caller aborts OR when the request takes too long.
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
+  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
+
+  let response
+  try {
+    response = await fetch(buildUrl(path, params), {
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: combinedSignal,
+    })
+  } catch (error) {
+    // fetch() only rejects when no HTTP response arrived at all.
+    if (error.name === 'TimeoutError') {
+      throw new ApiError('The server took too long to respond. Please try again.')
+    }
+    if (isAbortError(error)) throw error // cancelled on purpose: not a real failure
+    throw new ApiError('Network error. Check your internet connection and try again.')
+  }
+
+  const isJson = response.headers.get('content-type')?.includes('application/json')
+  let data = null
+  if (isJson) {
+    try {
+      data = await response.json()
+    } catch (error) {
+      if (isAbortError(error) || error.name === 'TimeoutError') throw error
+      throw new ApiError('The server sent a response we could not read.', { status: response.status })
+    }
+  }
+
+  // fetch() does NOT reject on 4xx/5xx — we must check response.ok ourselves.
+  if (!response.ok) {
+    const fallback = response.status >= 500 ? 'The server had a problem. Please try again later.' : 'Request failed.'
+    throw new ApiError(data?.message ?? STATUS_MESSAGES[response.status] ?? fallback, {
+      status: response.status,
+      data,
+    })
+  }
+
+  return data
+}
+
+export const apiClient = {
+  get: (path, options) => request(path, { ...options, method: 'GET' }),
+  post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
+  put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
+  patch: (path, body, options) => request(path, { ...options, method: 'PATCH', body }),
+  delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
+}

@@ -8,12 +8,14 @@ React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
 | --- | --- |
 | React 19 | UI library (functional components and hooks) |
 | Vite 8 | Dev server with hot module replacement, and production bundler |
-| React Router 8 | Client-side routing (`BrowserRouter`, nested routes) |
+| React Router 8 | Client-side routing (`BrowserRouter`, nested routes, URL search params) |
+| Fetch API | All app HTTP requests, through `services/apiClient.js` |
+| Axios | Learning comparison only (`src/learning/`, API playground at `/learn`) |
 | react-icons | Icon components (Lucide set for UI, Font Awesome 6 for brand logos) |
 | ESLint 10 | Code quality: core JS rules, Rules of Hooks, Fast Refresh safety |
 | CSS3 | Design tokens (CSS custom properties) and one stylesheet per component |
 
-Planned for later phases: Axios, TanStack Query, React Hook Form + Zod, Vitest + React Testing Library.
+Planned for later phases: TanStack Query, React Hook Form + Zod, Vitest + React Testing Library.
 
 ## Requirements
 
@@ -43,7 +45,7 @@ npm run dev                  # http://localhost:5173
 
 | Variable | Example | Used for |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `https://dummyjson.com` | Product API base URL (from Phase 3) |
+| `VITE_API_BASE_URL` | `https://dummyjson.com` | Product API base URL. Required: the app throws a clear error at startup if it's missing. |
 
 Only variables prefixed with `VITE_` reach browser code, and anything in them is public. Never store secrets there.
 
@@ -65,14 +67,14 @@ frontend/
 │   ├── pages/              # One component per route (HomePage, NotFoundPage…)
 │   ├── layouts/            # Shared page shells rendered around routes (MainLayout)
 │   ├── routes/             # Route table (AppRoutes)
-│   ├── hooks/              # Custom hooks (from Phase 3)
+│   ├── hooks/              # Custom hooks: useFetch, useProductList, useCategories, useToast
 │   ├── context/            # React Context providers: cart, wishlist, auth (Phases 6–9)
 │   ├── reducers/           # useReducer logic, e.g. the cart reducer (Phase 6)
-│   ├── services/           # API layer: all HTTP requests live here (Phase 3)
-│   ├── utils/              # Pure helpers: formatPrice, cn (class names)
+│   ├── services/           # API layer: apiClient, product/category services, adapters/
+│   ├── utils/              # Pure helpers: formatPrice, cn, product collections
 │   ├── constants/          # App-wide constants: routes, nav links, store settings
-│   ├── data/               # Clearly labeled sample data used until the API is connected
-│   ├── learning/           # Teaching examples (class vs functional components)
+│   ├── data/               # Homepage content config + an offline product fixture for tests
+│   ├── learning/           # Teaching examples: class components, Axios, HTTP methods playground
 │   ├── App.jsx             # Root component
 │   ├── main.jsx            # Entry point: mounts React into index.html
 │   └── index.css           # Imports the global stylesheets
@@ -90,7 +92,9 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | --- | --- | --- |
 | `/` | HomePage | Done |
 | `/learn` | Component lab (living style guide, class vs functional examples) | Done |
-| `/products`, `/categories/:slug`, `/deals` | Catalog | Placeholder until Phase 4 |
+| `/products` (`?q=`, `?sort=`) | ProductListingPage: all products or search results | Live API (filters in Phase 4) |
+| `/categories/:categorySlug` | ProductListingPage for one category | Live API |
+| `/deals` | ProductListingPage sorted by biggest discount | Live API |
 | `/products/:productId` | Product details | Placeholder until Phase 5 |
 | `/cart` | Cart | Placeholder until Phase 6 |
 | `/wishlist` | Wishlist | Placeholder until Phase 7 |
@@ -120,10 +124,35 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `Modal` | Accessible dialog built on native `<dialog>` (center or drawer) |
 | `Toast` | Auto-dismissing status message |
 
+## API layer
+
+```
+Component ──▶ custom hook (useFetch / useProductList) ──▶ service (productService)
+                                                              │
+                                     adapter (dummyJsonAdapter) ◀── apiClient (fetch) ──▶ DummyJSON
+```
+
+- **apiClient** builds URLs from `VITE_API_BASE_URL`, sets JSON headers, applies a 15-second timeout, turns HTTP and network failures into `ApiError` (message and status), and passes cancellations through.
+- **Services** know the endpoints. **Adapters** convert raw API responses into BuyNest's own shapes; to switch to Laravel, write a new adapter and keep the components.
+- **Hooks** track loading, error, retry, and cancellation (`AbortController`) for components.
+
+### Endpoints in use
+
+| Method | Endpoint | Used by |
+| --- | --- | --- |
+| GET | `/products?limit=&skip=&sortBy=&order=&select=` | Listing page, homepage (`limit=0` = all, card fields only) |
+| GET | `/products/search?q=` | Search results |
+| GET | `/products/category/:slug` | Category pages |
+| GET | `/products/categories` | Category nav and homepage tiles |
+| GET | `/products/:id` | `getProductById` (product details page in Phase 5) |
+| POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
+
+DummyJSON quirks we handle: unknown categories return `200` with an empty list (we check against the category list), unknown `sortBy` values are silently ignored (we only send whitelisted sort options), and there is a rate limit of about 100 requests per time window.
+
 ## Sample data vs real data
 
-`src/data/` holds a snapshot of real DummyJSON records. Field names and values are unchanged, so components already match the live API shape.
-The homepage "Featured", "New arrivals", and "Best sellers" lists are hand-picked product IDs, because DummyJSON has no such flags. They are not real sales or recency data.
+Product data is loaded live from DummyJSON. The homepage "Featured", "New arrivals", and "Best sellers" lists are hand-picked product IDs (`src/data/homeContent.js`), because DummyJSON has no such flags. They are not real sales or recency data.
+`src/data/sampleProducts.js` is an offline snapshot of real records, kept for tests that must not depend on the live API.
 The newsletter and add-to-cart actions are UI demos until the cart (Phase 6) and backend exist.
 
 ## Accessibility

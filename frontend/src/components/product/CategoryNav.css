@@ -1,0 +1,51 @@
+.category-nav {
+  position: relative; /* makes link offsetLeft relative to this scroll box */
+  margin-inline: calc(var(--container-gutter) * -1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.category-nav__list {
+  display: flex;
+  gap: var(--space-2);
+  width: max-content;
+  padding: var(--space-1) var(--container-gutter) var(--space-3);
+}
+
+.category-nav__link {
+  display: block;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.category-nav__link:hover {
+  border-color: var(--color-primary);
+}
+
+.category-nav__link--active {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Large screens: wrap onto several lines so every category is visible. */
+@media (min-width: 1024px) {
+  .category-nav {
+    margin-inline: 0;
+    overflow: visible;
+  }
+
+  .category-nav__list {
+    flex-wrap: wrap;
+    width: auto;
+    padding: 0;
+  }
+}

@@ -1,0 +1,129 @@
+.api-playground {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.api-playground__note {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-md);
+}
+
+.api-playground__clients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  padding: 0;
+  border: none;
+}
+
+.api-playground__clients legend {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.api-playground__clients label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.api-playground__clients input {
+  accent-color: var(--color-primary);
+}
+
+.api-playground__list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.api-playground__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.api-playground__item + .api-playground__item {
+  border-top: 1px solid var(--color-border);
+}
+
+.api-playground__method {
+  width: 4.5rem;
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: center;
+  border-radius: var(--radius-sm);
+}
+
+.api-playground__method--get {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.api-playground__method--post {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.api-playground__method--put,
+.api-playground__method--patch {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.api-playground__method--delete {
+  color: var(--color-sale);
+  background: var(--color-sale-soft);
+}
+
+.api-playground__details {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  font-size: var(--text-sm);
+}
+
+.api-playground__details span {
+  color: var(--color-text-muted);
+}
+
+.api-playground__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.api-playground__status .is-success {
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.api-playground__status .is-error {
+  font-weight: 700;
+  color: var(--color-sale);
+}
+
+.api-playground__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.api-playground pre {
+  max-height: 20rem;
+  padding: var(--space-4);
+  overflow: auto;
+  font-size: var(--text-xs);
+  color: #e2e8f0;
+  background: var(--color-secondary);
+  border-radius: var(--radius-md);
+}
