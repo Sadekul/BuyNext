@@ -83,4 +83,35 @@ export function CheckboxField({ label, error, className, ...inputProps }) {
   )
 }
 
+/** Labelled <select> with the same label/error wiring. `options` = string[]. */
+export function SelectField({ label, error, options, className, ...selectProps }) {
+  const id = useId()
+  const errorId = `${id}-error`
+  return (
+    <div className={cn('form-field', error && 'form-field--invalid', className)}>
+      <label htmlFor={id} className="form-field__label">
+        {label}
+      </label>
+      <select
+        id={id}
+        className="form-field__input form-field__select"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...selectProps}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p id={errorId} className="form-field__error">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default FormField

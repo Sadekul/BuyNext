@@ -97,3 +97,12 @@
 - Allow-listing user fields to keep sensitive data out of state and storage
 - Cross-tab sign-out with the `storage` event (and the remove-then-set bug it exposed)
 - Production plan: Laravel Sanctum with HttpOnly, Secure, SameSite cookies + CSRF
+
+## Phase 10: Checkout and order management
+
+- React Hook Form (`register`, `handleSubmit`, `useWatch`, `setError('root.…')`, `isSubmitting`, focus on error)
+- Zod schemas: formats, enums, nested objects, conditional rules with `superRefine`; `zodResolver`
+- Controlled vs uncontrolled inputs; validation timing (on submit, then on change) and why on-blur errors can swallow clicks
+- Nested forms are invalid HTML; the `form` attribute on a submit button
+- Server-side verification of prices, stock, discounts, shipping, taxes, and totals; never handling card data
+- Order history scoped to the signed-in customer (and IDOR on the server)

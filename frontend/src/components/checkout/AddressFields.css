@@ -1,0 +1,14 @@
+.address-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 560px) {
+  .address-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .address-fields__wide {
+    grid-column: 1 / -1;
+  }
+}

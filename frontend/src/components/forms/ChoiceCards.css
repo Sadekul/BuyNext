@@ -1,0 +1,73 @@
+.choice-cards {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.choice-cards__legend {
+  margin-bottom: var(--space-3);
+  font-weight: 700;
+}
+
+.choice-cards__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.choice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  cursor: pointer;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.choice-card:hover {
+  border-color: var(--color-primary);
+}
+
+.choice-card input {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+}
+
+.choice-card--selected {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.choice-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.choice-card__label {
+  font-weight: 600;
+}
+
+.choice-card__description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.choice-card__aside {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.choice-cards--invalid .choice-card {
+  border-color: var(--color-sale);
+}

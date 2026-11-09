@@ -15,7 +15,9 @@ React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
 | ESLint 10 | Code quality: core JS rules, Rules of Hooks, Fast Refresh safety |
 | CSS3 | Design tokens (CSS custom properties) and one stylesheet per component |
 
-Planned for later phases: TanStack Query, React Hook Form + Zod, Vitest + React Testing Library.
+| React Hook Form + Zod | Checkout form state and schema validation (`@hookform/resolvers` connects them) |
+
+Planned for later phases: TanStack Query, Vitest + React Testing Library.
 
 ## Requirements
 
@@ -97,12 +99,13 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `/deals` | ProductListingPage sorted by biggest discount | Live API |
 | `/products/:productId` | ProductDetailsPage: gallery, pricing, stock, quantity, specs, reviews, related | Live API |
 | `/cart` | CartPage: lines, quantities, coupon, shipping estimate, price/stock re-check | Done (localStorage) |
-| `/checkout` | Checkout | Placeholder until Phase 10 |
 | `/wishlist` | WishlistPage: saved items, move to cart, remove, availability re-check | Done (localStorage) |
 | `/login`, `/register` | Sign in (demo account emilys / emilyspass), registration (simulated) | Guest-only |
 | `/forgot-password` | Password reset request (simulated, no email sent) | Public |
 | `/account` | Profile from `GET /auth/me` | Protected |
-| `/account/orders` | Order history | Protected; placeholder until Phase 10 |
+| `/checkout` | Checkout: contact, addresses, delivery, payment choice, summary, coupon (simulated order) | Protected |
+| `/order-confirmation/:orderId` | Thank-you page with order summary and status | Protected |
+| `/account/orders`, `/account/orders/:orderId` | Order history and details (this customer's demo orders) | Protected |
 | `*` | NotFoundPage | Done |
 
 ## Components
@@ -169,6 +172,7 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 | GET | `/auth/me` (Bearer token) | Session check and profile |
 | POST | `/auth/refresh` | New tokens after a 401 |
 | POST | `/users/add` | Registration (simulated; nothing is saved) |
+| POST | `/carts/add` | Server price check before recording a (simulated) order |
 | GET | `/products/:id` | Quick view and the product details page |
 | GET | `/products/category/:slug?limit=5` | Related products |
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
@@ -182,6 +186,7 @@ DummyJSON quirks we handle: unknown categories return `200` with an empty list (
 | Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
 | Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
 | Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
+| Demo orders | `OrdersProvider`, key `buynest.orders.v1`, filtered by customer | DummyJSON has no orders API |
 | Signed-in customer | `AuthProvider`, key `buynest.session.v1` in localStorage ("keep me signed in") or sessionStorage | Demo token auth; production will use Sanctum HttpOnly cookies |
 | URL state (search, filters, sort, page, view) | `useSearchParams` + `utils/catalogParams.js` | Back/forward, refresh, and shared links restore the same results |
 | Local UI state (menu, drawers, gallery image) | `useState` in the component | Only one component cares |

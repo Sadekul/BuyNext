@@ -21,22 +21,18 @@ const EMPTY_FORM = {
 
 function RegisterPage() {
   const [values, setValues] = useState(EMPTY_FORM)
-  const [touched, setTouched] = useState({})
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverError, setServerError] = useState(null)
   const [createdUser, setCreatedUser] = useState(null)
 
+  // Shown after the first submit attempt, then live (see LoginPage).
   const errors = validateRegistration(values)
-  const visibleError = (field) => (touched[field] || hasSubmitted ? errors[field] : undefined)
+  const visibleError = (field) => (hasSubmitted ? errors[field] : undefined)
 
   function handleChange(event) {
     const { name, value, type, checked } = event.target
     setValues((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
-  }
-
-  function handleBlur(event) {
-    setTouched((current) => ({ ...current, [event.target.name]: true }))
   }
 
   async function handleSubmit(event) {
@@ -82,7 +78,6 @@ function RegisterPage() {
     name,
     value: values[name],
     onChange: handleChange,
-    onBlur: handleBlur,
     error: visibleError(name),
   })
 
@@ -129,7 +124,6 @@ function RegisterPage() {
             name="acceptTerms"
             checked={values.acceptTerms}
             onChange={handleChange}
-            onBlur={handleBlur}
             error={visibleError('acceptTerms')}
           />
           <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>

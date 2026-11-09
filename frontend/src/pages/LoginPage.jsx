@@ -19,23 +19,19 @@ function LoginPage() {
   const redirectTo = location.state?.from?.pathname ?? ROUTES.account
 
   const [values, setValues] = useState({ username: '', password: '', remember: true })
-  const [touched, setTouched] = useState({})
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverError, setServerError] = useState(null)
 
-  // Errors are derived from the values; we only *show* them once the field
-  // was left (touched) or the form was submitted.
+  // Errors are derived from the values. They're shown after the first submit
+  // attempt and then update live as the customer types. (Showing them on
+  // blur shifted the layout mid-click, so clicks on the button were lost.)
   const errors = validateLogin(values)
-  const visibleError = (field) => (touched[field] || hasSubmitted ? errors[field] : undefined)
+  const visibleError = (field) => (hasSubmitted ? errors[field] : undefined)
 
   function handleChange(event) {
     const { name, value, type, checked } = event.target
     setValues((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
-  }
-
-  function handleBlur(event) {
-    setTouched((current) => ({ ...current, [event.target.name]: true }))
   }
 
   async function handleSubmit(event) {
@@ -94,7 +90,6 @@ function LoginPage() {
             name="username"
             value={values.username}
             onChange={handleChange}
-            onBlur={handleBlur}
             error={visibleError('username')}
             autoComplete="username"
             autoCapitalize="none"
@@ -107,7 +102,6 @@ function LoginPage() {
             revealable
             value={values.password}
             onChange={handleChange}
-            onBlur={handleBlur}
             error={visibleError('password')}
             autoComplete="current-password"
           />

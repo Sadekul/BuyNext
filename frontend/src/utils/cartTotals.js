@@ -1,4 +1,4 @@
-import { COUPONS, SHIPPING_RULES } from '../constants/store'
+import { COUPONS, SHIPPING_METHODS, SHIPPING_RULES } from '../constants/store'
 import { getProductPricing } from './pricing'
 
 /*
@@ -27,8 +27,10 @@ export function evaluateCoupon(code, subtotalCents) {
 /**
  * Totals for the purchasable lines of a cart.
  * Unavailable lines (`isUnavailable`) are listed but never charged.
+ * `shippingMethodId`: 'standard' follows the free-shipping threshold;
+ * other methods have a flat price (constants/store.js).
  */
-export function calculateCartTotals(items, couponCode = null) {
+export function calculateCartTotals(items, couponCode = null, shippingMethodId = 'standard') {
   const lines = items.filter((item) => !item.isUnavailable)
   const unavailableCount = items.length - lines.length
 
@@ -46,7 +48,12 @@ export function calculateCartTotals(items, couponCode = null) {
   const afterDiscountCents = subtotalCents - discountCents
   const thresholdCents = toCents(SHIPPING_RULES.freeShippingThreshold)
   const qualifiesForFreeShipping = afterDiscountCents >= thresholdCents
-  const shippingCents = itemCount === 0 || qualifiesForFreeShipping ? 0 : toCents(SHIPPING_RULES.standardShippingCost)
+  const method = SHIPPING_METHODS.find((option) => option.id === shippingMethodId) ?? SHIPPING_METHODS[0]
+  let shippingCents = 0
+  if (itemCount > 0) {
+    if (method.price !== null) shippingCents = toCents(method.price)
+    else if (!qualifiesForFreeShipping) shippingCents = toCents(SHIPPING_RULES.standardShippingCost)
+  }
 
   return {
     itemCount, // purchasable units (used for the subtotal)
@@ -58,6 +65,7 @@ export function calculateCartTotals(items, couponCode = null) {
     coupon,
     couponError,
     discount: toDollars(discountCents),
+    shippingMethod: method,
     shipping: toDollars(shippingCents),
     amountToFreeShipping: toDollars(Math.max(0, thresholdCents - afterDiscountCents)),
     total: toDollars(afterDiscountCents + shippingCents),
