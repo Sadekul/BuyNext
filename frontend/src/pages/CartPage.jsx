@@ -49,7 +49,10 @@ function CartPage() {
       </header>
 
       <div className="cart-page__layout">
-        <section aria-label="Cart items">
+        <section aria-labelledby="cart-items-title">
+          <h2 id="cart-items-title" className="visually-hidden">
+            Items in your cart
+          </h2>
           <ul className="cart-page__list">
             {cart.items.map((item) => (
               <li key={item.productId}>

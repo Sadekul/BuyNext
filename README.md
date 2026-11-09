@@ -8,10 +8,10 @@ BuyNest is a modern e-commerce web application, built step by step as a professi
 
 ```
 buynest/
-├── frontend/   # React + Vite storefront (active development)
+├── frontend/   # React + Vite storefront (phases 1–14 complete)
 ├── backend/    # Future Laravel REST API (not started)
 ├── admin/      # Future React admin dashboard (not started)
-└── docs/       # Learning log and project notes
+└── docs/       # Phase lessons, learning log, backend contract, deployment guide
 ```
 
 ## How the pieces will connect
@@ -31,7 +31,15 @@ the adapter for the proposed contract already exists. See [docs/backend/](docs/b
 
 ## Getting started
 
-See [frontend/README.md](frontend/README.md) for installation, commands, and architecture.
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev        # http://localhost:5173
+npm test           # 94 tests, offline
+```
+
+Demo sign-in: **emilys / emilyspass**. Details: [frontend/README.md](frontend/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Progress
 
@@ -50,6 +58,6 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 11 | Advanced React | Done |
 | 12 | Admin backend integration (frontend side) | Done |
 | 13 | Testing and debugging | Done |
-| 14 | Deployment | Next |
+| 14 | Deployment | Done (push and hosting pending your approval) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

@@ -1,0 +1,3 @@
+# Netlify SPA fallback: serve index.html for every route so React Router can
+# handle deep links like /products/123 on refresh. (Real files are served first.)
+/*    /index.html   200

@@ -136,3 +136,12 @@
 - Loading, error, empty, validation, and protected-route tests; basic accessibility assertions
 - Proving tests catch bugs by breaking code on purpose
 - Debugging: console, breakpoints, Network tab, React DevTools, Profiler, storage, `screen.debug()`
+
+## Phase 14: Deployment
+
+- Production build vs dev server; `npm run preview`
+- Build-time environment variables and dead-code elimination (learning lab excluded)
+- SPA fallback routing (Vercel rewrites, Netlify `_redirects`, Nginx `try_files`)
+- Asset hashing and caching headers; basic security headers
+- Automated accessibility audit with axe-core (label-in-name, heading order)
+- Release checklist

@@ -7,6 +7,7 @@ import GuestOnlyRoute from './GuestOnlyRoute'
 import HomePage from '../pages/HomePage'
 import ProductListingPage from '../pages/ProductListingPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
+import { SHOW_LEARNING_LAB } from '../constants/site'
 
 // …everything else is CODE-SPLIT: React.lazy downloads a page's JavaScript
 // only when someone visits it (the checkout's form libraries, the account
@@ -23,7 +24,13 @@ const OrdersPage = lazy(() => import('../pages/OrdersPage'))
 const OrderDetailsPage = lazy(() => import('../pages/OrderDetailsPage'))
 const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
-const ComponentLabPage = lazy(() => import('../pages/ComponentLabPage'))
+// The learning lab (and Axios) is left out of production builds entirely:
+// with the condition written inline, Vite replaces it with `false` and the
+// bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
+const ComponentLabPage =
+  import.meta.env.DEV || import.meta.env.VITE_SHOW_LEARNING_LAB === 'true'
+    ? lazy(() => import('../pages/ComponentLabPage'))
+    : null
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 /**
@@ -57,7 +64,7 @@ function AppRoutes() {
             <Route path="orders/:orderId" element={<OrderDetailsPage />} />
           </Route>
         </Route>
-        <Route path="learn" element={<ComponentLabPage />} />
+        {SHOW_LEARNING_LAB && <Route path="learn" element={<ComponentLabPage />} />}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

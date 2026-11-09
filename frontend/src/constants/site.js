@@ -1,5 +1,9 @@
 import { ROUTES } from './routes'
 
+// The /learn component lab is a teaching tool: on in development, off in
+// production builds unless VITE_SHOW_LEARNING_LAB=true.
+export const SHOW_LEARNING_LAB = import.meta.env.DEV || import.meta.env.VITE_SHOW_LEARNING_LAB === 'true'
+
 export const SITE = {
   name: 'BuyNest',
   tagline: 'Your Modern Shopping Destination',
@@ -44,10 +48,7 @@ export const FOOTER_LINK_GROUPS = [
       { label: 'Cart', to: ROUTES.cart },
     ],
   },
-  {
-    title: 'Learning',
-    links: [{ label: 'Component lab', to: ROUTES.componentLab }],
-  },
+  ...(SHOW_LEARNING_LAB ? [{ title: 'Learning', links: [{ label: 'Component lab', to: ROUTES.componentLab }] }] : []),
 ]
 
 // Replace with BuyNest's real profile URLs once they exist.

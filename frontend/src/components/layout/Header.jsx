@@ -45,19 +45,15 @@ function Header({ navLinks }) {
         </div>
 
         <nav className="site-header__actions" aria-label="Account and shopping">
-          <Link
-            to={isAuthenticated ? ROUTES.account : ROUTES.login}
-            className="site-header__icon-button site-header__account"
-            aria-label={isAuthenticated ? `My account (signed in as ${user.firstName})` : 'Sign in'}
-          >
+          {/* The visible label is the start of the accessible name (WCAG 2.5.3). */}
+          <Link to={isAuthenticated ? ROUTES.account : ROUTES.login} className="site-header__icon-button site-header__account">
             {isAuthenticated && user.image ? (
               <img className="site-header__avatar" src={user.image} alt="" width="28" height="28" />
             ) : (
               <LuUser aria-hidden="true" />
             )}
-            <span className="site-header__action-label" aria-hidden="true">
-              {isAuthenticated ? `Hi, ${user.firstName}` : 'Sign in'}
-            </span>
+            <span className="site-header__action-label">{isAuthenticated ? `Hi, ${user.firstName}` : 'Sign in'}</span>
+            {isAuthenticated && <span className="visually-hidden">, my account</span>}
           </Link>
           <HeaderCountLink to={ROUTES.wishlist} icon={LuHeart} label="Wishlist" count={wishlistCount} />
           <button

@@ -7,7 +7,9 @@ import './Logo.css'
 /** Brand mark + wordmark linking to the homepage. `tone="light"` for dark backgrounds. */
 function Logo({ tone = 'dark', showTagline = false }) {
   return (
-    <Link to={ROUTES.home} className={cn('logo', `logo--${tone}`)} aria-label={`${SITE.name} home`}>
+    // No aria-label: the visible wordmark (and tagline) is the link's accessible name,
+    // so voice-control users can activate it by saying what they see.
+    <Link to={ROUTES.home} className={cn('logo', `logo--${tone}`)}>
       <svg className="logo__mark" viewBox="0 0 32 32" aria-hidden="true">
         <rect width="32" height="32" rx="8" />
         <path d="M8 13.5 16 7l8 6.5V24a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z" />

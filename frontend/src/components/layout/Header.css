@@ -49,8 +49,14 @@
   background: var(--color-bg-muted);
 }
 
+/* Hidden visually on small screens but still read as the link's name. */
 .site-header__action-label {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
   font-size: var(--text-sm);
   font-weight: 600;
 }
@@ -102,7 +108,11 @@
   }
 
   .site-header__action-label {
-    display: inline;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
   }
 }
 

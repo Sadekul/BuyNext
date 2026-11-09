@@ -1,222 +1,160 @@
 # BuyNest — Frontend
 
-React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
+> Your Modern Shopping Destination
 
-## Tech stack (current)
+A responsive React storefront: catalog with search and filters, product pages, cart, wishlist, sign-in, checkout, and order history. It runs against the public **DummyJSON** test API today and is ready to switch to the future **BuyNest Laravel API**.
+
+## What's real and what's simulated
+
+| Real (live API data) | Simulated (clearly labelled in the UI) |
+| --- | --- |
+| Products, categories, search, product details, reviews | Orders and payments: nothing is charged or shipped |
+| Sign-in with DummyJSON demo accounts (`emilys` / `emilyspass`), token refresh | Registration (DummyJSON doesn't save new users) |
+| Server price check before an order (`POST /carts/add`) | Password reset email (no API exists) |
+| | Profile name edit (not saved by DummyJSON) |
+
+Cart, wishlist, and demo orders live in the browser (`localStorage`). The backend must re-validate prices, stock, discounts, shipping, taxes, and totals before taking real orders.
+
+## Tech stack
 
 | Tool | Purpose |
 | --- | --- |
-| React 19 | UI library (functional components and hooks) |
-| Vite 8 | Dev server with hot module replacement, and production bundler |
-| React Router 8 | Client-side routing (`BrowserRouter`, nested routes, URL search params) |
-| Fetch API | All app HTTP requests, through `services/apiClient.js` |
-| TanStack Query 5 | Server-state cache: products, categories, profile (queries) and writes (mutations) |
-| Axios | Learning comparison only (`src/learning/`, API playground at `/learn`) |
-| react-icons | Icon components (Lucide set for UI, Font Awesome 6 for brand logos) |
-| ESLint 10 | Code quality: core JS rules, Rules of Hooks, Fast Refresh safety |
-| CSS3 | Design tokens (CSS custom properties) and one stylesheet per component |
-
-| React Hook Form + Zod | Checkout form state and schema validation (`@hookform/resolvers` connects them) |
-
-| Vitest + React Testing Library | Unit, component, and integration tests (jsdom, mocked `fetch`) |
+| React 19 | UI (functional components, hooks) |
+| Vite 8 | Dev server with HMR and production bundler |
+| React Router 8 | Client-side routing, nested and protected routes, URL search params |
+| TanStack Query 5 | Server-state cache: queries, mutations, retries, background refetching |
+| React Hook Form + Zod | Checkout form state and schema validation |
+| Fetch API | All HTTP requests through `src/services/apiClient.js` |
+| react-icons | Icons (Lucide set; Font Awesome 6 for brand logos) |
+| CSS3 | Design tokens (custom properties) and one stylesheet per component |
+| ESLint 10 | Core JS rules, Rules of Hooks, Fast Refresh safety |
+| Vitest + React Testing Library | Unit, component, and integration tests |
+| Axios | Development-only learning comparison (`/learn`); not in production builds |
 
 ## Requirements
-
-- Node.js 20.19+ or 22.12+ (developed on Node 24)
+- Node.js 20.19+ or 22.12+ (`.nvmrc`: 24)
 - npm 10+
 
-## Installation
-
+## Getting started
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local   # then adjust values if needed
-npm run dev                  # http://localhost:5173
+cp .env.example .env.local
+npm run dev            # http://localhost:5173
 ```
 
 ## Scripts
-
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the dev server with hot module replacement |
-| `npm run build` | Create an optimized production build in `dist/` |
-| `npm run preview` | Serve the production build locally |
-| `npm run lint` | Check all JS/JSX files with ESLint |
-| `npm run lint:fix` | Auto-fix the lint problems that can be fixed safely |
-| `npm test` | Run all tests once (offline, ~10 s) |
-| `npm run test:watch` | Re-run tests on every save |
+| `npm run dev` | Dev server with hot module replacement |
+| `npm run build` | Production build in `dist/` |
+| `npm run preview` | Serve the production build locally (http://localhost:4173) |
+| `npm run lint` / `lint:fix` | ESLint check / auto-fix |
+| `npm test` | Run all tests once (offline) |
+| `npm run test:watch` | Re-run tests on save |
 
 ## Environment variables
-
-| Variable | Example | Used for |
+| Variable | Default / example | Purpose |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `https://dummyjson.com` | API base URL. Required: the app throws a clear error at startup if it's missing. |
-| `VITE_API_PROVIDER` | `dummyjson` | Backend adapter: `dummyjson` (default) or `laravel` (see `docs/backend/API_CONTRACT.md`) |
+| `VITE_API_BASE_URL` | `https://dummyjson.com` | API base URL. **Required**: the app stops with a clear error if it's missing |
+| `VITE_API_PROVIDER` | `dummyjson` | Backend adapter: `dummyjson` or `laravel` |
+| `VITE_SHOW_LEARNING_LAB` | `false` | Include the `/learn` component lab in production builds (always on in dev) |
 
-Only variables prefixed with `VITE_` reach browser code, and anything in them is public. Never store secrets there.
+Only `VITE_` variables reach the browser, and everything in them is **public**. Never put secrets, admin tokens, or private API keys here.
 
 ## Folder structure
-
 ```
 frontend/
-├── public/                 # Copied as-is to the build (favicon, static images)
+├── public/                 # Copied as-is: favicon, _redirects/_headers (Netlify)
 ├── src/
-│   ├── assets/styles/      # Global CSS: tokens.css, base.css (reset), utilities.css
+│   ├── assets/styles/      # tokens.css, base.css (reset), utilities.css
 │   ├── components/
-│   │   ├── common/         # Small shared pieces: Logo, SearchBar, SectionHeading, ScrollToTop
-│   │   ├── layout/         # Page chrome: AnnouncementBar, Header, navigation, Footer
-│   │   ├── home/           # Homepage sections: HeroBanner, PromoBanner, ProductSection…
-│   │   ├── product/        # ProductCard, ProductGrid, ProductBadge, RatingStars, CategoryCard
+│   │   ├── common/         # Logo, SearchBar, Breadcrumb, Pagination, ErrorBoundary, ScrollToTop…
+│   │   ├── layout/         # AnnouncementBar, Header, Main/MobileNavigation, Footer, OfflineBanner
+│   │   ├── home/           # HeroBanner, FeaturedCategories, ProductSection, PromoBanner, BenefitsSection
+│   │   ├── product/        # ProductCard/Grid, filters, gallery, quick view, reviews, wishlist button…
 │   │   ├── cart/           # CartDrawer, CartLineItem, CartSummary, CouponForm, FreeShippingProgress
-│   │   ├── forms/          # Forms: Newsletter (auth and checkout forms later)
-│   │   └── ui/             # Generic building blocks: Button, Modal, Loader, Toast…
-│   ├── pages/              # One component per route (HomePage, NotFoundPage…)
-│   ├── layouts/            # Shared page shells rendered around routes (MainLayout)
-│   ├── routes/             # Route table (AppRoutes)
-│   ├── hooks/              # Custom hooks: useCart, useWishlist, useAuth, useOrders, useDebouncedValue, useOnlineStatus…
-│   ├── context/            # Context objects + providers (CartProvider; wishlist and auth next)
-│   ├── reducers/           # Pure reducers (cartReducer)
-│   ├── services/           # API layer: apiClient, services, providers/ (endpoints per backend), adapters/
-│   ├── queries/            # TanStack Query keys + queryOptions (products, categories, profile)
-│   ├── schemas/            # Zod validation schemas (checkout)
-│   ├── lib/                # Library setup (queryClient)
-│   ├── utils/              # Pure helpers: pricing, catalog filter/sort/paginate, formatters, cn
-│   ├── constants/          # App-wide constants: routes, nav links, store settings
-│   ├── data/               # Homepage content config + an offline product fixture for tests
-│   ├── learning/           # Teaching examples: class components, Axios, HTTP methods playground
-│   ├── App.jsx             # Root component
-│   ├── main.jsx            # Entry point: mounts React into index.html
-│   └── index.css           # Imports the global stylesheets
-├── .env.example            # Documented environment variables
-├── eslint.config.js        # ESLint flat config
-├── index.html              # HTML shell; Vite injects the bundled JS
-└── vite.config.js          # Vite configuration
+│   │   ├── checkout/       # AddressFields
+│   │   ├── orders/         # OrderItems, OrderTotals, OrderStatus, OrderDetailsView
+│   │   ├── forms/          # FormField/SelectField/CheckboxField, ChoiceCards, Newsletter, EditNameForm
+│   │   └── ui/             # Button, Modal, Loader, ErrorMessage, EmptyState, Toast
+│   ├── pages/              # One component per route
+│   ├── layouts/            # MainLayout (header/footer/boundary/suspense), AccountLayout
+│   ├── routes/             # AppRoutes (lazy routes), ProtectedRoute, GuestOnlyRoute
+│   ├── context/            # Auth, Cart, Wishlist, Orders providers + context objects
+│   ├── reducers/           # cartReducer, wishlistReducer, ordersReducer (pure)
+│   ├── hooks/              # useCart, useWishlist, useAuth, useOrders, usePersistentReducer, useDebouncedValue…
+│   ├── services/           # apiClient, product/category/auth/order services
+│   │   ├── providers/      # Endpoints per backend (dummyjson, laravel)
+│   │   └── adapters/       # API responses → BuyNest shapes
+│   ├── queries/            # TanStack Query keys + queryOptions
+│   ├── schemas/            # Zod schemas (checkout)
+│   ├── lib/                # QueryClient setup
+│   ├── utils/              # Pricing, cart totals, catalog filters, URL params, validation, formatters…
+│   ├── constants/          # Routes, store rules (shipping, coupons), site settings
+│   ├── data/               # Homepage content config; offline product snapshot for tests
+│   ├── learning/           # Teaching examples (class components, Axios, HTTP playground)
+│   ├── test/               # Test setup, renderWithProviders, mockFetch, fixtures
+│   ├── App.jsx             # Providers + routes
+│   └── main.jsx            # Entry point (BrowserRouter)
+├── vercel.json             # Vercel: SPA rewrites + headers
+├── eslint.config.js
+└── vite.config.js          # Vite + Vitest config
 ```
-
-Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins.
 
 ## Routes
-
-| Path | Page | Status |
+| Path | Page | Access |
 | --- | --- | --- |
-| `/` | HomePage | Done |
-| `/learn` | Component lab (living style guide, class vs functional examples) | Done |
-| `/products` (`?q=`, `?sort=`) | ProductListingPage: all products or search results, with filters, pagination, grid/list, quick view | Live API |
-| `/categories/:categorySlug` | ProductListingPage for one category | Live API |
-| `/deals` | ProductListingPage sorted by biggest discount | Live API |
-| `/products/:productId` | ProductDetailsPage: gallery, pricing, stock, quantity, specs, reviews, related | Live API |
-| `/cart` | CartPage: lines, quantities, coupon, shipping estimate, price/stock re-check | Done (localStorage) |
-| `/wishlist` | WishlistPage: saved items, move to cart, remove, availability re-check | Done (localStorage) |
-| `/login`, `/register` | Sign in (demo account emilys / emilyspass), registration (simulated) | Guest-only |
-| `/forgot-password` | Password reset request (simulated, no email sent) | Public |
-| `/account` | Profile from `GET /auth/me` | Protected |
-| `/checkout` | Checkout: contact, addresses, delivery, payment choice, summary, coupon (simulated order) | Protected |
-| `/order-confirmation/:orderId` | Thank-you page with order summary and status | Protected |
-| `/account/orders`, `/account/orders/:orderId` | Order history and details (this customer's demo orders) | Protected |
-| `*` | NotFoundPage | Done |
+| `/` | Homepage | Public |
+| `/products?q=&sort=&brand=&minPrice=&maxPrice=&rating=&available=&page=&view=` | Catalog (all products or search) | Public |
+| `/categories/:slug`, `/deals` | Category, biggest discounts | Public |
+| `/products/:id` | Product details | Public |
+| `/cart`, `/wishlist` | Cart, wishlist | Public |
+| `/login`, `/register` | Sign in, registration (simulated) | Guests only |
+| `/forgot-password` | Password reset request (simulated) | Public |
+| `/account`, `/account/orders`, `/account/orders/:id` | Profile, order history, order details | Signed in |
+| `/checkout`, `/order-confirmation/:id` | Checkout (simulated order), confirmation | Signed in |
+| `/learn` | Component lab (development only) | — |
 
-## Components
-
-| Component | Responsibility |
-| --- | --- |
-| `AnnouncementBar` | Promo messages above the header (one on mobile, all on desktop) |
-| `Header` | Logo, search, account/wishlist/cart links, owns mobile-menu state |
-| `Logo` | Brand mark linking home; `tone="light"` for dark backgrounds |
-| `SearchBar` | Search with debounced live suggestions (ARIA combobox); navigates to `/products?q=…` |
-| `MainNavigation` | Desktop nav with active-link highlighting (`NavLink`) |
-| `MobileNavigation` | Drawer menu built from `Modal` + `SearchBar` |
-| `HeroBanner` | Hero headline, CTAs, and product image |
-| `CategoryCard` | Category tile linking to its category page |
-| `ProductCard` | Grid or list layout: image, brand, category, title, rating, prices, availability, badges, add-to-cart, wishlist, quick view |
-| `ProductGrid` | Responsive grid/list of `ProductCard`s with an empty state |
-| `CatalogFilters` | Controlled price, rating, brand, and availability filters (sidebar and mobile drawer) |
-| `ActiveFilters` | Removable chips for each active filter, plus Clear all |
-| `SortSelect` / `ViewToggle` | Sort dropdown; grid/list toggle |
-| `Pagination` | Accessible page numbers with gaps |
-| `QuickViewModal` | Product summary in a modal, fetched by ID |
-| `ProductGallery` | Main image with thumbnail buttons |
-| `QuantitySelector` | Stepper limited to [min, max] |
-| `ProductReviews` | Review cards (name, date, rating, comment) |
-| `Breadcrumb` | Accessible breadcrumb trail |
-| `CategoryNav` | Category links from the API |
-| `ProductGridSkeleton` | Loading placeholders matching the grid |
-| `ProductBadge` | Sale, stock, and info pills |
-| `RatingStars` | 0–5 rating rendered as half-step stars, accessible label |
-| `Newsletter` | Validated email sign-up (demo only, nothing is sent) |
-| `Footer` | Link groups, contact details, social links, copyright |
-| `Button` | Shared button/link styles: variants and sizes |
-| `Loader` / `ErrorMessage` / `EmptyState` | Loading, error (with retry), and empty states |
-| `Modal` | Accessible dialog built on native `<dialog>` (center or drawer) |
-| `Toast` | Auto-dismissing status message |
-| `ErrorBoundary` | Class component that catches render errors per page |
-| `OfflineBanner` | Shows when the browser goes offline (`useSyncExternalStore`) |
-| `WishlistButton` | Heart toggle connected to the wishlist context |
-| `CartDrawer` | Slide-out mini cart (opens on add) |
-| `CartLineItem` | Cart row: image, price, quantity selector, remove, notices |
-| `CartSummary` / `CouponForm` | Totals, savings, shipping estimate, discount code |
-
-## API layer
-
+## Architecture
 ```
-Component ──▶ custom hook (useFetch / useProductList) ──▶ service (productService)
-                                                              │
-                                     adapter (dummyJsonAdapter) ◀── apiClient (fetch) ──▶ DummyJSON
+Component ─▶ hook (useQuery / useCart / useAuth…)
+                │
+                ├─ server state: queries/ ─▶ services/ ─▶ providers/ + adapters/ ─▶ apiClient ─▶ API
+                └─ client state: context/ + reducers/ ─▶ localStorage (usePersistentReducer)
 ```
-
-- **apiClient** builds URLs from `VITE_API_BASE_URL`, sets JSON headers, applies a 15-second timeout, turns HTTP and network failures into `ApiError` (message and status), and passes cancellations through.
-- **Providers** (`services/providers/`) know each backend's endpoints; **adapters** convert its responses into BuyNest's own shapes. Services are backend-agnostic. Switch with `VITE_API_PROVIDER=laravel` (verified against a mock of the documented contract).
-- **Hooks** track loading, error, retry, and cancellation (`AbortController`) for components.
-- **Catalog filtering** is split: search and category on the server; price, rating, brand, stock, sorting, and pagination on the client, because DummyJSON has no parameters for them. See [docs/phases/phase-04-product-catalog.md](../docs/phases/phase-04-product-catalog.md).
-
-### Endpoints in use
-
-| Method | Endpoint | Used by |
-| --- | --- | --- |
-| GET | `/products?limit=0&select=` | Catalog and homepage (all products, card fields only) |
-| GET | `/products/search?q=&limit=0` | Search scope of the catalog |
-| GET | `/products/category/:slug?limit=0` | Category scope of the catalog |
-| GET | `/products/categories` | Category nav and homepage tiles |
-| GET | `/products/search?q=&limit=6&select=…` | Search suggestions (debounced) |
-| POST | `/auth/login` | Sign in → access + refresh tokens |
-| GET | `/auth/me` (Bearer token) | Session check and profile |
-| POST | `/auth/refresh` | New tokens after a 401 |
-| POST | `/users/add` | Registration (simulated; nothing is saved) |
-| POST | `/carts/add` | Server price check before recording a (simulated) order |
-| GET | `/products/:id` | Quick view and the product details page |
-| GET | `/products/category/:slug?limit=5` | Related products |
-| POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
-
-DummyJSON quirks we handle: unknown categories return `200` with an empty list (we check against the category list), unknown `sortBy` values are silently ignored (we only send whitelisted sort options), and there is a rate limit of about 100 requests per time window.
-
-## State management
 
 | State | Where | Why |
 | --- | --- | --- |
-| Server data (products, categories, profile) | TanStack Query (`queries/`, `lib/queryClient.js`) | Cached, deduplicated, retried, refreshed in the background |
-| Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
-| Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
-| Demo orders | `OrdersProvider`, key `buynest.orders.v1`, filtered by customer | DummyJSON has no orders API |
-| Signed-in customer | `AuthProvider`, key `buynest.session.v1` in localStorage ("keep me signed in") or sessionStorage | Demo token auth; production will use Sanctum HttpOnly cookies |
-| URL state (search, filters, sort, page, view) | `useSearchParams` + `utils/catalogParams.js` | Back/forward, refresh, and shared links restore the same results |
-| Local UI state (menu, drawers, gallery image) | `useState` in the component | Only one component cares |
+| Server data (products, categories, profile) | TanStack Query | Cached, deduplicated, retried, refreshed in the background |
+| Cart, wishlist, demo orders | Context + `useReducer`, saved in `localStorage` (`buynest.*.v1`), synced across tabs | Needed across the app; rules in pure reducers |
+| Signed-in customer | `AuthProvider` (Web Storage, demo only) | Production: Sanctum HttpOnly cookies |
+| Search, filters, sort, page, view | URL search params | Back/refresh/share restore results |
+| Local UI (menus, drawers, gallery) | `useState` | Only one component cares |
 
-The cart is a client-side convenience: prices, stock, coupons, shipping, and totals must be re-validated by the backend at checkout.
+### API endpoints in use (DummyJSON)
+| Method | Endpoint | Used for |
+| --- | --- | --- |
+| GET | `/products?limit=0&select=…` | Catalog scope, homepage, cart/wishlist price checks |
+| GET | `/products/search?q=` | Search scope and suggestions |
+| GET | `/products/category/:slug` | Category scope, related products |
+| GET | `/products/:id` | Product details, quick view |
+| GET | `/products/categories` | Category navigation and tiles |
+| POST | `/auth/login`, `/auth/refresh`; GET `/auth/me` | Sign-in, token refresh, session check, profile |
+| POST | `/users/add`; PUT `/users/:id` | Registration, profile edit (both simulated) |
+| POST | `/carts/add` | Server price check before a (simulated) order |
 
-## Sample data vs real data
+Switching to Laravel: `VITE_API_PROVIDER=laravel` (contract: [docs/backend/API_CONTRACT.md](../docs/backend/API_CONTRACT.md)).
 
-Product data is loaded live from DummyJSON. The homepage "Featured", "New arrivals", and "Best sellers" lists are hand-picked product IDs (`src/data/homeContent.js`), because DummyJSON has no such flags. They are not real sales or recency data.
-`src/data/sampleProducts.js` is an offline snapshot of real records, kept for tests that must not depend on the live API.
-The newsletter and add-to-cart actions are UI demos until the cart (Phase 6) and backend exist.
+## Quality
+- **Tests:** `npm test` runs 94 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
+- **Accessibility:** semantic landmarks, skip link, visible focus, labelled controls with linked errors, ARIA combobox search, native `<dialog>` modals, reduced-motion support. axe-core reports **no violations** on the main pages of the production build.
+- **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 118 KB gzipped.
 
-## Testing
+## Deployment
+See [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md): build settings, environment variables, SPA fallback (`vercel.json` or `public/_redirects`), caching, and a release checklist.
 
-`npm test` runs 94 tests in 17 files: reducers and pure utilities, the checkout schema, the API client, the Laravel adapter, components (`ProductCard`, `ProductGrid`, `QuantitySelector`, `SearchBar`, `ErrorBoundary`), and page-level flows (catalog loading/error/filters, product details, login validation, protected routes). The network is mocked (`src/test/mockFetch.js`); tests never call the live API. Details: [docs/phases/phase-13-testing-debugging.md](../docs/phases/phase-13-testing-debugging.md).
-
-## Accessibility
-
-- Semantic landmarks (`header`, `nav`, `main`, `footer`) and a skip link
-- Visible `:focus-visible` outlines on every interactive element
-- Labelled form controls, `role="alert"` errors, `role="status"` announcements
-- Native `<dialog>` for focus trapping and Escape-to-close
-- Decorative images use `alt=""`; product names come from the linked title
-- Honors `prefers-reduced-motion`
+## Learning material
+- Per-phase lessons: [docs/phases/](../docs/phases/)
+- Concepts by phase: [docs/LEARNING_LOG.md](../docs/LEARNING_LOG.md)
+- Backend plan: [docs/backend/](../docs/backend/)
