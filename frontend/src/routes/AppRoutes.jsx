@@ -1,23 +1,30 @@
+import { lazy } from 'react'
 import { Route, Routes } from 'react-router'
 import MainLayout from '../layouts/MainLayout'
+import ProtectedRoute from './ProtectedRoute'
+import GuestOnlyRoute from './GuestOnlyRoute'
+// Shopping pages most visitors see first stay in the main bundle…
 import HomePage from '../pages/HomePage'
 import ProductListingPage from '../pages/ProductListingPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
-import CartPage from '../pages/CartPage'
-import WishlistPage from '../pages/WishlistPage'
-import LoginPage from '../pages/LoginPage'
-import RegisterPage from '../pages/RegisterPage'
-import ForgotPasswordPage from '../pages/ForgotPasswordPage'
-import ProfilePage from '../pages/ProfilePage'
-import AccountLayout from '../layouts/AccountLayout'
-import CheckoutPage from '../pages/CheckoutPage'
-import OrderConfirmationPage from '../pages/OrderConfirmationPage'
-import OrdersPage from '../pages/OrdersPage'
-import OrderDetailsPage from '../pages/OrderDetailsPage'
-import ProtectedRoute from './ProtectedRoute'
-import GuestOnlyRoute from './GuestOnlyRoute'
-import NotFoundPage from '../pages/NotFoundPage'
-import ComponentLabPage from '../pages/ComponentLabPage'
+
+// …everything else is CODE-SPLIT: React.lazy downloads a page's JavaScript
+// only when someone visits it (the checkout's form libraries, the account
+// area, the learning lab with Axios). MainLayout's <Suspense> shows a loader
+// meanwhile.
+const CartPage = lazy(() => import('../pages/CartPage'))
+const WishlistPage = lazy(() => import('../pages/WishlistPage'))
+const LoginPage = lazy(() => import('../pages/LoginPage'))
+const RegisterPage = lazy(() => import('../pages/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'))
+const AccountLayout = lazy(() => import('../layouts/AccountLayout'))
+const ProfilePage = lazy(() => import('../pages/ProfilePage'))
+const OrdersPage = lazy(() => import('../pages/OrdersPage'))
+const OrderDetailsPage = lazy(() => import('../pages/OrderDetailsPage'))
+const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
+const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
+const ComponentLabPage = lazy(() => import('../pages/ComponentLabPage'))
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 /**
  * All application routes in one place. Routes nested inside the

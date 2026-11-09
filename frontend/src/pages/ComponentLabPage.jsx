@@ -10,6 +10,10 @@ import RatingStarsClass from '../learning/RatingStarsClass'
 import QuantityCounter from '../learning/QuantityCounter'
 import QuantityCounterClass from '../learning/QuantityCounterClass'
 import ApiPlayground from '../learning/ApiPlayground'
+import OnlineStatusClass from '../learning/OnlineStatusClass'
+import BuggyCounter from '../learning/BuggyCounter'
+import ErrorBoundary from '../components/common/ErrorBoundary'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import './ComponentLabPage.css'
 
 /**
@@ -20,6 +24,7 @@ import './ComponentLabPage.css'
 function ComponentLabPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const isOnline = useOnlineStatus()
 
   return (
     <div className="section container component-lab">
@@ -81,6 +86,33 @@ function ComponentLabPage() {
             <EmptyState titleAs="h4" title="Your cart is empty" message="Add products to see them here." />
           </LabCard>
         </div>
+      </section>
+
+      <section aria-labelledby="lab-lifecycle">
+        <h2 id="lab-lifecycle">Lifecycle methods vs hooks, and error boundaries</h2>
+        <div className="component-lab__compare">
+          <LabCard title="OnlineStatusClass (componentDidMount / DidUpdate / WillUnmount)">
+            <OnlineStatusClass />
+          </LabCard>
+          <LabCard title="useOnlineStatus (useSyncExternalStore)">
+            <p>{isOnline ? 'Online' : 'Offline'}</p>
+          </LabCard>
+          <LabCard title="ErrorBoundary catching a render error">
+            <ErrorBoundary
+              fallback={({ error, reset }) => (
+                <div role="alert">
+                  <p>Caught: {error.message}</p>
+                  <Button size="sm" variant="outline" onClick={reset}>
+                    Reset
+                  </Button>
+                </div>
+              )}
+            >
+              <BuggyCounter />
+            </ErrorBoundary>
+          </LabCard>
+        </div>
+        <p className="component-lab__intro">Tip: DevTools → Network → "Offline" to see both status components (and the site banner) change.</p>
       </section>
 
       <section aria-labelledby="lab-api">

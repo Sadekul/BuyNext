@@ -42,3 +42,12 @@ export async function registerCustomer({ firstName, lastName, email, username, p
   const data = await apiClient.post('/users/add', { firstName, lastName, email, username, password }, { signal })
   return normalizeUser(data)
 }
+
+/**
+ * PUT /users/:id — SIMULATED: DummyJSON returns the updated user but does not
+ * save it, so the change disappears after a reload.
+ */
+export async function updateProfile(accessToken, userId, changes, { signal } = {}) {
+  const data = await apiClient.put(`/users/${userId}`, changes, { headers: authHeader(accessToken), signal })
+  return normalizeUser(data)
+}

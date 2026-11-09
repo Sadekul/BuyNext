@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { LuFilterX, LuSearchX, LuSlidersHorizontal } from 'react-icons/lu'
 import CategoryNav from '../components/product/CategoryNav'
@@ -153,10 +153,14 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
     toolbarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  function handleAddToCart(product) {
-    setQuickViewProduct(null) // close quick view first, so the cart drawer isn't stacked on it
-    addItem(product)
-  }
+  // useCallback: a stable function so memoized ProductCards can skip re-rendering.
+  const handleAddToCart = useCallback(
+    (product) => {
+      setQuickViewProduct(null) // close quick view first, so the cart drawer isn't stacked on it
+      addItem(product)
+    },
+    [addItem],
+  )
 
   // One removable chip per active filter, including search and category.
   const chips = []

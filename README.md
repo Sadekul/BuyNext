@@ -47,8 +47,8 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 8 | Search, filtering, and sorting | Done |
 | 9 | User registration and authentication | Done |
 | 10 | Checkout and order management | Done |
-| 11 | Advanced React | Next |
-| 12 | Admin backend integration (frontend side) | Planned |
+| 11 | Advanced React | Done |
+| 12 | Admin backend integration (frontend side) | Next |
 | 13 | Testing and debugging | Planned |
 | 14 | Deployment | Planned |
 

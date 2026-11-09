@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Link } from 'react-router'
 import { LuEye, LuShoppingBag } from 'react-icons/lu'
 import Button from '../ui/Button'
@@ -102,4 +103,12 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
   )
 }
 
-export default ProductCard
+/*
+ * React.memo: skip re-rendering a card when its props are unchanged. The
+ * catalog re-renders when the cart drawer, quick view, or filters change;
+ * memo keeps the 12 cards out of that work. It only helps because the parent
+ * passes STABLE props: product objects from the query cache and handlers
+ * wrapped in useCallback. (WishlistButton still updates on its own: context
+ * changes reach it directly.)
+ */
+export default memo(ProductCard)

@@ -62,3 +62,33 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+.profile__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.profile__edit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+}
+
+.profile__edit:hover {
+  text-decoration: underline;
+}
+
+.profile__status {
+  min-height: 1.5em;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

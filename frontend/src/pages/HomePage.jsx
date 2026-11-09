@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import HeroBanner from '../components/home/HeroBanner'
 import FeaturedCategories from '../components/home/FeaturedCategories'
 import ProductSection from '../components/home/ProductSection'
@@ -44,8 +45,10 @@ function HomePage() {
     }))
     .filter((category) => category.name)
 
-  // Passed down as a function prop: ProductCard reports the click, the cart handles it.
-  const handleAddToCart = (product) => addItem(product)
+  // Passed down as a function prop: ProductCard reports the click, the cart
+  // handles it. useCallback keeps the same function between renders, so the
+  // memoized ProductCards don't re-render just because HomePage did.
+  const handleAddToCart = useCallback((product) => addItem(product), [addItem])
 
   const productsUnavailable = collectionsRequest.error && (
     <section className="section section--muted" aria-label="Products">

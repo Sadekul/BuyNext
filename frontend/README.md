@@ -10,6 +10,7 @@ React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
 | Vite 8 | Dev server with hot module replacement, and production bundler |
 | React Router 8 | Client-side routing (`BrowserRouter`, nested routes, URL search params) |
 | Fetch API | All app HTTP requests, through `services/apiClient.js` |
+| TanStack Query 5 | Server-state cache: products, categories, profile (queries) and writes (mutations) |
 | Axios | Learning comparison only (`src/learning/`, API playground at `/learn`) |
 | react-icons | Icon components (Lucide set for UI, Font Awesome 6 for brand logos) |
 | ESLint 10 | Code quality: core JS rules, Rules of Hooks, Fast Refresh safety |
@@ -17,7 +18,7 @@ React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
 
 | React Hook Form + Zod | Checkout form state and schema validation (`@hookform/resolvers` connects them) |
 
-Planned for later phases: TanStack Query, Vitest + React Testing Library.
+Planned for later phases: Vitest + React Testing Library.
 
 ## Requirements
 
@@ -69,10 +70,13 @@ frontend/
 │   ├── pages/              # One component per route (HomePage, NotFoundPage…)
 │   ├── layouts/            # Shared page shells rendered around routes (MainLayout)
 │   ├── routes/             # Route table (AppRoutes)
-│   ├── hooks/              # Custom hooks: useFetch, useCatalogProducts, useCategories, useToast
+│   ├── hooks/              # Custom hooks: useCart, useWishlist, useAuth, useOrders, useDebouncedValue, useOnlineStatus…
 │   ├── context/            # Context objects + providers (CartProvider; wishlist and auth next)
 │   ├── reducers/           # Pure reducers (cartReducer)
-│   ├── services/           # API layer: apiClient, product/category services, adapters/
+│   ├── services/           # API layer: apiClient, product/category/auth/order services, adapters/
+│   ├── queries/            # TanStack Query keys + queryOptions (products, categories, profile)
+│   ├── schemas/            # Zod validation schemas (checkout)
+│   ├── lib/                # Library setup (queryClient)
 │   ├── utils/              # Pure helpers: pricing, catalog filter/sort/paginate, formatters, cn
 │   ├── constants/          # App-wide constants: routes, nav links, store settings
 │   ├── data/               # Homepage content config + an offline product fixture for tests
@@ -141,6 +145,8 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `Loader` / `ErrorMessage` / `EmptyState` | Loading, error (with retry), and empty states |
 | `Modal` | Accessible dialog built on native `<dialog>` (center or drawer) |
 | `Toast` | Auto-dismissing status message |
+| `ErrorBoundary` | Class component that catches render errors per page |
+| `OfflineBanner` | Shows when the browser goes offline (`useSyncExternalStore`) |
 | `WishlistButton` | Heart toggle connected to the wishlist context |
 | `CartDrawer` | Slide-out mini cart (opens on add) |
 | `CartLineItem` | Cart row: image, price, quantity selector, remove, notices |
@@ -183,7 +189,7 @@ DummyJSON quirks we handle: unknown categories return `200` with an empty list (
 
 | State | Where | Why |
 | --- | --- | --- |
-| Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
+| Server data (products, categories, profile) | TanStack Query (`queries/`, `lib/queryClient.js`) | Cached, deduplicated, retried, refreshed in the background |
 | Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
 | Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
 | Demo orders | `OrdersProvider`, key `buynest.orders.v1`, filtered by customer | DummyJSON has no orders API |

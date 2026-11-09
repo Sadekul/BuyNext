@@ -106,3 +106,14 @@
 - Nested forms are invalid HTML; the `form` attribute on a submit button
 - Server-side verification of prices, stock, discounts, shipping, taxes, and totals; never handling card data
 - Order history scoped to the signed-in customer (and IDOR on the server)
+
+## Phase 11: Advanced React
+
+- Every hook mapped to real code, including `useEffectEvent` and `useSyncExternalStore`
+- Class lifecycle methods vs hooks; error boundaries (`getDerivedStateFromError`, `componentDidCatch`, reset by `key`)
+- Controlled vs uncontrolled components; refs for DOM access only
+- `React.memo` with stable props, `useMemo` vs `useCallback`, when not to optimize
+- `React.lazy` + `Suspense` route code splitting; lazy images and `fetchPriority`
+- When list virtualization is (and isn't) needed; React DevTools and the Profiler
+- TanStack Query: query keys/options, caching, `isPending` vs `isFetching`, invalidation, background refetching, mutations, optimistic updates with rollback, retry policy
+- Server state vs client state
