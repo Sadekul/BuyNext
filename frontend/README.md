@@ -18,7 +18,7 @@ React storefront for BuyNest, built with Vite and plain JavaScript (ES6+).
 
 | React Hook Form + Zod | Checkout form state and schema validation (`@hookform/resolvers` connects them) |
 
-Planned for later phases: Vitest + React Testing Library.
+| Vitest + React Testing Library | Unit, component, and integration tests (jsdom, mocked `fetch`) |
 
 ## Requirements
 
@@ -43,6 +43,8 @@ npm run dev                  # http://localhost:5173
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Check all JS/JSX files with ESLint |
 | `npm run lint:fix` | Auto-fix the lint problems that can be fixed safely |
+| `npm test` | Run all tests once (offline, ~10 s) |
+| `npm run test:watch` | Re-run tests on every save |
 
 ## Environment variables
 
@@ -205,6 +207,10 @@ The cart is a client-side convenience: prices, stock, coupons, shipping, and tot
 Product data is loaded live from DummyJSON. The homepage "Featured", "New arrivals", and "Best sellers" lists are hand-picked product IDs (`src/data/homeContent.js`), because DummyJSON has no such flags. They are not real sales or recency data.
 `src/data/sampleProducts.js` is an offline snapshot of real records, kept for tests that must not depend on the live API.
 The newsletter and add-to-cart actions are UI demos until the cart (Phase 6) and backend exist.
+
+## Testing
+
+`npm test` runs 94 tests in 17 files: reducers and pure utilities, the checkout schema, the API client, the Laravel adapter, components (`ProductCard`, `ProductGrid`, `QuantitySelector`, `SearchBar`, `ErrorBoundary`), and page-level flows (catalog loading/error/filters, product details, login validation, protected routes). The network is mocked (`src/test/mockFetch.js`); tests never call the live API. Details: [docs/phases/phase-13-testing-debugging.md](../docs/phases/phase-13-testing-debugging.md).
 
 ## Accessibility
 

@@ -49,7 +49,7 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 10 | Checkout and order management | Done |
 | 11 | Advanced React | Done |
 | 12 | Admin backend integration (frontend side) | Done |
-| 13 | Testing and debugging | Next |
-| 14 | Deployment | Planned |
+| 13 | Testing and debugging | Done |
+| 14 | Deployment | Next |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

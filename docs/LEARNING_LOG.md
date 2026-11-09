@@ -126,3 +126,13 @@
 - Sanctum SPA auth: `credentials: 'include'`, CSRF via `XSRF-TOKEN` → `X-XSRF-TOKEN`, 419
 - Mapping server 422 validation errors onto form fields
 - Admin → API → MySQL → storefront flow; backend-enforced permissions; Shopify/Magento public vs private APIs
+
+## Phase 13: Testing and debugging
+
+- Vitest + jsdom + React Testing Library + user-event + jest-dom setup
+- API mocking at the `fetch` boundary; fixtures from an offline data snapshot
+- Unit (reducers, utils, schemas, API client, adapter), component, and integration tests
+- Role/label queries, `find*` for async UI, testing behavior instead of implementation
+- Loading, error, empty, validation, and protected-route tests; basic accessibility assertions
+- Proving tests catch bugs by breaking code on purpose
+- Debugging: console, breakpoints, Network tab, React DevTools, Profiler, storage, `screen.debug()`
