@@ -1,58 +1,58 @@
 import { apiClient } from './apiClient'
-import { normalizeProduct, normalizeProductPage } from './adapters/dummyJsonAdapter'
+import { apiProvider } from './providers'
 
-// Only the fields product cards need: smaller, faster list responses.
-// (DummyJSON always includes `id`.)
-const PRODUCT_CARD_FIELDS = [
-  'title',
-  'category',
-  'price',
-  'discountPercentage',
-  'rating',
-  'stock',
-  'brand',
-  'thumbnail',
-  'availabilityStatus',
-  'minimumOrderQuantity', // needed to add the right quantity from a card
-].join(',')
+/*
+ * Product data, whatever the backend. The provider knows the endpoints and
+ * the adapter turns its responses into BuyNest product shapes, so callers
+ * (queries/productQueries.js) never see backend-specific details.
+ */
+const { catalog, adapter } = apiProvider
 
-/** DummyJSON returns every product when `limit` is 0. */
-export const ALL_PRODUCTS = 0
-
-async function getProductPage(path, { limit, skip, sortBy, order, query, signal } = {}) {
-  const data = await apiClient.get(path, {
-    params: { q: query, limit, skip, sortBy, order, select: PRODUCT_CARD_FIELDS },
-    signal,
-  })
-  return normalizeProductPage(data)
+async function getProductPage({ path, params }, signal) {
+  return adapter.productPage(await apiClient.get(path, { params, signal }))
 }
 
-/** GET /products — paginated, optionally sorted. */
-export function getProducts(options) {
-  return getProductPage('/products', options)
+/**
+ * One page, or — with `{ all: true }` — every page. DummyJSON returns all
+ * products in one response; a paginated API (Laravel caps per_page) needs the
+ * remaining pages, which are fetched IN PARALLEL with Promise.all.
+ */
+async function getProductList(endpointFor, { signal, ...options }) {
+  const first = await getProductPage(endpointFor(options), signal)
+  if (!options.all || first.items.length >= first.total) return first
+
+  const perPage = first.limit
+  const pageCount = Math.ceil(first.total / perPage)
+  const rest = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      getProductPage(endpointFor({ ...options, skip: (index + 1) * perPage }), signal),
+    ),
+  )
+  return { ...first, items: [first, ...rest].flatMap((page) => page.items), limit: first.total }
 }
 
-/** GET /products/search?q= — server-side search over title and description. */
-export function searchProducts(query, options) {
-  return getProductPage('/products/search', { ...options, query })
+/** All products (one page, or `{ all: true }`), optionally sorted. */
+export function getProducts(options = {}) {
+  return getProductList(catalog.listProducts, options)
 }
 
-/** GET /products/category/:slug — products in one category. */
-export function getProductsByCategory(categorySlug, options) {
-  return getProductPage(`/products/category/${encodeURIComponent(categorySlug)}`, options)
+/** Server-side search over product names and descriptions. */
+export function searchProducts(query, options = {}) {
+  return getProductList((pageOptions) => catalog.searchProducts(query, pageOptions), options)
+}
+
+/** Products in one category. */
+export function getProductsByCategory(categorySlug, options = {}) {
+  return getProductList((pageOptions) => catalog.productsByCategory(categorySlug, pageOptions), options)
 }
 
 /** Search suggestions: a few matches with only the fields the dropdown shows. */
-export async function getSearchSuggestions(query, { limit = 6, signal } = {}) {
-  const data = await apiClient.get('/products/search', {
-    params: { q: query, limit, select: 'title,thumbnail,price,discountPercentage,category' },
-    signal,
-  })
-  return normalizeProductPage(data)
+export function getSearchSuggestions(query, { limit = 6, signal } = {}) {
+  return getProductPage(catalog.suggestions(query, limit), signal)
 }
 
-/** GET /products/:id — one product with all its fields. Throws ApiError(404) if missing. */
+/** One product with all its fields. Throws ApiError(404) if missing. */
 export async function getProductById(productId, { signal } = {}) {
-  const data = await apiClient.get(`/products/${encodeURIComponent(productId)}`, { signal })
-  return normalizeProduct(data)
+  const { path, params } = catalog.productDetail(productId)
+  return adapter.product(await apiClient.get(path, { params, signal }))
 }

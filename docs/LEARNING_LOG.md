@@ -117,3 +117,12 @@
 - When list virtualization is (and isn't) needed; React DevTools and the Profiler
 - TanStack Query: query keys/options, caching, `isPending` vs `isFetching`, invalidation, background refetching, mutations, optimistic updates with rollback, retry policy
 - Server state vs client state
+
+## Phase 12: Admin backend integration (frontend side)
+
+- Provider + adapter (anti-corruption) layer; switching backends with `VITE_API_PROVIDER`
+- Designing a REST contract: envelopes, pagination meta, error format, decimal-string money
+- Parallel requests with `Promise.all` for paginated "fetch all" scopes
+- Sanctum SPA auth: `credentials: 'include'`, CSRF via `XSRF-TOKEN` → `X-XSRF-TOKEN`, 419
+- Mapping server 422 validation errors onto form fields
+- Admin → API → MySQL → storefront flow; backend-enforced permissions; Shopify/Magento public vs private APIs

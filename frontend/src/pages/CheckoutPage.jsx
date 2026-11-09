@@ -24,7 +24,23 @@ import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { formatPrice } from '../utils/formatters'
+import { applyServerFieldErrors } from '../utils/serverErrors'
 import './CheckoutPage.css'
+
+// API field names (Laravel contract, snake_case) → checkout form fields.
+const SERVER_FIELD_MAP = {
+  email: 'email',
+  phone: 'phone',
+  'shipping_address.first_name': 'shipping.firstName',
+  'shipping_address.last_name': 'shipping.lastName',
+  'shipping_address.line1': 'shipping.line1',
+  'shipping_address.city': 'shipping.city',
+  'shipping_address.state': 'shipping.state',
+  'shipping_address.postal_code': 'shipping.postalCode',
+  'shipping_address.country': 'shipping.country',
+  shipping_method: 'shippingMethod',
+  payment_method: 'paymentMethod',
+}
 
 /**
  * /checkout (signed-in customers). Loads the profile to pre-fill contact and
@@ -165,6 +181,8 @@ function CheckoutForm({ defaultValues }) {
       navigate(ROUTES.orderConfirmation(order.id), { replace: true })
       cart.clearCart()
     } catch (error) {
+      // A real API answers invalid fields with 422 + per-field messages: show them on the fields.
+      if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
       setError('root.server', { message: error.message })
     }
   }

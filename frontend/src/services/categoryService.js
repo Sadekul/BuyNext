@@ -1,8 +1,8 @@
 import { apiClient } from './apiClient'
-import { normalizeCategory } from './adapters/dummyJsonAdapter'
+import { apiProvider } from './providers'
 
-/** GET /products/categories — every category as `{ slug, name }`. */
+/** Every category as `{ slug, name }`, whatever the backend. */
 export async function getCategories({ signal } = {}) {
-  const data = await apiClient.get('/products/categories', { signal })
-  return data.map(normalizeCategory)
+  const { path, params } = apiProvider.catalog.categories()
+  return apiProvider.adapter.categories(await apiClient.get(path, { params, signal }))
 }

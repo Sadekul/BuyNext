@@ -1,8 +1,9 @@
 /*
  * apiClient — the ONLY place that talks to the network.
- * Every service (products, categories, later auth/orders) goes through it,
- * so base URL, headers, timeouts, and error handling are defined once.
+ * Every service (products, categories, auth, orders) goes through it,
+ * so base URL, headers, cookies, timeouts, and errors are handled once.
  */
+import { apiProvider } from './providers'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
 
@@ -17,17 +18,30 @@ const STATUS_MESSAGES = {
   401: 'Please sign in to continue.',
   403: "You don't have permission to do that.",
   404: "We couldn't find what you were looking for.",
+  419: 'Your session expired. Please refresh the page and try again.', // Laravel CSRF mismatch
+  422: 'Please check the highlighted fields.', // Laravel validation
   429: 'Too many requests. Please wait a moment and try again.',
 }
 
-/** Error thrown for failed requests. `status` is 0 for network/timeout failures. */
+/**
+ * Error thrown for failed requests. `status` is 0 for network/timeout failures.
+ * `fieldErrors` holds per-field validation messages (Laravel 422:
+ * `{ message, errors: { "shipping_address.city": ["…"] } }`), or null.
+ */
 export class ApiError extends Error {
   constructor(message, { status = 0, data = null } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.data = data
+    this.fieldErrors = status === 422 && data?.errors && typeof data.errors === 'object' ? data.errors : null
   }
+}
+
+/** Reads a cookie value (used for Laravel's XSRF-TOKEN). */
+function readCookie(name) {
+  const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith(`${name}=`))
+  return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null
 }
 
 /** True when a request was cancelled on purpose (e.g. the component unmounted). */
@@ -71,13 +85,19 @@ async function request(path, { method = 'GET', params, body, headers, signal, ti
   const timeoutSignal = AbortSignal.timeout(timeoutMs)
   const combinedSignal = signal ? anySignal([signal, timeoutSignal]) : timeoutSignal
 
+  // Cookie-based auth (Laravel Sanctum) needs credentials + a CSRF header on writes.
+  const { credentials = 'omit', xsrfCookie } = apiProvider.request
+  const xsrfToken = xsrfCookie && method !== 'GET' ? readCookie(xsrfCookie) : null
+
   let response
   try {
     response = await fetch(buildUrl(path, params), {
       method,
+      credentials,
       headers: {
         Accept: 'application/json',
         ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...(xsrfToken && { 'X-XSRF-TOKEN': xsrfToken }),
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,

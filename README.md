@@ -26,8 +26,8 @@ Admin dashboard ──save──▶ Laravel REST API ──▶ MySQL
 
 During the learning phases the frontend talks to [DummyJSON](https://dummyjson.com), a public test API.
 DummyJSON never persists create/update/delete requests, so it is not a real database.
-All API calls go through `frontend/src/services/`, so switching to Laravel later means changing the base URL
-and the data adapters, not every component.
+All API calls go through `frontend/src/services/`. Switching to Laravel means setting `VITE_API_PROVIDER=laravel` and the base URL;
+the adapter for the proposed contract already exists. See [docs/backend/](docs/backend/).
 
 ## Getting started
 
@@ -48,8 +48,8 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 9 | User registration and authentication | Done |
 | 10 | Checkout and order management | Done |
 | 11 | Advanced React | Done |
-| 12 | Admin backend integration (frontend side) | Next |
-| 13 | Testing and debugging | Planned |
+| 12 | Admin backend integration (frontend side) | Done |
+| 13 | Testing and debugging | Next |
 | 14 | Deployment | Planned |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

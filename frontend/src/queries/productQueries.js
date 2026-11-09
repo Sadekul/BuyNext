@@ -1,6 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
 import {
-  ALL_PRODUCTS,
   getProductById,
   getProducts,
   getProductsByCategory,
@@ -36,7 +35,7 @@ export const categoryKeys = { all: ['categories'] }
 export const allProductsQuery = () =>
   queryOptions({
     queryKey: productKeys.list(),
-    queryFn: async ({ signal }) => (await getProducts({ limit: ALL_PRODUCTS, signal })).items,
+    queryFn: async ({ signal }) => (await getProducts({ all: true, signal })).items,
   })
 
 /** One catalog scope: all products, a search, or a category (filtered client-side afterwards). */
@@ -44,7 +43,7 @@ export const catalogQuery = ({ searchQuery, categorySlug }) =>
   queryOptions({
     queryKey: productKeys.catalog(searchQuery ? { q: searchQuery } : { category: categorySlug ?? 'all' }),
     queryFn: async ({ signal }) => {
-      const options = { limit: ALL_PRODUCTS, signal }
+      const options = { all: true, signal }
       if (searchQuery) return (await searchProducts(searchQuery, options)).items
       if (categorySlug) return (await getProductsByCategory(categorySlug, options)).items
       return (await getProducts(options)).items

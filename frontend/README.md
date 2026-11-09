@@ -48,7 +48,8 @@ npm run dev                  # http://localhost:5173
 
 | Variable | Example | Used for |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `https://dummyjson.com` | Product API base URL. Required: the app throws a clear error at startup if it's missing. |
+| `VITE_API_BASE_URL` | `https://dummyjson.com` | API base URL. Required: the app throws a clear error at startup if it's missing. |
+| `VITE_API_PROVIDER` | `dummyjson` | Backend adapter: `dummyjson` (default) or `laravel` (see `docs/backend/API_CONTRACT.md`) |
 
 Only variables prefixed with `VITE_` reach browser code, and anything in them is public. Never store secrets there.
 
@@ -73,7 +74,7 @@ frontend/
 │   ├── hooks/              # Custom hooks: useCart, useWishlist, useAuth, useOrders, useDebouncedValue, useOnlineStatus…
 │   ├── context/            # Context objects + providers (CartProvider; wishlist and auth next)
 │   ├── reducers/           # Pure reducers (cartReducer)
-│   ├── services/           # API layer: apiClient, product/category/auth/order services, adapters/
+│   ├── services/           # API layer: apiClient, services, providers/ (endpoints per backend), adapters/
 │   ├── queries/            # TanStack Query keys + queryOptions (products, categories, profile)
 │   ├── schemas/            # Zod validation schemas (checkout)
 │   ├── lib/                # Library setup (queryClient)
@@ -161,7 +162,7 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 ```
 
 - **apiClient** builds URLs from `VITE_API_BASE_URL`, sets JSON headers, applies a 15-second timeout, turns HTTP and network failures into `ApiError` (message and status), and passes cancellations through.
-- **Services** know the endpoints. **Adapters** convert raw API responses into BuyNest's own shapes; to switch to Laravel, write a new adapter and keep the components.
+- **Providers** (`services/providers/`) know each backend's endpoints; **adapters** convert its responses into BuyNest's own shapes. Services are backend-agnostic. Switch with `VITE_API_PROVIDER=laravel` (verified against a mock of the documented contract).
 - **Hooks** track loading, error, retry, and cancellation (`AbortController`) for components.
 - **Catalog filtering** is split: search and category on the server; price, rating, brand, stock, sorting, and pagination on the client, because DummyJSON has no parameters for them. See [docs/phases/phase-04-product-catalog.md](../docs/phases/phase-04-product-catalog.md).
 
