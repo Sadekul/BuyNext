@@ -1,0 +1,11 @@
+.featured-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6) var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .featured-categories {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}

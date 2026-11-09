@@ -1,0 +1,41 @@
+/* Shared styles for EmptyState and ErrorMessage. */
+.feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 32rem;
+  margin-inline: auto;
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+}
+
+.feedback__icon {
+  width: 3rem;
+  height: 3rem;
+  padding: var(--space-3);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: 50%;
+}
+
+.feedback--error .feedback__icon {
+  color: var(--color-sale);
+  background: var(--color-sale-soft);
+}
+
+.feedback__title {
+  font-size: var(--text-xl);
+}
+
+.feedback__message {
+  color: var(--color-text-muted);
+}
+
+.feedback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

@@ -1,0 +1,28 @@
+.product-badge {
+  display: inline-block;
+  padding: 0.125rem var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.5;
+  border-radius: var(--radius-full);
+}
+
+.product-badge--sale {
+  color: var(--color-text-inverse);
+  background: var(--color-sale);
+}
+
+.product-badge--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.product-badge--danger {
+  color: var(--color-text-inverse);
+  background: var(--color-secondary);
+}
+
+.product-badge--info {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}

@@ -1,0 +1,59 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.logo__mark {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.logo__mark rect {
+  fill: var(--color-primary);
+}
+
+.logo__mark path {
+  fill: none;
+  stroke: var(--color-text-inverse);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.logo__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo__name {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-secondary);
+}
+
+.logo__accent {
+  color: var(--color-primary);
+}
+
+.logo__tagline {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.logo--light .logo__name {
+  color: var(--color-text-inverse);
+}
+
+.logo--light .logo__accent {
+  color: #6ee7b7;
+}
+
+.logo--light .logo__tagline {
+  color: #cbd5e1;
+}

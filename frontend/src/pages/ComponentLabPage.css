@@ -1,0 +1,46 @@
+.component-lab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.component-lab h1 {
+  font-size: var(--text-3xl);
+}
+
+.component-lab h2 {
+  margin-bottom: var(--space-5);
+  font-size: var(--text-xl);
+}
+
+.component-lab__intro {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.component-lab__compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-4);
+}
+
+.component-lab__card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.component-lab__card-title {
+  margin-bottom: var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.component-lab__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
