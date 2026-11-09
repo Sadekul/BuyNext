@@ -67,11 +67,11 @@ frontend/
 │   ├── pages/              # One component per route (HomePage, NotFoundPage…)
 │   ├── layouts/            # Shared page shells rendered around routes (MainLayout)
 │   ├── routes/             # Route table (AppRoutes)
-│   ├── hooks/              # Custom hooks: useFetch, useProductList, useCategories, useToast
+│   ├── hooks/              # Custom hooks: useFetch, useCatalogProducts, useCategories, useToast
 │   ├── context/            # React Context providers: cart, wishlist, auth (Phases 6–9)
 │   ├── reducers/           # useReducer logic, e.g. the cart reducer (Phase 6)
 │   ├── services/           # API layer: apiClient, product/category services, adapters/
-│   ├── utils/              # Pure helpers: formatPrice, cn, product collections
+│   ├── utils/              # Pure helpers: pricing, catalog filter/sort/paginate, formatters, cn
 │   ├── constants/          # App-wide constants: routes, nav links, store settings
 │   ├── data/               # Homepage content config + an offline product fixture for tests
 │   ├── learning/           # Teaching examples: class components, Axios, HTTP methods playground
@@ -92,7 +92,7 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | --- | --- | --- |
 | `/` | HomePage | Done |
 | `/learn` | Component lab (living style guide, class vs functional examples) | Done |
-| `/products` (`?q=`, `?sort=`) | ProductListingPage: all products or search results | Live API (filters in Phase 4) |
+| `/products` (`?q=`, `?sort=`) | ProductListingPage: all products or search results, with filters, pagination, grid/list, quick view | Live API |
 | `/categories/:categorySlug` | ProductListingPage for one category | Live API |
 | `/deals` | ProductListingPage sorted by biggest discount | Live API |
 | `/products/:productId` | Product details | Placeholder until Phase 5 |
@@ -113,8 +113,14 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `MobileNavigation` | Drawer menu built from `Modal` + `SearchBar` |
 | `HeroBanner` | Hero headline, CTAs, and product image |
 | `CategoryCard` | Category tile linking to its category page |
-| `ProductCard` | Product image, brand, title, rating, prices, badges, add-to-cart |
-| `ProductGrid` | Responsive list of `ProductCard`s with an empty state |
+| `ProductCard` | Grid or list layout: image, brand, category, title, rating, prices, availability, badges, add-to-cart, wishlist, quick view |
+| `ProductGrid` | Responsive grid/list of `ProductCard`s with an empty state |
+| `CatalogFilters` | Controlled price, rating, brand, and stock filters |
+| `SortSelect` / `ViewToggle` | Sort dropdown; grid/list toggle |
+| `Pagination` | Accessible page numbers with gaps |
+| `QuickViewModal` | Product summary in a modal, fetched by ID |
+| `CategoryNav` | Category links from the API |
+| `ProductGridSkeleton` | Loading placeholders matching the grid |
 | `ProductBadge` | Sale, stock, and info pills |
 | `RatingStars` | 0–5 rating rendered as half-step stars, accessible label |
 | `Newsletter` | Validated email sign-up (demo only, nothing is sent) |
@@ -135,16 +141,17 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 - **apiClient** builds URLs from `VITE_API_BASE_URL`, sets JSON headers, applies a 15-second timeout, turns HTTP and network failures into `ApiError` (message and status), and passes cancellations through.
 - **Services** know the endpoints. **Adapters** convert raw API responses into BuyNest's own shapes; to switch to Laravel, write a new adapter and keep the components.
 - **Hooks** track loading, error, retry, and cancellation (`AbortController`) for components.
+- **Catalog filtering** is split: search and category on the server; price, rating, brand, stock, sorting, and pagination on the client, because DummyJSON has no parameters for them. See [docs/phases/phase-04-product-catalog.md](../docs/phases/phase-04-product-catalog.md).
 
 ### Endpoints in use
 
 | Method | Endpoint | Used by |
 | --- | --- | --- |
-| GET | `/products?limit=&skip=&sortBy=&order=&select=` | Listing page, homepage (`limit=0` = all, card fields only) |
-| GET | `/products/search?q=` | Search results |
-| GET | `/products/category/:slug` | Category pages |
+| GET | `/products?limit=0&select=` | Catalog and homepage (all products, card fields only) |
+| GET | `/products/search?q=&limit=0` | Search scope of the catalog |
+| GET | `/products/category/:slug?limit=0` | Category scope of the catalog |
 | GET | `/products/categories` | Category nav and homepage tiles |
-| GET | `/products/:id` | `getProductById` (product details page in Phase 5) |
+| GET | `/products/:id` | Quick view (and the product details page in Phase 5) |
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
 
 DummyJSON quirks we handle: unknown categories return `200` with an empty list (we check against the category list), unknown `sortBy` values are silently ignored (we only send whitelisted sort options), and there is a rate limit of about 100 requests per time window.

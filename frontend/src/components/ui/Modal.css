@@ -11,7 +11,7 @@
 }
 
 .modal--center {
-  width: min(32rem, calc(100% - 2rem));
+  width: min(40rem, calc(100% - 2rem));
   margin: auto;
 }
 

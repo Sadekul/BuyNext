@@ -10,10 +10,10 @@ export function formatPrice(amount) {
   return currencyFormatter.format(amount)
 }
 
-/**
- * Applies a percentage discount and rounds to cents.
- * Display only: the backend must always calculate the real charged price.
- */
-export function getDiscountedPrice(price, discountPercentage = 0) {
-  return Math.round(price * (1 - discountPercentage / 100) * 100) / 100
+/** "mens-watches" → "Mens Watches" (the same format the categories API uses). */
+export function formatSlug(slug) {
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }

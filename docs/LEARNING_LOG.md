@@ -40,3 +40,13 @@
 - Event-driven fetching (playground buttons, "load more") vs effect-driven fetching (data a page needs to show)
 - Server-side search, category, sorting, and pagination; URL search params as state (`useSearchParams`)
 - Fetch vs Axios: Axios adds `baseURL`, automatic JSON, throwing on 4xx/5xx, timeouts, and interceptors
+
+## Phase 4: Product listing and catalog
+
+- Server-side vs client-side filtering, and why filters must see the full set
+- Derived state: compute filtered/sorted/paginated lists during render instead of storing them
+- Controlled inputs for every filter (number, radio, checkbox) owned by one parent
+- Immutable updates with spread, `filter`, and `toSorted` (never `sort` on state)
+- Resetting a subtree's state with the `key` prop
+- Component communication through function props (filters, sort, view, pagination, quick view)
+- Accessible controls: `fieldset`/`legend`, `aria-pressed`, `aria-expanded`, `aria-current="page"`

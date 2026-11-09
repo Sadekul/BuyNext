@@ -19,3 +19,19 @@
   border-radius: var(--radius-md);
   appearance: none;
 }
+
+/* Small phones: keep the toolbar on one line. The label stays available to screen readers. */
+@media (max-width: 479px) {
+  .sort-select label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .sort-select select {
+    max-width: 11rem;
+  }
+}

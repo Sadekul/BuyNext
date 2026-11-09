@@ -17,3 +17,9 @@
     gap: var(--space-6);
   }
 }
+
+/* List layout: one card per row at every width (beats the media queries above). */
+.product-grid.product-grid--list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
