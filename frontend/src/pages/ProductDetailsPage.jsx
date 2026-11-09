@@ -14,9 +14,9 @@ import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
-import { useFetch } from '../hooks/useFetch'
+import { useQuery } from '@tanstack/react-query'
 import { useCart } from '../hooks/useCart'
-import { getProductById, getProductsByCategory } from '../services/productService'
+import { productQuery, relatedProductsQuery } from '../queries/productQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { formatPrice, formatSlug } from '../utils/formatters'
@@ -34,12 +34,10 @@ function ProductDetailsPage() {
   const { productId } = useParams()
   const isValidId = /^\d+$/.test(productId)
 
-  // Skip the request entirely for IDs that can't exist (e.g. /products/abc).
-  const request = useFetch(`product:${productId}`, (signal) =>
-    isValidId ? getProductById(productId, { signal }) : Promise.resolve(null),
-  )
+  // `enabled: false` skips the request entirely for IDs that can't exist (e.g. /products/abc).
+  const request = useQuery({ ...productQuery(productId), enabled: isValidId })
 
-  if (request.isLoading) {
+  if (isValidId && request.isPending) {
     return (
       <div className="section container">
         <Loader label="Loading product…" />
@@ -61,7 +59,7 @@ function ProductDetailsPage() {
   if (request.error) {
     return (
       <div className="section container">
-        <ErrorMessage title="We couldn't load this product" message={request.error.message} onRetry={request.retry} />
+        <ErrorMessage title="We couldn't load this product" message={request.error.message} onRetry={() => request.refetch()} />
       </div>
     )
   }
@@ -234,12 +232,10 @@ function StockStatus({ product, canBuy }) {
 
 /** Other products from the same category (server-side category request). */
 function RelatedProducts({ productId, categorySlug, categoryName }) {
-  const request = useFetch(`related:${categorySlug}`, (signal) =>
-    getProductsByCategory(categorySlug, { limit: RELATED_LIMIT + 1, signal }),
-  )
-  const related = (request.data?.items ?? []).filter((item) => item.id !== productId).slice(0, RELATED_LIMIT)
+  const request = useQuery(relatedProductsQuery(categorySlug, RELATED_LIMIT))
+  const related = (request.data ?? []).filter((item) => item.id !== productId).slice(0, RELATED_LIMIT)
 
-  if (request.error || (!request.isLoading && related.length === 0)) return null
+  if (request.error || (!request.isPending && related.length === 0)) return null
 
   return (
     <section className="product-details__section" aria-labelledby="related-title">
@@ -247,7 +243,7 @@ function RelatedProducts({ productId, categorySlug, categoryName }) {
         <h2 id="related-title">More in {categoryName}</h2>
         <Link to={ROUTES.category(categorySlug)}>View all</Link>
       </div>
-      {request.isLoading ? <ProductGridSkeleton count={RELATED_LIMIT} /> : <ProductGrid products={related} />}
+      {request.isPending ? <ProductGridSkeleton count={RELATED_LIMIT} /> : <ProductGrid products={related} />}
     </section>
   )
 }

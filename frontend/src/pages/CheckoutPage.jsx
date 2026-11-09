@@ -13,9 +13,10 @@ import EmptyState from '../components/ui/EmptyState'
 import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
-import { useFetch } from '../hooks/useFetch'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { profileQuery } from '../queries/userQueries'
+import { productKeys } from '../queries/productQueries'
 import { useOrders } from '../hooks/useOrders'
-import { getCurrentUser } from '../services/authService'
 import { createOrder, verifyCartWithServer } from '../services/orderService'
 import { EMPTY_ADDRESS, checkoutSchema } from '../schemas/checkoutSchema'
 import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS } from '../constants/store'
@@ -32,9 +33,8 @@ import './CheckoutPage.css'
 function CheckoutPage() {
   const cart = useCart()
   const { user, authorizedRequest } = useAuth()
-  const profileRequest = useFetch(`checkout-profile:${user.id}`, (signal) =>
-    authorizedRequest((token) => getCurrentUser(token, { signal })),
-  )
+  // Same cache entry as the profile page: visiting /account first makes this instant.
+  const profileRequest = useQuery(profileQuery(user.id, authorizedRequest))
 
   if (cart.items.length === 0) {
     return (
@@ -56,7 +56,7 @@ function CheckoutPage() {
     )
   }
 
-  if (profileRequest.isLoading) {
+  if (profileRequest.isPending) {
     return (
       <div className="section container">
         <Loader label="Preparing checkout…" />
@@ -100,6 +100,13 @@ function CheckoutForm({ defaultValues }) {
   const { user } = useAuth()
   const { placeOrder } = useOrders()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  // A MUTATION: a request that changes something on the server (here: the
+  // server prices the cart). Unlike queries, mutations run only when called.
+  const verifyMutation = useMutation({
+    mutationFn: ({ items, userId }) => verifyCartWithServer(items, userId),
+  })
 
   // React Hook Form keeps values in the inputs themselves (uncontrolled), so
   // typing doesn't re-render the whole page. zodResolver plugs in the schema.
@@ -134,7 +141,7 @@ function CheckoutForm({ defaultValues }) {
   async function onSubmit(values) {
     try {
       // 1. The server prices the cart; stop if anything changed since it was added.
-      const verification = await verifyCartWithServer(cart.items, user.id)
+      const verification = await verifyMutation.mutateAsync({ items: cart.items, userId: user.id })
       if (verification.problems.length > 0) {
         setError('root.server', {
           message: `${verification.problems.join(' ')} Please review your cart before placing the order.`,
@@ -152,6 +159,9 @@ function CheckoutForm({ defaultValues }) {
         verification,
       })
       placeOrder(order)
+      // Stock changed on the server: mark every cached product query stale so
+      // pages refetch fresh data the next time they're shown (INVALIDATION).
+      queryClient.invalidateQueries({ queryKey: productKeys.all })
       navigate(ROUTES.orderConfirmation(order.id), { replace: true })
       cart.clearCart()
     } catch (error) {

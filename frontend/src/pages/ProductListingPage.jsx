@@ -14,7 +14,8 @@ import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
-import { useCatalogProducts } from '../hooks/useCatalogProducts'
+import { useQuery } from '@tanstack/react-query'
+import { catalogQuery } from '../queries/productQueries'
 import { useCategories } from '../hooks/useCategories'
 import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
@@ -77,7 +78,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         <ErrorMessage
           title="We couldn't load categories"
           message={categoriesRequest.error.message}
-          onRetry={categoriesRequest.retry}
+          onRetry={categoriesRequest.refetch}
         />
       ) : isUnknownCategory ? (
         <EmptyState
@@ -103,7 +104,8 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
 
 /** Fetches one scope, then filters, sorts, and paginates it on the client. */
 function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultSort }) {
-  const request = useCatalogProducts({ searchQuery, categorySlug })
+  // Search and category are fetched on the server; each scope is cached separately.
+  const request = useQuery(catalogQuery({ searchQuery, categorySlug }))
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [areFiltersOpen, setAreFiltersOpen] = useState(false)
@@ -195,10 +197,10 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
     else setSearchParams(next)
   }
 
-  if (request.isLoading) return <ProductGridSkeleton count={8} />
+  if (request.isPending) return <ProductGridSkeleton count={8} />
 
   if (request.error) {
-    return <ErrorMessage title="We couldn't load products" message={request.error.message} onRetry={request.retry} />
+    return <ErrorMessage title="We couldn't load products" message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   if (products.length === 0) {

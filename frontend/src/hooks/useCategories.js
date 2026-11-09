@@ -1,9 +1,7 @@
-import { getCategories } from '../services/categoryService'
-import { useFetch } from './useFetch'
+import { useQuery } from '@tanstack/react-query'
+import { categoriesQuery } from '../queries/productQueries'
 
-const fetchCategories = (signal) => getCategories({ signal })
-
-/** All product categories from the API: `{ data: [{ slug, name }], isLoading, error, retry }`. */
+/** All product categories (cached for an hour, shared by every component that asks). */
 export function useCategories() {
-  return useFetch('categories', fetchCategories)
+  return useQuery(categoriesQuery())
 }

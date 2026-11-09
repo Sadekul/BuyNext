@@ -12,7 +12,7 @@ import './CartPage.css'
 function CartPage() {
   const cart = useCart()
   // Re-check prices and stock once each time the cart page opens.
-  const refresh = useProductRefresh('cart', { hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
+  const refresh = useProductRefresh({ hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
   const { unavailableCount, canCheckout } = cart.totals
   const changedCount = cart.items.filter((item) => item.notice).length
 
@@ -34,13 +34,13 @@ function CartPage() {
         <h1>Shopping cart</h1>
         <p className="cart-page__status" role="status">
           {/* This live region is always rendered, so screen readers announce its changes. */}
-          {refresh.isLoading && 'Checking the latest prices and stock…'}
-          {!refresh.isLoading && !refresh.error && changedCount > 0 &&
+          {refresh.isFetching && 'Checking the latest prices and stock…'}
+          {!refresh.isFetching && !refresh.error && changedCount > 0 &&
             `${changedCount} ${changedCount === 1 ? 'item has' : 'items have'} changed since you added ${changedCount === 1 ? 'it' : 'them'}. See the notes below.`}
           {refresh.error && (
             <>
               We couldn't check the latest prices ({refresh.error.message}){' '}
-              <button type="button" className="cart-page__link-button" onClick={refresh.retry}>
+              <button type="button" className="cart-page__link-button" onClick={() => refresh.refetch()}>
                 Try again
               </button>
             </>

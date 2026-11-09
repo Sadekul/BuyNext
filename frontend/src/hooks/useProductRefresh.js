@@ -1,17 +1,21 @@
-import { ALL_PRODUCTS, getProducts } from '../services/productService'
-import { useFetch } from './useFetch'
+import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { allProductsQuery } from '../queries/productQueries'
 
 /**
- * Re-checks saved products (cart, wishlist) against the API once per mount
- * and passes the fresh list to `onProducts`. DummyJSON can't fetch a list of
- * IDs, so one request for all products (card fields only) is cheaper than
- * one request per item. Returns { isLoading, error, retry }.
+ * Keeps saved products (cart, wishlist) in sync with the latest API data.
+ * Uses the same cached "all products" query as the homepage, but always
+ * refetches when the page opens (and again when you return to the tab), then
+ * hands each fresh list to `onProducts`, which reconciles the saved items.
  */
-export function useProductRefresh(key, { hasItems, onProducts }) {
-  return useFetch(`refresh:${key}`, async (signal) => {
-    if (!hasItems) return null
-    const { items: products } = await getProducts({ limit: ALL_PRODUCTS, signal })
-    if (!signal.aborted) onProducts(products)
-    return null
-  })
+export function useProductRefresh({ hasItems, onProducts }) {
+  const query = useQuery({ ...allProductsQuery(), enabled: hasItems, refetchOnMount: 'always' })
+  const { data } = query
+
+  // Sync server data → the cart/wishlist store whenever a new list arrives.
+  useEffect(() => {
+    if (data) onProducts(data)
+  }, [data, onProducts])
+
+  return query
 }

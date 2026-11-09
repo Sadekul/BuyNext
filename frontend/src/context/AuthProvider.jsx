@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { AuthContext } from './authContext'
 import { ApiError, isAbortError } from '../services/apiClient'
 import * as authService from '../services/authService'
+import { userKeys } from '../queries/userQueries'
 
 /*
  * Who is signed in, for the whole app.
@@ -80,6 +82,7 @@ async function verifyStoredSession(tokens, signal) {
 }
 
 function AuthProvider({ children }) {
+  const queryClient = useQueryClient()
   const [session, setSession] = useState(() => {
     const stored = readStoredSession()
     return stored ? { ...stored, status: 'checking', expired: false } : ANONYMOUS
@@ -89,6 +92,12 @@ function AuthProvider({ children }) {
   useEffect(() => {
     if (session.status !== 'checking') writeStoredSession(session)
   }, [session])
+
+  // Signed out (by the user, an expired session, or another tab): drop every
+  // cached profile so the next person on this device can't see it.
+  useEffect(() => {
+    if (session.status === 'anonymous') queryClient.removeQueries({ queryKey: userKeys.all })
+  }, [session.status, queryClient])
 
   // Signing out in another tab removes the stored session there → sign out here too.
   useEffect(() => {

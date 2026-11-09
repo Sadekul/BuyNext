@@ -2,8 +2,8 @@ import { useId, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { LuSearch } from 'react-icons/lu'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
-import { useFetch } from '../../hooks/useFetch'
-import { getSearchSuggestions } from '../../services/productService'
+import { useQuery } from '@tanstack/react-query'
+import { suggestionsQuery } from '../../queries/productQueries'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
 import { formatPrice, formatSlug } from '../../utils/formatters'
@@ -18,7 +18,8 @@ const DEBOUNCE_MS = 300
  *
  * - The input is controlled (`query`).
  * - Suggestions use a DEBOUNCED copy of the query, so typing "phone" sends
- *   one request after you pause, not five; useFetch cancels outdated ones.
+ *   one request after you pause, not five. TanStack Query caches each query
+ *   (typing "lap" again is instant, with no request).
  * - Keyboard: ↓/↑ move through suggestions, Enter opens one (or searches),
  *   Escape closes the list.
  *
@@ -36,16 +37,15 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
   const debouncedQuery = useDebouncedValue(trimmedQuery, DEBOUNCE_MS)
   const canSuggest = debouncedQuery.length >= MIN_QUERY_LENGTH
 
-  const request = useFetch(`suggest:${debouncedQuery}`, (signal) =>
-    canSuggest ? getSearchSuggestions(debouncedQuery, { signal }) : Promise.resolve(null),
-  )
+  const request = useQuery(suggestionsQuery(debouncedQuery)) // disabled below MIN_QUERY_LENGTH
   const suggestions = canSuggest ? (request.data?.items ?? []) : []
   const total = request.data?.total ?? 0
 
   // The highlighted option only counts for the query it was chosen in
   // (derived reset: typing a new letter clears the highlight, no effect needed).
   const activeIndex = active.query === debouncedQuery ? active.index : -1
-  const showList = isOpen && canSuggest && trimmedQuery === debouncedQuery && !request.isLoading && !request.error
+  // Only show results that belong to what's typed right now.
+  const showList = isOpen && canSuggest && trimmedQuery === debouncedQuery && request.isSuccess
 
   function goTo(path) {
     setIsOpen(false)

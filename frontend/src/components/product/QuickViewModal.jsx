@@ -4,8 +4,8 @@ import Button from '../ui/Button'
 import Loader from '../ui/Loader'
 import ErrorMessage from '../ui/ErrorMessage'
 import RatingStars from './RatingStars'
-import { useFetch } from '../../hooks/useFetch'
-import { getProductById } from '../../services/productService'
+import { useQuery } from '@tanstack/react-query'
+import { productQuery } from '../../queries/productQueries'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
@@ -17,7 +17,8 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
 /**
  * Quick view: a modal with a product summary, without leaving the listing.
  * List responses only contain card fields, so we fetch the full product
- * (description, images) by ID when the modal opens.
+ * (description, images) by ID when the modal opens. The details page uses
+ * the same query, so opening "View full details" afterwards is instant.
  */
 function QuickViewModal({ product, onClose, onAddToCart }) {
   return (
@@ -29,11 +30,11 @@ function QuickViewModal({ product, onClose, onAddToCart }) {
 }
 
 function QuickViewContent({ product, onAddToCart }) {
-  const request = useFetch(`product:${product.id}`, (signal) => getProductById(product.id, { signal }))
+  const request = useQuery(productQuery(product.id))
 
-  if (request.isLoading) return <Loader label="Loading product details…" />
+  if (request.isPending) return <Loader label="Loading product details…" />
   if (request.error) {
-    return <ErrorMessage titleAs="h3" message={request.error.message} onRetry={request.retry} />
+    return <ErrorMessage titleAs="h3" message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   const details = request.data

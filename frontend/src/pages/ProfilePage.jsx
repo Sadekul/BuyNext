@@ -1,8 +1,8 @@
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
-import { useFetch } from '../hooks/useFetch'
-import { getCurrentUser } from '../services/authService'
+import { useQuery } from '@tanstack/react-query'
+import { profileQuery } from '../queries/userQueries'
 import { SITE } from '../constants/site'
 import './ProfilePage.css'
 
@@ -12,13 +12,11 @@ import './ProfilePage.css'
  */
 function ProfilePage() {
   const { user, authorizedRequest } = useAuth()
-  const request = useFetch(`profile:${user.id}`, (signal) =>
-    authorizedRequest((accessToken) => getCurrentUser(accessToken, { signal })),
-  )
+  const request = useQuery(profileQuery(user.id, authorizedRequest))
 
-  if (request.isLoading) return <Loader label="Loading your profile…" />
+  if (request.isPending) return <Loader label="Loading your profile…" />
   if (request.error) {
-    return <ErrorMessage title="We couldn't load your profile" message={request.error.message} onRetry={request.retry} />
+    return <ErrorMessage title="We couldn't load your profile" message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   const profile = request.data

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { LuCircleCheck } from 'react-icons/lu'
 import FormField, { CheckboxField } from '../components/forms/FormField'
@@ -22,9 +23,9 @@ const EMPTY_FORM = {
 function RegisterPage() {
   const [values, setValues] = useState(EMPTY_FORM)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [serverError, setServerError] = useState(null)
-  const [createdUser, setCreatedUser] = useState(null)
+  // useMutation tracks the request for us: isPending, error, and data (the created user).
+  const registration = useMutation({ mutationFn: registerCustomer })
+  const createdUser = registration.data
 
   // Shown after the first submit attempt, then live (see LoginPage).
   const errors = validateRegistration(values)
@@ -38,7 +39,6 @@ function RegisterPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     setHasSubmitted(true)
-    setServerError(null)
 
     const firstInvalid = Object.keys(errors)[0]
     if (firstInvalid) {
@@ -46,14 +46,7 @@ function RegisterPage() {
       return
     }
 
-    setIsSubmitting(true)
-    try {
-      setCreatedUser(await registerCustomer(values))
-    } catch (error) {
-      setServerError(error.message)
-    } finally {
-      setIsSubmitting(false)
-    }
+    registration.mutate(values)
   }
 
   if (createdUser) {
@@ -90,9 +83,9 @@ function RegisterPage() {
           <p className="auth-card__subtitle">Track orders, save addresses, and check out faster.</p>
         </header>
 
-        {serverError && (
+        {registration.error && (
           <p className="auth-alert auth-alert--error" role="alert">
-            {serverError}
+            {registration.error.message}
           </p>
         )}
 
@@ -126,8 +119,8 @@ function RegisterPage() {
             onChange={handleChange}
             error={visibleError('acceptTerms')}
           />
-          <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+          <Button type="submit" size="lg" fullWidth disabled={registration.isPending}>
+            {registration.isPending ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
 

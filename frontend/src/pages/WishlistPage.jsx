@@ -15,7 +15,7 @@ import './WishlistPage.css'
 function WishlistPage() {
   const wishlist = useWishlist()
   // Saved prices and stock can be weeks old: re-check once when the page opens.
-  const refresh = useProductRefresh('wishlist', {
+  const refresh = useProductRefresh({
     hasItems: wishlist.items.length > 0,
     onProducts: wishlist.refreshProducts,
   })
@@ -38,7 +38,7 @@ function WishlistPage() {
         <div>
           <h1>Wishlist</h1>
           <p className="wishlist-page__status" role="status">
-            {refresh.isLoading
+            {refresh.isFetching
               ? 'Checking the latest prices and stock…'
               : `${wishlist.count} saved ${wishlist.count === 1 ? 'item' : 'items'}`}
           </p>
