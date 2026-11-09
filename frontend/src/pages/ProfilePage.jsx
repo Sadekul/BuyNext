@@ -11,8 +11,8 @@ import { SITE } from '../constants/site'
 import './ProfilePage.css'
 
 /**
- * /account — the customer's profile, loaded from GET /auth/me with the
- * access token (authorizedRequest refreshes it once if it has expired).
+ * /account — the customer's profile, loaded from GET /api/auth/me with the
+ * session cookie (authorizedRequest renews the session once if it has expired).
  */
 function ProfilePage() {
   const { user, authorizedRequest, updateUser } = useAuth()
@@ -29,7 +29,7 @@ function ProfilePage() {
    * real API, add onSettled: () => invalidateQueries({ queryKey: profileKey }).
    */
   const rename = useMutation({
-    mutationFn: (changes) => authorizedRequest((token) => updateProfile(token, user.id, changes)),
+    mutationFn: (changes) => authorizedRequest(() => updateProfile(changes)),
     onMutate: async (changes) => {
       await queryClient.cancelQueries({ queryKey: profileKey }) // don't let an in-flight refetch overwrite us
       const previous = queryClient.getQueryData(profileKey)

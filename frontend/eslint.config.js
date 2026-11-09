@@ -25,4 +25,9 @@ export default defineConfig([
       },
     },
   },
+  // Server-side code: the sign-in service, its host adapters, and build config run on Node.
+  {
+    files: ['server/**/*.js', 'api/**/*.js', 'netlify/**/*.mjs', 'vite.config.js'],
+    languageOptions: { globals: globals.node },
+  },
 ])

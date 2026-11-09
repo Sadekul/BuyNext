@@ -1,25 +1,38 @@
 import { useCallback, useMemo } from 'react'
 import { OrdersContext } from './ordersContext'
-import { EMPTY_ORDERS, ORDER_ACTIONS, ordersReducer, sanitizeOrders } from '../reducers/ordersReducer'
+import {
+  EMPTY_ORDERS,
+  ORDER_ACTIONS,
+  hasNoOrders,
+  mergeOrders,
+  ordersReducer,
+  sanitizeOrders,
+  takeOrdersOfCustomer,
+} from '../reducers/ordersReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
 import { useAuth } from '../hooks/useAuth'
+import { STORAGE_KEYS } from '../constants/storageKeys'
 
 const STORAGE_OPTIONS = {
-  storageKey: 'buynest.orders.v1',
+  storageKey: STORAGE_KEYS.orders,
   emptyState: EMPTY_ORDERS,
   sanitize: sanitizeOrders,
   replaceActionType: ORDER_ACTIONS.REPLACED,
+  // Guests can't place orders: the base key only holds the old shared list.
+  mergeGuest: mergeOrders,
+  takeGuest: takeOrdersOfCustomer,
+  isEmpty: hasNoOrders,
 }
 
 /*
- * Demo order history, saved in this browser and filtered by the signed-in
- * customer. A real store reads orders from the backend (GET /api/orders),
- * which only returns the authenticated customer's own orders.
+ * Demo order history, saved in this browser per account (and filtered by the
+ * signed-in customer as a second check). A real store reads orders from the
+ * backend (GET /api/orders), which only returns the customer's own orders.
  */
 function OrdersProvider({ children }) {
-  const [state, dispatch] = usePersistentReducer(ordersReducer, STORAGE_OPTIONS)
   const { user } = useAuth()
   const userId = user?.id ?? null
+  const [state, dispatch] = usePersistentReducer(ordersReducer, STORAGE_OPTIONS, userId)
 
   const placeOrder = useCallback((order) => dispatch({ type: ORDER_ACTIONS.PLACED, order }), [dispatch])
 

@@ -89,8 +89,3 @@ export function normalizeUser(raw) {
     address, // only in /auth/me
   }
 }
-
-/** Raw login/refresh response → `{ accessToken, refreshToken }`. */
-export function normalizeTokens(raw) {
-  return { accessToken: raw.accessToken, refreshToken: raw.refreshToken }
-}

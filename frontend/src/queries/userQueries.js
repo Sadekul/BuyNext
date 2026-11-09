@@ -7,12 +7,12 @@ export const userKeys = {
 }
 
 /**
- * The signed-in customer's profile (GET /auth/me). `authorizedRequest`
- * comes from useAuth() and handles token refresh on 401.
+ * The signed-in customer's profile (GET /api/auth/me). `authorizedRequest`
+ * comes from useAuth() and renews the session on 401.
  */
 export const profileQuery = (userId, authorizedRequest) =>
   queryOptions({
     queryKey: userKeys.profile(userId),
-    queryFn: ({ signal }) => authorizedRequest((token) => getCurrentUser(token, { signal })),
+    queryFn: ({ signal }) => authorizedRequest(() => getCurrentUser({ signal })),
     staleTime: 5 * 60_000,
   })

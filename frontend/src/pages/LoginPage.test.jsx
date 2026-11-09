@@ -34,7 +34,7 @@ describe('LoginPage (form validation)', () => {
   })
 
   it('shows the server message for wrong credentials', async () => {
-    mockFetch({ 'POST /auth/login': { status: 400, body: { message: 'Invalid credentials' } } })
+    mockFetch({ 'POST /api/auth/login': { status: 400, body: { message: 'Invalid credentials' } } })
     const user = userEvent.setup()
     renderLogin()
     await user.type(screen.getByLabelText('Username'), 'emilys')
@@ -44,13 +44,17 @@ describe('LoginPage (form validation)', () => {
   })
 
   it('signs in and redirects to the account page', async () => {
-    mockFetch({
-      'POST /auth/login': { body: { id: 1, username: 'emilys', firstName: 'Emily', accessToken: 'a', refreshToken: 'r' } },
-    })
+    const fetchMock = mockFetch({ 'POST /api/auth/login': { body: { id: 1, username: 'emilys', firstName: 'Emily' } } })
     const user = userEvent.setup()
     renderLogin()
     await user.click(screen.getByRole('button', { name: 'Use demo account' }))
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(await screen.findByText('Account home')).toBeInTheDocument()
+
+    // Sign-in goes to BuyNest's own service, which keeps the session in HttpOnly cookies.
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(new URL(url).origin).toBe(window.location.origin)
+    expect(init.credentials).toBe('same-origin')
+    expect(JSON.parse(init.body)).toMatchObject({ username: 'emilys', remember: true })
   })
 })

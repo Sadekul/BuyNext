@@ -1,16 +1,14 @@
 import { useEffect, useReducer, useState } from 'react'
-import { readJson, removeKey, writeJson } from '../utils/storage'
+import { ownerStorageKey, readJson, removeKey, writeJson } from '../utils/storage'
 
 const MERGE_GUEST = 'persistent/mergeGuest'
 
-/** Storage key for one owner: the guest list uses the base key, each account its own. */
-export function ownerStorageKey(storageKey, ownerId) {
-  return ownerId == null ? storageKey : `${storageKey}.user-${ownerId}`
-}
+const hasNoItems = (state) => state.items.length === 0
+const takeAllGuest = (guest) => ({ moved: guest, remaining: null })
 
 /**
  * useReducer whose state is saved to localStorage and kept in sync between
- * browser tabs. Used by the cart and the wishlist.
+ * browser tabs. Used by the cart, the wishlist, and demo orders.
  *
  *   const [state, dispatch] = usePersistentReducer(reducer, {
  *     storageKey: 'buynest.cart.v1',
@@ -18,6 +16,7 @@ export function ownerStorageKey(storageKey, ownerId) {
  *     sanitize: sanitizeCart,        // validates data read from storage
  *     replaceActionType: 'cart/replaced',
  *     mergeGuest: mergeCarts,        // (accountState, guestState) => state
+ *     takeGuest, isEmpty,            // optional, see the merge effect below
  *   }, user?.id)
  *
  * OWNERSHIP: each signed-in customer gets their own saved copy
@@ -31,7 +30,15 @@ export function ownerStorageKey(storageKey, ownerId) {
  * Pass module-level constants for the options so the effects stay stable.
  */
 export function usePersistentReducer(reducer, options, ownerId = null) {
-  const { storageKey, emptyState, sanitize, replaceActionType, mergeGuest } = options
+  const {
+    storageKey,
+    emptyState,
+    sanitize,
+    replaceActionType,
+    mergeGuest,
+    takeGuest = takeAllGuest,
+    isEmpty = hasNoItems,
+  } = options
   const activeKey = ownerStorageKey(storageKey, ownerId)
   const load = (key) => sanitize(readJson(key, emptyState))
 
@@ -56,13 +63,17 @@ export function usePersistentReducer(reducer, options, ownerId = null) {
   }, [activeKey, state])
 
   // Signed in with guest items waiting: move them into the account.
+  // `takeGuest` picks what belongs to this account (default: everything);
+  // whatever it leaves stays in the guest copy.
   useEffect(() => {
     if (activeKey === storageKey || !mergeGuest) return
     const guest = sanitize(readJson(storageKey, emptyState))
-    if (guest.items.length === 0) return
-    dispatch({ type: MERGE_GUEST, guest })
-    removeKey(storageKey)
-  }, [activeKey, storageKey, emptyState, sanitize, mergeGuest])
+    if (isEmpty(guest)) return
+    const { moved, remaining } = takeGuest(guest, ownerId)
+    if (!isEmpty(moved)) dispatch({ type: MERGE_GUEST, guest: moved })
+    if (remaining && !isEmpty(remaining)) writeJson(storageKey, remaining)
+    else removeKey(storageKey)
+  }, [activeKey, storageKey, ownerId, emptyState, sanitize, mergeGuest, takeGuest, isEmpty])
 
   // The `storage` event fires in OTHER tabs when this key changes.
   useEffect(() => {

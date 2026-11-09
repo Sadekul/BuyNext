@@ -1,15 +1,15 @@
 import { LuTriangleAlert } from 'react-icons/lu'
 import Button from '../ui/Button'
+import { ACCOUNT_STORES } from '../../constants/storageKeys'
 
 // Saved data that is safe to drop: carts, wishlists (guest and per-account
 // copies), and demo orders. The sign-in session is kept so the customer
 // doesn't have to sign in again.
-const RESETTABLE_PREFIXES = ['buynest.cart.v1', 'buynest.wishlist.v1', 'buynest.orders.v1']
 
 function resetSavedDataAndReload() {
   try {
     Object.keys(window.localStorage)
-      .filter((key) => RESETTABLE_PREFIXES.some((prefix) => key.startsWith(prefix)))
+      .filter((key) => ACCOUNT_STORES.some((prefix) => key.startsWith(prefix)))
       .forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // storage blocked: reloading is still worth a try

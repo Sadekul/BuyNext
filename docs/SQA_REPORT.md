@@ -21,7 +21,7 @@ A full quality and security pass over the storefront after Phase 14. Every findi
 | S7 | Low | Demo password in every production bundle | Shown only with the DummyJSON provider. Laravel builds don't contain it. |
 | S8 | Hardening | Post-login redirect trusted `location.state` | Only same-site paths are accepted (`//host` and `/\host` are rejected). |
 
-**Checked and clean:** XSS (no raw HTML, no API-controlled links), open redirects, token leakage (Bearer header to the API only, refresh token in the POST body), the learning lab being excluded from production, prototype pollution, unsafe JSON parsing, regex DoS, and secrets in env files.
+**Checked and clean:** XSS (no raw HTML, no API-controlled links), open redirects, token leakage (now: tokens never leave the server-side sign-in service), the learning lab being excluded from production, prototype pollution, unsafe JSON parsing, regex DoS, and secrets in env files.
 
 ## Functional findings
 
@@ -53,8 +53,21 @@ Behaviour now: items added as a guest move into the account at sign-in (the larg
 
 Checks: `src/hooks/usePersistentReducer.test.js`, merge tests in the reducers, and an 18-check browser audit.
 
+## Former known limits (resolved)
+
+| # | Was | Now |
+|---|---|---|
+| K1 | Sign-in tokens were kept in Web Storage, readable by any script on the page | A same-origin sign-in service (`server/authBff.js`, runs as a Vercel/Netlify function and inside Vite) keeps them in `HttpOnly; Secure; SameSite=Strict; Path=/api/auth` cookies. No token reaches JavaScript or storage; requests from other websites are refused and never carry the cookies. "Keep me signed in" = 7-day cookies, otherwise they end with the browser. Older token-bearing sessions are deleted on first load. |
+| K3 | Each account's saved cart, wishlist and demo orders stayed in the browser after sign-out | Without "Keep me signed in", they are deleted when the session ends: on sign-out, on expiry, and on the next visit after the browser was closed. With it, they're kept for the next sign-in (a trusted device). Orders are now saved per account, so exactly one customer's are removed. |
+
+Two bugs found while verifying K1/K3, both fixed with regression tests:
+- A reload immediately after signing in could forget "Keep me signed in" (the name cache wasn't written yet), so sign-out deleted a remembered account's items. The choice now travels in the session cookie itself.
+- Signing out and reloading (or closing the tab) immediately could cancel the sign-out request and leave the session alive. Sign-out now deletes the session hint at once and sends the request with `keepalive`; 8/8 instant-reload and 8/8 instant-close runs ended fully signed out.
+
+DummyJSON check behind this design: it reflects any `Origin` with `Access-Control-Allow-Credentials: true`, so a plain proxy of its API on our domain would have let other websites try credentialed reads. The service only exposes five sign-in endpoints, rejects `Sec-Fetch-Site: cross-site`, and sends no CORS headers.
+
 ## Known limits (by design, documented)
 
-- Tokens live in Web Storage because DummyJSON is token-based. The Laravel plan uses an HttpOnly session cookie (see `docs/backend/API_CONTRACT.md`).
-- Orders, payment and stock are simulated in the browser. The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
-- Demo orders (with contact details), and each account's saved cart and wishlist, stay in this browser's storage after sign-out (never shown to anyone else) because DummyJSON has nowhere to keep them. They move server-side with Laravel.
+- Orders, payment and stock are simulated in the browser (K2: kept simulated by decision, until the Laravel backend). The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
+- In Laravel mode, sign-in still goes through the DummyJSON sign-in service until Laravel's Sanctum endpoints exist (see `docs/backend/API_CONTRACT.md`).
+- The Vercel and Netlify function wrappers are verified locally only; confirm sign-in once after the first deploy (see `docs/DEPLOYMENT.md`).

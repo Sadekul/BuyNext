@@ -2,7 +2,7 @@
 
 **Goal:** sign-in, registration, password reset, a protected account area, and sign-out, using DummyJSON's demo auth API.
 
-> **Learning implementation, not real security.** BuyNest keeps tokens in Web Storage and hides pages in React. Neither protects data on its own. Production authentication arrives with the Laravel backend (Sanctum), described below.
+> **Update (after the SQA audit):** tokens no longer live in Web Storage. Sign-in now goes through a small same-origin service (`server/authBff.js`) that keeps them in HttpOnly, Secure, SameSite=Strict cookies, the same model Laravel Sanctum will use. The lesson below describes the original token-in-storage version, which is still worth understanding; see "Secure cookies" in [docs/SQA_REPORT.md](../SQA_REPORT.md) for what changed and why. Hiding pages in React is still not security on its own: the server checks the session on every request.
 
 ## What was built
 

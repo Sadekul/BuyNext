@@ -1,5 +1,40 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
+import { handleAuthRequest } from './server/authBff.js'
+
+/*
+ * Serves the sign-in service (server/authBff.js) at /api/auth/* in
+ * `npm run dev` and `npm run preview`, the way the Vercel/Netlify functions
+ * do in production. Converts Node's request/response to the Web standard
+ * Request/Response the service is written against.
+ */
+function authService() {
+  async function middleware(req, res) {
+    const chunks = []
+    for await (const chunk of req) chunks.push(chunk)
+    const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined
+    const request = new Request(`http://${req.headers.host}${req.originalUrl ?? req.url}`, {
+      method: req.method,
+      headers: Object.entries(req.headers).flatMap(([name, value]) =>
+        Array.isArray(value) ? value.map((item) => [name, item]) : [[name, value]],
+      ),
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
+    })
+    const response = await handleAuthRequest(request)
+    res.statusCode = response.status
+    response.headers.forEach((value, name) => {
+      if (name !== 'set-cookie') res.setHeader(name, value)
+    })
+    const cookies = response.headers.getSetCookie()
+    if (cookies.length > 0) res.setHeader('Set-Cookie', cookies)
+    res.end(Buffer.from(await response.arrayBuffer()))
+  }
+  // No return value: Vite would call a returned function as a post-middleware hook.
+  const mount = (server) => {
+    server.middlewares.use('/api/auth', middleware)
+  }
+  return { name: 'buynest-auth-service', configureServer: mount, configurePreviewServer: mount }
+}
 
 /*
  * Content-Security-Policy for production builds, added to index.html as a
@@ -20,7 +55,7 @@ function contentSecurityPolicy(mode) {
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     `img-src 'self' data: https://cdn.dummyjson.com ${apiOrigin}`,
-    `connect-src 'self' ${apiOrigin}`,
+    `connect-src 'self' ${apiOrigin}`, // 'self' covers the sign-in service at /api/auth
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -39,7 +74,7 @@ function contentSecurityPolicy(mode) {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), contentSecurityPolicy(mode)],
+  plugins: [react(), authService(), contentSecurityPolicy(mode)],
   // Vitest reuses this config, so tests compile JSX exactly like the app.
   test: {
     environment: 'jsdom', // a simulated browser DOM

@@ -140,14 +140,15 @@ Component ─▶ hook (useQuery / useCart / useAuth…)
 | GET | `/products/category/:slug` | Category scope, related products |
 | GET | `/products/:id` | Product details, quick view |
 | GET | `/products/categories` | Category navigation and tiles |
-| POST | `/auth/login`, `/auth/refresh`; GET `/auth/me` | Sign-in, token refresh, session check, profile |
-| POST | `/users/add`; PUT `/users/:id` | Registration, profile edit (both simulated) |
+| POST | `/users/add` | Registration (simulated) |
 | POST | `/carts/add` | Server price check before a (simulated) order |
+
+Sign-in goes through BuyNest's own service at `/api/auth/*` ([server/authBff.js](server/authBff.js)): `POST login`, `GET me`, `POST refresh`, `PUT profile` (simulated), `POST logout`. It calls DummyJSON's `/auth/*` endpoints and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies, so no token ever reaches page JavaScript or browser storage. It runs inside `npm run dev` / `npm run preview`, and as a Vercel function (`api/auth/[action].js`) or Netlify function (`netlify/functions/auth.mjs`) when deployed. "Keep me signed in" makes the session last 7 days; otherwise it ends when the browser closes, and signing out (or the session ending) also deletes the account's saved cart, wishlist, and demo orders from the device.
 
 Switching to Laravel: `VITE_API_PROVIDER=laravel` (contract: [docs/backend/API_CONTRACT.md](../docs/backend/API_CONTRACT.md)).
 
 ## Quality
-- **Tests:** `npm test` runs 94 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
+- **Tests:** `npm test` runs 133 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
 - **Accessibility:** semantic landmarks, skip link, visible focus, labelled controls with linked errors, ARIA combobox search, native `<dialog>` modals, reduced-motion support. axe-core reports **no violations** on the main pages of the production build.
 - **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 124 KB gzipped.
 

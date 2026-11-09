@@ -4,207 +4,215 @@ import { AuthContext } from './authContext'
 import { ApiError, isAbortError } from '../services/apiClient'
 import * as authService from '../services/authService'
 import { userKeys } from '../queries/userQueries'
+import { LEGACY_KEYS, STORAGE_KEYS } from '../constants/storageKeys'
+import { removeAccountData } from '../utils/accountData'
+import { readJson, removeKey, writeJson } from '../utils/storage'
 
 /*
  * Who is signed in, for the whole app.
  *
- * LEARNING IMPLEMENTATION — NOT REAL SECURITY:
- * - Tokens are kept in Web Storage so a refresh keeps you signed in. Any
- *   JavaScript on the page (including an XSS attack) can read them.
- * - Hiding pages in React does not protect data: the API must check the
- *   token on every request (it does: /auth/me returns 401 without one).
- * Production plan: Laravel Sanctum with an HttpOnly, Secure, SameSite
- * session cookie that JavaScript can't read, plus CSRF protection.
+ * The session lives in HttpOnly cookies set by BuyNest's sign-in service
+ * (server/authBff.js): no token ever reaches JavaScript or Web Storage, so an
+ * injected script can't steal one. The browser sends the cookies to /api/auth
+ * by itself.
  *
- * session.status: 'checking' (validating a stored session) | 'authenticated' | 'anonymous'
+ * What the page DOES keep:
+ * - the `buynest_session` cookie: a readable hint (no secret) that a session
+ *   exists and whether it is remembered (`remember` / `session`), set by the
+ *   server together with the session, so the two always agree;
+ * - the customer's name and avatar in localStorage (STORAGE_KEYS.profile), so
+ *   the header can greet them before /api/auth/me answers. Only trusted while
+ *   the hint cookie exists.
+ * Hiding pages in React is still not security: the API checks the session
+ * cookie on every request.
+ *
+ * session.status: 'checking' (validating a session) | 'authenticated' | 'anonymous'
+ * session.remember: "Remember me" — keeps the account's saved items on this
+ * device after the session ends; otherwise they are deleted (accountData.js).
  */
 
-const STORAGE_KEY = 'buynest.session.v1'
-const ANONYMOUS = { status: 'anonymous', user: null, tokens: null, remember: false, expired: false }
+const ANONYMOUS = { status: 'anonymous', user: null, remember: false, expired: false }
+const SESSION_HINT_COOKIE = 'buynest_session'
 
 // Only these profile fields are written to storage. Phone and address stay in
-// memory (pages fetch them fresh from /auth/me), so they don't linger on a
-// shared device.
+// memory (pages fetch them fresh from /api/auth/me).
 const STORED_USER_FIELDS = ['id', 'username', 'firstName', 'lastName', 'email', 'image']
 
-// Errors that mean "these tokens are no longer valid". Anything else (offline,
+// Errors that mean "this session is no longer valid". Anything else (offline,
 // timeout, 5xx, rate limiting) says nothing about the session, so it is kept.
 const isAuthFailure = (error) => error instanceof ApiError && [400, 401, 403].includes(error.status)
 
-// "Remember me" → localStorage (survives closing the browser); otherwise
-// sessionStorage (cleared when the tab closes).
-function readStoredSession() {
-  for (const storage of [window.localStorage, window.sessionStorage]) {
-    try {
-      const value = JSON.parse(storage.getItem(STORAGE_KEY))
-      if (value?.tokens?.accessToken && value?.tokens?.refreshToken && value?.user?.id) return value
-    } catch {
-      // unreadable entry: ignore it
-    }
-  }
-  return null
+/** The session hint cookie: null when there is no session, else { remember }. */
+function readSessionHint() {
+  const entry = document.cookie.split('; ').find((item) => item.startsWith(`${SESSION_HINT_COOKIE}=`))
+  const value = entry?.slice(SESSION_HINT_COOKIE.length + 1)
+  return value ? { remember: value === 'remember' } : null
 }
 
-function writeStoredSession(session) {
-  try {
-    if (session.status !== 'authenticated') {
-      window.localStorage.removeItem(STORAGE_KEY)
-      window.sessionStorage.removeItem(STORAGE_KEY)
-      return
-    }
-    const [target, other] = session.remember
-      ? [window.localStorage, window.sessionStorage]
-      : [window.sessionStorage, window.localStorage]
-    // Overwrite in place. Never remove-then-set the key we keep: the removal
-    // fires a `storage` event with newValue === null in other tabs, which
-    // they (correctly) treat as "signed out".
-    other.removeItem(STORAGE_KEY)
-    const user = Object.fromEntries(STORED_USER_FIELDS.map((field) => [field, session.user[field] ?? null]))
-    target.setItem(STORAGE_KEY, JSON.stringify({ user, tokens: session.tokens, remember: session.remember }))
-  } catch {
-    // storage blocked: the session simply won't survive a refresh
-  }
+function readCachedProfile() {
+  const cached = readJson(STORAGE_KEYS.profile, null)
+  return Number.isInteger(cached?.user?.id) ? { user: cached.user, remember: cached.remember === true } : null
 }
 
 /**
- * Asks the API who the stored tokens belong to. If the access token expired
- * (401), tries ONE refresh. Resolves to a state updater for setSession.
+ * The starting state, from the hint cookie and the cached profile. Also tidies
+ * up after sessions that ended while the app was closed: an unremembered
+ * session ends when the browser closes, so its account data is deleted here.
  */
-async function verifyStoredSession(tokens, signal) {
+function initialSession() {
+  LEGACY_KEYS.forEach((key) => {
+    removeKey(key) // older versions kept tokens in Web Storage
+    try {
+      window.sessionStorage.removeItem(key)
+    } catch {
+      // storage blocked: nothing to remove
+    }
+  })
+  const cached = readCachedProfile()
+  const hint = readSessionHint()
+  if (hint) return { status: 'checking', user: cached?.user ?? null, remember: hint.remember, expired: false }
+  if (cached) {
+    if (!cached.remember) removeAccountData(cached.user.id)
+    removeKey(STORAGE_KEYS.profile)
+  }
+  return ANONYMOUS
+}
+
+/**
+ * Asks the sign-in service who the session belongs to. If it has expired
+ * (401), renews it ONCE. Resolves to a state updater for setSession.
+ */
+async function verifySession(signal) {
   try {
-    let currentTokens = tokens
     let user
     try {
-      user = await authService.getCurrentUser(currentTokens.accessToken, { signal })
+      user = await authService.getCurrentUser({ signal })
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 401)) throw error
-      currentTokens = await authService.refreshSession(currentTokens.refreshToken, { signal })
-      user = await authService.getCurrentUser(currentTokens.accessToken, { signal })
+      await authService.refreshSession({ signal })
+      user = await authService.getCurrentUser({ signal })
     }
-    return (current) => ({ ...current, status: 'authenticated', user, tokens: currentTokens })
+    return (current) => ({ ...current, status: 'authenticated', user })
   } catch (error) {
     if (isAbortError(error)) return (current) => current
-    // Auth failures end the session. Network and server problems keep the
-    // stored user, because we can't tell whether the session is still valid.
     if (isAuthFailure(error)) return { ...ANONYMOUS, expired: true }
-    return (current) => ({ ...current, status: 'authenticated' })
+    // Offline or a server problem: keep the customer we know about, if any.
+    return (current) => (current.user ? { ...current, status: 'authenticated' } : ANONYMOUS)
   }
 }
 
 function AuthProvider({ children }) {
   const queryClient = useQueryClient()
-  const [session, setSession] = useState(() => {
-    const stored = readStoredSession()
-    return stored ? { ...stored, status: 'checking', expired: false } : ANONYMOUS
-  })
+  const [session, setSession] = useState(initialSession)
 
-  // Persist after every change (and remove on sign-out).
+  // Cache the name/avatar while signed in; remove it when signed out.
   useEffect(() => {
-    if (session.status !== 'checking') writeStoredSession(session)
+    if (session.status === 'authenticated') {
+      const user = Object.fromEntries(STORED_USER_FIELDS.map((field) => [field, session.user[field] ?? null]))
+      writeJson(STORAGE_KEYS.profile, { user, remember: session.remember })
+    } else if (session.status === 'anonymous') {
+      removeKey(STORAGE_KEYS.profile)
+    }
   }, [session])
 
-  // Signed out (by the user, an expired session, or another tab): drop every
-  // cached profile so the next person on this device can't see it.
+  // When a session ends (sign-out, expiry, or sign-out in another tab):
+  // - drop every cached profile so the next person can't see it;
+  // - without "Remember me", delete the account's saved cart, wishlist, and
+  //   orders from this device. This runs after the stores have switched to the
+  //   guest copies, so nothing writes the account's data back.
+  const previousSessionRef = useRef(session)
   useEffect(() => {
-    if (session.status === 'anonymous') queryClient.removeQueries({ queryKey: userKeys.all })
-  }, [session.status, queryClient])
+    const previous = previousSessionRef.current
+    previousSessionRef.current = session
+    if (session.status !== 'anonymous') return
+    queryClient.removeQueries({ queryKey: userKeys.all })
+    if (previous.user && !previous.remember) removeAccountData(previous.user.id)
+  }, [session, queryClient])
 
-  // Keep every tab on the same account (only "remember me" sessions are
-  // shared: sessionStorage belongs to one tab):
-  // - signed out in another tab → sign out here too (the cart and wishlist
-  //   switch to the guest copy, so nothing of the account stays on screen);
-  // - signed in, or signed in as someone else, in another tab → check and
-  //   adopt that session;
-  // - same account with refreshed tokens → use the new tokens.
+  // Keep every tab on the same account. Cookies are shared by all tabs; the
+  // cached profile's `storage` event tells the other tabs what happened.
   useEffect(() => {
     function handleStorage(event) {
-      if (event.key !== STORAGE_KEY) return
-      if (event.newValue === null) {
-        setSession(ANONYMOUS)
+      if (event.key !== STORAGE_KEYS.profile) return
+      const cached = readCachedProfile()
+      const hint = readSessionHint()
+      if (!cached || !hint) {
+        setSession((current) => (current.status === 'anonymous' ? current : ANONYMOUS))
         return
       }
-      const stored = readStoredSession()
-      if (!stored) return
-      setSession((current) => {
-        if (current.status === 'authenticated' && current.user?.id === stored.user.id) {
-          return current.tokens?.accessToken === stored.tokens.accessToken ? current : { ...current, tokens: stored.tokens }
-        }
-        return { ...stored, status: 'checking', expired: false }
-      })
+      setSession((current) =>
+        current.status !== 'anonymous' && current.user?.id === cached.user.id
+          ? current
+          : { status: 'checking', user: cached.user, remember: hint.remember, expired: false },
+      )
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [])
 
-  // Startup check for a stored session (see verifyStoredSession below).
+  // Session check on start-up (and when another tab signs in).
   // The effect applies the result in .then(): setState after the request, never synchronously.
-  const checkStoredSession = useEffectEvent((signal) => verifyStoredSession(session.tokens, signal))
+  const checkSession = useEffectEvent((signal) => verifySession(signal))
 
   useEffect(() => {
     if (session.status !== 'checking') return
     const controller = new AbortController()
-    checkStoredSession(controller.signal).then((update) => {
+    checkSession(controller.signal).then((update) => {
       if (!controller.signal.aborted) setSession(update)
     })
     return () => controller.abort()
   }, [session.status])
 
   const login = useCallback(async ({ username, password, remember }) => {
-    const { user, tokens } = await authService.login({ username, password })
-    setSession({ status: 'authenticated', user, tokens, remember, expired: false })
+    const user = await authService.login({ username, password, remember })
+    setSession({ status: 'authenticated', user, remember, expired: false })
     return user
   }, [])
 
   const logout = useCallback(() => {
-    // DummyJSON has no logout endpoint. A real backend must also revoke the
-    // refresh token / destroy the server session (e.g. POST /logout).
+    // 1. Delete the readable hint now: even if the page reloads before the
+    //    request below finishes, the app starts signed out.
+    // 2. The service deletes the HttpOnly session cookies (a keepalive request,
+    //    so closing the tab doesn't cancel it).
+    document.cookie = `${SESSION_HINT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Strict`
+    authService.logout().catch(() => {})
     setSession(ANONYMOUS)
   }, [])
 
-  // The refresh in progress, shared by every request that hit a 401 at the
-  // same time: one refresh call, not one per request. (A backend that
-  // rotates refresh tokens would reject the second call and sign the user out.)
+  // The renewal in progress, shared by every request that hit a 401 at the
+  // same time: one refresh call, not one per request.
   const refreshRef = useRef(null)
 
   /**
-   * Runs an authorized request: `request(accessToken)`. On 401 it refreshes
-   * the tokens once and retries. If the refresh is rejected, the customer is
-   * signed out with `expired: true`; other failures (offline, server error)
-   * are re-thrown without signing out.
+   * Runs a request that needs the session: `request()`. On 401 it renews the
+   * session once and retries. If renewal is rejected, the customer is signed
+   * out with `expired: true`; other failures (offline, server error) are
+   * re-thrown without signing out.
    */
   const authorizedRequest = useCallback(
     async (request) => {
-      if (!session.tokens) throw new ApiError('Please sign in to continue.', { status: 401 })
+      if (session.status === 'anonymous') throw new ApiError('Please sign in to continue.', { status: 401 })
       try {
-        return await request(session.tokens.accessToken)
+        return await request()
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 401)) throw error
-        const { refreshToken } = session.tokens
-        refreshRef.current ??= authService.refreshSession(refreshToken).finally(() => {
+        refreshRef.current ??= authService.refreshSession().finally(() => {
           refreshRef.current = null
         })
-        let tokens
         try {
-          tokens = await refreshRef.current
+          await refreshRef.current
         } catch (refreshError) {
           if (!isAuthFailure(refreshError)) throw refreshError
-          setSession({ ...ANONYMOUS, expired: true })
+          setSession((current) => (current.status === 'anonymous' ? current : { ...ANONYMOUS, expired: true }))
           throw new ApiError('Your session has expired. Please sign in again.', { status: 401 })
         }
-        // Apply the new tokens only to the session they were refreshed for:
-        // not after a sign-out, and not over a different account's session.
-        setSession((current) =>
-          current.status === 'authenticated' && current.tokens?.refreshToken === refreshToken
-            ? { ...current, tokens }
-            : current,
-        )
-        return request(tokens.accessToken)
+        return request()
       }
     },
-    [session.tokens],
+    [session.status],
   )
 
-  /** Merges fresh profile data (e.g. from /auth/me) into the session. */
+  /** Merges fresh profile data (e.g. a renamed customer) into the session. */
   const updateUser = useCallback((user) => setSession((current) => ({ ...current, user })), [])
 
   const value = useMemo(

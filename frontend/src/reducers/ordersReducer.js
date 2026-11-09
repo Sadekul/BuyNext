@@ -68,6 +68,27 @@ function isValidOrder(order) {
   )
 }
 
+/**
+ * Orders used to be saved in one list for every account on the device. When
+ * a customer signs in, their orders from that old list move into their own
+ * copy; other customers' orders stay where they are until those customers sign in.
+ */
+export function takeOrdersOfCustomer(legacy, userId) {
+  return {
+    moved: { orders: legacy.orders.filter((order) => order.userId === userId) },
+    remaining: { orders: legacy.orders.filter((order) => order.userId !== userId) },
+  }
+}
+
+/** Adds moved orders to the account's list, once each, newest first. */
+export function mergeOrders(account, moved) {
+  const known = new Set(account.orders.map((order) => order.id))
+  const orders = [...moved.orders.filter((order) => !known.has(order.id)), ...account.orders]
+  return { orders: orders.sort((a, b) => b.placedAt - a.placedAt) }
+}
+
+export const hasNoOrders = (state) => state.orders.length === 0
+
 export function sanitizeOrders(value) {
   if (!value || !Array.isArray(value.orders)) return EMPTY_ORDERS
   return { orders: value.orders.filter(isValidOrder) }

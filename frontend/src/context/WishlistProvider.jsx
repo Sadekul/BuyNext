@@ -2,12 +2,13 @@ import { useCallback, useMemo } from 'react'
 import { WishlistContext } from './wishlistContext'
 import { EMPTY_WISHLIST, WISHLIST_ACTIONS, mergeWishlists, sanitizeWishlist, wishlistReducer } from '../reducers/wishlistReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
+import { STORAGE_KEYS } from '../constants/storageKeys'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { getPurchaseLimits } from '../utils/inventory'
 
 const STORAGE_OPTIONS = {
-  storageKey: 'buynest.wishlist.v1',
+  storageKey: STORAGE_KEYS.wishlist,
   emptyState: EMPTY_WISHLIST,
   sanitize: sanitizeWishlist,
   replaceActionType: WISHLIST_ACTIONS.REPLACED,

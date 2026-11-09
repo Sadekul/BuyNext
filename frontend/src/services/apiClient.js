@@ -69,9 +69,12 @@ function anySignal(signals) {
 
 const TIMEOUT_MESSAGE = 'The server took too long to respond. Please try again.'
 
-/** Builds `${base}${path}?a=1&b=2`, skipping empty parameters. */
-function buildUrl(path, params = {}) {
-  const url = new URL(`${API_BASE_URL}${path}`)
+/**
+ * Builds `${base}${path}?a=1&b=2`, skipping empty parameters. `sameOrigin`
+ * requests go to this site itself (the sign-in service at /api/auth).
+ */
+function buildUrl(path, params = {}, sameOrigin = false) {
+  const url = sameOrigin ? new URL(path, window.location.origin) : new URL(`${API_BASE_URL}${path}`)
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value))
@@ -80,18 +83,23 @@ function buildUrl(path, params = {}) {
   return url
 }
 
-async function request(path, { method = 'GET', params, body, headers, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+async function request(
+  path,
+  { method = 'GET', params, body, headers, signal, sameOrigin = false, keepalive = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {},
+) {
   // Cancel when the caller aborts OR when the request takes too long.
   const timeoutSignal = AbortSignal.timeout(timeoutMs)
   const combinedSignal = signal ? anySignal([signal, timeoutSignal]) : timeoutSignal
 
   // Cookie-based auth (Laravel Sanctum) needs credentials + a CSRF header on writes.
-  const { credentials = 'omit', xsrfCookie } = apiProvider.request
-  const xsrfToken = xsrfCookie && method !== 'GET' ? readCookie(xsrfCookie) : null
+  // Same-origin requests carry this site's own cookies (the sign-in session).
+  const { credentials: providerCredentials = 'omit', xsrfCookie } = apiProvider.request
+  const credentials = sameOrigin ? 'same-origin' : providerCredentials
+  const xsrfToken = xsrfCookie && method !== 'GET' && !sameOrigin ? readCookie(xsrfCookie) : null
 
   let response
   try {
-    response = await fetch(buildUrl(path, params), {
+    response = await fetch(buildUrl(path, params, sameOrigin), {
       method,
       credentials,
       headers: {
@@ -102,6 +110,7 @@ async function request(path, { method = 'GET', params, body, headers, signal, ti
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: combinedSignal,
+      keepalive, // true: the request finishes even if the page is closed or reloaded
     })
   } catch (error) {
     // fetch() only rejects when no HTTP response arrived at all.

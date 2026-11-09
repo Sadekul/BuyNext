@@ -19,7 +19,7 @@ The server only has `index.html`; routes like `/products/123` exist only in Reac
 
 | Host | Configuration (already in the repo) |
 | --- | --- |
-| Vercel | `frontend/vercel.json` → `"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]` |
+| Vercel | `frontend/vercel.json` → `"rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]` (everything except the sign-in service) |
 | Netlify | `frontend/public/_redirects` → `/*  /index.html  200` (copied into `dist/`) |
 | Nginx | `location / { try_files $uri /index.html; }` |
 | Apache | `FallbackResource /index.html` |
@@ -27,6 +27,10 @@ The server only has `index.html`; routes like `/products/123` exist only in Reac
 Both configs also set long-term caching for `/assets/*` and basic security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`).
 
 **Content-Security-Policy.** `npm run build` adds a CSP `<meta>` tag to `dist/index.html` (see `vite.config.js`). It allows scripts and styles only from the site itself (plus Google Fonts), images from the site, `cdn.dummyjson.com` and the API, and network requests only to the site and the origin in `VITE_API_BASE_URL`. Because the API origin is read at build time, a Laravel build gets the right policy automatically. If you add another image host, analytics, or a payment script, add its origin there, or the browser will block it. The dev server has no CSP, because hot reload needs inline scripts.
+
+**Sign-in service.** Sign-in needs a small server function at `/api/auth/*` ([server/authBff.js](../frontend/server/authBff.js)); it keeps the session in HttpOnly cookies so no token reaches the browser. Both hosts pick it up from the repo with no extra settings: Vercel from `frontend/api/auth/[action].js`, Netlify from `frontend/netlify/functions/auth.mjs` (its `config.path` maps it to `/api/auth/:action`). Static hosts without functions (Nginx, Apache, S3) need that service run somewhere and proxied at `/api/auth/` on the same domain, or sign-in won't work. The cookies are `Secure`, so the site must be served over HTTPS (`http://localhost` is the exception browsers allow).
+
+> **Verified locally only.** The service, cookies, sign-out, and session renewal are tested in `npm run dev` and `npm run preview` (unit tests in `server/authBff.test.js` plus browser checks). The Vercel and Netlify function wrappers are two-line adapters around the same code, but they have not been run on a real deployment yet: after the first deploy, sign in, reload, and sign out once to confirm.
 
 ## Vercel
 1. Import the GitHub repository.

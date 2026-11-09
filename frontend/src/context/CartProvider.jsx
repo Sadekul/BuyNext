@@ -2,13 +2,13 @@ import { useCallback, useMemo, useState } from 'react'
 import { CartContext } from './cartContext'
 import { CART_ACTIONS, EMPTY_CART, cartReducer, mergeCarts, sanitizeCart } from '../reducers/cartReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
+import { STORAGE_KEYS } from '../constants/storageKeys'
 import { useAuth } from '../hooks/useAuth'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
 
-// Versioned key: if the stored shape ever changes, bump to v2 and old data is ignored.
 const STORAGE_OPTIONS = {
-  storageKey: 'buynest.cart.v1',
+  storageKey: STORAGE_KEYS.cart,
   emptyState: EMPTY_CART,
   sanitize: sanitizeCart,
   replaceActionType: CART_ACTIONS.REPLACED,
