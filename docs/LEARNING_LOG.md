@@ -77,3 +77,12 @@
 - Provider nesting order when one provider uses another
 - Keeping reducers pure (timestamps created in handlers, passed in actions)
 - Preventing duplicates in the reducer and when loading from storage
+
+## Phase 8: Search, filtering, and sorting
+
+- Debouncing with `setTimeout` + effect cleanup (`useDebouncedValue`); debounce vs throttle
+- Client-side vs server-side searching
+- URL search params as the single source of truth (`replace` vs push history entries; validating URL input)
+- `useMemo` for expensive derived data and stable object identity; when not to use it
+- React Router transitions vs controlled inputs (`useTransitions={false}`)
+- Accessible combobox (search suggestions), removable filter chips, mobile filter drawer

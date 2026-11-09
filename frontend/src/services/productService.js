@@ -42,6 +42,15 @@ export function getProductsByCategory(categorySlug, options) {
   return getProductPage(`/products/category/${encodeURIComponent(categorySlug)}`, options)
 }
 
+/** Search suggestions: a few matches with only the fields the dropdown shows. */
+export async function getSearchSuggestions(query, { limit = 6, signal } = {}) {
+  const data = await apiClient.get('/products/search', {
+    params: { q: query, limit, select: 'title,thumbnail,price,discountPercentage,category' },
+    signal,
+  })
+  return normalizeProductPage(data)
+}
+
 /** GET /products/:id — one product with all its fields. Throws ApiError(404) if missing. */
 export async function getProductById(productId, { signal } = {}) {
   const data = await apiClient.get(`/products/${encodeURIComponent(productId)}`, { signal })

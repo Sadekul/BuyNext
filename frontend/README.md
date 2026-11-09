@@ -109,14 +109,15 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `AnnouncementBar` | Promo messages above the header (one on mobile, all on desktop) |
 | `Header` | Logo, search, account/wishlist/cart links, owns mobile-menu state |
 | `Logo` | Brand mark linking home; `tone="light"` for dark backgrounds |
-| `SearchBar` | Controlled search input; navigates to `/products?q=…` |
+| `SearchBar` | Search with debounced live suggestions (ARIA combobox); navigates to `/products?q=…` |
 | `MainNavigation` | Desktop nav with active-link highlighting (`NavLink`) |
 | `MobileNavigation` | Drawer menu built from `Modal` + `SearchBar` |
 | `HeroBanner` | Hero headline, CTAs, and product image |
 | `CategoryCard` | Category tile linking to its category page |
 | `ProductCard` | Grid or list layout: image, brand, category, title, rating, prices, availability, badges, add-to-cart, wishlist, quick view |
 | `ProductGrid` | Responsive grid/list of `ProductCard`s with an empty state |
-| `CatalogFilters` | Controlled price, rating, brand, and stock filters |
+| `CatalogFilters` | Controlled price, rating, brand, and availability filters (sidebar and mobile drawer) |
+| `ActiveFilters` | Removable chips for each active filter, plus Clear all |
 | `SortSelect` / `ViewToggle` | Sort dropdown; grid/list toggle |
 | `Pagination` | Accessible page numbers with gaps |
 | `QuickViewModal` | Product summary in a modal, fetched by ID |
@@ -160,6 +161,7 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 | GET | `/products/search?q=&limit=0` | Search scope of the catalog |
 | GET | `/products/category/:slug?limit=0` | Category scope of the catalog |
 | GET | `/products/categories` | Category nav and homepage tiles |
+| GET | `/products/search?q=&limit=6&select=…` | Search suggestions (debounced) |
 | GET | `/products/:id` | Quick view and the product details page |
 | GET | `/products/category/:slug?limit=5` | Related products |
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
@@ -173,8 +175,8 @@ DummyJSON quirks we handle: unknown categories return `200` with an empty list (
 | Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
 | Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
 | Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
-| URL state (search, sort) | `useSearchParams` | Shareable and bookmarkable |
-| Local UI state (menu, filters, gallery image) | `useState` in the component | Only one component cares |
+| URL state (search, filters, sort, page, view) | `useSearchParams` + `utils/catalogParams.js` | Back/forward, refresh, and shared links restore the same results |
+| Local UI state (menu, drawers, gallery image) | `useState` in the component | Only one component cares |
 
 The cart is a client-side convenience: prices, stock, coupons, shipping, and totals must be re-validated by the backend at checkout.
 

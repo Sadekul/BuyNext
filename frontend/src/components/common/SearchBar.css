@@ -1,4 +1,9 @@
 .search-bar {
+  position: relative;
+  width: 100%;
+}
+
+.search-bar__field {
   display: flex;
   width: 100%;
   background: var(--color-bg-muted);
@@ -9,7 +14,7 @@
     box-shadow var(--transition-fast);
 }
 
-.search-bar:focus-within {
+.search-bar__field:focus-within {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgb(4 120 87 / 0.15);
 }
@@ -41,4 +46,100 @@
 
 .search-bar__button:hover {
   background: var(--color-primary-hover);
+}
+
+.search-bar__suggestions {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  left: 0;
+  z-index: 60;
+  max-height: min(26rem, 70vh);
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.search-bar__suggestions[hidden] {
+  display: none;
+}
+
+.search-bar__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.search-bar__option:hover,
+.search-bar__option--active {
+  background: var(--color-primary-soft);
+}
+
+.search-bar__option img {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-sm);
+}
+
+.search-bar__option-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-bar__option-title {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-bar__option-title mark {
+  font-weight: 700;
+  color: inherit;
+  background: none;
+}
+
+.search-bar__option-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.search-bar__option-price {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.search-bar__empty {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.search-bar__all button {
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.search-bar__all button:hover {
+  text-decoration: underline;
 }

@@ -19,17 +19,9 @@
   gap: var(--space-6);
 }
 
-/* Mobile/tablet: filters are a collapsible panel opened by the toolbar button. */
+/* Mobile/tablet: the sidebar is hidden; the toolbar button opens a drawer instead. */
 .listing__filters {
   display: none;
-  padding: var(--space-5);
-  background: var(--color-bg-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.listing__filters--open {
-  display: block;
 }
 
 .listing__results {
@@ -74,22 +66,6 @@
   border-radius: var(--radius-md);
 }
 
-.listing__filter-toggle[aria-expanded='true'] {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-/* The filter panel is placed before the results, but on small screens
-   the toolbar (with its toggle) should come first visually. */
-@media (max-width: 1023px) {
-  .listing__results {
-    display: contents;
-  }
-
-  .listing__toolbar {
-    order: -1;
-  }
-}
 
 @media (min-width: 1024px) {
   .listing__body {
@@ -102,11 +78,8 @@
     top: 9rem;
     display: block;
     max-height: calc(100vh - 10rem);
-    padding: 0 var(--space-2) 0 0;
+    padding-right: var(--space-2);
     overflow-y: auto;
-    background: none;
-    border: none;
-    border-radius: 0;
   }
 
   .listing__filter-toggle {

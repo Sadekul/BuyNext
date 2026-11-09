@@ -15,8 +15,8 @@ const RATING_OPTIONS = [
  * parent and every change is reported through `onChange(nextFilters)`.
  * The component never mutates `filters` — it always builds a new object.
  */
-function CatalogFilters({ filters, brandOptions, onChange, onClear, activeCount }) {
-  const ids = { min: useId(), max: useId(), priceError: useId() }
+function CatalogFilters({ filters, brandOptions, onChange, onClear, activeCount, showTitle = true }) {
+  const ids = { min: useId(), max: useId(), priceError: useId(), ratingGroup: useId() }
   const isPriceRangeInvalid = hasInvalidPriceRange(filters)
 
   function update(changes) {
@@ -32,14 +32,16 @@ function CatalogFilters({ filters, brandOptions, onChange, onClear, activeCount 
 
   return (
     <div className="catalog-filters">
-      <div className="catalog-filters__header">
-        <h2 className="catalog-filters__title">Filters</h2>
-        {activeCount > 0 && (
-          <button type="button" className="catalog-filters__clear" onClick={onClear}>
-            Clear all ({activeCount})
-          </button>
-        )}
-      </div>
+      {(showTitle || activeCount > 0) && (
+        <div className="catalog-filters__header">
+          {showTitle && <h2 className="catalog-filters__title">Filters</h2>}
+          {activeCount > 0 && (
+            <button type="button" className="catalog-filters__clear" onClick={onClear}>
+              Clear all ({activeCount})
+            </button>
+          )}
+        </div>
+      )}
 
       <fieldset className="catalog-filters__group">
         <legend>Price</legend>
@@ -87,7 +89,7 @@ function CatalogFilters({ filters, brandOptions, onChange, onClear, activeCount 
           <label key={option.value} className="catalog-filters__option">
             <input
               type="radio"
-              name="min-rating"
+              name={ids.ratingGroup} // unique per instance: radios sharing a name form one group page-wide
               checked={filters.minRating === option.value}
               onChange={() => update({ minRating: option.value })}
             />
