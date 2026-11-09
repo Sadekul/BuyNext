@@ -6,8 +6,10 @@ import './CouponForm.css'
 /**
  * Discount code input. The draft text is local state; the applied code
  * lives in the cart. Validation messages come from the cart totals.
+ * `disabled` locks it while checkout is placing the order, so the total
+ * can't change between clicking "Place order" and recording it.
  */
-function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove }) {
+function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disabled = false }) {
   const [draft, setDraft] = useState('')
   const inputId = useId()
   const messageId = useId()
@@ -33,12 +35,13 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove }) {
               {couponError ? ` — ${couponError}` : coupon && ` — ${coupon.description}`}
             </span>
           </p>
-          <button type="button" className="coupon-form__remove" onClick={onRemove} aria-label={`Remove code ${appliedCode}`}>
+          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={`Remove code ${appliedCode}`}>
             <LuX aria-hidden="true" />
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
+          <fieldset disabled={disabled} className="coupon-form__fieldset">
           <label htmlFor={inputId}>Discount code</label>
           <div className="coupon-form__row">
             <input
@@ -56,6 +59,7 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove }) {
           <p id={messageId} className="coupon-form__hint">
             Demo codes: NEST10, SAVE20
           </p>
+          </fieldset>
         </form>
       )}
       {/* Always rendered so screen readers announce when a code is applied or rejected. */}

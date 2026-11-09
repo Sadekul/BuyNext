@@ -122,13 +122,19 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
   // otherwise re-run on every render (e.g. opening quick view or the drawer).
   const products = request.data
   const brandOptions = useMemo(() => getBrandOptions(products ?? []), [products])
-  const visibleProducts = useMemo(() => {
-    // An impossible price range (min > max) is ignored rather than showing zero results.
-    const effectiveFilters = hasInvalidPriceRange(filters) ? { ...filters, minPrice: '', maxPrice: '' } : filters
-    return sortProducts(filterProducts(products ?? [], effectiveFilters), sortOption.value)
-  }, [products, filters, sortOption.value])
+  // An impossible price range (min > max) is ignored rather than showing zero
+  // results. The list, the chips, and the filter count all use these filters,
+  // so they never disagree (the filter panel explains the bad range).
+  const effectiveFilters = useMemo(
+    () => (hasInvalidPriceRange(filters) ? { ...filters, minPrice: '', maxPrice: '' } : filters),
+    [filters],
+  )
+  const visibleProducts = useMemo(
+    () => sortProducts(filterProducts(products ?? [], effectiveFilters), sortOption.value),
+    [products, effectiveFilters, sortOption.value],
+  )
   const pagination = paginate(visibleProducts, page, PRODUCTS_PER_PAGE)
-  const activeFilterCount = countActiveFilters(filters)
+  const activeFilterCount = countActiveFilters(effectiveFilters)
 
   // `replace: true` for filters and sort: refining results shouldn't fill the
   // Back history with one entry per keystroke. Page changes push a new entry.
@@ -163,21 +169,26 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
   )
 
   // One removable chip per active filter, including search and category.
+  // Removing search or category changes the result set, so it also returns to page 1.
   const chips = []
   if (searchQuery) {
-    chips.push({ id: 'q', label: `Search: "${searchQuery}"`, onRemove: () => setSearchParams(withParam(searchParams, 'q', null)) })
+    chips.push({
+      id: 'q',
+      label: `Search: "${searchQuery}"`,
+      onRemove: () => setSearchParams(withParam(withParam(searchParams, 'q', null), 'page', null)),
+    })
   }
   if (categorySlug) {
     chips.push({
       id: 'category',
       label: `Category: ${categoryName ?? categorySlug}`,
-      onRemove: () => navigate({ pathname: ROUTES.products, search: searchParams.toString() }),
+      onRemove: () => navigate({ pathname: ROUTES.products, search: withParam(searchParams, 'page', null).toString() }),
     })
   }
-  if (filters.minPrice !== '') {
+  if (effectiveFilters.minPrice !== '') {
     chips.push({ id: 'min', label: `From ${formatPrice(Number(filters.minPrice))}`, onRemove: () => handleFiltersChange({ ...filters, minPrice: '' }) })
   }
-  if (filters.maxPrice !== '') {
+  if (effectiveFilters.maxPrice !== '') {
     chips.push({ id: 'max', label: `Up to ${formatPrice(Number(filters.maxPrice))}`, onRemove: () => handleFiltersChange({ ...filters, maxPrice: '' }) })
   }
   if (filters.minRating > 0) {

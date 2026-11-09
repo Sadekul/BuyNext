@@ -12,7 +12,8 @@ import { apiClient } from './apiClient'
 
 /**
  * Server price check for the cart lines. Returns the server's cart plus a
- * list of problems (missing products, list prices that differ from the cart).
+ * list of problems (missing products, list prices or discounts that differ
+ * from the cart).
  */
 export async function verifyCartWithServer(items, userId, { signal } = {}) {
   const cart = await apiClient.post(
@@ -26,7 +27,9 @@ export async function verifyCartWithServer(items, userId, { signal } = {}) {
   for (const item of items) {
     const serverLine = serverById.get(item.productId)
     if (!serverLine) problems.push(`"${item.title}" is no longer available.`)
-    else if (serverLine.price !== item.price) problems.push(`The price of "${item.title}" has changed.`)
+    else if (serverLine.price !== item.price || (serverLine.discountPercentage ?? 0) !== (item.discountPercentage ?? 0)) {
+      problems.push(`The price of "${item.title}" has changed.`)
+    }
   }
 
   return {

@@ -13,6 +13,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
+import { useProductRefresh } from '../hooks/useProductRefresh'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
 import { productKeys } from '../queries/productQueries'
@@ -51,6 +52,10 @@ function CheckoutPage() {
   const { user, authorizedRequest } = useAuth()
   // Same cache entry as the profile page: visiting /account first makes this instant.
   const profileRequest = useQuery(profileQuery(user.id, authorizedRequest))
+  // Re-check prices and stock on arrival, like the cart page: the cart holds
+  // snapshots taken when each product was added. Items that sold out make
+  // canCheckout false (the "needs your attention" screen below).
+  const refresh = useProductRefresh({ hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
 
   if (cart.items.length === 0) {
     return (
@@ -98,6 +103,7 @@ function CheckoutPage() {
 
   return (
     <CheckoutForm
+      isCheckingPrices={refresh.isFetching}
       defaultValues={{
         email: profile.email,
         phone: profile.phone ?? '',
@@ -111,7 +117,7 @@ function CheckoutPage() {
   )
 }
 
-function CheckoutForm({ defaultValues }) {
+function CheckoutForm({ defaultValues, isCheckingPrices }) {
   const cart = useCart()
   const { user } = useAuth()
   const { placeOrder } = useOrders()
@@ -149,6 +155,7 @@ function CheckoutForm({ defaultValues }) {
   })
 
   const totals = calculateCartTotals(cart.items, cart.couponCode, shippingMethod)
+  const changedCount = cart.items.filter((item) => item.notice).length
   const shippingOptions = SHIPPING_METHODS.map((method) => {
     const price = calculateCartTotals(cart.items, cart.couponCode, method.id).shipping
     return { ...method, description: method.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
@@ -179,7 +186,7 @@ function CheckoutForm({ defaultValues }) {
       // pages refetch fresh data the next time they're shown (INVALIDATION).
       queryClient.invalidateQueries({ queryKey: productKeys.all })
       navigate(ROUTES.orderConfirmation(order.id), { replace: true })
-      cart.clearCart()
+      cart.removeOrderedItems(order.items.map((item) => item.productId))
     } catch (error) {
       // A real API answers invalid fields with 422 + per-field messages: show them on the fields.
       if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
@@ -260,7 +267,15 @@ function CheckoutForm({ defaultValues }) {
             couponError={totals.couponError}
             onApply={cart.applyCoupon}
             onRemove={cart.removeCoupon}
+            disabled={isSubmitting}
           />
+
+          {changedCount > 0 && (
+            <p className="checkout__notice" role="status">
+              {changedCount === 1 ? 'An item has' : `${changedCount} items have`} changed since you added{' '}
+              {changedCount === 1 ? 'it' : 'them'} (price or available quantity). The total above is up to date.
+            </p>
+          )}
 
           {errors.root?.server && (
             <div className="checkout__error" role="alert">
@@ -271,8 +286,8 @@ function CheckoutForm({ defaultValues }) {
             </div>
           )}
 
-          <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? 'Checking prices…' : `Place order · ${formatPrice(totals.total)}`}
+          <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isSubmitting || isCheckingPrices}>
+            {isSubmitting || isCheckingPrices ? 'Checking prices…' : `Place order · ${formatPrice(totals.total)}`}
           </Button>
           <p className="cart-summary__note">
             Prices are re-checked with the server before the order is recorded. Shipping, discounts, and taxes would be

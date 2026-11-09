@@ -66,6 +66,13 @@
   border-radius: var(--radius-md);
 }
 
+/* Shown when the arrival re-check changed a price or quantity. */
+.checkout__notice {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-warning);
+}
+
 @media (min-width: 560px) {
   .checkout__grid {
     grid-template-columns: 1fr 1fr;

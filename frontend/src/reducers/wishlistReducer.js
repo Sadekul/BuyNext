@@ -1,3 +1,5 @@
+import { storedNumber, storedProductSnapshot, storedTimestamp } from '../utils/storedValues'
+
 /*
  * Wishlist reducer: saved products, no duplicates, newest first.
  * Pure: the timestamp is created by the caller and passed in the action.
@@ -64,16 +66,22 @@ export function wishlistReducer(state, action) {
   }
 }
 
-/** Validates stored data and removes duplicates. */
+/** Validates stored data (rebuilding each line from checked fields) and removes duplicates. */
 export function sanitizeWishlist(value) {
   if (!value || !Array.isArray(value.items)) return EMPTY_WISHLIST
   const seen = new Set()
-  const items = value.items.filter((item) => {
-    const isValid =
-      item && Number.isInteger(item.productId) && typeof item.title === 'string' && typeof item.price === 'number'
-    if (!isValid || seen.has(item.productId)) return false
+  const items = []
+  for (const stored of value.items) {
+    if (!stored || !Number.isInteger(stored.productId) || seen.has(stored.productId)) continue
+    const item = {
+      productId: stored.productId,
+      ...storedProductSnapshot(stored),
+      rating: storedNumber(stored.rating, 0, 5),
+      addedAt: storedTimestamp(stored.addedAt),
+    }
+    if (item.title === null || item.price === null) continue
     seen.add(item.productId)
-    return true
-  })
+    items.push(item)
+  }
   return { items }
 }

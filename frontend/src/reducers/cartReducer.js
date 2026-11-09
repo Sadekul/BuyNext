@@ -1,6 +1,7 @@
 import { formatPrice } from '../utils/formatters'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { getProductPricing } from '../utils/pricing'
+import { storedProductSnapshot, storedText } from '../utils/storedValues'
 
 /*
  * Cart reducer: a pure function (state, action) → new state.
@@ -13,6 +14,7 @@ export const CART_ACTIONS = {
   QUANTITY_CHANGED: 'cart/quantityChanged',
   REMOVED: 'cart/removed',
   CLEARED: 'cart/cleared',
+  ORDER_PLACED: 'cart/orderPlaced',
   COUPON_APPLIED: 'cart/couponApplied',
   COUPON_REMOVED: 'cart/couponRemoved',
   PRODUCTS_REFRESHED: 'cart/productsRefreshed',
@@ -100,6 +102,13 @@ export function cartReducer(state, action) {
     case CART_ACTIONS.CLEARED:
       return EMPTY_CART
 
+    // Remove only the lines that were ordered: anything added meanwhile (for
+    // example in another tab) stays. The coupon was used by the order.
+    case CART_ACTIONS.ORDER_PLACED: {
+      const ordered = new Set(action.productIds)
+      return { items: state.items.filter((item) => !ordered.has(item.productId)), couponCode: null }
+    }
+
     case CART_ACTIONS.COUPON_APPLIED:
       return { ...state, couponCode: action.code.trim().toUpperCase() }
 
@@ -144,21 +153,27 @@ export function cartReducer(state, action) {
   }
 }
 
-/** Validates data loaded from storage; anything malformed is dropped. */
+/**
+ * Validates data loaded from storage (on start-up and from other tabs).
+ * Each line is rebuilt from known fields with checked types; malformed and
+ * duplicate lines are dropped.
+ */
 export function sanitizeCart(value) {
   if (!value || !Array.isArray(value.items)) return EMPTY_CART
   const seen = new Set()
-  const items = value.items.filter((item) => {
-    const isValid =
-      item &&
-      Number.isInteger(item.productId) &&
-      Number.isInteger(item.quantity) &&
-      item.quantity > 0 &&
-      typeof item.price === 'number' &&
-      typeof item.title === 'string'
-    if (!isValid || seen.has(item.productId)) return false // drop malformed and duplicate lines
+  const items = []
+  for (const stored of value.items) {
+    if (!stored || !Number.isInteger(stored.productId) || seen.has(stored.productId)) continue
+    if (!Number.isInteger(stored.quantity) || stored.quantity < 1) continue
+    const item = {
+      productId: stored.productId,
+      ...storedProductSnapshot(stored),
+      quantity: stored.quantity,
+      notice: storedText(stored.notice),
+    }
+    if (item.title === null || item.price === null) continue
     seen.add(item.productId)
-    return true
-  })
-  return { items, couponCode: typeof value.couponCode === 'string' ? value.couponCode : null }
+    items.push(item)
+  }
+  return { items, couponCode: storedText(value.couponCode) }
 }

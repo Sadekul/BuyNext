@@ -37,6 +37,10 @@ function CartProvider({ children }) {
   )
   const removeItem = useCallback((productId) => dispatch({ type: CART_ACTIONS.REMOVED, productId }), [dispatch])
   const clearCart = useCallback(() => dispatch({ type: CART_ACTIONS.CLEARED }), [dispatch])
+  const removeOrderedItems = useCallback(
+    (productIds) => dispatch({ type: CART_ACTIONS.ORDER_PLACED, productIds }),
+    [dispatch],
+  )
   const applyCoupon = useCallback((code) => dispatch({ type: CART_ACTIONS.COUPON_APPLIED, code }), [dispatch])
   const removeCoupon = useCallback(() => dispatch({ type: CART_ACTIONS.COUPON_REMOVED }), [dispatch])
   const refreshProducts = useCallback(
@@ -57,13 +61,14 @@ function CartProvider({ children }) {
       updateQuantity,
       removeItem,
       clearCart,
+      removeOrderedItems,
       applyCoupon,
       removeCoupon,
       refreshProducts,
       openCart,
       closeCart,
     }),
-    [cart, isCartOpen, addItem, updateQuantity, removeItem, clearCart, applyCoupon, removeCoupon, refreshProducts, openCart, closeCart],
+    [cart, isCartOpen, addItem, updateQuantity, removeItem, clearCart, removeOrderedItems, applyCoupon, removeCoupon, refreshProducts, openCart, closeCart],
   )
 
   return <CartContext value={value}>{children}</CartContext>

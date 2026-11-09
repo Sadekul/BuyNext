@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { CART_ACTIONS, EMPTY_CART, cartReducer, sanitizeCart } from './cartReducer'
-import { iphone13, galaxyS8 } from '../test/fixtures'
+import { iphone13, galaxyS8, tennisRacket } from '../test/fixtures'
 
 const add = (state, product, quantity) => cartReducer(state, { type: CART_ACTIONS.ADDED, product, quantity })
 // Freezing proves the reducer never mutates its input (mutation would throw in strict mode).
 const frozen = (value) => Object.freeze(structuredClone(value))
 
 describe('cartReducer', () => {
+  it('removes only the ordered lines and the used coupon after an order', () => {
+    const state = { items: add(add(EMPTY_CART, iphone13, 1), tennisRacket, 1).items, couponCode: 'NEST10' }
+    const next = cartReducer(frozen(state), { type: CART_ACTIONS.ORDER_PLACED, productIds: [iphone13.id] })
+    expect(next.items.map((item) => item.productId)).toEqual([tennisRacket.id])
+    expect(next.couponCode).toBeNull()
+  })
+
   it('adds a new product as a cart line', () => {
     const state = add(frozen(EMPTY_CART), iphone13, 2)
     expect(state.items).toHaveLength(1)
@@ -97,7 +104,34 @@ describe('cartReducer', () => {
     it('drops malformed and duplicate lines', () => {
       const valid = { productId: 1, quantity: 1, price: 5, title: 'A' }
       const result = sanitizeCart({ items: [valid, { ...valid }, { productId: 'x', quantity: 1 }, null], couponCode: 7 })
-      expect(result).toEqual({ items: [valid], couponCode: null })
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]).toMatchObject({ ...valid, notice: null, isUnavailable: false })
+      expect(result.couponCode).toBeNull()
+    })
+
+    // Tampered storage must not crash rendering or bend the price math.
+    it('replaces wrongly typed or out-of-range fields with null', () => {
+      const tampered = {
+        productId: 1,
+        quantity: 1,
+        price: 5,
+        title: 'A',
+        notice: { evil: true }, // an object would crash React when rendered
+        brand: 42,
+        thumbnail: ['x'],
+        discountPercentage: 150,
+        stock: -3,
+        isUnavailable: 'yes',
+        extra: 'dropped',
+      }
+      const [item] = sanitizeCart({ items: [tampered] }).items
+      expect(item).toMatchObject({ notice: null, brand: null, thumbnail: null, discountPercentage: null, stock: null, isUnavailable: false })
+      expect(item).not.toHaveProperty('extra')
+    })
+
+    it('drops lines with a negative or non-finite price', () => {
+      const line = { productId: 1, quantity: 1, title: 'A' }
+      expect(sanitizeCart({ items: [{ ...line, price: -1 }, { ...line, productId: 2, price: Infinity }] }).items).toEqual([])
     })
 
     it('falls back to an empty cart for garbage', () => {

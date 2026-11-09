@@ -67,6 +67,12 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
 
   function handleKeyDown(event) {
     if (event.key === 'Escape') {
+      // With suggestions showing, Escape closes only them: without this, the
+      // mobile menu (a <dialog>) would also treat it as "close the menu".
+      if (showList) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
       setIsOpen(false)
       return
     }

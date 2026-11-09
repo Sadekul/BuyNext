@@ -59,5 +59,6 @@ Demo sign-in: **emilys / emilyspass**. Details: [frontend/README.md](frontend/RE
 | 12 | Admin backend integration (frontend side) | Done |
 | 13 | Testing and debugging | Done |
 | 14 | Deployment | Done (push and hosting pending your approval) |
+| — | SQA & security audit | Done: 16 issues fixed, see [docs/SQA_REPORT.md](docs/SQA_REPORT.md) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

@@ -36,6 +36,14 @@ describe('calculateCartTotals', () => {
     const totals = calculateCartTotals([line(10, 2), line(99, 3, { isUnavailable: true })])
     expect(totals).toMatchObject({ itemCount: 2, totalQuantity: 5, subtotal: 20, unavailableCount: 1, canCheckout: false })
   })
+
+  it('counts the coupon when saying how much more reaches free shipping', () => {
+    // $52 - 10% = $46.80. $3.20 more of items is only $2.88 after the discount;
+    // $3.56 more makes $55.56, which is exactly $50.00 after 10% off.
+    const totals = calculateCartTotals([line(52, 1)], 'NEST10')
+    expect(totals.amountToFreeShipping).toBe(3.56)
+    expect(calculateCartTotals([line(55.56, 1)], 'NEST10').shipping).toBe(0)
+  })
 })
 
 describe('evaluateCoupon', () => {

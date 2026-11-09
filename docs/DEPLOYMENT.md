@@ -26,6 +26,8 @@ The server only has `index.html`; routes like `/products/123` exist only in Reac
 
 Both configs also set long-term caching for `/assets/*` and basic security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`).
 
+**Content-Security-Policy.** `npm run build` adds a CSP `<meta>` tag to `dist/index.html` (see `vite.config.js`). It allows scripts and styles only from the site itself (plus Google Fonts), images from the site, `cdn.dummyjson.com` and the API, and network requests only to the site and the origin in `VITE_API_BASE_URL`. Because the API origin is read at build time, a Laravel build gets the right policy automatically. If you add another image host, analytics, or a payment script, add its origin there, or the browser will block it. The dev server has no CSP, because hot reload needs inline scripts.
+
 ## Vercel
 1. Import the GitHub repository.
 2. **Root directory:** `frontend`. Framework preset: Vite (build `npm run build`, output `dist`; also set in `vercel.json`).

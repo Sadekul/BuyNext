@@ -149,7 +149,7 @@ Switching to Laravel: `VITE_API_PROVIDER=laravel` (contract: [docs/backend/API_C
 ## Quality
 - **Tests:** `npm test` runs 94 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
 - **Accessibility:** semantic landmarks, skip link, visible focus, labelled controls with linked errors, ARIA combobox search, native `<dialog>` modals, reduced-motion support. axe-core reports **no violations** on the main pages of the production build.
-- **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 118 KB gzipped.
+- **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 124 KB gzipped.
 
 ## Deployment
 See [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md): build settings, environment variables, SPA fallback (`vercel.json` or `public/_redirects`), caching, and a release checklist.

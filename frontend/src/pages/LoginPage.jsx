@@ -9,14 +9,25 @@ import { validateLogin } from '../utils/validation'
 import './AuthPages.css'
 
 // A real DummyJSON account (listed publicly at https://dummyjson.com/users).
-const DEMO_ACCOUNT = { username: 'emilys', password: 'emilyspass' }
+// Only offered with the DummyJSON learning API: the env value is replaced at
+// build time, so a Laravel build doesn't contain these credentials at all.
+const DEMO_ACCOUNT =
+  (import.meta.env.VITE_API_PROVIDER || 'dummyjson') === 'dummyjson' ? { username: 'emilys', password: 'emilyspass' } : null
+
+/**
+ * Only same-site paths ("/checkout"). Rejects full URLs and "//other-site.com";
+ * browsers read a backslash as a slash, so "/\other-site.com" too.
+ */
+function safeRedirectPath(path) {
+  return typeof path === 'string' && /^\/(?![/\\])/.test(path) ? path : ROUTES.account
+}
 
 function LoginPage() {
   const { login, sessionExpired } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   // Where the customer was going before ProtectedRoute sent them here.
-  const redirectTo = location.state?.from?.pathname ?? ROUTES.account
+  const redirectTo = safeRedirectPath(location.state?.from?.pathname)
 
   const [values, setValues] = useState({ username: '', password: '', remember: true })
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -75,14 +86,16 @@ function LoginPage() {
           </p>
         )}
 
-        <div className="auth-demo">
-          <span>
-            Demo account: <code>{DEMO_ACCOUNT.username}</code> / <code>{DEMO_ACCOUNT.password}</code>
-          </span>
-          <button type="button" className="auth-link" onClick={() => setValues((current) => ({ ...current, ...DEMO_ACCOUNT }))}>
-            Use demo account
-          </button>
-        </div>
+        {DEMO_ACCOUNT && (
+          <div className="auth-demo">
+            <span>
+              Demo account: <code>{DEMO_ACCOUNT.username}</code> / <code>{DEMO_ACCOUNT.password}</code>
+            </span>
+            <button type="button" className="auth-link" onClick={() => setValues((current) => ({ ...current, ...DEMO_ACCOUNT }))}>
+              Use demo account
+            </button>
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField

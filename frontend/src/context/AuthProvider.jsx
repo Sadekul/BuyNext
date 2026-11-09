@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AuthContext } from './authContext'
 import { ApiError, isAbortError } from '../services/apiClient'
@@ -21,6 +21,15 @@ import { userKeys } from '../queries/userQueries'
 
 const STORAGE_KEY = 'buynest.session.v1'
 const ANONYMOUS = { status: 'anonymous', user: null, tokens: null, remember: false, expired: false }
+
+// Only these profile fields are written to storage. Phone and address stay in
+// memory (pages fetch them fresh from /auth/me), so they don't linger on a
+// shared device.
+const STORED_USER_FIELDS = ['id', 'username', 'firstName', 'lastName', 'email', 'image']
+
+// Errors that mean "these tokens are no longer valid". Anything else (offline,
+// timeout, 5xx, rate limiting) says nothing about the session, so it is kept.
+const isAuthFailure = (error) => error instanceof ApiError && [400, 401, 403].includes(error.status)
 
 // "Remember me" → localStorage (survives closing the browser); otherwise
 // sessionStorage (cleared when the tab closes).
@@ -50,7 +59,8 @@ function writeStoredSession(session) {
     // fires a `storage` event with newValue === null in other tabs, which
     // they (correctly) treat as "signed out".
     other.removeItem(STORAGE_KEY)
-    target.setItem(STORAGE_KEY, JSON.stringify({ user: session.user, tokens: session.tokens, remember: session.remember }))
+    const user = Object.fromEntries(STORED_USER_FIELDS.map((field) => [field, session.user[field] ?? null]))
+    target.setItem(STORAGE_KEY, JSON.stringify({ user, tokens: session.tokens, remember: session.remember }))
   } catch {
     // storage blocked: the session simply won't survive a refresh
   }
@@ -74,9 +84,9 @@ async function verifyStoredSession(tokens, signal) {
     return (current) => ({ ...current, status: 'authenticated', user, tokens: currentTokens })
   } catch (error) {
     if (isAbortError(error)) return (current) => current
-    // Auth failures end the session. Network problems keep the stored user,
-    // because we can't tell whether the session is still valid.
-    if (error instanceof ApiError && error.status !== 0) return { ...ANONYMOUS, expired: true }
+    // Auth failures end the session. Network and server problems keep the
+    // stored user, because we can't tell whether the session is still valid.
+    if (isAuthFailure(error)) return { ...ANONYMOUS, expired: true }
     return (current) => ({ ...current, status: 'authenticated' })
   }
 }
@@ -133,10 +143,16 @@ function AuthProvider({ children }) {
     setSession(ANONYMOUS)
   }, [])
 
+  // The refresh in progress, shared by every request that hit a 401 at the
+  // same time: one refresh call, not one per request. (A backend that
+  // rotates refresh tokens would reject the second call and sign the user out.)
+  const refreshRef = useRef(null)
+
   /**
    * Runs an authorized request: `request(accessToken)`. On 401 it refreshes
-   * the tokens once and retries; if the refresh fails, the customer is
-   * signed out with `expired: true` and the error is re-thrown.
+   * the tokens once and retries. If the refresh is rejected, the customer is
+   * signed out with `expired: true`; other failures (offline, server error)
+   * are re-thrown without signing out.
    */
   const authorizedRequest = useCallback(
     async (request) => {
@@ -145,14 +161,25 @@ function AuthProvider({ children }) {
         return await request(session.tokens.accessToken)
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 401)) throw error
+        const { refreshToken } = session.tokens
+        refreshRef.current ??= authService.refreshSession(refreshToken).finally(() => {
+          refreshRef.current = null
+        })
         let tokens
         try {
-          tokens = await authService.refreshSession(session.tokens.refreshToken)
-        } catch {
+          tokens = await refreshRef.current
+        } catch (refreshError) {
+          if (!isAuthFailure(refreshError)) throw refreshError
           setSession({ ...ANONYMOUS, expired: true })
           throw new ApiError('Your session has expired. Please sign in again.', { status: 401 })
         }
-        setSession((current) => ({ ...current, tokens }))
+        // Apply the new tokens only to the session they were refreshed for:
+        // not after a sign-out, and not over a different account's session.
+        setSession((current) =>
+          current.status === 'authenticated' && current.tokens?.refreshToken === refreshToken
+            ? { ...current, tokens }
+            : current,
+        )
         return request(tokens.accessToken)
       }
     },

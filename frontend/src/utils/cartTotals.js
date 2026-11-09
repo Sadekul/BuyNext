@@ -25,6 +25,25 @@ export function evaluateCoupon(code, subtotalCents) {
 }
 
 /**
+ * How much more MERCHANDISE (before the coupon) reaches the free-shipping
+ * threshold. With a percent coupon, $1 of items adds less than $1 after the
+ * discount, so the gap is grossed up, then checked against the real coupon
+ * math (which rounds to the cent).
+ */
+function amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents) {
+  const afterDiscount = (cents) => cents - evaluateCoupon(couponCode, cents).discountCents
+  const gapCents = thresholdCents - afterDiscount(subtotalCents)
+  if (gapCents <= 0) return 0
+
+  const { coupon, error } = evaluateCoupon(couponCode, subtotalCents)
+  const percentOff = coupon?.type === 'percent' && !error ? coupon.value : 0
+  if (percentOff >= 100) return 0 // every item would be free: no amount closes the gap
+  let extraCents = Math.ceil((gapCents * 100) / (100 - percentOff))
+  while (afterDiscount(subtotalCents + extraCents) < thresholdCents) extraCents += 1
+  return extraCents
+}
+
+/**
  * Totals for the purchasable lines of a cart.
  * Unavailable lines (`isUnavailable`) are listed but never charged.
  * `shippingMethodId`: 'standard' follows the free-shipping threshold;
@@ -67,7 +86,7 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
     discount: toDollars(discountCents),
     shippingMethod: method,
     shipping: toDollars(shippingCents),
-    amountToFreeShipping: toDollars(Math.max(0, thresholdCents - afterDiscountCents)),
+    amountToFreeShipping: toDollars(amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents)),
     total: toDollars(afterDiscountCents + shippingCents),
   }
 }

@@ -10,7 +10,7 @@
 | 3 | Run ESLint | Clean |
 | 4 | Run tests | 94/94 Vitest tests; browser regression suites also pass |
 | 5 | Check accessibility | axe-core found 3 real issues (fixed below); now **0 violations** on 9 key views |
-| 6 | Build | `npm run build`: initial JS ≈ 320 KB (≈ 98 KB gzipped) + lazy chunks |
+| 6 | Build | `npm run build`: initial JS ≈ 400 KB in three files (≈ 124 KB gzipped) + lazy chunks |
 | 7 | Verify static assets | Favicon, scripts, styles all 200; no failed requests |
 | 8 | Responsive layouts | No horizontal overflow at 390/768/1440 px on the main pages |
 | 9 | Routing in production | Deep links work through the SPA fallback; unknown paths show the 404 page |

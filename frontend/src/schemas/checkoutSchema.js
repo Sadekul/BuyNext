@@ -1,10 +1,14 @@
 import { z } from 'zod'
 import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS } from '../constants/store'
 
+// The production Content-Security-Policy forbids eval. Zod otherwise probes
+// `new Function` to speed up parsing, which the browser reports as a violation.
+z.config({ jitless: true })
+
 /*
  * Checkout validation rules as a Zod SCHEMA: one declarative description of
- * valid data. React Hook Form runs it (through zodResolver) on blur and on
- * submit. The same rules must be enforced again on the server.
+ * valid data. React Hook Form runs it (through zodResolver) on submit, then
+ * again as the user corrects a field. The same rules must be enforced again on the server.
  */
 
 // The same friendly message whether the field is empty OR missing entirely.
