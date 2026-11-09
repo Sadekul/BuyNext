@@ -60,3 +60,37 @@ export function normalizeProductPage(raw) {
 export function normalizeCategory(raw) {
   return { slug: raw.slug, name: raw.name }
 }
+
+/**
+ * Raw DummyJSON user → BuyNest customer. ALLOW-LIST on purpose: /auth/me also
+ * returns the password, bank card, SSN, IP address, and more. Copying only
+ * the fields the storefront needs keeps sensitive data out of React state,
+ * DevTools, and browser storage.
+ */
+export function normalizeUser(raw) {
+  const address = raw.address
+    ? {
+        line1: raw.address.address ?? '',
+        city: raw.address.city ?? '',
+        state: raw.address.state ?? '',
+        postalCode: raw.address.postalCode ?? '',
+        country: raw.address.country ?? '',
+      }
+    : null
+
+  return {
+    id: raw.id,
+    username: raw.username,
+    firstName: raw.firstName ?? '',
+    lastName: raw.lastName ?? '',
+    email: raw.email ?? '',
+    image: raw.image ?? null,
+    phone: raw.phone ?? null, // only in /auth/me
+    address, // only in /auth/me
+  }
+}
+
+/** Raw login/refresh response → `{ accessToken, refreshToken }`. */
+export function normalizeTokens(raw) {
+  return { accessToken: raw.accessToken, refreshToken: raw.refreshToken }
+}

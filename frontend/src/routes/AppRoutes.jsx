@@ -6,6 +6,13 @@ import ProductListingPage from '../pages/ProductListingPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
 import CartPage from '../pages/CartPage'
 import WishlistPage from '../pages/WishlistPage'
+import LoginPage from '../pages/LoginPage'
+import RegisterPage from '../pages/RegisterPage'
+import ForgotPasswordPage from '../pages/ForgotPasswordPage'
+import ProfilePage from '../pages/ProfilePage'
+import AccountLayout from '../layouts/AccountLayout'
+import ProtectedRoute from './ProtectedRoute'
+import GuestOnlyRoute from './GuestOnlyRoute'
 import NotFoundPage from '../pages/NotFoundPage'
 import ComponentLabPage from '../pages/ComponentLabPage'
 
@@ -26,7 +33,19 @@ function AppRoutes() {
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<ComingSoonPage title="Checkout" phase={10} />} />
         <Route path="wishlist" element={<WishlistPage />} />
-        <Route path="account" element={<ComingSoonPage title="My account" phase={9} />} />
+        <Route element={<GuestOnlyRoute />}>
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+        </Route>
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+
+        {/* Signed-in customers only (UX guard; the API enforces real access). */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="account" element={<AccountLayout />}>
+            <Route index element={<ProfilePage />} />
+            <Route path="orders" element={<ComingSoonPage title="Order history" phase={10} />} />
+          </Route>
+        </Route>
         <Route path="learn" element={<ComponentLabPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

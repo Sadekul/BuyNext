@@ -1,0 +1,75 @@
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.account__eyebrow {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.account__header h1 {
+  font-size: var(--text-3xl);
+}
+
+.account__layout {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.account__nav-list {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.account__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.account__link:hover {
+  border-color: var(--color-primary);
+}
+
+.account__link--active {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.account__logout {
+  color: var(--color-sale);
+}
+
+.account__content {
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .account__layout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+
+  .account__nav-list {
+    flex-direction: column;
+  }
+
+  .account__link {
+    border-radius: var(--radius-md);
+  }
+}

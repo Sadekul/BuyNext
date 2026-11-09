@@ -86,3 +86,14 @@
 - `useMemo` for expensive derived data and stable object identity; when not to use it
 - React Router transitions vs controlled inputs (`useTransitions={false}`)
 - Accessible combobox (search suggestions), removable filter chips, mobile filter drawer
+
+## Phase 9: User registration and authentication
+
+- Authentication vs authorization; session cookies vs bearer tokens
+- Access and refresh tokens; refresh-and-retry on 401; expired sessions
+- 401 vs 403 (and DummyJSON's 400 for bad credentials)
+- Protected and guest-only layout routes with `<Navigate>` and `state.from`
+- Client-side validation with touched/submitted state, focus management, `aria-invalid`/`aria-describedby`; why the server must validate too
+- Allow-listing user fields to keep sensitive data out of state and storage
+- Cross-tab sign-out with the `storage` event (and the remove-then-set bug it exposed)
+- Production plan: Laravel Sanctum with HttpOnly, Secure, SameSite cookies + CSRF

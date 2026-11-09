@@ -105,3 +105,10 @@
     display: inline;
   }
 }
+
+.site-header__avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: var(--color-bg-muted);
+  border-radius: 50%;
+}

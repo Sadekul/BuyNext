@@ -4,13 +4,9 @@ import Modal from '../ui/Modal'
 import SearchBar from '../common/SearchBar'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
+import { useAuth } from '../../hooks/useAuth'
 import './MobileNavigation.css'
 
-const ACCOUNT_LINKS = [
-  { label: 'My account', to: ROUTES.account, icon: LuUser },
-  { label: 'Wishlist', to: ROUTES.wishlist, icon: LuHeart },
-  { label: 'Cart', to: ROUTES.cart, icon: LuShoppingBag },
-]
 
 /**
  * Mobile/tablet menu. Composition in action: it reuses Modal (drawer variant)
@@ -18,6 +14,15 @@ const ACCOUNT_LINKS = [
  * Every link calls `onClose` so the drawer closes after navigating.
  */
 function MobileNavigation({ isOpen, onClose, links }) {
+  const { isAuthenticated } = useAuth()
+  const accountLinks = [
+    isAuthenticated
+      ? { label: 'My account', to: ROUTES.account, icon: LuUser }
+      : { label: 'Sign in', to: ROUTES.login, icon: LuUser },
+    { label: 'Wishlist', to: ROUTES.wishlist, icon: LuHeart },
+    { label: 'Cart', to: ROUTES.cart, icon: LuShoppingBag },
+  ]
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Menu" variant="drawer">
       <div className="mobile-nav">
@@ -43,7 +48,7 @@ function MobileNavigation({ isOpen, onClose, links }) {
         </nav>
 
         <ul className="mobile-nav__list mobile-nav__list--secondary">
-          {ACCOUNT_LINKS.map(({ label, to, icon: Icon }) => (
+          {accountLinks.map(({ label, to, icon: Icon }) => (
             <li key={to}>
               <NavLink to={to} onClick={onClose} className="mobile-nav__link">
                 <Icon aria-hidden="true" />

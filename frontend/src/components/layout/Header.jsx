@@ -8,6 +8,7 @@ import MobileNavigation from './MobileNavigation'
 import { ROUTES } from '../../constants/routes'
 import { useCart } from '../../hooks/useCart'
 import { useWishlist } from '../../hooks/useWishlist'
+import { useAuth } from '../../hooks/useAuth'
 import './Header.css'
 
 /**
@@ -21,6 +22,7 @@ function Header({ navLinks }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { totals, openCart } = useCart()
   const { count: wishlistCount } = useWishlist()
+  const { user, isAuthenticated } = useAuth()
 
   return (
     <header className="site-header">
@@ -43,9 +45,19 @@ function Header({ navLinks }) {
         </div>
 
         <nav className="site-header__actions" aria-label="Account and shopping">
-          <Link to={ROUTES.account} className="site-header__icon-button site-header__account">
-            <LuUser aria-hidden="true" />
-            <span className="site-header__action-label">Account</span>
+          <Link
+            to={isAuthenticated ? ROUTES.account : ROUTES.login}
+            className="site-header__icon-button site-header__account"
+            aria-label={isAuthenticated ? `My account (signed in as ${user.firstName})` : 'Sign in'}
+          >
+            {isAuthenticated && user.image ? (
+              <img className="site-header__avatar" src={user.image} alt="" width="28" height="28" />
+            ) : (
+              <LuUser aria-hidden="true" />
+            )}
+            <span className="site-header__action-label" aria-hidden="true">
+              {isAuthenticated ? `Hi, ${user.firstName}` : 'Sign in'}
+            </span>
           </Link>
           <HeaderCountLink to={ROUTES.wishlist} icon={LuHeart} label="Wishlist" count={wishlistCount} />
           <button

@@ -99,7 +99,10 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `/cart` | CartPage: lines, quantities, coupon, shipping estimate, price/stock re-check | Done (localStorage) |
 | `/checkout` | Checkout | Placeholder until Phase 10 |
 | `/wishlist` | WishlistPage: saved items, move to cart, remove, availability re-check | Done (localStorage) |
-| `/account` | Account | Placeholder until Phase 9 |
+| `/login`, `/register` | Sign in (demo account emilys / emilyspass), registration (simulated) | Guest-only |
+| `/forgot-password` | Password reset request (simulated, no email sent) | Public |
+| `/account` | Profile from `GET /auth/me` | Protected |
+| `/account/orders` | Order history | Protected; placeholder until Phase 10 |
 | `*` | NotFoundPage | Done |
 
 ## Components
@@ -162,6 +165,10 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 | GET | `/products/category/:slug?limit=0` | Category scope of the catalog |
 | GET | `/products/categories` | Category nav and homepage tiles |
 | GET | `/products/search?q=&limit=6&select=…` | Search suggestions (debounced) |
+| POST | `/auth/login` | Sign in → access + refresh tokens |
+| GET | `/auth/me` (Bearer token) | Session check and profile |
+| POST | `/auth/refresh` | New tokens after a 401 |
+| POST | `/users/add` | Registration (simulated; nothing is saved) |
 | GET | `/products/:id` | Quick view and the product details page |
 | GET | `/products/category/:slug?limit=5` | Related products |
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
@@ -175,6 +182,7 @@ DummyJSON quirks we handle: unknown categories return `200` with an empty list (
 | Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
 | Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
 | Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
+| Signed-in customer | `AuthProvider`, key `buynest.session.v1` in localStorage ("keep me signed in") or sessionStorage | Demo token auth; production will use Sanctum HttpOnly cookies |
 | URL state (search, filters, sort, page, view) | `useSearchParams` + `utils/catalogParams.js` | Back/forward, refresh, and shared links restore the same results |
 | Local UI state (menu, drawers, gallery image) | `useState` in the component | Only one component cares |
 

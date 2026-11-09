@@ -9,5 +9,9 @@ export const ROUTES = {
   checkout: '/checkout',
   wishlist: '/wishlist',
   account: '/account',
+  orders: '/account/orders',
+  login: '/login',
+  register: '/register',
+  forgotPassword: '/forgot-password',
   componentLab: '/learn',
 }
