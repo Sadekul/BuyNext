@@ -50,3 +50,12 @@
 - Resetting a subtree's state with the `key` prop
 - Component communication through function props (filters, sort, view, pagination, quick view)
 - Accessible controls: `fieldset`/`legend`, `aria-pressed`, `aria-expanded`, `aria-current="page"`
+
+## Phase 5: Product details page
+
+- Dynamic routes (`:productId`) and `useParams` (params are strings — validate them)
+- Route-based data fetching keyed by the URL; 404 handling with `ApiError.status`
+- Component reuse across same-route navigation, and resetting state with `key`
+- `Link` vs `NavLink` vs `useNavigate` (`navigate(-1)`, `location.key`)
+- React 19 `<title>` in components for per-page document titles
+- Real business rules from data (minimum order quantity vs stock); not inventing variants

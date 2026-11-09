@@ -1,0 +1,28 @@
+.breadcrumb__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.breadcrumb__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.breadcrumb__item a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.breadcrumb__item [aria-current='page'] {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.breadcrumb__separator {
+  flex-shrink: 0;
+}

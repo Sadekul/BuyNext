@@ -41,7 +41,15 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 2 | Components and frontend template | Done |
 | 3 | External API integration | Done |
 | 4 | Product listing and catalog | Done |
-| 5 | Product details page | Next |
-| 6–14 | Cart, wishlist, search, auth, checkout, advanced React, backend, testing, deployment | Planned |
+| 5 | Product details page | Done |
+| 6 | Shopping cart | Next |
+| 7 | Wishlist | Planned |
+| 8 | Search, filtering, and sorting | Planned |
+| 9 | User registration and authentication | Planned |
+| 10 | Checkout and order management | Planned |
+| 11 | Advanced React | Planned |
+| 12 | Admin backend integration (frontend side) | Planned |
+| 13 | Testing and debugging | Planned |
+| 14 | Deployment | Planned |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

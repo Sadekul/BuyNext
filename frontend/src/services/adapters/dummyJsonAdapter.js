@@ -23,6 +23,26 @@ export function normalizeProduct(raw) {
     availabilityStatus: raw.availabilityStatus ?? null,
     thumbnail: raw.thumbnail ?? null,
     images: raw.images ?? [],
+    // Detail-only fields (absent from list responses that use `select`):
+    sku: raw.sku ?? null,
+    tags: raw.tags ?? [],
+    minimumOrderQuantity: raw.minimumOrderQuantity ?? 1,
+    warrantyInformation: raw.warrantyInformation ?? null,
+    shippingInformation: raw.shippingInformation ?? null,
+    returnPolicy: raw.returnPolicy ?? null,
+    reviews: (raw.reviews ?? []).map(normalizeReview),
+    // Not mapped on purpose: `weight` and `dimensions` (the API gives no units),
+    // and `meta` (barcode/QR data the storefront doesn't use).
+  }
+}
+
+/** Reviewer emails are dropped: the storefront never needs to display them. */
+function normalizeReview(raw) {
+  return {
+    rating: raw.rating,
+    comment: raw.comment,
+    date: raw.date,
+    reviewerName: raw.reviewerName,
   }
 }
 

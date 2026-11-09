@@ -95,7 +95,7 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `/products` (`?q=`, `?sort=`) | ProductListingPage: all products or search results, with filters, pagination, grid/list, quick view | Live API |
 | `/categories/:categorySlug` | ProductListingPage for one category | Live API |
 | `/deals` | ProductListingPage sorted by biggest discount | Live API |
-| `/products/:productId` | Product details | Placeholder until Phase 5 |
+| `/products/:productId` | ProductDetailsPage: gallery, pricing, stock, quantity, specs, reviews, related | Live API |
 | `/cart` | Cart | Placeholder until Phase 6 |
 | `/wishlist` | Wishlist | Placeholder until Phase 7 |
 | `/account` | Account | Placeholder until Phase 9 |
@@ -119,6 +119,10 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `SortSelect` / `ViewToggle` | Sort dropdown; grid/list toggle |
 | `Pagination` | Accessible page numbers with gaps |
 | `QuickViewModal` | Product summary in a modal, fetched by ID |
+| `ProductGallery` | Main image with thumbnail buttons |
+| `QuantitySelector` | Stepper limited to [min, max] |
+| `ProductReviews` | Review cards (name, date, rating, comment) |
+| `Breadcrumb` | Accessible breadcrumb trail |
 | `CategoryNav` | Category links from the API |
 | `ProductGridSkeleton` | Loading placeholders matching the grid |
 | `ProductBadge` | Sale, stock, and info pills |
@@ -151,7 +155,8 @@ Component ──▶ custom hook (useFetch / useProductList) ──▶ service (p
 | GET | `/products/search?q=&limit=0` | Search scope of the catalog |
 | GET | `/products/category/:slug?limit=0` | Category scope of the catalog |
 | GET | `/products/categories` | Category nav and homepage tiles |
-| GET | `/products/:id` | Quick view (and the product details page in Phase 5) |
+| GET | `/products/:id` | Quick view and the product details page |
+| GET | `/products/category/:slug?limit=5` | Related products |
 | POST/PUT/PATCH/DELETE | `/products/add`, `/products/:id` | API playground only; DummyJSON simulates these and saves nothing |
 
 DummyJSON quirks we handle: unknown categories return `200` with an empty list (we check against the category list), unknown `sortBy` values are silently ignored (we only send whitelisted sort options), and there is a rate limit of about 100 requests per time window.

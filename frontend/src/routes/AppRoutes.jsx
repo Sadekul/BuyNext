@@ -3,6 +3,7 @@ import MainLayout from '../layouts/MainLayout'
 import HomePage from '../pages/HomePage'
 import ComingSoonPage from '../pages/ComingSoonPage'
 import ProductListingPage from '../pages/ProductListingPage'
+import ProductDetailsPage from '../pages/ProductDetailsPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ComponentLabPage from '../pages/ComponentLabPage'
 
@@ -17,7 +18,7 @@ function AppRoutes() {
       <Route element={<MainLayout />}>
         <Route index element={<HomePage />} />
         <Route path="products" element={<ProductListingPage />} />
-        <Route path="products/:productId" element={<ComingSoonPage title="Product details" phase={5} />} />
+        <Route path="products/:productId" element={<ProductDetailsPage />} />
         <Route path="categories/:categorySlug" element={<ProductListingPage />} />
         <Route path="deals" element={<ProductListingPage title="Deals" defaultSort="discount-desc" />} />
         <Route path="cart" element={<ComingSoonPage title="Shopping cart" phase={6} />} />
