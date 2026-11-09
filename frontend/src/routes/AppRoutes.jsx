@@ -5,6 +5,7 @@ import ComingSoonPage from '../pages/ComingSoonPage'
 import ProductListingPage from '../pages/ProductListingPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
 import CartPage from '../pages/CartPage'
+import WishlistPage from '../pages/WishlistPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ComponentLabPage from '../pages/ComponentLabPage'
 
@@ -24,7 +25,7 @@ function AppRoutes() {
         <Route path="deals" element={<ProductListingPage title="Deals" defaultSort="discount-desc" />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<ComingSoonPage title="Checkout" phase={10} />} />
-        <Route path="wishlist" element={<ComingSoonPage title="Wishlist" phase={7} />} />
+        <Route path="wishlist" element={<WishlistPage />} />
         <Route path="account" element={<ComingSoonPage title="My account" phase={9} />} />
         <Route path="learn" element={<ComponentLabPage />} />
         <Route path="*" element={<NotFoundPage />} />

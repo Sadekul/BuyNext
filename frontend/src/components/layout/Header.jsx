@@ -7,6 +7,7 @@ import MainNavigation from './MainNavigation'
 import MobileNavigation from './MobileNavigation'
 import { ROUTES } from '../../constants/routes'
 import { useCart } from '../../hooks/useCart'
+import { useWishlist } from '../../hooks/useWishlist'
 import './Header.css'
 
 /**
@@ -14,12 +15,12 @@ import './Header.css'
  * Owns the `isMenuOpen` state because both the menu button (opens) and the
  * mobile drawer (closes) need it — the closest common parent holds the state.
  *
- * The cart count comes from shared cart state (useCart); wishlistCount
- * is still a prop until the wishlist is built in Phase 7.
+ * Cart and wishlist counts come from shared state (useCart, useWishlist).
  */
-function Header({ navLinks, wishlistCount = 0 }) {
+function Header({ navLinks }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { totals, openCart } = useCart()
+  const { count: wishlistCount } = useWishlist()
 
   return (
     <header className="site-header">

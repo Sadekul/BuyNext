@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
-import { LuEye, LuHeart, LuShoppingBag } from 'react-icons/lu'
+import { LuEye, LuShoppingBag } from 'react-icons/lu'
 import Button from '../ui/Button'
 import ProductBadge from './ProductBadge'
 import RatingStars from './RatingStars'
+import WishlistButton from './WishlistButton'
 import { ROUTES } from '../../constants/routes'
 import { STORE_SETTINGS } from '../../constants/store'
 import { cn } from '../../utils/classNames'
@@ -15,11 +16,12 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
 
 /**
  * One product tile, in "grid" or "list" layout.
- * Every action is an optional function prop — the card only reports clicks;
- * the parent decides what "add to cart", "wishlist", or "quick view" do.
- * A button is only rendered when its handler is provided.
+ * "Add to cart" and "Quick view" are optional function props — the card only
+ * reports clicks and the parent decides what happens; each button renders
+ * only when its handler is provided. The wishlist heart is self-contained
+ * (WishlistButton reads the wishlist context), shown unless showWishlist={false}.
  */
-function ProductCard({ product, layout = 'grid', onAddToCart, onToggleWishlist, isWishlisted = false, onQuickView }) {
+function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true }) {
   const { id, title, brand, category, thumbnail, rating, stock, availabilityStatus } = product
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
   const isOutOfStock = stock === 0
@@ -52,17 +54,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onToggleWishlist, 
         {availabilityStatus === 'Low Stock' && <ProductBadge variant="warning">Low stock</ProductBadge>}
       </div>
 
-      {onToggleWishlist && (
-        <button
-          type="button"
-          className={cn('product-card__wishlist', isWishlisted && 'product-card__wishlist--active')}
-          onClick={() => onToggleWishlist(product)}
-          aria-pressed={isWishlisted}
-          aria-label={`${isWishlisted ? 'Remove' : 'Add'} ${title} ${isWishlisted ? 'from' : 'to'} wishlist`}
-        >
-          <LuHeart aria-hidden="true" />
-        </button>
-      )}
+      {showWishlist && <WishlistButton product={product} className="product-card__wishlist" />}
 
       <div className="product-card__body">
         <p className="product-card__meta">

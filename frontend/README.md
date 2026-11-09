@@ -98,7 +98,7 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `/products/:productId` | ProductDetailsPage: gallery, pricing, stock, quantity, specs, reviews, related | Live API |
 | `/cart` | CartPage: lines, quantities, coupon, shipping estimate, price/stock re-check | Done (localStorage) |
 | `/checkout` | Checkout | Placeholder until Phase 10 |
-| `/wishlist` | Wishlist | Placeholder until Phase 7 |
+| `/wishlist` | WishlistPage: saved items, move to cart, remove, availability re-check | Done (localStorage) |
 | `/account` | Account | Placeholder until Phase 9 |
 | `*` | NotFoundPage | Done |
 
@@ -134,6 +134,7 @@ Empty folders hold a `.gitkeep` file so Git tracks them until their phase begins
 | `Loader` / `ErrorMessage` / `EmptyState` | Loading, error (with retry), and empty states |
 | `Modal` | Accessible dialog built on native `<dialog>` (center or drawer) |
 | `Toast` | Auto-dismissing status message |
+| `WishlistButton` | Heart toggle connected to the wishlist context |
 | `CartDrawer` | Slide-out mini cart (opens on add) |
 | `CartLineItem` | Cart row: image, price, quantity selector, remove, notices |
 | `CartSummary` / `CouponForm` | Totals, savings, shipping estimate, discount code |
@@ -170,7 +171,8 @@ DummyJSON quirks we handle: unknown categories return `200` with an empty list (
 | State | Where | Why |
 | --- | --- | --- |
 | Server data (products, categories) | `useFetch` hooks per component | Fetched, cancellable; caching arrives with TanStack Query in Phase 11 |
-| Cart | `CartProvider` (Context + `useReducer`), saved in `localStorage` (`buynest.cart.v1`) | Needed across the whole app; rules live in one pure reducer |
+| Cart | `CartProvider` (Context + `usePersistentReducer`), `localStorage` key `buynest.cart.v1` | Needed across the whole app; rules live in one pure reducer |
+| Wishlist | `WishlistProvider` (same pattern), key `buynest.wishlist.v1` | Shared by every product card, the header, and `/wishlist` |
 | URL state (search, sort) | `useSearchParams` | Shareable and bookmarkable |
 | Local UI state (menu, filters, gallery image) | `useState` in the component | Only one component cares |
 

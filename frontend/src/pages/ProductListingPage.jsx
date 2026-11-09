@@ -12,10 +12,8 @@ import Pagination from '../components/common/Pagination'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
-import Toast from '../components/ui/Toast'
 import { useCatalogProducts } from '../hooks/useCatalogProducts'
 import { useCategories } from '../hooks/useCategories'
-import { useToast } from '../hooks/useToast'
 import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
 import { PRODUCTS_PER_PAGE, getSortOption } from '../constants/catalog'
@@ -106,7 +104,6 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
   const [layout, setLayout] = useState('grid')
   const [areFiltersOpen, setAreFiltersOpen] = useState(false)
   const [quickViewProduct, setQuickViewProduct] = useState(null)
-  const toast = useToast()
   const { addItem } = useCart()
   const toolbarRef = useRef(null) // scroll target when changing page
 
@@ -142,10 +139,6 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
   function handleAddToCart(product) {
     setQuickViewProduct(null) // close quick view first, so the cart drawer isn't stacked on it
     addItem(product)
-  }
-
-  function handleToggleWishlist(product) {
-    toast.show(`"${product.title}" will be saved once the wishlist is built in Phase 7.`)
   }
 
   if (request.isLoading) return <ProductGridSkeleton count={8} />
@@ -219,7 +212,6 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
               products={pagination.items}
               layout={layout}
               onAddToCart={handleAddToCart}
-              onToggleWishlist={handleToggleWishlist}
               onQuickView={setQuickViewProduct}
             />
             <Pagination currentPage={pagination.currentPage} pageCount={pagination.pageCount} onPageChange={handlePageChange} />
@@ -228,7 +220,6 @@ function Catalog({ searchQuery, categorySlug, sortOption, onSortChange }) {
       </div>
 
       <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} />
-      <Toast message={toast.message} onDismiss={toast.dismiss} />
     </div>
   )
 }

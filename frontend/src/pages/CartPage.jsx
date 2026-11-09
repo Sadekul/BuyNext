@@ -4,14 +4,15 @@ import CartSummary from '../components/cart/CartSummary'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import { useCart } from '../hooks/useCart'
-import { useCartRefresh } from '../hooks/useCartRefresh'
+import { useProductRefresh } from '../hooks/useProductRefresh'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import './CartPage.css'
 
 function CartPage() {
   const cart = useCart()
-  const refresh = useCartRefresh()
+  // Re-check prices and stock once each time the cart page opens.
+  const refresh = useProductRefresh('cart', { hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
   const unavailableCount = cart.items.filter((item) => item.isUnavailable).length
 
   if (cart.items.length === 0) {

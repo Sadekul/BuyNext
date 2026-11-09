@@ -43,8 +43,8 @@ See [frontend/README.md](frontend/README.md) for installation, commands, and arc
 | 4 | Product listing and catalog | Done |
 | 5 | Product details page | Done |
 | 6 | Shopping cart | Done |
-| 7 | Wishlist | Next |
-| 8 | Search, filtering, and sorting | Planned |
+| 7 | Wishlist | Done |
+| 8 | Search, filtering, and sorting | Next |
 | 9 | User registration and authentication | Planned |
 | 10 | Checkout and order management | Planned |
 | 11 | Advanced React | Planned |

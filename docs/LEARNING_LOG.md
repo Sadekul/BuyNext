@@ -69,3 +69,11 @@
 - Lazy state initialization, `localStorage` sync in an effect, validation of stored data, cross-tab `storage` events
 - `useMemo`/`useCallback` to keep a context value stable
 - Money in integer cents; explicit shipping and coupon rules; why the backend must re-validate
+
+## Phase 7: Wishlist
+
+- Extracting reusable hooks (`usePersistentReducer`, `useProductRefresh`): hooks share logic, not state
+- Context-connected components (`WishlistButton`) vs function props
+- Provider nesting order when one provider uses another
+- Keeping reducers pure (timestamps created in handlers, passed in actions)
+- Preventing duplicates in the reducer and when loading from storage

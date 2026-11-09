@@ -1,0 +1,132 @@
+.wishlist-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.wishlist-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.wishlist-page__header h1 {
+  font-size: var(--text-3xl);
+}
+
+.wishlist-page__status,
+.wishlist-page__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wishlist-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-5);
+}
+
+.wishlist-item {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.wishlist-item__media {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg-muted);
+}
+
+.wishlist-item__media img {
+  width: 100%;
+  height: 100%;
+  padding: var(--space-4);
+  object-fit: contain;
+}
+
+.wishlist-item__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.wishlist-item__brand {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.wishlist-item__title {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.wishlist-item__title a:hover {
+  color: var(--color-primary);
+}
+
+.wishlist-item__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.wishlist-item__price strong {
+  font-size: var(--text-lg);
+  color: var(--color-secondary);
+}
+
+.wishlist-item__price s {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wishlist-item__stock {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.wishlist-item__stock--out {
+  color: var(--color-sale);
+}
+
+.wishlist-item__date {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.wishlist-item__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.wishlist-item__remove {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.wishlist-item__remove:hover {
+  color: var(--color-sale);
+  border-color: var(--color-sale);
+}

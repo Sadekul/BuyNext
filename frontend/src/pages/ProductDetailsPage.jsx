@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
-import { LuArrowLeft, LuHeart, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
+import { LuArrowLeft, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
 import ProductGallery from '../components/product/ProductGallery'
+import WishlistButton from '../components/product/WishlistButton'
 import ProductBadge from '../components/product/ProductBadge'
 import ProductGrid from '../components/product/ProductGrid'
 import ProductGridSkeleton from '../components/product/ProductGridSkeleton'
@@ -13,9 +14,7 @@ import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
-import Toast from '../components/ui/Toast'
 import { useFetch } from '../hooks/useFetch'
-import { useToast } from '../hooks/useToast'
 import { useCart } from '../hooks/useCart'
 import { getProductById, getProductsByCategory } from '../services/productService'
 import { ROUTES } from '../constants/routes'
@@ -76,7 +75,6 @@ function ProductDetailsPage() {
 function ProductDetails({ product }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const toast = useToast()
   const { addItem } = useCart()
 
   const { min: minQuantity, canBuy } = getPurchaseLimits(product)
@@ -163,14 +161,7 @@ function ProductDetails({ product }) {
               <LuShoppingBag aria-hidden="true" />
               {canBuy ? 'Add to cart' : 'Unavailable'}
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => toast.show(`"${product.title}" will be saved once the wishlist is built in Phase 7.`)}
-              aria-label={`Add ${product.title} to wishlist`}
-            >
-              <LuHeart aria-hidden="true" />
-            </Button>
+            <WishlistButton product={product} variant="button" />
           </div>
           {canBuy && minQuantity > 1 && (
             <p className="product-details__note">Minimum order quantity: {minQuantity}</p>
@@ -217,7 +208,6 @@ function ProductDetails({ product }) {
         <RelatedProducts productId={product.id} categorySlug={product.category} categoryName={categoryName} />
       )}
 
-      <Toast message={toast.message} onDismiss={toast.dismiss} />
     </div>
   )
 }
