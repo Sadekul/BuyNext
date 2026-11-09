@@ -109,10 +109,28 @@ function AuthProvider({ children }) {
     if (session.status === 'anonymous') queryClient.removeQueries({ queryKey: userKeys.all })
   }, [session.status, queryClient])
 
-  // Signing out in another tab removes the stored session there → sign out here too.
+  // Keep every tab on the same account (only "remember me" sessions are
+  // shared: sessionStorage belongs to one tab):
+  // - signed out in another tab → sign out here too (the cart and wishlist
+  //   switch to the guest copy, so nothing of the account stays on screen);
+  // - signed in, or signed in as someone else, in another tab → check and
+  //   adopt that session;
+  // - same account with refreshed tokens → use the new tokens.
   useEffect(() => {
     function handleStorage(event) {
-      if (event.key === STORAGE_KEY && event.newValue === null) setSession(ANONYMOUS)
+      if (event.key !== STORAGE_KEY) return
+      if (event.newValue === null) {
+        setSession(ANONYMOUS)
+        return
+      }
+      const stored = readStoredSession()
+      if (!stored) return
+      setSession((current) => {
+        if (current.status === 'authenticated' && current.user?.id === stored.user.id) {
+          return current.tokens?.accessToken === stored.tokens.accessToken ? current : { ...current, tokens: stored.tokens }
+        }
+        return { ...stored, status: 'checking', expired: false }
+      })
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)

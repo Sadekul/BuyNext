@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import { WishlistContext } from './wishlistContext'
-import { EMPTY_WISHLIST, WISHLIST_ACTIONS, sanitizeWishlist, wishlistReducer } from '../reducers/wishlistReducer'
+import { EMPTY_WISHLIST, WISHLIST_ACTIONS, mergeWishlists, sanitizeWishlist, wishlistReducer } from '../reducers/wishlistReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
+import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { getPurchaseLimits } from '../utils/inventory'
 
@@ -10,17 +11,20 @@ const STORAGE_OPTIONS = {
   emptyState: EMPTY_WISHLIST,
   sanitize: sanitizeWishlist,
   replaceActionType: WISHLIST_ACTIONS.REPLACED,
+  mergeGuest: mergeWishlists,
 }
 
 /*
- * Shared wishlist state, saved in this browser only. Once customers can sign
- * in (Phase 9) and a real backend exists, the wishlist should be stored on
- * the server per account and merged with this local copy after login.
+ * Shared wishlist state, saved in this browser. Each signed-in customer has
+ * their own saved list; signing out shows the (empty) guest list, and guest
+ * items move into the account on sign-in (see usePersistentReducer). With a
+ * real backend the account list is stored on the server instead.
  *
  * Must be rendered inside <CartProvider>, because "move to cart" uses the cart.
  */
 function WishlistProvider({ children }) {
-  const [wishlist, dispatch] = usePersistentReducer(wishlistReducer, STORAGE_OPTIONS)
+  const { user } = useAuth()
+  const [wishlist, dispatch] = usePersistentReducer(wishlistReducer, STORAGE_OPTIONS, user?.id)
   const { addItem: addToCart } = useCart()
 
   // A Set makes "is this product saved?" checks fast for every card on the page.

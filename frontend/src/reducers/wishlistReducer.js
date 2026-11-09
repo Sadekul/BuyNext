@@ -66,6 +66,13 @@ export function wishlistReducer(state, action) {
   }
 }
 
+/** Guest wishlist → account wishlist on sign-in: every product once, newest first. */
+export function mergeWishlists(accountWishlist, guestWishlist) {
+  const accountIds = new Set(accountWishlist.items.map((item) => item.productId))
+  const items = [...guestWishlist.items.filter((item) => !accountIds.has(item.productId)), ...accountWishlist.items]
+  return { items: items.sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0)) }
+}
+
 /** Validates stored data (rebuilding each line from checked fields) and removes duplicates. */
 export function sanitizeWishlist(value) {
   if (!value || !Array.isArray(value.items)) return EMPTY_WISHLIST

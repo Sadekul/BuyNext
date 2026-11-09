@@ -18,3 +18,11 @@ export function writeJson(key, value) {
     // Quota exceeded or storage blocked: the app keeps working in memory.
   }
 }
+
+export function removeKey(key) {
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    // storage blocked: nothing to remove
+  }
+}

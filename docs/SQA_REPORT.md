@@ -36,8 +36,25 @@ A full quality and security pass over the storefront after Phase 14. Every findi
 | F7 | Low | Removing the search or category chip kept the page number | It goes back to page 1. |
 | F8 | Low | A signed-in visit to /login briefly showed the form | Waits for the session check, like protected pages. |
 
+## Account separation (follow-up audit)
+
+Reported: wishlist items stayed visible after signing out. A browser audit of everything that could outlive a customer's session (two real accounts, two tabs, an expired session) found:
+
+| # | Problem | Fix |
+|---|---|---|
+| A1 | Wishlist stayed visible after sign-out | Each account has its own saved wishlist; signed out = empty guest list |
+| A2 | Cart stayed visible after sign-out | Same, per-account cart |
+| A3 | A different account signing in on the same browser saw the previous customer's wishlist and cart | Lists switch with the account; nothing is copied across accounts |
+| A4 | Signing out in one tab left the wishlist and cart on screen in other tabs | The other tab signs out and switches to the guest lists |
+| A5 | An expired session kept the account's wishlist and cart on screen | Expiry switches to the guest lists, like a sign-out |
+| A6 | Signing in in one tab left other tabs signed out | Other tabs check and adopt the new session (and refreshed tokens) |
+
+Behaviour now: items added as a guest move into the account at sign-in (the larger quantity wins for a product in both carts), the customer's own items come back when they sign in again, and lists saved by the previous version of the site are moved into the signed-in account instead of reappearing after sign-out. Already correct: profile, orders, and account pages (cached per account, filtered by account, or redirected to sign-in).
+
+Checks: `src/hooks/usePersistentReducer.test.js`, merge tests in the reducers, and an 18-check browser audit.
+
 ## Known limits (by design, documented)
 
 - Tokens live in Web Storage because DummyJSON is token-based. The Laravel plan uses an HttpOnly session cookie (see `docs/backend/API_CONTRACT.md`).
 - Orders, payment and stock are simulated in the browser. The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
-- Demo orders (with contact details) stay in this browser's storage after sign-out, filtered by account, because DummyJSON has nowhere to keep them. They move server-side with Laravel.
+- Demo orders (with contact details), and each account's saved cart and wishlist, stay in this browser's storage after sign-out (never shown to anyone else) because DummyJSON has nowhere to keep them. They move server-side with Laravel.

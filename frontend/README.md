@@ -13,7 +13,7 @@ A responsive React storefront: catalog with search and filters, product pages, c
 | Server price check before an order (`POST /carts/add`) | Password reset email (no API exists) |
 | | Profile name edit (not saved by DummyJSON) |
 
-Cart, wishlist, and demo orders live in the browser (`localStorage`). The backend must re-validate prices, stock, discounts, shipping, taxes, and totals before taking real orders.
+Cart, wishlist, and demo orders live in the browser (`localStorage`). Each signed-in account has its own cart and wishlist; signing out shows an empty guest cart and wishlist, and guest items move into the account on sign-in. The backend must re-validate prices, stock, discounts, shipping, taxes, and totals before taking real orders.
 
 ## Tech stack
 
@@ -127,7 +127,7 @@ Component ─▶ hook (useQuery / useCart / useAuth…)
 | State | Where | Why |
 | --- | --- | --- |
 | Server data (products, categories, profile) | TanStack Query | Cached, deduplicated, retried, refreshed in the background |
-| Cart, wishlist, demo orders | Context + `useReducer`, saved in `localStorage` (`buynest.*.v1`), synced across tabs | Needed across the app; rules in pure reducers |
+| Cart, wishlist, demo orders | Context + `useReducer`, saved in `localStorage` (`buynest.*.v1`, one copy per account plus a guest copy), synced across tabs | Needed across the app; rules in pure reducers |
 | Signed-in customer | `AuthProvider` (Web Storage, demo only) | Production: Sanctum HttpOnly cookies |
 | Search, filters, sort, page, view | URL search params | Back/refresh/share restore results |
 | Local UI (menus, drawers, gallery) | `useState` | Only one component cares |

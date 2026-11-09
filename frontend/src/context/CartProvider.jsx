@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
 import { CartContext } from './cartContext'
-import { CART_ACTIONS, EMPTY_CART, cartReducer, sanitizeCart } from '../reducers/cartReducer'
+import { CART_ACTIONS, EMPTY_CART, cartReducer, mergeCarts, sanitizeCart } from '../reducers/cartReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
+import { useAuth } from '../hooks/useAuth'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
 
@@ -11,6 +12,7 @@ const STORAGE_OPTIONS = {
   emptyState: EMPTY_CART,
   sanitize: sanitizeCart,
   replaceActionType: CART_ACTIONS.REPLACED,
+  mergeGuest: mergeCarts,
 }
 
 /*
@@ -19,10 +21,16 @@ const STORAGE_OPTIONS = {
  * localStorage keeps the cart across refreshes. It is a convenience only:
  * anyone can edit it in DevTools, so the backend must re-validate prices,
  * stock, discounts, and totals before taking an order.
+ *
+ * Each signed-in customer has their own saved cart; signing out shows the
+ * (empty) guest cart, and a guest cart moves into the account on sign-in
+ * (see usePersistentReducer). With a real backend the account cart lives on
+ * the server instead.
  */
 function CartProvider({ children }) {
   // Reducer + localStorage persistence + cross-tab sync (see usePersistentReducer).
-  const [cart, dispatch] = usePersistentReducer(cartReducer, STORAGE_OPTIONS)
+  const { user } = useAuth()
+  const [cart, dispatch] = usePersistentReducer(cartReducer, STORAGE_OPTIONS, user?.id)
   const [isCartOpen, setIsCartOpen] = useState(false)
 
   // Stable action functions (useCallback) so consumers don't re-render needlessly.

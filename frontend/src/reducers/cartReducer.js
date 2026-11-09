@@ -154,6 +154,22 @@ export function cartReducer(state, action) {
 }
 
 /**
+ * Guest cart → account cart, when a customer signs in. Lines for the same
+ * product keep the larger quantity (both are already within stock limits,
+ * and adding them could double an item by surprise). The account's coupon
+ * wins; otherwise the guest's carries over.
+ */
+export function mergeCarts(accountCart, guestCart) {
+  const items = [...accountCart.items]
+  for (const guestItem of guestCart.items) {
+    const index = items.findIndex((item) => item.productId === guestItem.productId)
+    if (index === -1) items.push(guestItem)
+    else items[index] = { ...items[index], quantity: Math.max(items[index].quantity, guestItem.quantity) }
+  }
+  return { items, couponCode: accountCart.couponCode ?? guestCart.couponCode }
+}
+
+/**
  * Validates data loaded from storage (on start-up and from other tabs).
  * Each line is rebuilt from known fields with checked types; malformed and
  * duplicate lines are dropped.
