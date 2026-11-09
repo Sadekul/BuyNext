@@ -13,6 +13,7 @@ import './Modal.css'
  */
 function Modal({ isOpen, onClose, title, variant = 'center', footer, children }) {
   const dialogRef = useRef(null)
+  const pressStartedOnBackdropRef = useRef(false)
   const titleId = useId()
 
   // Sync React state → DOM: open or close the native dialog when `isOpen` changes.
@@ -28,8 +29,14 @@ function Modal({ isOpen, onClose, title, variant = 'center', footer, children })
   }, [isOpen])
 
   // A click whose target is the <dialog> itself landed on the backdrop.
+  // Also require the press to START there, so selecting text inside the
+  // panel and releasing over the backdrop doesn't close the dialog.
+  function handlePointerDown(event) {
+    pressStartedOnBackdropRef.current = event.target === event.currentTarget
+  }
+
   function handleBackdropClick(event) {
-    if (event.target === event.currentTarget) {
+    if (event.target === event.currentTarget && pressStartedOnBackdropRef.current) {
       onClose()
     }
   }
@@ -40,6 +47,7 @@ function Modal({ isOpen, onClose, title, variant = 'center', footer, children })
       className={cn('modal', `modal--${variant}`)}
       aria-labelledby={titleId}
       onClose={onClose}
+      onPointerDown={handlePointerDown}
       onClick={handleBackdropClick}
     >
       <div className="modal__panel">

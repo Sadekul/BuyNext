@@ -213,6 +213,9 @@ function ProductDetails({ product }) {
 }
 
 function StockStatus({ product, canBuy }) {
+  if (product.stock === null) {
+    return <p className="product-details__stock product-details__stock--out">Stock information unavailable</p>
+  }
   if (product.stock === 0) {
     return <p className="product-details__stock product-details__stock--out">Out of stock</p>
   }

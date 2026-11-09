@@ -53,10 +53,10 @@ function Header({ navLinks }) {
             className="site-header__icon-button"
             onClick={openCart}
             aria-haspopup="dialog"
-            aria-label={`Cart, ${totals.itemCount} items`}
+            aria-label={`Cart, ${totals.totalQuantity} items`}
           >
             <LuShoppingBag aria-hidden="true" />
-            <CountBadge count={totals.itemCount} />
+            <CountBadge count={totals.totalQuantity} />
           </button>
         </nav>
       </div>

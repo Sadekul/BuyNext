@@ -1,4 +1,5 @@
 import { getProductPricing } from './pricing'
+import { getPurchaseLimits } from './inventory'
 
 /*
  * Client-side catalog logic: pure functions (same input → same output, no
@@ -16,7 +17,7 @@ export const EMPTY_FILTERS = {
   maxPrice: '',
   minRating: 0,
   brands: [],
-  inStockOnly: false,
+  inStockOnly: false, // "available to order": in stock AND enough stock for the minimum order
 }
 
 /** Parses a price input: '' or invalid → null (no bound). */
@@ -45,7 +46,7 @@ export function filterProducts(products, filters) {
     if (max !== null && salePrice > max) return false
     if (filters.minRating > 0 && (product.rating ?? 0) < filters.minRating) return false
     if (brandSet.size > 0 && !brandSet.has(product.brand)) return false // no brand → excluded only when filtering by brand
-    if (filters.inStockOnly && !(product.stock > 0)) return false
+    if (filters.inStockOnly && !getPurchaseLimits(product).canBuy) return false
     return true
   })
 }

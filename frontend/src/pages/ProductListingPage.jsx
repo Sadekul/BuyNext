@@ -75,7 +75,14 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         {categories.length > 0 && <CategoryNav categories={categories} />}
       </header>
 
-      {isUnknownCategory ? (
+      {categorySlug && categoriesRequest.error ? (
+        // Without the category list we can't tell a real category from a typo.
+        <ErrorMessage
+          title="We couldn't load categories"
+          message={categoriesRequest.error.message}
+          onRetry={categoriesRequest.retry}
+        />
+      ) : isUnknownCategory ? (
         <EmptyState
           icon={LuSearchX}
           title="Category not found"

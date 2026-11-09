@@ -19,43 +19,50 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove }) {
     setDraft('')
   }
 
-  if (appliedCode) {
-    return (
-      <div className="coupon-form__applied">
-        <p className={couponError ? 'coupon-form__error' : 'coupon-form__success'} role="status">
-          <LuTicket aria-hidden="true" />
-          <span>
-            <strong>{appliedCode}</strong>
-            {couponError ? ` — ${couponError}` : coupon && ` — ${coupon.description}`}
-          </span>
-        </p>
-        <button type="button" className="coupon-form__remove" onClick={onRemove} aria-label={`Remove code ${appliedCode}`}>
-          <LuX aria-hidden="true" />
-        </button>
-      </div>
-    )
-  }
+  let message = null
+  if (appliedCode) message = couponError ? `${appliedCode}: ${couponError}` : coupon && `${appliedCode}: ${coupon.description}`
 
   return (
-    <form className="coupon-form" onSubmit={handleSubmit}>
-      <label htmlFor={inputId}>Discount code</label>
-      <div className="coupon-form__row">
-        <input
-          id={inputId}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="e.g. NEST10"
-          autoComplete="off"
-          aria-describedby={messageId}
-        />
-        <Button type="submit" variant="outline" size="sm">
-          Apply
-        </Button>
-      </div>
-      <p id={messageId} className="coupon-form__hint">
-        Demo codes: NEST10, SAVE20
+    <div className="coupon-form">
+      {appliedCode ? (
+        <div className="coupon-form__applied">
+          <p className={couponError ? 'coupon-form__error' : 'coupon-form__success'}>
+            <LuTicket aria-hidden="true" />
+            <span>
+              <strong>{appliedCode}</strong>
+              {couponError ? ` — ${couponError}` : coupon && ` — ${coupon.description}`}
+            </span>
+          </p>
+          <button type="button" className="coupon-form__remove" onClick={onRemove} aria-label={`Remove code ${appliedCode}`}>
+            <LuX aria-hidden="true" />
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <label htmlFor={inputId}>Discount code</label>
+          <div className="coupon-form__row">
+            <input
+              id={inputId}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="e.g. NEST10"
+              autoComplete="off"
+              aria-describedby={messageId}
+            />
+            <Button type="submit" variant="outline" size="sm">
+              Apply
+            </Button>
+          </div>
+          <p id={messageId} className="coupon-form__hint">
+            Demo codes: NEST10, SAVE20
+          </p>
+        </form>
+      )}
+      {/* Always rendered so screen readers announce when a code is applied or rejected. */}
+      <p className="visually-hidden" role="status">
+        {message}
       </p>
-    </form>
+    </div>
   )
 }
 

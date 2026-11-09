@@ -19,9 +19,19 @@ function CartDrawer() {
         <span>Subtotal</span>
         <strong>{formatPrice(totals.subtotal)}</strong>
       </p>
-      <Button to={ROUTES.checkout} onClick={closeCart} fullWidth>
-        Checkout
-      </Button>
+      {totals.unavailableCount > 0 && (
+        <p className="cart-drawer__blocker">Remove unavailable items to check out.</p>
+      )}
+      {/* Same rule as the cart page: no checkout while unavailable items remain. */}
+      {totals.canCheckout ? (
+        <Button to={ROUTES.checkout} onClick={closeCart} fullWidth>
+          Checkout
+        </Button>
+      ) : (
+        <Button fullWidth disabled>
+          Checkout
+        </Button>
+      )}
       <Button to={ROUTES.cart} onClick={closeCart} variant="outline" fullWidth>
         View cart
       </Button>
@@ -32,7 +42,7 @@ function CartDrawer() {
     <Modal
       isOpen={isCartOpen}
       onClose={closeCart}
-      title={`Your cart (${totals.itemCount})`}
+      title={`Your cart (${totals.totalQuantity})`}
       variant="drawer-right"
       footer={footer}
     >

@@ -13,7 +13,8 @@ function CartPage() {
   const cart = useCart()
   // Re-check prices and stock once each time the cart page opens.
   const refresh = useProductRefresh('cart', { hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
-  const unavailableCount = cart.items.filter((item) => item.isUnavailable).length
+  const { unavailableCount, canCheckout } = cart.totals
+  const changedCount = cart.items.filter((item) => item.notice).length
 
   if (cart.items.length === 0) {
     return (
@@ -32,7 +33,10 @@ function CartPage() {
       <header className="cart-page__header">
         <h1>Shopping cart</h1>
         <p className="cart-page__status" role="status">
+          {/* This live region is always rendered, so screen readers announce its changes. */}
           {refresh.isLoading && 'Checking the latest prices and stock…'}
+          {!refresh.isLoading && !refresh.error && changedCount > 0 &&
+            `${changedCount} ${changedCount === 1 ? 'item has' : 'items have'} changed since you added ${changedCount === 1 ? 'it' : 'them'}. See the notes below.`}
           {refresh.error && (
             <>
               We couldn't check the latest prices ({refresh.error.message}){' '}
@@ -75,7 +79,7 @@ function CartPage() {
               continue.
             </p>
           )}
-          {unavailableCount > 0 ? (
+          {!canCheckout ? (
             <Button size="lg" fullWidth disabled>
               Proceed to checkout
             </Button>

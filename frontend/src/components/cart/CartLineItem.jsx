@@ -30,11 +30,8 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = 
           {hasDiscount && <s>{formatPrice(originalPrice)}</s>}
           <span className="visually-hidden"> each</span>
         </p>
-        {item.notice && (
-          <p className="cart-line__notice" role="status">
-            {item.notice}
-          </p>
-        )}
+        {/* Announced through the page's summary live region, not individually. */}
+        {item.notice && <p className="cart-line__notice">{item.notice}</p>}
 
         <div className="cart-line__controls">
           {!item.isUnavailable && (

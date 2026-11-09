@@ -124,7 +124,7 @@ function CatalogFilters({ filters, brandOptions, onChange, onClear, activeCount 
             checked={filters.inStockOnly}
             onChange={(event) => update({ inStockOnly: event.target.checked })}
           />
-          In stock only
+          Available to order
         </label>
       </fieldset>
     </div>

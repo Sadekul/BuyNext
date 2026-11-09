@@ -30,6 +30,7 @@ export function evaluateCoupon(code, subtotalCents) {
  */
 export function calculateCartTotals(items, couponCode = null) {
   const lines = items.filter((item) => !item.isUnavailable)
+  const unavailableCount = items.length - lines.length
 
   let itemCount = 0
   let originalCents = 0
@@ -48,7 +49,10 @@ export function calculateCartTotals(items, couponCode = null) {
   const shippingCents = itemCount === 0 || qualifiesForFreeShipping ? 0 : toCents(SHIPPING_RULES.standardShippingCost)
 
   return {
-    itemCount,
+    itemCount, // purchasable units (used for the subtotal)
+    totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0), // every unit in the cart (badge)
+    unavailableCount,
+    canCheckout: lines.length > 0 && unavailableCount === 0,
     subtotal: toDollars(subtotalCents),
     productSavings: toDollars(originalCents - subtotalCents),
     coupon,

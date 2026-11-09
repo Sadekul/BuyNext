@@ -1,3 +1,5 @@
+import { getPurchaseLimits } from './inventory'
+
 /** Products in the same order as `ids`, skipping IDs that weren't found. */
 export function pickProductsByIds(products, ids) {
   const productsById = new Map(products.map((product) => [product.id, product]))
@@ -6,13 +8,14 @@ export function pickProductsByIds(products, ids) {
 
 /**
  * Builds the homepage collections from one product list.
- * Special offers = biggest in-stock discounts not already shown elsewhere.
+ * Special offers = biggest discounts on products shoppers can actually buy,
+ * not already shown elsewhere.
  */
 export function buildHomeCollections(products, collectionIds) {
   const shownIds = new Set(Object.values(collectionIds).flat())
 
   const specialOffers = products
-    .filter((product) => product.stock > 0 && !shownIds.has(product.id))
+    .filter((product) => getPurchaseLimits(product).canBuy && !shownIds.has(product.id))
     .toSorted((a, b) => b.discountPercentage - a.discountPercentage)
     .slice(0, 4)
 

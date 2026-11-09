@@ -35,6 +35,26 @@ export function isAbortError(error) {
   return error?.name === 'AbortError'
 }
 
+/**
+ * One signal that aborts when ANY input signal aborts. Uses AbortSignal.any
+ * where available (Chrome 116+, Firefox 124+, Safari 17.4+) and a manual
+ * fallback for older browsers.
+ */
+function anySignal(signals) {
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any(signals)
+  const controller = new AbortController()
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason)
+      break
+    }
+    signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+  }
+  return controller.signal
+}
+
+const TIMEOUT_MESSAGE = 'The server took too long to respond. Please try again.'
+
 /** Builds `${base}${path}?a=1&b=2`, skipping empty parameters. */
 function buildUrl(path, params = {}) {
   const url = new URL(`${API_BASE_URL}${path}`)
@@ -49,7 +69,7 @@ function buildUrl(path, params = {}) {
 async function request(path, { method = 'GET', params, body, headers, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   // Cancel when the caller aborts OR when the request takes too long.
   const timeoutSignal = AbortSignal.timeout(timeoutMs)
-  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
+  const combinedSignal = signal ? anySignal([signal, timeoutSignal]) : timeoutSignal
 
   let response
   try {
@@ -65,9 +85,7 @@ async function request(path, { method = 'GET', params, body, headers, signal, ti
     })
   } catch (error) {
     // fetch() only rejects when no HTTP response arrived at all.
-    if (error.name === 'TimeoutError') {
-      throw new ApiError('The server took too long to respond. Please try again.')
-    }
+    if (error.name === 'TimeoutError') throw new ApiError(TIMEOUT_MESSAGE)
     if (isAbortError(error)) throw error // cancelled on purpose: not a real failure
     throw new ApiError('Network error. Check your internet connection and try again.')
   }
@@ -78,7 +96,8 @@ async function request(path, { method = 'GET', params, body, headers, signal, ti
     try {
       data = await response.json()
     } catch (error) {
-      if (isAbortError(error) || error.name === 'TimeoutError') throw error
+      if (isAbortError(error)) throw error
+      if (error.name === 'TimeoutError') throw new ApiError(TIMEOUT_MESSAGE)
       throw new ApiError('The server sent a response we could not read.', { status: response.status })
     }
   }
@@ -90,6 +109,12 @@ async function request(path, { method = 'GET', params, body, headers, signal, ti
       status: response.status,
       data,
     })
+  }
+
+  // Every BuyNest endpoint returns JSON; anything else (e.g. an HTML error
+  // page from a proxy) would crash the adapters, so treat it as an error.
+  if (!isJson) {
+    throw new ApiError('The server sent an unexpected response.', { status: response.status })
   }
 
   return data
