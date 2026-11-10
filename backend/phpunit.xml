@@ -30,6 +30,7 @@
         <!-- Production rate limits, whatever this machine's .env relaxes for browser tests -->
         <env name="BUYNEST_AUTH_PER_MINUTE" value="30"/>
         <env name="BUYNEST_AUTH_PER_EMAIL_PER_MINUTE" value="10"/>
+        <env name="BUYNEST_ORDERS_PER_MINUTE" value="10"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

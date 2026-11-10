@@ -2,20 +2,21 @@ import { apiClient } from './apiClient'
 import { REAL_ACCOUNTS } from '../constants/accounts'
 
 /*
- * Orders — SIMULATED. DummyJSON has no orders API, so BuyNest:
+ * Demo orders — SIMULATED (REAL_SHOP off, constants/shop.js). DummyJSON has
+ * no orders API, so BuyNest:
  * 1. asks the server to price the cart (POST /carts/add looks up the real
  *    list price of every product ID and drops unknown products), and
  * 2. saves the order in this browser (OrdersProvider).
- * No payment is taken and nothing ships. With a real backend, step 2 becomes
- * POST /api/orders and the SERVER creates the order from its own prices,
- * stock, coupon rules, shipping rates, and taxes.
+ * No payment is taken and nothing ships. With BuyNest's API, shopService.js
+ * is used instead: the SERVER creates the order from its own prices, stock,
+ * coupon rules, shipping rates, and taxes.
  */
 
 /**
- * DummyJSON's cart check only accepts its own demo users (ids 1 to 208). With
- * BuyNest accounts, the price check (still DummyJSON until orders move to
- * Laravel in phase 2) runs as demo user 1; the order itself keeps the real
- * customer's id.
+ * DummyJSON's cart check only accepts its own demo users (ids 1 to 208). When
+ * BuyNest accounts are combined with the DummyJSON catalog, the price check
+ * runs as demo user 1; the order itself keeps the real customer's id. (With
+ * the Laravel catalog too, the demo check isn't used at all.)
  */
 const priceCheckUserId = (userId) => (REAL_ACCOUNTS ? 1 : userId)
 

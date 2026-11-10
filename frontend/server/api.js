@@ -1,14 +1,18 @@
 import { json, readCookies } from './http.js'
 import { AUTH_ROUTES } from './authBff.js'
 import { handleAdminRequest } from './adminApi.js'
+import { handleCatalogRequest } from './catalogApi.js'
+import { handleShopRequest } from './shopApi.js'
 
 /*
  * Entry point for BuyNest's server-side services, on the storefront's own
  * address. The same function runs in `npm run dev` / `npm run preview`
  * (vite.config.js), as Vercel functions (api/), and as a Netlify function
  * (netlify/functions/api.mjs):
- *   /api/auth/*   sign-in service (authBff.js)
- *   /api/admin/*  admin service, admins only (adminApi.js)
+ *   /api/auth/*     sign-in service (authBff.js)
+ *   /api/admin/*    admin service, admins only (adminApi.js)
+ *   /api/catalog/*  public product catalog, read-only (catalogApi.js)
+ *   /api/shop/*     cart pricing and orders, guests too (shopApi.js)
  */
 export async function handleApiRequest(request) {
   // Only BuyNest's own pages may call these services. Browsers label requests
@@ -27,5 +31,7 @@ export async function handleApiRequest(request) {
   if (segments[0] === 'api' && segments[1] === 'admin') {
     return handleAdminRequest(request, segments.slice(2), cookies)
   }
+  if (segments[0] === 'api' && segments[1] === 'catalog') return handleCatalogRequest(request, segments.slice(2))
+  if (segments[0] === 'api' && segments[1] === 'shop') return handleShopRequest(request, segments.slice(2), cookies)
   return json({ message: 'Not found.' }, 404)
 }

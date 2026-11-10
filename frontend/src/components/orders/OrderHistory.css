@@ -1,0 +1,27 @@
+.order-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 0 0 var(--space-4);
+  margin: 0;
+  list-style: none;
+  border-left: 2px solid var(--color-border);
+}
+
+.order-history__entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.order-history__entry time {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.order-history__note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+}

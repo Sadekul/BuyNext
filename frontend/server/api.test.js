@@ -8,8 +8,8 @@ const SITE = 'https://shop.example'
 function fakeUpstream(routes) {
   const calls = []
   vi.stubGlobal('fetch', async (url, init = {}) => {
-    const { pathname } = new URL(url)
-    calls.push({ path: pathname, init })
+    const { pathname, search } = new URL(url)
+    calls.push({ path: pathname, search, init })
     const route = routes[`${init.method ?? 'GET'} ${pathname}`] ?? { status: 404, body: { message: 'Not found' } }
     return new Response(JSON.stringify(route.body), { status: route.status ?? 200, headers: { 'Content-Type': 'application/json' } })
   })
@@ -373,5 +373,206 @@ describe('with BuyNest accounts (VITE_ACCOUNTS_BACKEND=laravel)', () => {
 
     const invalid = await call('customers/5', { service: 'admin', method: 'PATCH', cookie: 'buynest_admin_at=1|ACCESS', body: { isActive: 'no' } })
     expect(invalid.status).toBe(422)
+  })
+})
+
+describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_ACCOUNTS_BACKEND', 'laravel')
+    vi.stubEnv('VITE_API_PROVIDER', 'laravel')
+    vi.stubEnv('BUYNEST_LARAVEL_URL', 'http://laravel.test')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  const sentBody = (entry) => JSON.parse(entry.init.body)
+  const PRODUCT = { id: 1, name: 'Mascara', price: '9.99', discount_percent: 10.48, sale_price: '8.94' }
+  const TOTALS = { item_count: 2, subtotal: '17.88', discount: '1.79', shipping: '4.99', tax: '0.00', total: '21.08' }
+  const LINE = { product_id: 1, sku: 'BEA-1', name: 'Mascara', thumbnail_url: 'https://cdn.dummyjson.com/t.webp', price: '9.99', discount_percent: 10.48, sale_price: '8.94', quantity: 2, line_total: '17.88' }
+  const CART = { lines: [{ ...LINE, stock_quantity: 99, min_order_quantity: 1, available: true }], problems: [], coupon: { code: 'NEST10', description: '10% off' }, coupon_error: null, shipping_options: [{ id: 'standard', label: 'Standard', eta: '3–5 days', price: '4.99' }], totals: TOTALS }
+  const ADDRESS = { first_name: 'Ava', last_name: 'Customer', line1: '12 Market Street', line2: null, city: 'Springfield', state: 'Oregon', postal_code: '29112', country: 'United States' }
+  const ORDER = {
+    number: 'BN-100001', status: 'processing', payment_status: 'unpaid', payment_method: 'cod', shipping_method: { id: 'standard', label: 'Standard', eta: '3–5 days' },
+    email: 'guest@example.com', phone: '+15550100100', shipping_address: ADDRESS, billing_address: ADDRESS, coupon_code: 'NEST10', items: [LINE], totals: TOTALS,
+    placed_at: '2026-11-10T09:41:02Z', history: [{ status: 'processing', payment_status: 'unpaid', note: 'Order placed.', created_at: '2026-11-10T09:41:02Z' }],
+  }
+  const CHECKOUT = {
+    items: [{ productId: 1, quantity: 2, price: 0.01 }], couponCode: 'NEST10', shippingMethod: 'standard', paymentMethod: 'cod', email: 'guest@example.com', phone: '+15550100100',
+    shippingAddress: { firstName: 'Ava', lastName: 'Customer', line1: '12 Market Street', line2: '', city: 'Springfield', state: 'Oregon', postalCode: '29112', country: 'United States' },
+    billingAddress: null, expectedTotal: 21.08, total: 0.01,
+  }
+
+  it('the catalog forwards only allowed paths and query keys, and may be cached for a minute', async () => {
+    const meta = { total: 1, path: 'http://laravel.test/api/v1/products', links: [{ url: 'http://laravel.test/secret' }] }
+    const calls = fakeUpstream({ 'GET /api/v1/products': { body: { data: [PRODUCT], meta, links: { next: 'http://laravel.test/secret' } } } })
+    const response = await call('products?search=mascara&category=beauty&per_page=12&evil=1&brand[]=Essence', { service: 'catalog' })
+    expect(response.headers.get('cache-control')).toBe('public, max-age=60')
+    const text = await response.text()
+    expect(JSON.parse(text)).toEqual({ data: [PRODUCT], meta: { total: 1 } })
+    expect(text).not.toContain('laravel.test') // the API's internal address never reaches the browser
+    expect(new URLSearchParams(calls[0].search).toString()).toBe('search=mascara&category=beauty&brand%5B%5D=Essence&per_page=12')
+  })
+
+  it('the catalog is read-only and only knows products and categories', async () => {
+    const calls = fakeUpstream({ 'GET /api/v1/products/7': { status: 404, body: { message: 'Product not found.' } } })
+    expect((await call('products', { service: 'catalog', method: 'POST', body: {} })).status).toBe(405)
+    expect((await call('customers', { service: 'catalog' })).status).toBe(404)
+    expect((await call('products/abc', { service: 'catalog' })).status).toBe(404)
+    const missing = await call('products/7', { service: 'catalog' })
+    expect(missing.status).toBe(404)
+    expect(missing.headers.get('cache-control')).toBe('no-store')
+    expect(calls.map((entry) => entry.path)).toEqual(['/api/v1/products/7'])
+  })
+
+  it('prices a cart from ids and quantities only, and answers in camelCase with numbers', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/cart/validate': { body: { data: CART } } })
+    const response = await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [{ productId: 1, quantity: 2, price: 0.01 }], couponCode: 'NEST10', shippingMethod: 'standard' } })
+    expect(sentBody(calls[0])).toEqual({ items: [{ product_id: 1, quantity: 2 }], coupon_code: 'NEST10', shipping_method: 'standard' })
+    const cart = await response.json()
+    expect(cart.totals).toEqual({ itemCount: 2, subtotal: 17.88, discount: 1.79, shipping: 4.99, tax: 0, total: 21.08 })
+    expect(cart.lines[0]).toMatchObject({ productId: 1, title: 'Mascara', salePrice: 8.94, lineTotal: 17.88, available: true })
+    expect(cart.shippingOptions[0].price).toBe(4.99)
+  })
+
+  it('places a guest order without a token, never sending prices from the browser', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/orders': { status: 201, body: { data: ORDER } } })
+    const response = await call('orders', { service: 'shop', method: 'POST', body: CHECKOUT })
+    expect(response.status).toBe(201)
+    const order = await response.json()
+    expect(order).toMatchObject({ number: 'BN-100001', status: 'processing', paymentStatus: 'unpaid', email: 'guest@example.com', totals: { total: 21.08 } })
+    expect(order.shippingAddress).toEqual({ firstName: 'Ava', lastName: 'Customer', line1: '12 Market Street', line2: '', city: 'Springfield', state: 'Oregon', postalCode: '29112', country: 'United States' })
+    expect(order.history[0]).toEqual({ status: 'processing', paymentStatus: 'unpaid', note: 'Order placed.', createdAt: '2026-11-10T09:41:02Z' })
+    expect(calls[0].init.headers.Authorization).toBeUndefined()
+    const sent = sentBody(calls[0])
+    expect(sent.items).toEqual([{ product_id: 1, quantity: 2 }])
+    expect(sent.expected_total).toBe('21.08')
+    expect(sent.shipping_address).toEqual({ ...ADDRESS })
+    expect(JSON.stringify(sent)).not.toMatch(/0\.01/)
+  })
+
+  it("places a signed-in customer's order with their token", async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/orders': { status: 201, body: { data: ORDER } } })
+    await call('orders', { service: 'shop', method: 'POST', body: CHECKOUT, cookie: 'buynest_at=1|ACCESS' })
+    expect(calls[0].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+  })
+
+  it('passes on "prices changed" (409) with the new cart, and field errors (422) with form names', async () => {
+    fakeUpstream({ 'POST /api/v1/orders': { status: 409, body: { message: 'Prices changed since you added these items.', data: CART } } })
+    const changed = await call('orders', { service: 'shop', method: 'POST', body: CHECKOUT })
+    expect(changed.status).toBe(409)
+    expect(await changed.json()).toMatchObject({ code: 'prices_changed', cart: { totals: { total: 21.08 } } })
+
+    fakeUpstream({ 'POST /api/v1/orders': { status: 422, body: { message: 'Invalid', errors: { 'shipping_address.postal_code': ['Enter a postal code.'], payment_method: ['Choose'] }, problems: [{ product_id: 1, code: 'insufficient_stock', message: 'Only 1 left.' }], trace: 'x' } } })
+    const invalid = await call('orders', { service: 'shop', method: 'POST', body: CHECKOUT })
+    expect(await invalid.json()).toEqual({
+      message: 'Invalid',
+      errors: { 'shippingAddress.postalCode': ['Enter a postal code.'], paymentMethod: ['Choose'] },
+      problems: [{ productId: 1, code: 'insufficient_stock', message: 'Only 1 left.' }],
+    })
+  })
+
+  it("lists and shows a customer's orders only with the customer session", async () => {
+    const calls = fakeUpstream({
+      'GET /api/v1/orders': { body: { data: [ORDER], meta: { current_page: 2, per_page: 10, total: 11, last_page: 2 } } },
+      'GET /api/v1/orders/BN-100001': { body: { data: ORDER } },
+    })
+    expect((await call('orders', { service: 'shop' })).status).toBe(401)
+    expect((await call('orders/BN-100001', { service: 'shop' })).status).toBe(401)
+    expect(calls).toEqual([])
+
+    const list = await (await call('orders?page=2', { service: 'shop', cookie: 'buynest_at=1|ACCESS' })).json()
+    expect(list).toMatchObject({ total: 11, page: 2, perPage: 10, lastPage: 2, orders: [{ number: 'BN-100001' }] })
+    expect(calls[0].search).toBe('?page=2')
+    expect(calls[0].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+    expect(await (await call('orders/BN-100001', { service: 'shop', cookie: 'buynest_at=1|ACCESS' })).json()).toMatchObject({ number: 'BN-100001' })
+    expect((await call('orders/1%2F..', { service: 'shop', cookie: 'buynest_at=1|ACCESS' })).status).toBe(404)
+  })
+
+  it('looks up a guest order by number and email', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/orders/lookup': { status: 404, body: { message: "We couldn't find an order with that number and email." } } })
+    const response = await call('orders/lookup', { service: 'shop', method: 'POST', body: { number: ' BN-100001 ', email: 'guest@example.com', extra: 1 } })
+    expect(response.status).toBe(404)
+    expect(sentBody(calls[0])).toEqual({ number: 'BN-100001', email: 'guest@example.com' })
+  })
+
+  describe('admin data from Laravel', () => {
+    const ADMIN_ME = { 'GET /api/admin/v1/me': { body: { data: { id: 1, name: 'Store Admin', email: 'admin@buynest.test' } } } }
+    const admin = (action, options = {}) => call(action, { service: 'admin', cookie: 'buynest_admin_at=9|ADMIN', ...options })
+    const ADMIN_ORDER = { ...ORDER, id: 1, customer: null, history: [{ ...ORDER.history[0], admin_name: null, customer_notified: false }] }
+
+    it('maps products, with their status, and sends product changes in the API names', async () => {
+      const raw = { ...PRODUCT, sku: 'BEA-1', stock_quantity: 4, rating_average: '4.50', category: { slug: 'beauty' }, brand: { name: 'Essence' }, status: 'draft', thumbnail_url: 't.webp' }
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/products': { body: { data: [raw], meta: { total: 30 } } },
+        'PATCH /api/admin/v1/products/1': { body: { data: { ...raw, price: '12.50' } } },
+        'POST /api/admin/v1/products': { status: 422, body: { message: 'Invalid', errors: { name: ['Taken'], stock_quantity: ['Too many'] } } },
+      })
+      const list = await (await admin('products?q=mas&status=draft&sortBy=title&order=desc&limit=10&skip=20')).json()
+      expect(list).toMatchObject({ total: 30, live: true, products: [{ id: 1, title: 'Mascara', category: 'beauty', brand: 'Essence', price: 9.99, stock: 4, status: 'draft' }] })
+      expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '3', per_page: '10', search: 'mas', status: 'draft', sort: 'name', direction: 'desc' })
+
+      const saved = await (await admin('products/1', { method: 'PUT', body: { price: 12.5, status: 'active', brand: '' } })).json()
+      expect(saved).toMatchObject({ product: { price: 12.5 }, live: true })
+      expect(sentBody(calls.at(-1))).toEqual({ price: 12.5, status: 'active', brand: null })
+      expect((await admin('products/1', { method: 'PUT', body: { status: 'hidden' } })).status).toBe(422)
+
+      const invalid = await admin('products', { method: 'POST', body: { title: 'Lamp', category: 'beauty', price: 1, stock: 1 } })
+      expect((await invalid.json()).errors).toEqual({ title: ['Taken'], stock: ['Too many'] })
+    })
+
+    it('lists orders with filters, shows one by number, and changes its status', async () => {
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/orders': { body: { data: [ADMIN_ORDER], meta: { total: 1 } } },
+        'GET /api/admin/v1/orders/BN-100001': { body: { data: ADMIN_ORDER } },
+        'PATCH /api/admin/v1/orders/BN-100001': { body: { data: { ...ADMIN_ORDER, status: 'shipped' } } },
+      })
+      const list = await (await admin('orders?q=ava&status=processing&paymentStatus=unpaid&evil=1')).json()
+      expect(list.orders[0]).toMatchObject({ id: 'BN-100001', customer: 'Ava Customer', guest: true, status: 'processing', paymentStatus: 'unpaid', total: 21.08 })
+      expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '1', per_page: '20', search: 'ava', status: 'processing', payment_status: 'unpaid' })
+
+      const detail = await (await admin('orders/BN-100001')).json()
+      expect(detail).toMatchObject({ number: 'BN-100001', customer: { guest: true, firstName: 'Ava', lastName: 'Customer' }, lines: [{ id: 1, title: 'Mascara', quantity: 2, discountedTotal: 17.88 }], history: [{ note: 'Order placed.' }] })
+
+      const shipped = await admin('orders/BN-100001', { method: 'PATCH', body: { status: 'shipped', note: ' Tracking 123 ', notifyCustomer: false, total: 0 } })
+      expect((await shipped.json()).status).toBe('shipped')
+      expect(sentBody(calls.at(-1))).toEqual({ status: 'shipped', note: 'Tracking 123', notify_customer: false })
+
+      expect((await admin('orders/BN-100001', { method: 'PATCH', body: { paymentStatus: 'unpaid' } })).status).toBe(422)
+      expect((await admin('orders/BN-100001', { method: 'PATCH', body: {} })).status).toBe(422)
+    })
+
+    it('maps the overview, including orders by status', async () => {
+      fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/overview': {
+          body: {
+            data: {
+              products: { total: 194, active: 190, out_of_stock: 2, low_stock: 5, inventory_value: '1000.50' },
+              orders: { total: 3, revenue: '63.24', units_sold: 6, average_order: '21.08', by_status: { processing: 2, cancelled: 1 } },
+              customers: { total: 4 },
+              low_stock_products: [{ id: 1, name: 'Mascara', sku: 'BEA-1', category: 'beauty', stock_quantity: 2, thumbnail_url: 't.webp' }],
+              latest_orders: [{ number: 'BN-100001', customer_name: null, email: 'guest@example.com', items: 2, total: '21.08', status: 'processing', placed_at: 'T' }],
+              low_stock_threshold: 10,
+            },
+          },
+        },
+      })
+      const overview = await (await admin('overview')).json()
+      expect(overview).toMatchObject({
+        products: { total: 194, outOfStock: 2, inventoryValue: 1000.5 },
+        orders: { revenue: 63.24, averageOrder: 21.08, byStatus: { processing: 2, cancelled: 1 } },
+        lowStockProducts: [{ id: 1, title: 'Mascara', category: 'beauty', stock: 2 }],
+        latestOrders: [{ id: 'BN-100001', customer: 'guest@example.com', total: 21.08, status: 'processing' }],
+        live: true,
+      })
+    })
+
+    it('demo mode refuses order changes and order numbers', async () => {
+      vi.stubEnv('VITE_API_PROVIDER', 'dummyjson')
+      fakeUpstream(ADMIN_ME)
+      expect((await admin('orders/BN-100001', { method: 'PATCH', body: { status: 'shipped' } })).status).toBe(404)
+      expect((await admin('orders/BN-100001')).status).toBe(404)
+    })
   })
 })

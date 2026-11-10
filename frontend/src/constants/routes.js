@@ -8,6 +8,7 @@ export const ROUTES = {
   cart: '/cart',
   checkout: '/checkout',
   orderConfirmation: (orderId) => `/order-confirmation/${orderId}`,
+  trackOrder: '/track-order',
   wishlist: '/wishlist',
   account: '/account',
   orders: '/account/orders',

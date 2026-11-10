@@ -3,8 +3,9 @@ import { api } from './client'
 /*
  * Admin endpoints (server/adminApi.js in the frontend project). Every one is
  * checked on the server: non-admin accounts get 403 whatever this app shows.
- * Customers are real with BuyNest accounts; products and orders are still
- * DummyJSON demo data, whose writes are simulated (`simulated: true`).
+ * Customers are real with BuyNest accounts. Products and orders are real with
+ * the Laravel catalog too (LIVE_DATA, api/mode.js; answers say `live: true`);
+ * otherwise they are DummyJSON demo data, whose writes are simulated (`simulated: true`).
  */
 
 export const adminKeys = {
@@ -26,6 +27,8 @@ export const deleteProduct = (id) => api.delete(`/api/admin/products/${id}`)
 export const getCategories = ({ signal } = {}) => api.get('/api/admin/categories', { signal })
 export const getOrders = (params, { signal } = {}) => api.get('/api/admin/orders', { params, signal })
 export const getOrder = (id, { signal } = {}) => api.get(`/api/admin/orders/${id}`, { signal })
+/** { status?, paymentStatus: 'paid'?, note?, notifyCustomer? } → the updated order. Real orders only. */
+export const updateOrder = (number, changes) => api.patch(`/api/admin/orders/${number}`, changes)
 export const getCustomers = (params, { signal } = {}) => api.get('/api/admin/customers', { params, signal })
 /** Block (isActive false) or unblock a customer. Blocking signs them out everywhere. BuyNest accounts only. */
 export const updateCustomer = (id, values) => api.patch(`/api/admin/customers/${id}`, values)

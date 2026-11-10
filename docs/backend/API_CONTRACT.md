@@ -1,6 +1,6 @@
 # BuyNest REST API contract (proposed, v1)
 
-The API the Laravel backend ([backend/](../../backend/README.md)) provides for the storefront. The frontend's Laravel provider (`frontend/src/services/providers/laravelProvider.js`) and adapter (`frontend/src/services/adapters/laravelAdapter.js`) are written against this document. **Status (2026-11-10):** the authentication and customer-profile endpoints exist (backend phase 1, see [ACCOUNTS.md](ACCOUNTS.md)); the catalog, cart, and order endpoints below are still the agreement for phase 2.
+The API the Laravel backend ([backend/](../../backend/README.md)) provides for the storefront. The frontend's Laravel provider (`frontend/src/services/providers/laravelProvider.js`) and adapter (`frontend/src/services/adapters/laravelAdapter.js`) are written against this document. **Status (2026-11-10):** the authentication and customer-profile endpoints exist (backend phase 1, see [ACCOUNTS.md](ACCOUNTS.md)); the catalog, cart, and order endpoints exist since phase 2, as specified in [PHASE2_CONTRACT.md](PHASE2_CONTRACT.md) (which refines this page).
 
 ## Conventions
 - Base path: `/api/v1`. JSON only (`Accept: application/json`).

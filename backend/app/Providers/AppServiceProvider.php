@@ -29,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(config('buynest.auth_per_email_per_minute'))->by('email:'.$request->path().'|'.$email),
             ];
         });
+        // Placing orders: per visitor (the BFF passes the visitor's IP, see TrustBffClientIp).
+        RateLimiter::for('orders', fn (Request $request) => Limit::perMinute(config('buynest.orders_per_minute'))->by('ip:'.$request->ip()));
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(240)->by(
             $request->user() ? $request->user()->getMorphClass().':'.$request->user()->getKey() : 'ip:'.$request->ip(),
         ));

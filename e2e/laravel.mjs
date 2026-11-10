@@ -14,7 +14,8 @@ const children = [
   spawn(process.execPath, [fileURLToPath(new URL('./laravel-mock-server.mjs', import.meta.url)), '8765'], { stdio: 'ignore' }),
   spawn(process.execPath, [`${FRONTEND}node_modules/vite/bin/vite.js`, '--port', '5174', '--strictPort'], {
     cwd: FRONTEND,
-    env: { ...process.env, VITE_API_PROVIDER: 'laravel', VITE_API_BASE_URL: API },
+    // The catalog is read through the store's own service (/api/catalog), which calls this API.
+    env: { ...process.env, VITE_API_PROVIDER: 'laravel', VITE_API_BASE_URL: API, BUYNEST_LARAVEL_URL: API },
     stdio: 'ignore',
   }),
 ]
@@ -34,11 +35,13 @@ await waitFor(BASE)
 const browser = await launch()
 const errors = []
 const page = watchErrors(await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage(), errors)
+// The browser reads the catalog from the store's own /api/catalog/*; the store's service calls the API.
 const apiHosts = new Set()
+let catalogCalls = 0
 page.on('request', (request) => {
-  const { hostname, port, pathname } = new URL(request.url())
-  if (!/\.(webp|png|jpe?g|svg|woff2?)$/.test(pathname) && hostname !== 'localhost') apiHosts.add(hostname)
-  if (port === '8765') apiHosts.add('mock-laravel')
+  const { hostname, pathname } = new URL(request.url())
+  if (!/\.(webp|png|jpe?g|svg|woff2?|css)$/.test(pathname) && !['localhost', 'fonts.googleapis.com', 'fonts.gstatic.com'].includes(hostname)) apiHosts.add(hostname)
+  if (pathname.startsWith('/api/catalog/')) catalogCalls++
 })
 const resultCount = async () => Number((await page.getByText(/of \d+ products?$/).first().textContent()).match(/of (\d+)/)[1])
 
@@ -58,7 +61,7 @@ log(await visible(page.getByText('Served by the mock Laravel API (product 7).'))
 log(await visible(page.getByText(/out of stock/i)), 'product page: availability mapped ("out_of_stock")')
 await page.goto(`${BASE}/products/999`, { waitUntil: 'networkidle' })
 log(await visible(page.getByText(/not found/i)), 'unknown product: Laravel 404 → "not found"')
-log(apiHosts.has('mock-laravel') && !apiHosts.has('dummyjson.com'), `catalog data only from the Laravel API (hosts: ${[...apiHosts].join(', ')})`)
+log(catalogCalls > 0 && apiHosts.size === 0, `catalog only through the store's /api/catalog, which calls the Laravel API (${catalogCalls} calls; other hosts: ${[...apiHosts].join(', ') || 'none'})`)
 
 log(errors.length === 0, `no page errors ${JSON.stringify(errors)}`)
 report.done()

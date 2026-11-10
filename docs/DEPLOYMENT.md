@@ -49,7 +49,7 @@ Both configs also set long-term caching for `/assets/*` and basic security heade
 | Variable | Development | Production (today) | Production (with Laravel) |
 | --- | --- | --- | --- |
 | `VITE_API_BASE_URL` | `https://dummyjson.com` | `https://dummyjson.com` | `https://api.buynest.com` |
-| `VITE_API_PROVIDER` | `dummyjson` | `dummyjson` | `laravel` |
+| `VITE_API_PROVIDER` | `laravel` | `dummyjson` | `laravel` (the catalog is then read through the store's own `/api/catalog/*`; `VITE_API_BASE_URL` isn't needed) |
 | `VITE_SHOW_LEARNING_LAB` | (always on) | `false` | `false` |
 | `VITE_ACCOUNTS_BACKEND` | `laravel` | `dummyjson` | `laravel` |
 | `BUYNEST_LARAVEL_URL` (server only) | `http://127.0.0.1:8000` | — | the API's URL, reachable from the server functions |

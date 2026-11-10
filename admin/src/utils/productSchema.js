@@ -31,6 +31,8 @@ export const productSchema = z.object({
     .int('Enter a whole number of units.')
     .min(0, 'Enter a whole number of units from 0 to 100,000.')
     .max(100_000, 'Enter a whole number of units from 0 to 100,000.'),
+  // Only active products are in the store (real data only; the demo ignores it).
+  status: z.enum(['active', 'draft', 'archived'], { error: 'Choose active, draft, or archived.' }),
 })
 
-export const EMPTY_PRODUCT = { title: '', brand: '', category: '', description: '', price: 0, discountPercentage: 0, stock: 0 }
+export const EMPTY_PRODUCT = { title: '', brand: '', category: '', description: '', price: 0, discountPercentage: 0, stock: 0, status: 'active' }

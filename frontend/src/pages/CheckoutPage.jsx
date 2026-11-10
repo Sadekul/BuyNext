@@ -1,6 +1,6 @@
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { LuLock, LuShoppingBag, LuTriangleAlert } from 'react-icons/lu'
 import AddressFields from '../components/checkout/AddressFields'
 import CouponForm from '../components/cart/CouponForm'
@@ -17,10 +17,13 @@ import { useProductRefresh } from '../hooks/useProductRefresh'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
 import { productKeys } from '../queries/productQueries'
+import { cartPricingKey, cartPricingQuery, orderKeys } from '../queries/orderQueries'
 import { useOrders } from '../hooks/useOrders'
 import { createOrder, verifyCartWithServer } from '../services/orderService'
+import { placeOrder as placeServerOrder } from '../services/shopService'
 import { EMPTY_ADDRESS, checkoutSchema } from '../schemas/checkoutSchema'
 import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS } from '../constants/store'
+import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { calculateCartTotals } from '../utils/cartTotals'
@@ -28,30 +31,38 @@ import { formatPrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
 import './CheckoutPage.css'
 
-// API field names (Laravel contract, snake_case) → checkout form fields.
+// API field names → checkout form fields. The shop service (server/shop/laravel.js)
+// already turns the API's snake_case into these camelCase paths.
+const ADDRESS_FIELDS = ['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'postalCode', 'country']
 const SERVER_FIELD_MAP = {
   email: 'email',
   phone: 'phone',
-  'shipping_address.first_name': 'shipping.firstName',
-  'shipping_address.last_name': 'shipping.lastName',
-  'shipping_address.line1': 'shipping.line1',
-  'shipping_address.city': 'shipping.city',
-  'shipping_address.state': 'shipping.state',
-  'shipping_address.postal_code': 'shipping.postalCode',
-  'shipping_address.country': 'shipping.country',
-  shipping_method: 'shippingMethod',
-  payment_method: 'paymentMethod',
+  shippingMethod: 'shippingMethod',
+  paymentMethod: 'paymentMethod',
+  ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`shippingAddress.${field}`, `shipping.${field}`])),
+  ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`billingAddress.${field}`, `billing.${field}`])),
+}
+
+const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
+
+// What the shopper is told about paying, per method (REAL_SHOP). No payment provider is connected yet.
+const PAYMENT_NOTES = {
+  cod: 'Your order is confirmed straight away. Pay the courier when it arrives.',
+  online:
+    "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers.",
 }
 
 /**
- * /checkout (signed-in customers). Loads the profile to pre-fill contact and
- * address details, then renders the form. SIMULATED: no payment is taken.
+ * /checkout. Signed-in customers get their details pre-filled from the
+ * profile. With BuyNest's API (REAL_SHOP) guests can check out too: the
+ * server prices the cart and stores the order. In the demo, checkout needs a
+ * sign-in (AppRoutes) and no payment is taken.
  */
 function CheckoutPage() {
   const cart = useCart()
-  const { user, authorizedRequest } = useAuth()
+  const { user, status, authorizedRequest } = useAuth()
   // Same cache entry as the profile page: visiting /account first makes this instant.
-  const profileRequest = useQuery(profileQuery(user.id, authorizedRequest))
+  const profileRequest = useQuery({ ...profileQuery(user?.id, authorizedRequest), enabled: Boolean(user) })
   // Re-check prices and stock on arrival, like the cart page: the cart holds
   // snapshots taken when each product was added. Items that sold out make
   // canCheckout false (the "needs your attention" screen below).
@@ -77,7 +88,8 @@ function CheckoutPage() {
     )
   }
 
-  if (profileRequest.isPending) {
+  // Guests can check out (REAL_SHOP), but a session being checked may still turn out to be a customer.
+  if (status === 'checking' || (user && profileRequest.isPending)) {
     return (
       <div className="section container">
         <Loader label="Preparing checkout…" />
@@ -87,11 +99,11 @@ function CheckoutPage() {
 
   // If the profile can't be loaded, fall back to what we know from sign-in.
   const profile = profileRequest.data ?? user
-  const address = profile.address
+  const address = profile?.address
   const shippingDefaults = {
     ...EMPTY_ADDRESS,
-    firstName: profile.firstName,
-    lastName: profile.lastName,
+    firstName: profile?.firstName ?? '',
+    lastName: profile?.lastName ?? '',
     ...(address && {
       line1: address.line1,
       city: address.city,
@@ -104,30 +116,38 @@ function CheckoutPage() {
   return (
     <CheckoutForm
       isCheckingPrices={refresh.isFetching}
+      refreshProducts={refresh.refetch}
       defaultValues={{
-        email: profile.email,
-        phone: profile.phone ?? '',
+        email: profile?.email ?? '',
+        phone: profile?.phone ?? '',
         shipping: shippingDefaults,
         billingSameAsShipping: true,
         billing: EMPTY_ADDRESS,
         shippingMethod: 'standard',
-        paymentMethod: 'card',
+        // Cash on delivery is the one real order that needs no payment provider.
+        paymentMethod: REAL_SHOP ? 'cod' : 'card',
       }}
     />
   )
 }
 
-function CheckoutForm({ defaultValues, isCheckingPrices }) {
+function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
   const cart = useCart()
-  const { user } = useAuth()
+  const { user, isAuthenticated, authorizedRequest } = useAuth()
   const { placeOrder } = useOrders()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
 
   // A MUTATION: a request that changes something on the server (here: the
   // server prices the cart). Unlike queries, mutations run only when called.
   const verifyMutation = useMutation({
     mutationFn: ({ items, userId }) => verifyCartWithServer(items, userId),
+  })
+  // REAL_SHOP: the server creates the order. A signed-in customer's request
+  // renews the session once if it expired, so the order lands in their account.
+  const orderMutation = useMutation({
+    mutationFn: (input) => (isAuthenticated ? authorizedRequest(() => placeServerOrder(input)) : placeServerOrder(input)),
   })
 
   // React Hook Form keeps values in the inputs themselves (uncontrolled), so
@@ -137,6 +157,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
     handleSubmit,
     control,
     setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(checkoutSchema),
@@ -154,45 +175,86 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
     name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod'],
   })
 
-  const totals = calculateCartTotals(cart.items, cart.couponCode, shippingMethod)
+  // REAL_SHOP: the server's prices are the ones shown and charged. The local
+  // calculation (same rules) fills in until the first answer arrives.
+  const pricingInput = { items: cart.items, couponCode: cart.couponCode, shippingMethod }
+  const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
+  const serverCart = REAL_SHOP ? pricing.data : null
+
+  const localTotals = calculateCartTotals(cart.items, cart.couponCode, shippingMethod)
+  const totals = serverCart ? serverCart.totals : localTotals
+  const coupon = serverCart ? serverCart.coupon : localTotals.coupon
+  const couponError = serverCart ? serverCart.couponError : localTotals.couponError
+  const problems = serverCart?.problems ?? []
+  const shippingLabel = SHIPPING_METHODS.find((method) => method.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
   const changedCount = cart.items.filter((item) => item.notice).length
   const shippingOptions = SHIPPING_METHODS.map((method) => {
-    const price = calculateCartTotals(cart.items, cart.couponCode, method.id).shipping
+    const serverPrice = serverCart?.shippingOptions.find((option) => option.id === method.id)?.price
+    const price = serverPrice ?? calculateCartTotals(cart.items, cart.couponCode, method.id).shipping
     return { ...method, description: method.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
   })
+  const isPricing = REAL_SHOP && (pricing.isPending || pricing.isFetching)
+  const isBusy = isSubmitting || isCheckingPrices || isPricing
+  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0)
+
+  async function placeDemoOrder(values) {
+    // 1. The server prices the cart; stop if anything changed since it was added.
+    const verification = await verifyMutation.mutateAsync({ items: cart.items, userId: user.id })
+    if (verification.problems.length > 0) {
+      setError('root.server', {
+        message: `${verification.problems.join(' ')} Please review your cart before placing the order.`,
+      })
+      return
+    }
+
+    // 2. Record the (simulated) order, then empty the cart.
+    const order = createOrder({ userId: user.id, values, items: cart.items, totals: localTotals, couponCode: cart.couponCode, verification })
+    placeOrder(order)
+    // Stock changed on the server: mark every cached product query stale so
+    // pages refetch fresh data the next time they're shown (INVALIDATION).
+    queryClient.invalidateQueries({ queryKey: productKeys.all })
+    navigate(ROUTES.orderConfirmation(order.id), { replace: true })
+    cart.removeOrderedItems(order.items.map((item) => item.productId))
+  }
+
+  async function placeRealOrder(values) {
+    // Only ids, quantities, and choices are sent; `expectedTotal` is the total
+    // the shopper saw, so the server refuses (409) if its own total differs.
+    const order = await orderMutation.mutateAsync({ items: cart.items, couponCode: cart.couponCode, values, expectedTotal: totals.total })
+    queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
+    queryClient.invalidateQueries({ queryKey: orderKeys.all })
+    // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
+    navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order } })
+    cart.removeOrderedItems(cart.items.filter((item) => !item.isUnavailable).map((item) => item.productId))
+  }
 
   async function onSubmit(values) {
+    clearErrors('root.server')
     try {
-      // 1. The server prices the cart; stop if anything changed since it was added.
-      const verification = await verifyMutation.mutateAsync({ items: cart.items, userId: user.id })
-      if (verification.problems.length > 0) {
-        setError('root.server', {
-          message: `${verification.problems.join(' ')} Please review your cart before placing the order.`,
-        })
+      if (REAL_SHOP) await placeRealOrder(values)
+      else await placeDemoOrder(values)
+    } catch (error) {
+      if (error.status === 409) {
+        // Show the server's new prices, and refresh the cart's product snapshots too.
+        if (error.data?.cart) queryClient.setQueryData(cartPricingKey(pricingInput), error.data.cart)
+        else pricing.refetch()
+        refreshProducts()
+        setError('root.server', { message: PRICES_CHANGED })
         return
       }
-
-      // 2. Record the (simulated) order, then empty the cart.
-      const order = createOrder({
-        userId: user.id,
-        values,
-        items: cart.items,
-        totals,
-        couponCode: cart.couponCode,
-        verification,
-      })
-      placeOrder(order)
-      // Stock changed on the server: mark every cached product query stale so
-      // pages refetch fresh data the next time they're shown (INVALIDATION).
-      queryClient.invalidateQueries({ queryKey: productKeys.all })
-      navigate(ROUTES.orderConfirmation(order.id), { replace: true })
-      cart.removeOrderedItems(order.items.map((item) => item.productId))
-    } catch (error) {
-      // A real API answers invalid fields with 422 + per-field messages: show them on the fields.
+      // Invalid fields (422) come back with per-field messages: show them on the fields.
       if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
-      setError('root.server', { message: error.message })
+      // Stock problems (422 on the items) explain themselves; so does a coupon
+      // the server refused (couponCode), which has no field in this form.
+      const stockProblems = error.data?.problems?.map((problem) => problem.message).join(' ')
+      const otherField = Object.values(error.fieldErrors ?? {})[0]?.[0]
+      if (stockProblems) setError('root.server', { message: `${stockProblems} Please review your cart.` })
+      else setError('root.server', { message: otherField ?? error.message })
     }
   }
+
+  const placeLabel = isBusy ? 'Checking prices…' : `Place order · ${formatPrice(totals.total)}`
+  const paymentNote = REAL_SHOP ? (paymentMethod === 'cod' ? PAYMENT_NOTES.cod : PAYMENT_NOTES.online) : null
 
   return (
     <div className="checkout section container">
@@ -200,8 +262,18 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
       <header className="checkout__header">
         <h1>Checkout</h1>
         <p className="checkout__secure">
-          <LuLock aria-hidden="true" /> Demo checkout — no payment is taken and nothing ships.
+          <LuLock aria-hidden="true" />{' '}
+          {REAL_SHOP ? 'Secure checkout — our server confirms every price before your order is placed.' : 'Demo checkout — no payment is taken and nothing ships.'}
         </p>
+        {REAL_SHOP && !isAuthenticated && (
+          <p className="checkout__note">
+            Have an account?{' '}
+            <Link to={ROUTES.login} state={{ from: location }}>
+              Sign in
+            </Link>{' '}
+            to keep this order in your order history. Or continue as a guest.
+          </p>
+        )}
       </header>
 
       {/* The summary (with its own coupon <form>) sits OUTSIDE the checkout form:
@@ -212,7 +284,14 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
           <section className="checkout__section" aria-labelledby="contact-title">
             <h2 id="contact-title">Contact details</h2>
             <div className="checkout__grid">
-              <FormField label="Email" type="email" autoComplete="email" {...register('email')} error={errors.email?.message} />
+              <FormField
+                label="Email"
+                type="email"
+                autoComplete="email"
+                hint={REAL_SHOP ? "We'll send your order confirmation here." : undefined}
+                {...register('email')}
+                error={errors.email?.message}
+              />
               <FormField label="Phone" type="tel" autoComplete="tel" hint="For delivery updates only." {...register('phone')} error={errors.phone?.message} />
             </div>
           </section>
@@ -248,10 +327,16 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
               selectedId={paymentMethod}
               error={errors.paymentMethod?.message}
             />
-            <p className="checkout__note">
-              BuyNest never asks for card numbers. A real payment would happen on the provider's secure page, and the
-              order would only be confirmed after our server verifies the payment.
-            </p>
+            {REAL_SHOP ? (
+              <p className="checkout__note" aria-live="polite">
+                {paymentNote}
+              </p>
+            ) : (
+              <p className="checkout__note">
+                BuyNest never asks for card numbers. A real payment would happen on the provider's secure page, and the
+                order would only be confirmed after our server verifies the payment.
+              </p>
+            )}
           </section>
         </form>
 
@@ -259,12 +344,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
           <h2 id="checkout-summary-title" className="cart-summary__title">
             Order summary
           </h2>
-          <OrderItems items={cart.items} />
-          <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={totals.shippingMethod.label} />
+          <OrderItems items={serverCart ? serverCart.lines.filter((line) => line.available) : cart.items} />
+          <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} />
           <CouponForm
             appliedCode={cart.couponCode}
-            coupon={totals.coupon}
-            couponError={totals.couponError}
+            coupon={coupon}
+            couponError={couponError}
             onApply={cart.applyCoupon}
             onRemove={cart.removeCoupon}
             disabled={isSubmitting}
@@ -277,6 +362,24 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
             </p>
           )}
 
+          {problems.length > 0 && (
+            <div className="checkout__error" role="alert">
+              <p>{problems.map((problem) => problem.message).join(' ')}</p>
+              <Button to={ROUTES.cart} variant="outline" size="sm">
+                Review cart
+              </Button>
+            </div>
+          )}
+
+          {REAL_SHOP && pricing.error && !serverCart && (
+            <div className="checkout__error" role="alert">
+              <p>We couldn't check the prices: {pricing.error.message}</p>
+              <Button variant="outline" size="sm" onClick={() => pricing.refetch()}>
+                Try again
+              </Button>
+            </div>
+          )}
+
           {errors.root?.server && (
             <div className="checkout__error" role="alert">
               <p>{errors.root.server.message}</p>
@@ -286,12 +389,13 @@ function CheckoutForm({ defaultValues, isCheckingPrices }) {
             </div>
           )}
 
-          <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isSubmitting || isCheckingPrices}>
-            {isSubmitting || isCheckingPrices ? 'Checking prices…' : `Place order · ${formatPrice(totals.total)}`}
+          <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isBusy || cannotPlace}>
+            {placeLabel}
           </Button>
           <p className="cart-summary__note">
-            Prices are re-checked with the server before the order is recorded. Shipping, discounts, and taxes would be
-            confirmed by the BuyNest backend.
+            {REAL_SHOP
+              ? 'Prices, stock, discounts, and shipping are checked again by our server when you place the order.'
+              : 'Prices are re-checked with the server before the order is recorded. Shipping, discounts, and taxes would be confirmed by the BuyNest backend.'}
           </p>
         </aside>
       </div>

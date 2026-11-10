@@ -1,4 +1,5 @@
 import { ROUTES } from './routes'
+import { REAL_SHOP } from './shop'
 
 // The /learn component lab is a teaching tool: on in development, off in
 // production builds unless VITE_SHOW_LEARNING_LAB=true.
@@ -46,6 +47,8 @@ export const FOOTER_LINK_GROUPS = [
       { label: 'Account', to: ROUTES.account },
       { label: 'Wishlist', to: ROUTES.wishlist },
       { label: 'Cart', to: ROUTES.cart },
+      // Guests look up an order with its number and email (real orders only).
+      ...(REAL_SHOP ? [{ label: 'Track your order', to: ROUTES.trackOrder }] : []),
     ],
   },
   ...(SHOW_LEARNING_LAB ? [{ title: 'Learning', links: [{ label: 'Component lab', to: ROUTES.componentLab }] }] : []),

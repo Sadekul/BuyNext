@@ -4,7 +4,7 @@ import { laravelProvider } from './laravelProvider'
 /*
  * Which backend the storefront talks to, chosen at build time:
  *   VITE_API_PROVIDER=dummyjson   (default, learning API)
- *   VITE_API_PROVIDER=laravel     (future BuyNest backend)
+ *   VITE_API_PROVIDER=laravel     (BuyNest's Laravel API, through /api/catalog)
  * Adding Shopify or Magento later means adding one more provider here.
  */
 const PROVIDERS = { dummyjson: dummyJsonProvider, laravel: laravelProvider }

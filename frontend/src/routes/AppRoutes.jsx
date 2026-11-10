@@ -8,6 +8,7 @@ import HomePage from '../pages/HomePage'
 import ProductListingPage from '../pages/ProductListingPage'
 import ProductDetailsPage from '../pages/ProductDetailsPage'
 import { SHOW_LEARNING_LAB } from '../constants/site'
+import { REAL_SHOP } from '../constants/shop'
 
 // …everything else is CODE-SPLIT: React.lazy downloads a page's JavaScript
 // only when someone visits it (the checkout's form libraries, the account
@@ -25,6 +26,7 @@ const OrdersPage = lazy(() => import('../pages/OrdersPage'))
 const OrderDetailsPage = lazy(() => import('../pages/OrderDetailsPage'))
 const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
+const TrackOrderPage = lazy(() => import('../pages/TrackOrderPage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -33,6 +35,14 @@ const ComponentLabPage =
     ? lazy(() => import('../pages/ComponentLabPage'))
     : null
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
+
+// Guests can buy from BuyNest's API (REAL_SHOP); the demo checkout needs a sign-in.
+const checkoutRoutes = (
+  <>
+    <Route path="checkout" element={<CheckoutPage />} />
+    <Route path="order-confirmation/:orderId" element={<OrderConfirmationPage />} />
+  </>
+)
 
 /**
  * All application routes in one place. Routes nested inside the
@@ -55,11 +65,12 @@ function AppRoutes() {
           <Route path="verify-email" element={<VerifyEmailPage />} />
         </Route>
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        {REAL_SHOP && checkoutRoutes}
+        {REAL_SHOP && <Route path="track-order" element={<TrackOrderPage />} />}
 
         {/* Signed-in customers only (UX guard; the API enforces real access). */}
         <Route element={<ProtectedRoute />}>
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="order-confirmation/:orderId" element={<OrderConfirmationPage />} />
+          {!REAL_SHOP && checkoutRoutes}
           <Route path="account" element={<AccountLayout />}>
             <Route index element={<ProfilePage />} />
             <Route path="orders" element={<OrdersPage />} />

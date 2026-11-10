@@ -16,3 +16,7 @@ export const fullName = (person) => [person?.firstName, person?.lastName].filter
 const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 /** ISO date → "Nov 10, 2026"; empty → the fallback. */
 export const formatDate = (iso, fallback = '—') => (iso ? dateFormat.format(new Date(iso)) : fallback)
+
+const dateTimeFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+/** ISO date → "Nov 10, 2026, 9:41 AM". */
+export const formatDateTime = (iso, fallback = '—') => (iso ? dateTimeFormat.format(new Date(iso)) : fallback)

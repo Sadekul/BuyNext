@@ -23,20 +23,22 @@ const pageParams = ({ all, limit = 12, skip = 0, sortBy, order }) => {
 }
 
 /**
- * Future BuyNest Laravel API (Sanctum SPA authentication).
- * `credentials: 'include'` sends the session cookie; apiClient copies the
- * XSRF-TOKEN cookie into the X-XSRF-TOKEN header on writes (CSRF protection).
+ * BuyNest's Laravel API, reached through the catalog service on this site's
+ * own address (/api/catalog → /api/v1, frontend/server/catalogApi.js): no
+ * CORS, no API address in the bundle. The catalog is public, so no cookies
+ * are sent (`credentials: 'omit'`); carts and orders use /api/shop
+ * (services/shopService.js).
  */
 export const laravelProvider = {
   name: 'laravel',
-  request: { credentials: 'include', xsrfCookie: 'XSRF-TOKEN' },
+  request: { credentials: 'omit', sameOrigin: true },
   catalog: {
-    listProducts: (options) => ({ path: '/api/v1/products', params: pageParams(options) }),
-    searchProducts: (query, options) => ({ path: '/api/v1/products', params: { search: query, ...pageParams(options) } }),
-    productsByCategory: (slug, options) => ({ path: '/api/v1/products', params: { category: slug, ...pageParams(options) } }),
-    productDetail: (id) => ({ path: `/api/v1/products/${encodeURIComponent(id)}` }),
-    suggestions: (query, limit) => ({ path: '/api/v1/products', params: { search: query, per_page: limit } }),
-    categories: () => ({ path: '/api/v1/categories' }),
+    listProducts: (options) => ({ path: '/api/catalog/products', params: pageParams(options) }),
+    searchProducts: (query, options) => ({ path: '/api/catalog/products', params: { search: query, ...pageParams(options) } }),
+    productsByCategory: (slug, options) => ({ path: '/api/catalog/products', params: { category: slug, ...pageParams(options) } }),
+    productDetail: (id) => ({ path: `/api/catalog/products/${encodeURIComponent(id)}` }),
+    suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit } }),
+    categories: () => ({ path: '/api/catalog/categories' }),
   },
   adapter: {
     productPage: normalizeProductPage,

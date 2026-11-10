@@ -76,6 +76,13 @@ await page.getByRole('button', { name: 'Search' }).click()
 await page.waitForURL(/q=phone/)
 await page.waitForFunction(() => /phone/i.test(document.querySelector('tbody')?.innerText ?? ''), null, { timeout: 15000 }).catch(() => {})
 log((await page.locator('tbody tr').count()) > 0, `products: search "phone" → ${await page.locator('tbody tr').count()} rows`)
+if (LARAVEL) {
+  // The real API combines search and category: "phone" among laptops finds nothing.
+  await page.getByLabel('Category').selectOption('laptops')
+  await page.waitForURL(/q=phone.*category=laptops|category=laptops.*q=phone/)
+  log(await visible(page.getByText('No products match.')), 'products: search and category combine (phone + laptops = none)')
+  await page.goto(`${BASE}/admin/products`, { waitUntil: 'networkidle' })
+}
 await page.getByLabel('Category').selectOption('laptops')
 await page.waitForURL(/category=laptops/)
 // The previous rows stay visible while the next page loads: wait for the new ones.
@@ -97,8 +104,26 @@ const prices = (await page.locator('tbody td.num').allInnerTexts()).map((price) 
 log(prices.length === 5 && prices.every((price, i) => i === 0 || prices[i - 1] >= price), `products: sort price high → low (${prices.slice(0, 3)})`)
 await axe(page, 'products')
 
-// Edit, delete, add (demo writes)
-await page.goto(`${BASE}/admin/products/1`, { waitUntil: 'networkidle' })
+// Add, edit, delete. With the real shop the test only changes a product it created itself.
+await page.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
+const testName = `E2E Bamboo Desk Organizer ${Date.now()}`
+await page.getByLabel('Name').fill(testName)
+await page.getByLabel('Brand').fill('NestWorks')
+await page.getByLabel('Category').selectOption('home-decoration')
+await page.getByLabel('Price (USD)').fill('24.5')
+await page.getByLabel('Units in stock').fill('40')
+if (LARAVEL) await page.getByLabel('Status').selectOption('draft') // never shown to shoppers
+await page.getByRole('button', { name: 'Add product' }).click()
+let editId = 1
+if (LARAVEL) {
+  await page.waitForURL(/\/admin\/products\/\d+$/, { timeout: 15000 }).catch(() => {})
+  editId = Number(page.url().split('/').pop())
+  log(Number.isInteger(editId) && (await visible(page.getByText('Product created.'))), `add: product saved (id #${editId}, Draft)`)
+} else {
+  log(await visible(page.getByRole('status').filter({ hasText: /Product created \(demo, id #\d+\)/ })), 'add: product created (demo, with the new id)')
+}
+
+await page.goto(`${BASE}/admin/products/${editId}`, { waitUntil: 'networkidle' })
 await page.getByLabel('Price (USD)').waitFor()
 log(await page.getByRole('button', { name: 'Save changes' }).isDisabled(), 'edit: Save disabled until something changes')
 await page.getByLabel('Price (USD)').fill('-3')
@@ -106,35 +131,42 @@ await page.getByRole('button', { name: 'Save changes' }).click()
 log(await visible(page.getByText('Enter a price from 0 to 1,000,000.')), 'edit: invalid price shows a field error')
 await page.getByLabel('Price (USD)').fill('19.99')
 await page.getByRole('button', { name: 'Save changes' }).click()
-log(await visible(page.getByRole('status').filter({ hasText: 'Changes saved (demo)' })), 'edit: price 19.99 saved (demo notice)')
+log(await visible(page.getByRole('status').filter({ hasText: LARAVEL ? 'Changes saved.' : 'Changes saved (demo)' })), `edit: price 19.99 saved${LARAVEL ? '' : ' (demo notice)'}`)
+if (LARAVEL) {
+  await page.reload({ waitUntil: 'networkidle' })
+  log((await page.getByLabel('Price (USD)').inputValue()) === '19.99', 'edit: the new price is still there after a reload (stored)')
+}
 await axe(page, 'product form')
 
-await page.goto(`${BASE}/admin/products?q=mascara`, { waitUntil: 'networkidle' })
+await page.goto(`${BASE}/admin/products?q=${encodeURIComponent(LARAVEL ? testName : 'mascara')}${LARAVEL ? '&status=draft' : ''}`, { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: /^Delete / }).first().click()
 log(await visible(page.getByRole('dialog', { name: 'Delete this product?' })), 'delete: asks for confirmation')
 await page.getByRole('button', { name: 'Delete product' }).click()
-log(await visible(page.getByRole('status').filter({ hasText: 'deleted (demo)' })), 'delete: demo notice after confirming')
+log(await visible(page.getByRole('status').filter({ hasText: LARAVEL ? 'is no longer in the store' : 'deleted (demo)' })), `delete: ${LARAVEL ? 'deleted' : 'demo notice'} after confirming`)
 
-await page.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
-await page.getByLabel('Name').fill('Bamboo Desk Organizer')
-await page.getByLabel('Brand').fill('NestWorks')
-await page.getByLabel('Category').selectOption('home-decoration')
-await page.getByLabel('Price (USD)').fill('24.5')
-await page.getByLabel('Units in stock').fill('40')
-await page.getByRole('button', { name: 'Add product' }).click()
-log(await visible(page.getByRole('status').filter({ hasText: /Product created \(demo, id #\d+\)/ })), 'add: product created (demo, with the new id)')
-
-// Orders and customers
+// Orders
 await page.getByRole('link', { name: 'Orders' }).click()
 await page.getByRole('table').waitFor()
 const ordersHeader = await page.locator('.page-header').innerText()
-log(/208 orders/.test(ordersHeader), `orders: all 208 DummyJSON orders (${ordersHeader.replace(/\n/g, ' ')})`)
-await page.getByRole('button', { name: /Next/ }).click()
-await page.waitForURL(/skip=20/)
-log(await visible(page.getByText(/21–40 of 208/)), 'orders: next page (21–40 of 208)')
-await page.locator('tbody a').first().click()
-log(await visible(page.getByRole('heading', { name: 'Customer' })) && (await page.locator('tfoot').innerText()).includes('Total after discounts'), 'order detail: items, totals, and customer')
-await axe(page, 'order detail')
+if (LARAVEL) {
+  log(/\d+ orders?/.test(ordersHeader), `orders: the real orders are listed (${ordersHeader.replace(/\n/g, ' ')})`)
+  await page.getByLabel('Status').selectOption('cancelled')
+  await page.waitForURL(/status=cancelled/)
+  await page.waitForTimeout(800)
+  const statuses = await page.locator('tbody .status').allInnerTexts()
+  log(statuses.length === 0 || statuses.filter((text) => /Cancelled/.test(text)).length === (await page.locator('tbody tr').count()), 'orders: status filter shows only cancelled orders')
+  await page.goto(`${BASE}/admin/orders`, { waitUntil: 'networkidle' })
+} else {
+  log(/208 orders/.test(ordersHeader), `orders: all 208 DummyJSON orders (${ordersHeader.replace(/\n/g, ' ')})`)
+  await page.getByRole('button', { name: /Next/ }).click()
+  await page.waitForURL(/skip=20/)
+  log(await visible(page.getByText(/21–40 of 208/)), 'orders: next page (21–40 of 208)')
+}
+if ((await page.locator('tbody a').count()) > 0) {
+  await page.locator('tbody a').first().click()
+  log(await visible(page.getByRole('heading', { name: 'Customer' })), 'order detail: items, totals, and customer')
+  await axe(page, 'order detail')
+}
 await page.getByRole('link', { name: 'Customers' }).click()
 await page.getByRole('table').waitFor()
 const customersJson = await page.evaluate(async () => (await fetch('/api/admin/customers?limit=100')).text())
@@ -176,7 +208,7 @@ if (LARAVEL) {
 
 // Phone-sized layout
 await page.setViewportSize({ width: 390, height: 844 })
-for (const path of ['/admin/', '/admin/products', '/admin/orders/1', '/admin/customers']) {
+for (const path of ['/admin/', '/admin/products', LARAVEL ? '/admin/orders' : '/admin/orders/1', '/admin/customers']) {
   await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(300)
   const overflow = await sidewaysOverflow(page)

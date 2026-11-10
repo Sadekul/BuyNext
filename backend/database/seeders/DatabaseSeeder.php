@@ -4,10 +4,11 @@ namespace Database\Seeders;
 
 use App\Models\Admin;
 use App\Models\Customer;
+use App\Models\Product;
 use Illuminate\Database\Seeder;
 
 /**
- * Demo accounts for local development only (php artisan db:seed).
+ * Demo accounts (and the demo catalog) for local development only (php artisan db:seed).
  * Production admins are created with `php artisan buynest:create-admin`.
  */
 class DatabaseSeeder extends Seeder
@@ -30,6 +31,11 @@ class DatabaseSeeder extends Seeder
         foreach ($shoppers as $shopper) {
             Customer::updateOrCreate(['email' => $shopper['email']], $shopper)
                 ->forceFill(['email_verified_at' => now(), 'is_active' => true])->save();
+        }
+
+        // The demo catalog, downloaded once. Tests build their own products with factories (no network).
+        if (app()->environment('local') && Product::withTrashed()->doesntExist()) {
+            $this->command?->call('buynest:import-catalog');
         }
     }
 }

@@ -1,12 +1,10 @@
 /*
- * Adapter for the FUTURE BuyNest Laravel API (contract:
- * docs/backend/API_CONTRACT.md). Laravel API Resources use snake_case, wrap
+ * Adapter for BuyNest's Laravel API (contract: docs/backend/API_CONTRACT.md
+ * and PHASE2_CONTRACT.md), whose catalog reaches the browser through
+ * /api/catalog unchanged. Laravel API Resources use snake_case, wrap
  * payloads in `data`, and paginate with `meta`. This file converts them into
  * the same BuyNest shapes the DummyJSON adapter produces, so no component
  * changes when the backend switches.
- *
- * Written against the documented contract and checked with fixtures and a
- * local mock server — there is no live Laravel API yet.
  */
 
 const AVAILABILITY = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }

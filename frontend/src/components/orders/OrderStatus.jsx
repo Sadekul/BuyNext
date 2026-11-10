@@ -1,4 +1,5 @@
 import { LuCheck } from 'react-icons/lu'
+import OrderStatusBadge from './OrderStatusBadge'
 import { cn } from '../../utils/classNames'
 import './OrderStatus.css'
 
@@ -9,12 +10,17 @@ const STEPS = [
   { id: 'delivered', label: 'Delivered' },
 ]
 
+// Where each status sits on the steps. Awaiting payment is still "placed".
+const STEP_OF = { placed: 0, pending_payment: 0, processing: 1, shipped: 2, delivered: 3 }
+
 /**
  * Status timeline. Statuses are set by the backend as the warehouse works;
- * demo orders stay at "Order placed" because there is no backend yet.
+ * demo orders stay at "Order placed" because there is no backend. A
+ * cancelled order has no next step, so it shows its status instead.
  */
 function OrderStatus({ status }) {
-  const currentIndex = Math.max(0, STEPS.findIndex((step) => step.id === status))
+  if (status === 'cancelled') return <OrderStatusBadge status={status} />
+  const currentIndex = STEP_OF[status] ?? 0
 
   return (
     <ol className="order-status" aria-label="Order status">

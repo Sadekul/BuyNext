@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuPencil, LuPlus, LuSearch, LuTrash2 } from 'react-icons/lu'
 import { adminKeys, deleteProduct, getCategories, getProducts } from '../api/admin'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -10,14 +10,21 @@ import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatMoney, formatSlug } from '../utils/format'
+import { PRODUCT_STATUSES, productStatus } from '../utils/orders'
+import { LIVE_DATA } from '../api/mode'
 
 const LIMIT = 20
 
-/** Product list: search, category filter, sorting, pages. Filters live in the URL. */
+/**
+ * Product list: search, category (and, with real data, status) filters,
+ * sorting, pages. Filters live in the URL.
+ */
 function ProductsPage() {
   const [params, setParams] = useSearchParams()
+  const queryClient = useQueryClient()
   const q = params.get('q') ?? ''
   const category = params.get('category') ?? ''
+  const status = LIVE_DATA ? (params.get('status') ?? '') : ''
   const sortBy = params.get('sortBy') ?? ''
   const order = params.get('order') ?? 'asc'
   const skip = Number(params.get('skip')) || 0
@@ -25,7 +32,7 @@ function ProductsPage() {
   const [toDelete, setToDelete] = useState(null)
   const [notice, setNotice] = useState(null)
 
-  const query = { q, category, sortBy, order, skip, limit: LIMIT }
+  const query = { q, category, status, sortBy, order, skip, limit: LIMIT }
   const products = useQuery({
     queryKey: adminKeys.products(query),
     queryFn: ({ signal }) => getProducts(query, { signal }),
@@ -37,7 +44,14 @@ function ProductsPage() {
     mutationFn: (product) => deleteProduct(product.id),
     onSuccess: (result, product) => {
       setToDelete(null)
-      setNotice(`"${product.title}" deleted (demo): DummyJSON doesn't save deletions, so it still appears in the list.`)
+      if (result?.simulated) {
+        setNotice(`"${product.title}" deleted (demo): DummyJSON doesn't save deletions, so it still appears in the list.`)
+        return
+      }
+      // Past orders keep their own copy of the product (name, price), so they don't change.
+      setNotice(`"${product.title}" deleted. It is no longer in the store; past orders still show it.`)
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: adminKeys.overview })
     },
     onError: (error) => {
       setToDelete(null)
@@ -56,8 +70,8 @@ function ProductsPage() {
 
   function handleSearch(event) {
     event.preventDefault()
-    // Search and category can't be combined in DummyJSON; a search clears the category.
-    update({ q: draft.trim(), category: '', skip: 0 })
+    // Search and category can't be combined in DummyJSON; there a search clears the category.
+    update({ q: draft.trim(), ...(!LIVE_DATA && { category: '' }), skip: 0 })
   }
 
   return (
@@ -72,7 +86,7 @@ function ProductsPage() {
           </Link>
         }
       />
-      <DemoNotice />
+      {!LIVE_DATA && <DemoNotice />}
       {notice && (
         <p className="notice" role="status">
           {notice}
@@ -94,6 +108,7 @@ function ProductsPage() {
           <select
             value={category}
             onChange={(event) => {
+              if (LIVE_DATA) return update({ category: event.target.value, skip: 0 })
               setDraft('')
               update({ category: event.target.value, q: '', skip: 0 })
             }}
@@ -106,6 +121,19 @@ function ProductsPage() {
             ))}
           </select>
         </label>
+        {LIVE_DATA && (
+          <label className="toolbar__select">
+            <span>Status</span>
+            <select value={status} onChange={(event) => update({ status: event.target.value, skip: 0 })}>
+              <option value="">All statuses</option>
+              {Object.entries(PRODUCT_STATUSES).map(([value, { label }]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="toolbar__select">
           <span>Sort</span>
           <select
@@ -121,6 +149,7 @@ function ProductsPage() {
             <option value="price:desc">Price, high to low</option>
             <option value="stock:asc">Stock, lowest first</option>
             <option value="rating:desc">Rating, highest first</option>
+            {LIVE_DATA && <option value="newest:desc">Newest first</option>}
           </select>
         </label>
       </div>
@@ -139,6 +168,7 @@ function ProductsPage() {
                   Price
                 </th>
                 <th scope="col">Stock</th>
+                {LIVE_DATA && <th scope="col">Status</th>}
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
                 </th>
@@ -161,6 +191,11 @@ function ProductsPage() {
                   <td>
                     <StatusBadge stock={product.stock} /> <span className="muted">{formatCount(product.stock)}</span>
                   </td>
+                  {LIVE_DATA && (
+                    <td>
+                      <StatusBadge {...productStatus(product.status)} />
+                    </td>
+                  )}
                   <td className="table__actions">
                     <Link to={`/products/${product.id}`} className="icon-button" aria-label={`Edit ${product.title}`}>
                       <LuPencil aria-hidden="true" />
@@ -180,7 +215,7 @@ function ProductsPage() {
       <ConfirmDialog
         isOpen={toDelete !== null}
         title="Delete this product?"
-        message={toDelete ? `"${toDelete.title}" will be removed from the store.` : ''}
+        message={toDelete ? `"${toDelete.title}" will be removed from the store.${LIVE_DATA ? ' Past orders keep their copy of it.' : ''}` : ''}
         confirmLabel="Delete product"
         busy={remove.isPending}
         onConfirm={() => remove.mutate(toDelete)}

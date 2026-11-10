@@ -98,10 +98,27 @@ Also by design: admins and customers are separate tables, tokens, and cookies (t
 
 Checks: backend 39 feature tests (MySQL test database), frontend 168 unit tests (35 for the server services), admin 12, and the browser checks in `e2e/`, now with `signup.mjs`, against BuyNest accounts on both the dev server and the production build.
 
+## Backend phase 2 (catalog and real orders) — 2026-11-10
+
+Built by two agents in parallel against [backend/PHASE2_CONTRACT.md](backend/PHASE2_CONTRACT.md), then integrated and verified: products in MySQL (194 imported from DummyJSON, same ids), server pricing in integer cents (checked against the storefront's own math on 533,530 price/discount pairs), orders with stock reserved in a locked transaction, guest checkout and order tracking, order emails, and admin product and order management. Found and fixed during integration:
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| O1 | Medium | The public catalog answer carried Laravel's pagination `meta.path` and `meta.links`, which reveal the API's internal address | The service passes only the page numbers; a test checks the internal address never appears |
+| O2 | Medium | Updating only the note of an already-cancelled order put its stock back a second time | Stock is returned only on the change to cancelled (backend test) |
+| O3 | Medium | The Vercel admin function didn't accept PATCH, so blocking customers would have failed once deployed | PATCH added; catalog and shop functions added for Vercel and Netlify |
+| O4 | Low | The order confirmation used `<header role="status">` (not an allowed role for a header) | A `div` carries the status role (axe clean) |
+| O6 | Test hygiene | Real test orders used up real stock: product 1 (minimum order 48) fell from 99 to 3 over two runs, after which the store rightly called it unavailable and a check failed | Stock reset with `buynest:import-catalog --overwrite`; the full browser run now records every product's stock first and puts it back afterwards |
+| O5 | Test hygiene | The admin browser checks edited and deleted product 1 and added a product: harmless on DummyJSON, but real changes on the store's database | Restored product 1; the checks now create their own Draft product and only change and delete that one |
+
+Behaviour decided on the way: a 401 on a customer's order renews the session once and retries (never silently turns into a guest order); stock and minimum-quantity problems stay visible in the cart total but block the order; with real data the admin's search and category filters combine.
+
+Checks: backend 79 feature tests; frontend 190 unit tests (47 for the server services); admin 17; browser checks with the new `orders.mjs` (guest and customer orders, stock, emails, tracking, someone else's order refused, admin ship/deliver/paid/cancel with restock, price change mid-checkout, Draft products hidden).
+
 ## Known limits (by design, documented)
 
-- Orders, payment and stock are simulated in the browser (K2: kept simulated by decision, until the Laravel backend). The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
-- Accounts are real with `VITE_ACCOUNTS_BACKEND=laravel`; the catalog, orders, and the admin overview still use DummyJSON until backend phase 2. The checkout's price check runs as DummyJSON demo user 1 for BuyNest customers (DummyJSON only knows its own users).
+- In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
+- With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin records the payment (invoices in phase 3). Tax is 0 until phase 4.
 - Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
-- Admin edits are simulated: DummyJSON accepts product changes but never stores them, and the store's demo orders live in each customer's browser, so the admin can't list them. Both change with the Laravel backend.
+- Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database.

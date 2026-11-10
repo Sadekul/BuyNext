@@ -2,6 +2,8 @@
 
 How the React admin dashboard, the Laravel API, and the storefront fit together.
 
+> **Update (2026-11-10, backend phase 2):** products, categories, orders, and the overview are real too (Laravel `/api/admin/v1/*`): product saves and deletes are stored, products have a status (active, draft, archived), and orders can be shipped, delivered, marked paid, or cancelled (restocking), with a history of who did what. See [PHASE2_CONTRACT.md](PHASE2_CONTRACT.md).
+>
 > **Update (2026-11-10, backend phase 1):** admins are now real accounts in Laravel's `admins` table, separate from customers, with their own sign-in (`/api/admin/v1/auth/*`) and their own cookies. The customers page lists the real sign-ups and can block/unblock them (`/api/admin/v1/customers`). Products, orders, and the overview still use the demo data below until phase 2. See [ACCOUNTS.md](ACCOUNTS.md).
 >
 > **Earlier status:** the admin dashboard exists ([admin/](../../admin/README.md), served at `/admin/`) and runs on demo data through BuyNest's own admin API, `frontend/server/adminApi.js` (`/api/admin/*`). That API already does what the Laravel version must do: it checks the signed-in account's role on every request (403 for customers), validates product writes with Laravel-style 422 errors, and allow-lists every field sent to the browser. DummyJSON doesn't store changes, so edits are simulated. When Laravel exists, its endpoints replace that file (same shapes, real saves, a Policy instead of the role check), and the dashboard keeps working without changes.

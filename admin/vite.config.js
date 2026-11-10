@@ -56,6 +56,6 @@ export default defineConfig({
     css: false,
     restoreMocks: true,
     // Demo accounts in unit tests, whatever ../frontend/.env.local says.
-    env: { VITE_ACCOUNTS_BACKEND: 'dummyjson' },
+    env: { VITE_ACCOUNTS_BACKEND: 'dummyjson', VITE_API_PROVIDER: 'dummyjson' },
   },
 })

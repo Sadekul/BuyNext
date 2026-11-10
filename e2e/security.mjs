@@ -80,7 +80,9 @@ const label = await placeOrder.textContent()
 log(!/\$0\.10/.test(label), `checkout re-checks prices on arrival (${label.trim()})`)
 log(await page.getByText(/changed since you added/).isVisible(), 'checkout explains that an item changed')
 await fillEmptyAddress(page)
-await page.route('**/carts/add', async (route) => {
+// Slow down the order request (the real shop's, or the demo's price check) to see the form locked meanwhile.
+const orderRequest = LARAVEL ? '**/api/shop/orders' : '**/carts/add'
+await page.route(orderRequest, async (route) => {
   await new Promise((resolve) => setTimeout(resolve, 1500))
   await route.continue()
 })
@@ -89,7 +91,7 @@ await page.waitForTimeout(400)
 log((await page.getByLabel('Discount code').isDisabled().catch(() => 'missing')) === true, 'discount code locked while the order is placed')
 await page.waitForURL(/order-confirmation/, { timeout: 20000 }).catch(() => {})
 log(/order-confirmation/.test(page.url()), `order placed at the corrected price (${page.url()})`)
-await page.unroute('**/carts/add')
+await page.unroute(orderRequest)
 
 // Content-Security-Policy: only the production build has it (the dev server needs inline scripts)
 if (isProductionBuild) {

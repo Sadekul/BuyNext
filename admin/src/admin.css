@@ -565,6 +565,16 @@
   background: var(--color-sale-soft);
 }
 
+.status--info {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.status--neutral {
+  color: var(--color-text-muted);
+  background: var(--color-bg-muted);
+}
+
 /* ---------- Toolbar, pagination ---------- */
 .toolbar {
   display: flex;
@@ -823,4 +833,64 @@
   justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-6);
+}
+
+/* ---------- Real orders: actions and history ---------- */
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5) var(--space-5);
+}
+
+.order-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-2) var(--space-5) var(--space-5);
+  padding: 0 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  list-style: none;
+  border-left: 2px solid var(--color-border);
+}
+
+.history__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.address {
+  font-style: normal;
+}
+
+.page-header__actions .status {
+  font-size: var(--text-sm);
+}
+
+.by-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  list-style: none;
+}
+
+.panel--spaced {
+  margin-bottom: var(--space-5);
+}
+
+.by-status a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
 }

@@ -2,12 +2,14 @@
 //   npm test             against the dev server (http://localhost:5173)
 //   npm run test:prod    against the production build (npm run build && npm run preview)
 import { spawnSync } from 'node:child_process'
-import { isProductionBuild } from './lib.mjs'
+import { isProductionBuild, preserveStock } from './lib.mjs'
 
-const suites = ['storefront', 'accounts', 'sessions', 'signup', 'security', 'motion', 'admin']
+const suites = ['storefront', 'accounts', 'sessions', 'signup', 'orders', 'security', 'motion', 'admin']
 // Laravel mode starts its own dev server, so it runs only in the dev run.
 if (!isProductionBuild) suites.push('laravel')
 
+// Test orders use up real stock: put it back afterwards.
+const restoreStock = await preserveStock()
 const results = []
 for (const suite of suites) {
   const run = spawnSync(process.execPath, [`${suite}.mjs`], { cwd: import.meta.dirname, encoding: 'utf8', timeout: 15 * 60_000 })
@@ -16,6 +18,9 @@ for (const suite of suites) {
   const summary = run.stdout.match(/(\d+) passed, (\d+) failed\s*$/)
   results.push({ suite, passed: Number(summary?.[1] ?? 0), failed: summary ? Number(summary[2]) : 1, crashed: !summary })
 }
+
+const restored = await restoreStock()
+if (restored > 0) console.log(`\n(Stock put back for ${restored} products changed by test orders)`)
 
 console.log('\n# Summary')
 for (const { suite, passed, failed, crashed } of results) {

@@ -26,6 +26,8 @@ BASE_URL=http://localhost:4173 node security.mjs
 
 Accounts: by default the checks use **BuyNest accounts** (`E2E_ACCOUNTS=laravel`), so the Laravel API must be running with its local demo accounts (`php artisan db:seed`) and its test inbox (`DEV_MAILBOX=true`), which `signup.mjs` reads the emailed codes from. Against a store set up with the DummyJSON demo users, run with `E2E_ACCOUNTS=dummyjson` (`signup.mjs` is then skipped). The catalog still comes from DummyJSON, so the checks need internet access.
 
+With the BuyNest API the checks place real orders. `npm test` records every product's stock before the suites and puts it back afterwards; run single suites knowing they change stock (reset everything with `php artisan buynest:import-catalog --overwrite` in backend/).
+
 ## Suites
 
 | File | What it checks |
@@ -33,6 +35,7 @@ Accounts: by default the checks use **BuyNest accounts** (`E2E_ACCOUNTS=laravel`
 | `storefront.mjs` | Home, catalog filters/sort/pages and URL state, search suggestions, product page, wishlist, cart and discount codes, checkout to confirmation and order history, phone layout, accessibility |
 | `accounts.mjs` | Nothing of one customer survives sign-out, another account signing in, other tabs, or an expired session; guest items move into the account |
 | `sessions.mjs` | HttpOnly session cookies, no tokens in browser storage, "Keep me signed in", silent renewal, sign-out races, other websites can't use the session |
+| `orders.mjs` | Real orders: guest and customer checkout at server prices, stock reserved and returned, confirmation and shipping emails, order tracking, account order history, someone else's order refused, the admin ships/delivers/marks paid/cancels, a price change mid-checkout stops the order, a Draft product leaves the store |
 | `signup.mjs` | Sign-up with name, email, phone; the emailed 6-digit code (wrong and right); profile changes saved; duplicate email; unconfirmed sign-in; password reset by code; the admin sees the new customer; the test inbox |
 | `security.mjs` | Tampered browser data, URL edge cases, Escape in the mobile search, checkout price re-check, coupon lock; on the production build, the Content-Security-Policy on every page of both apps |
 | `motion.mjs` | Mini cart, mobile menu, and quick view animate smoothly (no jump back) |

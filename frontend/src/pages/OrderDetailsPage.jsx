@@ -1,38 +1,63 @@
 import { Link, useParams } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
 import { LuArrowLeft, LuPackageX } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import ErrorMessage from '../components/ui/ErrorMessage'
+import Loader from '../components/ui/Loader'
+import { useAuth } from '../hooks/useAuth'
 import { useOrders } from '../hooks/useOrders'
+import { orderQuery } from '../queries/orderQueries'
+import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import './OrderPages.css'
 
-/** /account/orders/:orderId — only finds orders belonging to the signed-in customer. */
-function OrderDetailsPage() {
-  const { orderId } = useParams()
-  const order = useOrders().getOrder(orderId)
+function NotFound() {
+  return (
+    <EmptyState icon={LuPackageX} titleAs="h2" title="Order not found" message="This order doesn't exist or belongs to another account.">
+      <Button to={ROUTES.orders}>Back to orders</Button>
+    </EmptyState>
+  )
+}
 
-  if (!order) {
-    return (
-      <EmptyState icon={LuPackageX} titleAs="h2" title="Order not found" message="This order doesn't exist or belongs to another account.">
-        <Button to={ROUTES.orders}>Back to orders</Button>
-      </EmptyState>
-    )
-  }
-
+function OrderSection({ order }) {
+  const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
-      <title>{`Order ${order.id} | ${SITE.name}`}</title>
+      <title>{`Order ${id} | ${SITE.name}`}</title>
       <Link to={ROUTES.orders} className="orders__back">
         <LuArrowLeft aria-hidden="true" /> All orders
       </Link>
       <h2 id="order-details-title" className="orders__title">
-        Order {order.id}
+        Order {id}
       </h2>
       <OrderDetailsView order={order} />
     </section>
   )
 }
+
+/** Demo: only finds orders on this device belonging to the signed-in customer. */
+function DemoOrderDetailsPage() {
+  const { orderId } = useParams()
+  const order = useOrders().getOrder(orderId)
+  return order ? <OrderSection order={order} /> : <NotFound />
+}
+
+/** BuyNest's API: the server only returns the customer's own orders (someone else's → 404). */
+function ServerOrderDetailsPage() {
+  const { orderId } = useParams()
+  const { user, authorizedRequest } = useAuth()
+  const request = useQuery(orderQuery(user.id, orderId, authorizedRequest))
+
+  if (request.isPending) return <Loader label="Loading the order…" />
+  if (request.error?.status === 404) return <NotFound />
+  if (request.error) return <ErrorMessage title="We couldn't load this order" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
+  return <OrderSection order={request.data} />
+}
+
+/** /account/orders/:orderId */
+const OrderDetailsPage = REAL_SHOP ? ServerOrderDetailsPage : DemoOrderDetailsPage
 
 export default OrderDetailsPage

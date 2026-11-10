@@ -7,7 +7,8 @@ import { apiProvider } from './providers'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
 
-if (!API_BASE_URL) {
+// Providers on this site's own address (Laravel, through /api/catalog) need no API address.
+if (!API_BASE_URL && !apiProvider.request.sameOrigin) {
   throw new Error('VITE_API_BASE_URL is not set. Copy frontend/.env.example to frontend/.env.local.')
 }
 
@@ -71,7 +72,7 @@ const TIMEOUT_MESSAGE = 'The server took too long to respond. Please try again.'
 
 /**
  * Builds `${base}${path}?a=1&b=2`, skipping empty parameters. `sameOrigin`
- * requests go to this site itself (the sign-in service at /api/auth).
+ * requests go to this site itself (the services at /api: sign-in, catalog, shop).
  */
 function buildUrl(path, params = {}, sameOrigin = false) {
   const url = sameOrigin ? new URL(path, window.location.origin) : new URL(`${API_BASE_URL}${path}`)
@@ -92,14 +93,15 @@ async function request(
   const combinedSignal = signal ? anySignal([signal, timeoutSignal]) : timeoutSignal
 
   // Cookie-based auth (Laravel Sanctum) needs credentials + a CSRF header on writes.
-  // Same-origin requests carry this site's own cookies (the sign-in session).
-  const { credentials: providerCredentials = 'omit', xsrfCookie } = apiProvider.request
+  // Requests that ask for `sameOrigin` carry this site's own cookies (the
+  // sign-in session). A same-origin PROVIDER (the public catalog) needs none.
+  const { credentials: providerCredentials = 'omit', xsrfCookie, sameOrigin: providerSameOrigin = false } = apiProvider.request
   const credentials = sameOrigin ? 'same-origin' : providerCredentials
   const xsrfToken = xsrfCookie && method !== 'GET' && !sameOrigin ? readCookie(xsrfCookie) : null
 
   let response
   try {
-    response = await fetch(buildUrl(path, params, sameOrigin), {
+    response = await fetch(buildUrl(path, params, sameOrigin || providerSameOrigin), {
       method,
       credentials,
       headers: {

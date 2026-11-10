@@ -24,3 +24,10 @@ export function formatSlug(slug) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 }
+
+const dateTimeFormatter = new Intl.DateTimeFormat(STORE_SETTINGS.locale, { dateStyle: 'medium', timeStyle: 'short' })
+
+/** ISO date-time → "Nov 10, 2026, 9:41 AM" (in the shopper's time zone). */
+export function formatDateTime(isoDate) {
+  return dateTimeFormatter.format(new Date(isoDate))
+}

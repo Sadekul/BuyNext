@@ -5,7 +5,8 @@ import PageHeader from '../components/PageHeader'
 import StatTile from '../components/StatTile'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
-import { formatCount, formatCountCompact, formatMoney, formatMoneyCompact, formatSlug } from '../utils/format'
+import { formatCount, formatCountCompact, formatDate, formatMoney, formatMoneyCompact, formatSlug } from '../utils/format'
+import { ORDER_STATUSES, orderStatus } from '../utils/orders'
 
 /** The shop at a glance: headline numbers, then what needs attention. */
 function OverviewPage() {
@@ -14,7 +15,9 @@ function OverviewPage() {
   if (overview.isPending) return <Loading label="Loading the overview…" />
   if (overview.error) return <ErrorState error={overview.error} onRetry={overview.refetch} />
 
-  const { products, orders, customers, lowStockProducts, latestOrders, lowStockThreshold } = overview.data
+  const { products, orders, customers, lowStockProducts, latestOrders, lowStockThreshold, live } = overview.data
+  // Real data (live) counts revenue from orders that aren't cancelled, and knows each order's status.
+  const averageOrder = orders.averageOrder ?? (orders.total > 0 ? orders.revenue / orders.total : 0)
   return (
     <>
       <title>Overview | BuyNest Admin</title>
@@ -22,14 +25,41 @@ function OverviewPage() {
 
       {/* One hero number (revenue), then six supporting tiles. No trend arrows: the demo data has no history. */}
       <dl className="stats">
-        <StatTile hero label="Revenue" value={formatMoneyCompact(orders.revenue)} note={`${formatCount(orders.total)} orders, after discounts`} />
-        <StatTile label="Average order" value={formatMoney(orders.total > 0 ? orders.revenue / orders.total : 0)} />
+        <StatTile
+          hero
+          label="Revenue"
+          value={formatMoneyCompact(orders.revenue)}
+          note={live ? `${formatCount(orders.total)} orders, not counting cancelled ones` : `${formatCount(orders.total)} orders, after discounts`}
+        />
+        <StatTile label="Average order" value={formatMoney(averageOrder)} />
         <StatTile label="Units sold" value={formatCountCompact(orders.unitsSold)} />
-        <StatTile label="Products" value={formatCount(products.total)} note={`${formatCount(products.outOfStock)} out of stock`} />
+        <StatTile
+          label="Products"
+          value={formatCount(products.total)}
+          note={live ? `${formatCount(products.active)} active · ${formatCount(products.outOfStock)} out of stock` : `${formatCount(products.outOfStock)} out of stock`}
+        />
         <StatTile label="Low stock" value={formatCount(products.lowStock)} note={`Fewer than ${lowStockThreshold} units`} />
         <StatTile label="Customers" value={formatCount(customers.total)} />
         <StatTile label="Inventory value" value={formatMoneyCompact(products.inventoryValue)} note="Price × units in stock" />
       </dl>
+
+      {live && orders.byStatus && (
+        <section className="panel panel--spaced" aria-labelledby="by-status-title">
+          <header className="panel__header">
+            <h2 id="by-status-title">Orders by status</h2>
+            <Link to="/orders">All orders</Link>
+          </header>
+          <ul className="by-status">
+            {Object.keys(ORDER_STATUSES).map((status) => (
+              <li key={status}>
+                <Link to={`/orders?status=${status}`}>
+                  <StatusBadge {...orderStatus(status)} /> <strong>{formatCount(orders.byStatus[status] ?? 0)}</strong>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="panels">
         <section className="panel" aria-labelledby="restock-title">
@@ -79,6 +109,7 @@ function OverviewPage() {
               <tr>
                 <th scope="col">Order</th>
                 <th scope="col">Customer</th>
+                {live && <th scope="col">Status</th>}
                 <th scope="col" className="num">
                   Total
                 </th>
@@ -88,12 +119,18 @@ function OverviewPage() {
               {latestOrders.map((order) => (
                 <tr key={order.id}>
                   <td>
-                    <Link to={`/orders/${order.id}`}>#{order.id}</Link>
+                    <Link to={`/orders/${order.id}`}>{live ? order.number : `#${order.id}`}</Link>
+                    {live && <small className="muted"> {formatDate(order.placedAt)}</small>}
                   </td>
                   <td>
                     {order.customer}
                     <small className="muted"> · {formatCount(order.items)} items</small>
                   </td>
+                  {live && (
+                    <td>
+                      <StatusBadge {...orderStatus(order.status)} />
+                    </td>
+                  )}
                   <td className="num">{formatMoney(order.total)}</td>
                 </tr>
               ))}

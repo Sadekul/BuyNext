@@ -61,14 +61,16 @@ const CLIENT_IP_HEADERS = ['x-real-ip', 'x-forwarded-for', 'x-nf-client-connecti
 
 /*
  * Settings the server-side services read from process.env (never sent to the
- * browser, except VITE_ACCOUNTS_BACKEND, which only names the accounts source):
+ * browser, except the two VITE_ names, which only name the data sources):
  *   VITE_ACCOUNTS_BACKEND  laravel | dummyjson (default)
+ *   VITE_API_PROVIDER      laravel | dummyjson (default): with both on laravel,
+ *                          the admin's products and orders are real too
  *   BUYNEST_LARAVEL_URL    the Laravel API, default http://127.0.0.1:8000
  *   BUYNEST_BFF_KEY        = the backend's BFF_SHARED_KEY (passes on visitor IPs)
  * Values already in the environment win over .env files.
  */
 function loadServerEnv(mode) {
-  const env = loadEnv(mode, import.meta.dirname, ['VITE_ACCOUNTS_BACKEND', 'BUYNEST_'])
+  const env = loadEnv(mode, import.meta.dirname, ['VITE_ACCOUNTS_BACKEND', 'VITE_API_PROVIDER', 'BUYNEST_'])
   for (const [name, value] of Object.entries(env)) process.env[name] ??= value
 }
 
@@ -128,8 +130,9 @@ function contentSecurityPolicy(mode) {
     "script-src 'self'",
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
+    // Product photos: the catalog imported into Laravel keeps DummyJSON's CDN addresses.
     `img-src 'self' data: https://cdn.dummyjson.com ${apiOrigin}`,
-    `connect-src 'self' ${apiOrigin}`, // 'self' covers the sign-in service at /api/auth
+    `connect-src 'self' ${apiOrigin}`, // 'self' covers the services at /api (sign-in, catalog, shop)
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

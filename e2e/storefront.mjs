@@ -1,6 +1,7 @@
 // Storefront shopping flows, end to end: browse, search, product page, cart, wishlist, checkout, orders.
 import {
   BASE,
+  LARAVEL,
   SHOPPER,
   axeViolations,
   fillEmptyAddress,
@@ -131,7 +132,8 @@ await axe('cart')
 
 // ---------- Checkout → confirmation → order history ----------
 await page.goto(`${BASE}/checkout`, { waitUntil: 'networkidle' })
-log(/\/login/.test(page.url()), 'checkout: needs sign-in first')
+// The real shop (BuyNest API) lets guests buy; the DummyJSON demo needs a sign-in.
+log(LARAVEL ? !/\/login/.test(page.url()) : /\/login/.test(page.url()), LARAVEL ? 'checkout: open to guests' : 'checkout: needs sign-in first')
 await storefrontSignIn(page, SHOPPER)
 await page.goto(`${BASE}/checkout`, { waitUntil: 'networkidle' })
 const placeOrder = page.getByRole('button', { name: /^Place order · / })

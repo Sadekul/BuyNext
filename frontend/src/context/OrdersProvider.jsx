@@ -12,6 +12,7 @@ import {
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
 import { useAuth } from '../hooks/useAuth'
 import { STORAGE_KEYS } from '../constants/storageKeys'
+import { REAL_SHOP } from '../constants/shop'
 
 const STORAGE_OPTIONS = {
   storageKey: STORAGE_KEYS.orders,
@@ -26,10 +27,12 @@ const STORAGE_OPTIONS = {
 
 /*
  * Demo order history, saved in this browser per account (and filtered by the
- * signed-in customer as a second check). A real store reads orders from the
- * backend (GET /api/orders), which only returns the customer's own orders.
+ * signed-in customer as a second check). With BuyNest's API (REAL_SHOP) the
+ * orders live on the server instead (GET /api/shop/orders, which only returns
+ * the customer's own orders, read with TanStack Query in the order pages), so
+ * nothing is saved in the browser.
  */
-function OrdersProvider({ children }) {
+function LocalOrdersProvider({ children }) {
   const { user } = useAuth()
   const userId = user?.id ?? null
   const [state, dispatch] = usePersistentReducer(ordersReducer, STORAGE_OPTIONS, userId)
@@ -43,5 +46,13 @@ function OrdersProvider({ children }) {
   const value = useMemo(() => ({ orders, getOrder, placeOrder }), [orders, getOrder, placeOrder])
   return <OrdersContext value={value}>{children}</OrdersContext>
 }
+
+const NO_LOCAL_ORDERS = { orders: [], getOrder: () => null, placeOrder: () => {} }
+
+function ServerOrdersProvider({ children }) {
+  return <OrdersContext value={NO_LOCAL_ORDERS}>{children}</OrdersContext>
+}
+
+const OrdersProvider = REAL_SHOP ? ServerOrdersProvider : LocalOrdersProvider
 
 export default OrdersProvider

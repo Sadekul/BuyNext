@@ -36,4 +36,45 @@ return [
 
     // Local test inbox at /dev/mailbox (only when APP_ENV=local).
     'dev_mailbox' => (bool) env('DEV_MAILBOX', false),
+
+    // Orders placed per visitor per minute (checkout clicks, guest or signed in).
+    'orders_per_minute' => (int) env('BUYNEST_ORDERS_PER_MINUTE', 10),
+
+    /*
+     * Store rules. Every amount is in whole CENTS (499 = $4.99), because
+     * integers add up exactly and floats don't. App\Services\Pricing is the
+     * only code that reads these money rules. They move into the admin in
+     * phase 3/4.
+     */
+    'store' => [
+        'currency' => 'USD',
+        'tax_cents' => 0, // tax rules arrive in phase 4
+
+        // Free standard shipping once the merchandise (after the coupon) reaches this.
+        'free_shipping_threshold_cents' => 5000,
+
+        // Keys are the ids the storefront sends. Standard is the only one that can be free.
+        'shipping_methods' => [
+            'standard' => ['label' => 'Standard', 'eta' => '3–5 business days', 'price_cents' => 499, 'free_over_threshold' => true],
+            'express' => ['label' => 'Express', 'eta' => '1–2 business days', 'price_cents' => 1299, 'free_over_threshold' => false],
+            'nextDay' => ['label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price_cents' => 2499, 'free_over_threshold' => false],
+        ],
+
+        // Codes are matched case-insensitively (stored upper case here).
+        'coupons' => [
+            'NEST10' => ['type' => 'percent', 'value' => 10, 'description' => '10% off your order'],
+            'SAVE20' => ['type' => 'fixed', 'value_cents' => 2000, 'min_subtotal_cents' => 15000, 'description' => '$20 off orders of $150 or more'],
+        ],
+
+        'payment_methods' => [
+            'card' => 'Credit or debit card',
+            'paypal' => 'PayPal',
+            'cod' => 'Cash on delivery',
+        ],
+
+        'countries' => ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India'],
+
+        // Fewer units than this shows as "low stock".
+        'low_stock_threshold' => 10,
+    ],
 ];

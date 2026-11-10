@@ -1,0 +1,67 @@
+import { json, readBody } from './http.js'
+import { laravelShop } from './shop/laravel.js'
+import { CUSTOMER, notSignedIn } from './session.js'
+
+/*
+ * BuyNest shop service, at /api/shop/* (storefront, VITE_API_PROVIDER=laravel).
+ * Forwards to BuyNest's Laravel API (shop/laravel.js), which prices every
+ * cart and order itself: the browser sends product ids and quantities, never
+ * prices.
+ *
+ * GUESTS CAN BUY: an order is placed as the signed-in customer when the
+ * customer session cookie is there (its token goes to Laravel), otherwise as
+ * a guest, who can find the order later with its number and email.
+ *
+ *   POST /api/shop/cart/validate   { items: [{ productId, quantity }], couponCode, shippingMethod } → priced cart
+ *   POST /api/shop/orders          { items, couponCode, shippingMethod, paymentMethod, email, phone,
+ *                                    shippingAddress, billingAddress, expectedTotal } → 201 order
+ *                                  409 { code: 'prices_changed', cart } · 422 { errors, problems? }
+ *   GET  /api/shop/orders?page     → { orders, total, page, perPage, lastPage } (customer session)
+ *   GET  /api/shop/orders/:number  → order (customer session; someone else's → 404)
+ *   POST /api/shop/orders/lookup   { number, email } → order (guests)
+ */
+
+const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
+const reply = (result, status) => (result.ok ? json(result.data, status ?? result.status) : json(result.body, result.status))
+
+const ROUTES = {
+  async 'POST cart/validate'({ request }) {
+    return reply(await laravelShop.validateCart(await readBody(request), request))
+  },
+
+  async 'POST orders'({ request, cookies }) {
+    // Signed in → the order belongs to the account; no cookie → a guest order.
+    return reply(await laravelShop.placeOrder(await readBody(request), cookies[CUSTOMER.access], request), 201)
+  },
+
+  async 'GET orders'({ request, cookies, url }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    const page = Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
+    return reply(await laravelShop.listOrders(cookies[CUSTOMER.access], page, request))
+  },
+
+  async 'GET orders/:number'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelShop.getOrder(cookies[CUSTOMER.access], param, request))
+  },
+
+  async 'POST orders/lookup'({ request }) {
+    return reply(await laravelShop.lookupOrder(await readBody(request), request))
+  },
+}
+
+/** /api/shop/<segments> → a route, or null. */
+function matchRoute(method, segments) {
+  const path = segments.join('/')
+  if (ROUTES[`${method} ${path}`]) return { route: ROUTES[`${method} ${path}`] }
+  if (segments.length === 2 && segments[0] === 'orders' && isOrderNumber(segments[1])) {
+    return { route: ROUTES[`${method} orders/:number`], param: segments[1] }
+  }
+  return null
+}
+
+export async function handleShopRequest(request, segments, cookies) {
+  const match = matchRoute(request.method, segments)
+  if (!match?.route) return json({ message: 'Not found.' }, 404)
+  return match.route({ request, cookies, url: new URL(request.url), param: match.param })
+}

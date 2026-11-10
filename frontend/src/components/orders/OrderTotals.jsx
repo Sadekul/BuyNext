@@ -20,7 +20,8 @@ function OrderTotals({ totals, couponCode, shippingLabel }) {
       </div>
       <div>
         <dt>Taxes</dt>
-        <dd>Calculated by our servers</dd>
+        {/* Server-priced totals include the tax (none yet); the demo can't know it. */}
+        <dd>{typeof totals.tax === 'number' ? formatPrice(totals.tax) : 'Calculated by our servers'}</dd>
       </div>
       <div className="cart-summary__total">
         <dt>Total</dt>

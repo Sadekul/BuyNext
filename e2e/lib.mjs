@@ -144,3 +144,40 @@ export async function fillEmptyAddress(page) {
     if ((await input.count()) > 0 && !(await input.inputValue())) await input.fill(value)
   }
 }
+
+/**
+ * Real-shop test runs place real orders, which use up stock (a product with a
+ * minimum order of 48 loses 48 units per run). Records every product's stock
+ * and returns a function that puts back whatever changed. BuyNest API only.
+ */
+export async function preserveStock() {
+  if (!LARAVEL) return async () => 0
+  const call = async (path, { method = 'GET', token, body } = {}) => {
+    const response = await fetch(`${LARAVEL_URL}${path}`, {
+      method,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+      body: body && JSON.stringify(body),
+    })
+    return response.json()
+  }
+  const token = (await call('/api/admin/v1/auth/login', { method: 'POST', body: { email: ADMIN_USER.email, password: ADMIN_USER.password } })).data.tokens.access_token
+  const stockLevels = async () => {
+    const levels = new Map()
+    for (let page = 1; ; page++) {
+      const { data, meta } = await call(`/api/admin/v1/products?per_page=100&page=${page}`, { token })
+      for (const product of data) levels.set(product.id, product.stock_quantity)
+      if (page >= meta.last_page) return levels
+    }
+  }
+  const before = await stockLevels()
+  return async () => {
+    let restored = 0
+    for (const [id, stock] of await stockLevels()) {
+      if (before.has(id) && before.get(id) !== stock) {
+        await call(`/api/admin/v1/products/${id}`, { method: 'PATCH', token, body: { stock_quantity: before.get(id) } })
+        restored++
+      }
+    }
+    return restored
+  }
+}
