@@ -3,24 +3,18 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import FormField, { CheckboxField } from '../components/forms/FormField'
 import Button from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
+import { ApiError } from '../services/apiClient'
+import { DEMO_ACCOUNT, REAL_ACCOUNTS } from '../constants/accounts'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
+import { safeRedirectPath } from '../utils/safeRedirect'
 import { validateLogin } from '../utils/validation'
 import './AuthPages.css'
 
-// A real DummyJSON account (listed publicly at https://dummyjson.com/users).
-// Only offered with the DummyJSON learning API: the env value is replaced at
-// build time, so a Laravel build doesn't contain these credentials at all.
-const DEMO_ACCOUNT =
-  (import.meta.env.VITE_API_PROVIDER || 'dummyjson') === 'dummyjson' ? { username: 'emilys', password: 'emilyspass' } : null
-
-/**
- * Only same-site paths ("/checkout"). Rejects full URLs and "//other-site.com";
- * browsers read a backslash as a slash, so "/\other-site.com" too.
- */
-function safeRedirectPath(path) {
-  return typeof path === 'string' && /^\/(?![/\\])/.test(path) ? path : ROUTES.account
-}
+// BuyNest accounts sign in with an email; DummyJSON's demo users with a username.
+const ID_FIELD = REAL_ACCOUNTS
+  ? { name: 'email', label: 'Email', type: 'email', autoComplete: 'email' }
+  : { name: 'username', label: 'Username', type: 'text', autoComplete: 'username' }
 
 function LoginPage() {
   const { login, sessionExpired } = useAuth()
@@ -29,7 +23,7 @@ function LoginPage() {
   // Where the customer was going before ProtectedRoute sent them here.
   const redirectTo = safeRedirectPath(location.state?.from?.pathname)
 
-  const [values, setValues] = useState({ username: '', password: '', remember: true })
+  const [values, setValues] = useState({ [ID_FIELD.name]: '', password: '', remember: true })
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverError, setServerError] = useState(null)
@@ -61,7 +55,15 @@ function LoginPage() {
       await login(values)
       navigate(redirectTo, { replace: true })
     } catch (error) {
-      setServerError(error.message) // e.g. "Invalid credentials" (HTTP 400 from DummyJSON)
+      // Right password, but the email isn't confirmed yet: a new code was
+      // emailed, so continue on the code page.
+      if (error instanceof ApiError && error.status === 403 && error.data?.code === 'email_unverified') {
+        navigate(ROUTES.verifyEmail, {
+          state: { email: error.data.data?.email ?? values.email, resendIn: error.data.data?.resendIn, from: location.state?.from },
+        })
+        return
+      }
+      setServerError(error.message) // e.g. "The email or password is incorrect."
       setIsSubmitting(false)
     }
   }
@@ -75,7 +77,12 @@ function LoginPage() {
           <p className="auth-card__subtitle">Sign in to see your orders and saved details.</p>
         </header>
 
-        {sessionExpired && !serverError && (
+        {location.state?.notice && !serverError && (
+          <p className="auth-alert auth-alert--success" role="status">
+            {location.state.notice}
+          </p>
+        )}
+        {sessionExpired && !serverError && !location.state?.notice && (
           <p className="auth-alert auth-alert--info" role="status">
             Your session has expired. Please sign in again.
           </p>
@@ -89,7 +96,7 @@ function LoginPage() {
         {DEMO_ACCOUNT && (
           <div className="auth-demo">
             <span>
-              Demo account: <code>{DEMO_ACCOUNT.username}</code> / <code>{DEMO_ACCOUNT.password}</code>
+              Demo account: <code>{DEMO_ACCOUNT[ID_FIELD.name]}</code> / <code>{DEMO_ACCOUNT.password}</code>
             </span>
             <button type="button" className="auth-link" onClick={() => setValues((current) => ({ ...current, ...DEMO_ACCOUNT }))}>
               Use demo account
@@ -99,12 +106,13 @@ function LoginPage() {
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField
-            label="Username"
-            name="username"
-            value={values.username}
+            label={ID_FIELD.label}
+            name={ID_FIELD.name}
+            type={ID_FIELD.type}
+            value={values[ID_FIELD.name]}
             onChange={handleChange}
-            error={visibleError('username')}
-            autoComplete="username"
+            error={visibleError(ID_FIELD.name)}
+            autoComplete={ID_FIELD.autoComplete}
             autoCapitalize="none"
             spellCheck={false}
           />

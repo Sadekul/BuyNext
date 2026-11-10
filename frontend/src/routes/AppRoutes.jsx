@@ -18,6 +18,7 @@ const WishlistPage = lazy(() => import('../pages/WishlistPage'))
 const LoginPage = lazy(() => import('../pages/LoginPage'))
 const RegisterPage = lazy(() => import('../pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'))
+const VerifyEmailPage = lazy(() => import('../pages/VerifyEmailPage'))
 const AccountLayout = lazy(() => import('../layouts/AccountLayout'))
 const ProfilePage = lazy(() => import('../pages/ProfilePage'))
 const OrdersPage = lazy(() => import('../pages/OrdersPage'))
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route element={<GuestOnlyRoute />}>
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
         </Route>
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
 

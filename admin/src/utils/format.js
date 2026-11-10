@@ -12,3 +12,7 @@ export const formatCountCompact = (value) => (Math.abs(value) < 10_000 ? count.f
 /** "home-decoration" → "Home decoration" */
 export const formatSlug = (slug = '') => slug.charAt(0).toUpperCase() + slug.slice(1).replaceAll('-', ' ')
 export const fullName = (person) => [person?.firstName, person?.lastName].filter(Boolean).join(' ')
+
+const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+/** ISO date → "Nov 10, 2026"; empty → the fallback. */
+export const formatDate = (iso, fallback = '—') => (iso ? dateFormat.format(new Date(iso)) : fallback)

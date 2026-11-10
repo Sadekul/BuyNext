@@ -81,9 +81,27 @@ Built: the shop owner's dashboard (`admin/`, at `/admin/`) on demo data, with an
 
 Checks: frontend 143 unit tests (20 of them for the server services), admin 8 unit tests, and the browser checks in `e2e/` (storefront, accounts, sessions, security, motion, admin, Laravel mode), against both the dev server and the production build.
 
+## Backend phase 1 (accounts) — 2026-11-10
+
+Built: the Laravel API (`backend/`) with real customer accounts (sign-up with name, email, phone, password; a 6-digit email code; password reset by code) and separate admin accounts; the sign-in service and both React apps switched to it with `VITE_ACCOUNTS_BACKEND=laravel`. Design and reasoning: [backend/ACCOUNTS.md](backend/ACCOUNTS.md). Found and fixed while verifying it:
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| A1 | Medium | A customer token on `/api/admin/v1/customers/{id}` got 404 or 403 depending on whether that id existed (the record was looked up before the customer/admin check), so a customer could map customer ids | The token-kind check runs before route-model binding (middleware priority); every id gets 403 |
+| A2 | Medium | The general API rate limit grouped every signed-in user under one key (operator precedence), so one busy account could slow everyone | Keyed per account type and id, or per IP when signed out |
+| A3 | Medium | Every request reached Laravel from the sign-in service's address, so sign-in rate limits would have counted all visitors together (one attacker could lock everyone out) | The service passes the visitor's IP with a shared key; Laravel only trusts it with the key, and the dev server takes the IP from the connection, never from browser headers |
+| A4 | Low | A rate limit read `env()` outside the config files, which stops working once settings are cached in production | Moved into `config/buynest.php` |
+| A5 | Low | Admin "Block" buttons had their hidden name joined without a space by some screen-reader engines ("BlockNadia Rahman") | Explicit `aria-label` ("Block Nadia Rahman") |
+| A6 | Low | Checkout assumed every account has a saved address (DummyJSON users do); new customers have none | Works as intended (the form asks for it); browser checks now fill the address like a shopper |
+
+Also by design: admins and customers are separate tables, tokens, and cookies (the storefront's "Shop admin" link is gone; admins sign in at `/admin/login`); the old cross-app sign-out signal was removed.
+
+Checks: backend 39 feature tests (MySQL test database), frontend 168 unit tests (35 for the server services), admin 12, and the browser checks in `e2e/`, now with `signup.mjs`, against BuyNest accounts on both the dev server and the production build.
+
 ## Known limits (by design, documented)
 
 - Orders, payment and stock are simulated in the browser (K2: kept simulated by decision, until the Laravel backend). The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
-- In Laravel mode, sign-in still goes through the DummyJSON sign-in service until Laravel's Sanctum endpoints exist (see `docs/backend/API_CONTRACT.md`).
+- Accounts are real with `VITE_ACCOUNTS_BACKEND=laravel`; the catalog, orders, and the admin overview still use DummyJSON until backend phase 2. The checkout's price check runs as DummyJSON demo user 1 for BuyNest customers (DummyJSON only knows its own users).
+- Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
 - Admin edits are simulated: DummyJSON accepts product changes but never stores them, and the store's demo orders live in each customer's browser, so the admin can't list them. Both change with the Laravel backend.

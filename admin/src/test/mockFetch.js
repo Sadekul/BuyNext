@@ -16,10 +16,9 @@ export function mockFetch(routes) {
   return fetchMock
 }
 
-export const ADMIN = { id: 1, username: 'emilys', firstName: 'Emily', lastName: 'Johnson', role: 'admin' }
-export const CUSTOMER = { id: 16, username: 'averyp', firstName: 'Avery', lastName: 'Perez', role: 'user' }
+export const ADMIN = { id: 1, username: 'emilys', name: 'Emily Johnson', firstName: 'Emily', lastName: 'Johnson', role: 'admin' }
 
-/** The readable "a session exists" cookie the sign-in service sets. */
+/** The readable "an admin session exists" cookie the admin service sets. */
 export const withSession = () => {
-  document.cookie = 'buynest_session=session; Path=/'
+  document.cookie = 'buynest_admin_session=session; Path=/'
 }

@@ -7,6 +7,7 @@ import { LuPencil } from 'react-icons/lu'
 import EditNameForm from '../components/forms/EditNameForm'
 import { profileQuery, userKeys } from '../queries/userQueries'
 import { updateProfile } from '../services/authService'
+import { REAL_ACCOUNTS } from '../constants/accounts'
 import { SITE } from '../constants/site'
 import './ProfilePage.css'
 
@@ -22,11 +23,11 @@ function ProfilePage() {
   const profileKey = userKeys.profile(user.id)
 
   /*
-   * OPTIMISTIC UPDATE: show the new name immediately, before the server
+   * OPTIMISTIC UPDATE: show the new details immediately, before the server
    * answers; roll back if the request fails.
-   * We deliberately don't invalidate/refetch afterwards: DummyJSON doesn't
-   * save the change, so a refetch would bring the old name back. With a
-   * real API, add onSettled: () => invalidateQueries({ queryKey: profileKey }).
+   * BuyNest accounts save the change, so afterwards the profile is fetched
+   * again (onSettled) to show exactly what was stored. DummyJSON doesn't save
+   * it: a refetch would bring the old name back, so the demo skips that.
    */
   const rename = useMutation({
     mutationFn: (changes) => authorizedRequest(() => updateProfile(changes)),
@@ -41,8 +42,11 @@ function ProfilePage() {
       queryClient.setQueryData(profileKey, context.previous) // roll back
     },
     onSuccess: (updated) => {
-      queryClient.setQueryData(profileKey, (current) => ({ ...current, firstName: updated.firstName, lastName: updated.lastName }))
+      queryClient.setQueryData(profileKey, (current) => ({ ...current, firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone }))
       updateUser({ ...user, firstName: updated.firstName, lastName: updated.lastName }) // header greeting
+    },
+    onSettled: () => {
+      if (REAL_ACCOUNTS) queryClient.invalidateQueries({ queryKey: profileKey })
     },
   })
 
@@ -68,7 +72,11 @@ function ProfilePage() {
         {profile.image && <img className="profile__avatar" src={profile.image} alt="" width="96" height="96" />}
         {isEditing ? (
           <EditNameForm
-            initialValues={{ firstName: profile.firstName, lastName: profile.lastName }}
+            initialValues={{
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              ...(REAL_ACCOUNTS && { phone: profile.phone ?? '' }),
+            }}
             onSave={(changes) => rename.mutate(changes)}
             onCancel={() => setIsEditing(false)}
           />
@@ -77,9 +85,9 @@ function ProfilePage() {
             <h2 id="profile-title" className="profile__name">
               {profile.firstName} {profile.lastName}
             </h2>
-            <p className="profile__username">@{profile.username}</p>
+            {profile.username && <p className="profile__username">@{profile.username}</p>}
             <button type="button" className="profile__edit" onClick={() => setIsEditing(true)}>
-              <LuPencil aria-hidden="true" /> Edit name
+              <LuPencil aria-hidden="true" /> {REAL_ACCOUNTS ? 'Edit details' : 'Edit name'}
             </button>
           </div>
         )}
@@ -87,8 +95,8 @@ function ProfilePage() {
 
       <p className="profile__status" role="status">
         {rename.isPending && 'Saving…'}
-        {rename.isSuccess && 'Name updated (demo: DummyJSON forgets it after a reload).'}
-        {rename.isError && `Couldn't save your name: ${rename.error.message} Your previous name was restored.`}
+        {rename.isSuccess && (REAL_ACCOUNTS ? 'Your details were saved.' : 'Name updated (demo: DummyJSON forgets it after a reload).')}
+        {rename.isError && `Couldn't save your changes: ${rename.error.message} Your previous details were restored.`}
       </p>
 
       <dl className="profile__details">
@@ -101,7 +109,9 @@ function ProfilePage() {
       </dl>
 
       <p className="profile__note">
-        Profile editing needs a real backend (DummyJSON doesn't save changes). It arrives with the BuyNest API.
+        {REAL_ACCOUNTS
+          ? 'To use a different email address, contact BuyNest support: a new address has to be confirmed first.'
+          : "Profile editing needs a real backend (DummyJSON doesn't save changes). It arrives with the BuyNest API."}
       </p>
     </section>
   )

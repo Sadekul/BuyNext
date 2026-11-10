@@ -1,19 +1,29 @@
-import { json, pick, readBody, safeProfile, upstream } from './http.js'
-import { currentUser } from './session.js'
+import { json, pick, readBody, upstream } from './http.js'
+import { accounts } from './accounts/index.js'
+import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
  *
+ * ADMINS HAVE THEIR OWN SESSION: separate sign-in (/api/admin/auth/*) and
+ * separate HttpOnly cookies (session.js ADMIN), never the storefront's. With
+ * Laravel accounts, admins are a separate table: a customer can't sign in here
+ * even with the right password. With the DummyJSON demo users, only users
+ * whose role is "admin" can.
+ *
  * PERMISSIONS ARE CHECKED HERE, ON THE SERVER: every request looks up the
- * signed-in account with DummyJSON and refuses anyone whose role isn't
- * "admin" (403), whatever the browser shows or hides. Responses are
- * allow-listed: customer records never include passwords, bank, or SSN data.
+ * admin session with the accounts backend and refuses anything else (401/403),
+ * whatever the browser shows or hides. Responses are allow-listed: customer
+ * records never include passwords, bank, or SSN data.
  *
- * DEMO DATA: DummyJSON accepts product changes and answers as if it saved
- * them, but it doesn't. Every write response says `simulated: true`.
- * With the Laravel backend, these routes become real endpoints protected by
- * Sanctum + an admin policy (docs/backend/API_CONTRACT.md).
+ * DATA: customers come from Laravel when VITE_ACCOUNTS_BACKEND=laravel (real,
+ * and admins can block them). Products, orders, and the overview still use
+ * DummyJSON's demo data until phase 2: DummyJSON accepts product changes and
+ * answers as if it saved them, but it doesn't. Those writes say `simulated: true`.
  *
+ *   POST   /api/admin/auth/login         { email | username, password, remember } → the admin's profile
+ *   POST   /api/admin/auth/refresh       → renews the admin session
+ *   POST   /api/admin/auth/logout        → ends the admin session
  *   GET    /api/admin/me                 → the admin's profile
  *   GET    /api/admin/overview           → store totals, low stock, latest orders
  *   GET    /api/admin/products?q&category&limit&skip&sortBy&order
@@ -24,7 +34,8 @@ import { currentUser } from './session.js'
  *   GET    /api/admin/categories
  *   GET    /api/admin/orders?limit&skip
  *   GET    /api/admin/orders/:id
- *   GET    /api/admin/customers?q&limit&skip
+ *   GET    /api/admin/customers?q&status&limit&skip
+ *   PATCH  /api/admin/customers/:id      { isActive } → block or unblock (Laravel accounts only)
  */
 
 const PRODUCT_LIST_FIELDS = ['id', 'title', 'category', 'brand', 'price', 'discountPercentage', 'stock', 'rating', 'thumbnail', 'availabilityStatus']
@@ -89,7 +100,7 @@ const invalid = (errors) => json({ message: 'Please check the highlighted fields
 
 const ROUTES = {
   async 'GET me'(ctx) {
-    return json(safeProfile(ctx.admin))
+    return json(ctx.admin)
   },
 
   async 'GET overview'() {
@@ -234,13 +245,30 @@ const ROUTES = {
     const { url } = ctx
     const { limit, skip } = pageParams(url)
     const q = url.searchParams.get('q')?.trim()
+    const backend = accounts()
+    if (backend.admin.listCustomers) {
+      const status = ['verified', 'unverified', 'blocked'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : undefined
+      // The API pages by page number; this service by limit/skip.
+      const result = await backend.admin.listCustomers(ctx.token, { search: q?.slice(0, 100), status, page: Math.floor(skip / limit) + 1, perPage: limit }, ctx.request)
+      if (!result.ok) return json(result.body, result.status)
+      return json({ ...result.data, limit, skip, manageable: true })
+    }
     const select = 'firstName,lastName,username,email,phone,role,image,address'
     const path = q
       ? `/users/search?q=${encodeURIComponent(q)}&limit=${limit}&skip=${skip}&select=${select}`
       : `/users?limit=${limit}&skip=${skip}&select=${select}`
     const result = await upstream(path)
     if (result.status !== 200) return passThrough(result)
-    return json({ customers: result.data.users.map(toCustomer), total: result.data.total, limit, skip })
+    return json({ customers: result.data.users.map(toCustomer), total: result.data.total, limit, skip, manageable: false })
+  },
+
+  async 'PATCH customers/:id'(ctx) {
+    const backend = accounts()
+    if (!backend.admin.updateCustomer) return json({ message: 'Blocking customers needs the BuyNest backend; the demo accounts cannot do it.' }, 404)
+    const body = await readBody(ctx.request)
+    if (typeof body.isActive !== 'boolean') return invalid({ isActive: ['Choose whether the account is active.'] })
+    const result = await backend.admin.updateCustomer(ctx.token, ctx.id, { isActive: body.isActive }, ctx.request)
+    return result.ok ? json(result.data) : json(result.body, result.status)
   },
 }
 
@@ -253,14 +281,46 @@ function matchRoute(method, segments) {
   return { route: ROUTES[`${method} ${resource}/:id`], id }
 }
 
+/** The admin session routes: no permission check (they create or end the session). */
+const SESSION_ROUTES = {
+  async 'POST login'(request) {
+    const body = await readBody(request)
+    const remember = body.remember === true
+    const result = await accounts().admin.login(body, remember, request)
+    return result.ok ? json(result.profile, 200, sessionCookies(result.tokens, remember, ADMIN)) : json(result.body, result.status)
+  },
+
+  async 'POST refresh'(request, cookies) {
+    if (!cookies[ADMIN.refresh]) return json({ message: 'Your session has expired.' }, 401, clearedCookies(ADMIN))
+    const remember = cookies[ADMIN.remember] === '1'
+    const result = await accounts().admin.refresh(cookies[ADMIN.refresh], remember, request)
+    if (!result.ok) {
+      const ended = [400, 401, 403].includes(result.status)
+      return json(result.body, result.status, ended ? clearedCookies(ADMIN) : [])
+    }
+    return json({ ok: true }, 200, sessionCookies(result.tokens, remember, ADMIN))
+  },
+
+  async 'POST logout'(request, cookies) {
+    await accounts().admin.logout(cookies[ADMIN.access], request)
+    return json({ ok: true }, 200, clearedCookies(ADMIN))
+  },
+}
+
 export async function handleAdminRequest(request, segments, cookies) {
+  if (segments[0] === 'auth' && segments.length === 2) {
+    const route = SESSION_ROUTES[`${request.method} ${segments[1]}`]
+    return route ? route(request, cookies) : json({ message: 'Not found.' }, 404)
+  }
+
   const match = matchRoute(request.method, segments)
   if (!match?.route) return json({ message: 'Not found.' }, 404)
 
-  // The permission check, on every request.
-  const { user, response } = await currentUser(cookies)
-  if (response) return response
-  if (user.role !== 'admin') return json({ message: 'This account does not have admin access.' }, 403)
+  // The permission check, on every request: a valid ADMIN session.
+  const token = cookies[ADMIN.access]
+  if (!token) return notSignedIn()
+  const session = await accounts().admin.me(token, request)
+  if (!session.ok) return json(session.body, session.status, session.status === 403 ? clearedCookies(ADMIN) : [])
 
-  return match.route({ request, url: new URL(request.url), id: match.id, admin: user })
+  return match.route({ request, url: new URL(request.url), id: match.id, admin: session.profile, token })
 }

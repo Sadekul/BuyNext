@@ -1,8 +1,13 @@
-// Admin dashboard (/admin), end to end: access rules, every page, demo writes, layout, accessibility.
+// Admin dashboard (/admin), end to end: separate admin accounts, every page, demo writes, layout, accessibility.
 import {
+  ADMIN_USER,
   BASE,
-  DEMO_ADMIN,
-  DEMO_CUSTOMER,
+  ID_LABEL,
+  LARAVEL,
+  NOT_ADMIN,
+  SHOPPER,
+  SHOPPER_2,
+  adminSignIn,
   axeViolations,
   launch,
   reporter,
@@ -21,38 +26,40 @@ const axe = async (page, name) => {
   log(violations.length === 0, `axe ${name}: ${violations.join(', ') || 'no violations'}`)
 }
 const newPage = async (ctx) => watchErrors(await ctx.newPage(), errors)
+const adminCookies = async (ctx) => (await ctx.cookies()).filter((cookie) => cookie.name.startsWith('buynest_admin_'))
 
 // 1. Signed out → the admin sign-in page
 let ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, bypassCSP: true })
 let page = await newPage(ctx)
 await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' })
 log(/\/admin\/login$/.test(page.url()) && (await visible(page.getByRole('heading', { name: 'BuyNest Admin' }))), `signed out: /admin → admin sign-in (${page.url()})`)
+log(await page.getByLabel(ID_LABEL).isVisible(), `admin signs in with ${LARAVEL ? 'an email' : 'a username'}`)
 await axe(page, 'sign-in')
 
-// 2. A customer account: no access, in the UI and in the API
-await storefrontSignIn(page, DEMO_CUSTOMER)
+// 2. A customer: separate session, refused at the admin sign-in, refused by the API
+await storefrontSignIn(page, NOT_ADMIN)
 log((await page.getByRole('link', { name: 'Shop admin' }).count()) === 0, 'customer account page has no "Shop admin" link')
 await page.goto(`${BASE}/admin/products`, { waitUntil: 'networkidle' })
-log(await visible(page.getByRole('heading', { name: 'No admin access' })), 'customer account: "No admin access" page')
-await axe(page, 'no access')
+log(/\/admin\/login$/.test(page.url()), 'a signed-in customer is still signed out of the admin (separate sessions)')
 const apiStatus = await page.evaluate(async () => (await fetch('/api/admin/customers')).status)
-log(apiStatus === 403, `customer account: admin API refuses with 403 (${apiStatus})`)
-// The customer then tries the admin sign-in form: refused and signed back out
-await page.getByRole('button', { name: 'Sign in with an admin account' }).click()
-await page.getByLabel('Username').fill(DEMO_CUSTOMER.username)
-await page.getByLabel('Password').fill(DEMO_CUSTOMER.password)
-await page.getByRole('button', { name: 'Sign in' }).click()
-log(await visible(page.getByRole('alert').filter({ hasText: 'not a shop admin' })), 'customer signing in on the admin page is refused')
-await page.waitForTimeout(500)
-log(!(await ctx.cookies()).some((cookie) => cookie.name === 'buynest_at'), 'refused customer is signed back out (no session cookie)')
+log(apiStatus === 401, `customer session: admin API refuses (${apiStatus})`)
+await adminSignIn(page, NOT_ADMIN)
+const refusal = LARAVEL ? 'The email or password is incorrect.' : 'not a shop admin'
+log(await visible(page.getByRole('alert').filter({ hasText: refusal })), `customer's own password at the admin sign-in: refused ("${refusal}")`)
+await page.waitForTimeout(300)
+log((await adminCookies(ctx)).length === 0, 'refused customer gets no admin session cookie')
 await ctx.close()
 
-// 3. An admin, via the storefront: "Shop admin" opens the dashboard on the same session
+// 3. An admin signs in on the admin's own page
 ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, bypassCSP: true })
 page = await newPage(ctx)
-await storefrontSignIn(page, DEMO_ADMIN)
-await page.getByRole('link', { name: 'Shop admin' }).click()
-log(await visible(page.getByRole('heading', { name: 'Overview' })), 'admin: "Shop admin" link opens the dashboard without signing in again')
+await page.goto(`${BASE}/admin/`, { waitUntil: 'networkidle' })
+await adminSignIn(page, ADMIN_USER)
+log(await visible(page.getByRole('heading', { name: 'Overview' })), 'admin signs in and lands on the overview')
+const adminAccess = (await adminCookies(ctx)).find((cookie) => cookie.name === 'buynest_admin_at')
+log(adminAccess?.httpOnly && adminAccess.sameSite === 'Strict' && adminAccess.path === '/api/admin', `admin session cookie: HttpOnly, SameSite=Strict, Path=/api/admin (${adminAccess?.path})`)
+log(!(await ctx.cookies()).some((cookie) => cookie.name === 'buynest_at'), 'signing in to the admin does not sign in to the storefront')
+log(await visible(page.getByText(ADMIN_USER.name)), `sidebar shows the admin (${ADMIN_USER.name})`)
 await page.locator('.stat').first().waitFor()
 const stats = await page.locator('.stat').allInnerTexts()
 log(stats.length === 7 && /Revenue/.test(stats[0]) && /\$/.test(stats[0]) && stats.some((tile) => /Average order/.test(tile)), `overview: hero revenue + 6 tiles incl. average order (${stats[0]?.replace(/\n/g, ' ')})`)
@@ -131,12 +138,41 @@ await axe(page, 'order detail')
 await page.getByRole('link', { name: 'Customers' }).click()
 await page.getByRole('table').waitFor()
 const customersJson = await page.evaluate(async () => (await fetch('/api/admin/customers?limit=100')).text())
-log(!/password|ssn|iban|cardNumber|"ip"/i.test(customersJson), 'customers: API response has no passwords, SSN, bank, or IP data')
-await page.getByLabel('Search customers').fill('emily')
+log(!/password|ssn|iban|cardNumber|"ip"|token/i.test(customersJson), 'customers: API response has no passwords, tokens, SSN, bank, or IP data')
+const searchFor = LARAVEL ? SHOPPER.firstName : 'emily'
+await page.getByLabel('Search customers').fill(searchFor)
 await page.getByRole('button', { name: 'Search' }).click()
-await page.waitForURL(/q=emily/)
-log(await visible(page.locator('tbody').getByText(/Emily/)), 'customers: search "emily"')
+await page.waitForURL(new RegExp(`q=${searchFor}`))
+log(await visible(page.locator('tbody').getByText(new RegExp(searchFor, 'i'))), `customers: search "${searchFor}"`)
 await axe(page, 'customers')
+
+if (LARAVEL) {
+  // Real customers: block one, and they are locked out of the storefront; unblock, and they're back
+  const shopperContext = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  const shopper = await newPage(shopperContext)
+  await storefrontSignIn(shopper, SHOPPER_2)
+  await page.goto(`${BASE}/admin/customers?q=${SHOPPER_2.firstName}`, { waitUntil: 'networkidle' })
+  const blockButton = page.getByRole('button', { name: new RegExp(`^Block ${SHOPPER_2.firstName}`) })
+  await blockButton.click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Block account' }).click()
+  log(await visible(page.getByRole('status').filter({ hasText: 'signed out everywhere' })), 'block: confirmed, with a notice')
+  log(await visible(page.locator('tbody').getByText('Blocked')), 'block: status shows "Blocked" (icon + word)')
+  await shopper.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
+  log(/\/login/.test(shopper.url()), `block: the customer's open session ends (${new URL(shopper.url()).pathname})`)
+  await shopper.getByLabel('Email').fill(SHOPPER_2.email)
+  await shopper.getByLabel('Password', { exact: true }).fill(SHOPPER_2.password)
+  await shopper.getByRole('button', { name: /^sign in$/i }).click()
+  log(await visible(shopper.getByRole('alert').filter({ hasText: 'disabled' })), 'block: the customer cannot sign in again')
+  await page.getByRole('button', { name: new RegExp(`^Unblock ${SHOPPER_2.firstName}`) }).click()
+  log(await visible(page.getByRole('status').filter({ hasText: 'can sign in again' })), 'unblock: notice')
+  await storefrontSignIn(shopper, SHOPPER_2)
+  log(/\/account/.test(shopper.url()), 'unblock: the customer can sign in again')
+  await shopperContext.close()
+  await page.getByLabel('Status').selectOption('blocked')
+  await page.waitForURL(/status=blocked/)
+  await page.waitForTimeout(500)
+  log(!(await page.locator('tbody').getByText(SHOPPER_2.firstName).isVisible().catch(() => false)), 'status filter: "Blocked" no longer lists the unblocked customer')
+}
 
 // Phone-sized layout
 await page.setViewportSize({ width: 390, height: 844 })
@@ -150,16 +186,19 @@ await page.goto(`${BASE}/admin/`, { waitUntil: 'networkidle' })
 await page.screenshot({ path: 'admin-overview-390.png', fullPage: true })
 await page.setViewportSize({ width: 1440, height: 900 })
 
-// Signing out in the admin also signs out an open storefront tab
+// Two separate sessions: a storefront sign-in in the same browser, then the admin signs out
 const store = await newPage(ctx)
-await store.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
-await store.getByRole('heading', { name: /Hi, Emily/ }).waitFor()
+await storefrontSignIn(store, SHOPPER)
 await page.goto(`${BASE}/admin/`, { waitUntil: 'networkidle' })
+log(await visible(page.getByRole('heading', { name: 'Overview' })), 'a storefront sign-in leaves the admin session alone')
 await page.getByRole('button', { name: 'Sign out' }).click()
 log(await visible(page.getByRole('heading', { name: 'BuyNest Admin' })), 'admin sign-out → admin sign-in page')
-log(await store.waitForURL(/\/login/, { timeout: 8000 }).then(() => true, () => false), 'admin sign-out also signs out the open storefront tab')
 await page.waitForTimeout(500)
-log(!(await ctx.cookies()).some((cookie) => cookie.name === 'buynest_at'), 'admin sign-out deletes the session cookies')
+log((await adminCookies(ctx)).length === 0, 'admin sign-out deletes the admin session cookies')
+await store.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
+log(await visible(store.getByRole('heading', { name: new RegExp(`Hi, ${SHOPPER.firstName}`) })), 'admin sign-out leaves the storefront customer signed in')
+await page.goto(`${BASE}/admin/customers`, { waitUntil: 'networkidle' })
+log(/\/admin\/login$/.test(page.url()), 'after sign-out the admin pages need a sign-in again')
 await ctx.close()
 
 log(errors.length === 0, `no page errors ${JSON.stringify(errors)}`)

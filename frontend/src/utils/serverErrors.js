@@ -16,3 +16,10 @@ export function applyServerFieldErrors(error, setError, fieldMap = {}) {
   }
   return applied
 }
+
+/** A copy of a { field: messages } object without one field (its message was about the old value). */
+export function withoutField(errors, field) {
+  const rest = { ...errors }
+  delete rest[field]
+  return rest
+}

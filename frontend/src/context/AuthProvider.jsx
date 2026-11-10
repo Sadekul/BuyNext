@@ -130,15 +130,10 @@ function AuthProvider({ children }) {
   }, [session, queryClient])
 
   // Keep every tab on the same account. Cookies are shared by all tabs; the
-  // cached profile's `storage` event tells the other tabs what happened, and
-  // the admin dashboard (../admin) sends STORAGE_KEYS.signOutSignal when an
-  // admin signs out there.
+  // cached profile's `storage` event tells the other tabs what happened.
+  // (The admin dashboard has its own, separate session.)
   useEffect(() => {
     function handleStorage(event) {
-      if (event.key === STORAGE_KEYS.signOutSignal) {
-        setSession((current) => (current.status === 'anonymous' ? current : ANONYMOUS))
-        return
-      }
       if (event.key !== STORAGE_KEYS.profile) return
       const cached = readCachedProfile()
       const hint = readSessionHint()
@@ -169,8 +164,15 @@ function AuthProvider({ children }) {
     return () => controller.abort()
   }, [session.status])
 
-  const login = useCallback(async ({ username, password, remember }) => {
-    const user = await authService.login({ username, password, remember })
+  const login = useCallback(async ({ username, email, password, remember }) => {
+    const user = await authService.login({ username, email, password, remember })
+    setSession({ status: 'authenticated', user, remember, expired: false })
+    return user
+  }, [])
+
+  /** Confirms a new account with the emailed code; the customer is then signed in. */
+  const verifyEmail = useCallback(async ({ email, code, remember }) => {
+    const user = await authService.verifyEmail({ email, code, remember })
     setSession({ status: 'authenticated', user, remember, expired: false })
     return user
   }, [])
@@ -228,11 +230,12 @@ function AuthProvider({ children }) {
       isAuthenticated: session.status === 'authenticated',
       sessionExpired: session.expired,
       login,
+      verifyEmail,
       logout,
       authorizedRequest,
       updateUser,
     }),
-    [session.status, session.user, session.expired, login, logout, authorizedRequest, updateUser],
+    [session.status, session.user, session.expired, login, verifyEmail, logout, authorizedRequest, updateUser],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

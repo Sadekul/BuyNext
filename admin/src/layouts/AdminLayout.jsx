@@ -28,7 +28,7 @@ function AdminLayout() {
     )
   }
   if (status === 'signedOut') return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  if (status === 'forbidden') return <AccessDenied user={user} />
+  if (status === 'forbidden') return <AccessDenied />
   if (status === 'error') {
     return (
       <main className="state state--error" role="alert">
@@ -63,7 +63,7 @@ function AdminLayout() {
         </nav>
         <div className="admin__account">
           <p>
-            Signed in as <strong>{fullName(user) || user?.username}</strong>
+            Signed in as <strong>{user?.name || fullName(user) || user?.username}</strong>
           </p>
           {/* The storefront is a different app: a normal link, not router navigation. */}
           <a href="/" className="admin__account-link">

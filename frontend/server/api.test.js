@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleApiRequest } from './api'
 
 const SITE = 'https://shop.example'
@@ -16,11 +16,11 @@ function fakeUpstream(routes) {
   return calls
 }
 
-const call = (action, { method = 'GET', body, cookie, site = 'same-origin', service = 'auth' } = {}) =>
+const call = (action, { method = 'GET', body, cookie, site = 'same-origin', service = 'auth', ip } = {}) =>
   handleApiRequest(
     new Request(`${SITE}/api/${service}/${action}`, {
       method,
-      headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': site, ...(cookie && { Cookie: cookie }) },
+      headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': site, ...(cookie && { Cookie: cookie }), ...(ip && { 'X-Real-IP': ip }) },
       body: body && JSON.stringify(body),
     }),
   )
@@ -153,15 +153,44 @@ describe('sign-in service (server/authBff.js)', () => {
 
 describe('admin service (server/adminApi.js)', () => {
   const ADMIN = { 'GET /auth/me': { body: { id: 1, role: 'admin', firstName: 'Emily' } } }
-  const admin = (action, options = {}) => call(action, { service: 'admin', cookie: 'buynest_at=AT', ...options })
+  // Admins have their own session cookies, separate from the storefront's.
+  const admin = (action, options = {}) => call(action, { service: 'admin', cookie: 'buynest_admin_at=AT', ...options })
 
-  it('refuses visitors without a session (401) and customer accounts (403) on every route', async () => {
+  it('refuses visitors without an admin session (401) and non-admin accounts (403) on every route', async () => {
     fakeUpstream({ 'GET /auth/me': { body: { id: 16, role: 'user' } } })
-    const routes = [['overview'], ['products'], ['products/1'], ['products', 'POST'], ['products/1', 'PUT'], ['products/1', 'DELETE'], ['orders'], ['orders/1'], ['customers'], ['categories'], ['me']]
+    const routes = [['overview'], ['products'], ['products/1'], ['products', 'POST'], ['products/1', 'PUT'], ['products/1', 'DELETE'], ['orders'], ['orders/1'], ['customers'], ['customers/1', 'PATCH'], ['categories'], ['me']]
     for (const [action, method = 'GET'] of routes) {
-      expect((await call(action, { service: 'admin', method })).status).toBe(401)
-      expect((await admin(action, { method, body: method === 'GET' || method === 'DELETE' ? undefined : {} })).status).toBe(403)
+      const body = method === 'GET' || method === 'DELETE' ? undefined : {}
+      expect((await call(action, { service: 'admin', method, body })).status).toBe(401)
+      // A storefront (customer) session is not an admin session.
+      expect((await call(action, { service: 'admin', method, body, cookie: 'buynest_at=AT' })).status).toBe(401)
+      expect((await admin(action, { method, body })).status).toBe(403)
     }
+  })
+
+  it('signs admins in with their own HttpOnly cookies, never the storefront ones', async () => {
+    fakeUpstream(LOGIN_OK)
+    const response = await call('auth/login', { service: 'admin', method: 'POST', body: { username: 'emilys', password: 'x' } })
+    expect(await response.json()).toMatchObject({ id: 1, role: 'admin', name: 'Emily' })
+    const cookies = response.headers.getSetCookie()
+    expect(cookies.find((cookie) => cookie.startsWith('buynest_admin_at='))).toMatch(/HttpOnly; Secure; SameSite=Strict/)
+    expect(cookies.find((cookie) => cookie.startsWith('buynest_admin_at='))).toMatch(/Path=\/api\/admin;/)
+    expect(cookies).toContainEqual(expect.stringMatching(/^buynest_admin_session=session; Path=\/;/))
+    expect(cookies.some((cookie) => /^buynest_(at|rt|session)=/.test(cookie))).toBe(false)
+  })
+
+  it('refuses a customer account at the admin sign-in, with no cookies', async () => {
+    fakeUpstream({ ...LOGIN_OK, 'GET /auth/me': { body: { id: 16, role: 'user' } } })
+    const response = await call('auth/login', { service: 'admin', method: 'POST', body: { username: 'averyp', password: 'x' } })
+    expect(response.status).toBe(403)
+    expect((await response.json()).message).toMatch(/not a shop admin/)
+    expect(response.headers.getSetCookie()).toEqual([])
+  })
+
+  it('signs admins out by expiring only the admin cookies', async () => {
+    const cookies = (await call('auth/logout', { service: 'admin', method: 'POST' })).headers.getSetCookie()
+    expect(cookies).toHaveLength(4)
+    expect(cookies.every((cookie) => cookie.startsWith('buynest_admin_') && cookie.includes('Max-Age=0'))).toBe(true)
   })
 
   it('lets admins in', async () => {
@@ -176,6 +205,7 @@ describe('admin service (server/adminApi.js)', () => {
     })
     const body = await (await admin('customers')).json()
     expect(body.customers).toEqual([{ id: 2, firstName: 'Mike', email: 'm@x.co', city: 'Austin', country: 'US' }])
+    expect(body.manageable).toBe(false) // demo users can't be blocked
   })
 
   it('validates product changes on the server (422, Laravel-style errors)', async () => {
@@ -205,5 +235,143 @@ describe('admin service (server/adminApi.js)', () => {
     expect((await admin('settings')).status).toBe(404)
     expect((await admin('products/abc')).status).toBe(404)
     expect((await admin('products/1/extra')).status).toBe(404)
+    expect((await admin('auth/unknown', { method: 'POST' })).status).toBe(404)
+  })
+})
+
+describe('with BuyNest accounts (VITE_ACCOUNTS_BACKEND=laravel)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_ACCOUNTS_BACKEND', 'laravel')
+    vi.stubEnv('BUYNEST_LARAVEL_URL', 'http://laravel.test')
+    vi.stubEnv('BUYNEST_BFF_KEY', 'shared-key')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  const CUSTOMER = { id: 5, first_name: 'Nadia', last_name: 'Rahman', email: 'nadia@example.com', phone: '+8801712345678', email_verified: true }
+  const TOKENS = { access_token: '1|ACCESS', refresh_token: '2|REFRESH', remember: false }
+  const sentBody = (entry) => JSON.parse(entry.init.body)
+
+  it('signs in with an email, returns the profile in camelCase, and keeps the tokens in cookies', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/login': { body: { data: { customer: CUSTOMER, tokens: TOKENS } } } })
+    const response = await call('login', { method: 'POST', body: { email: 'nadia@example.com', password: 'Secret123', remember: true }, ip: '203.0.113.9' })
+
+    const text = await response.text()
+    expect(JSON.parse(text)).toEqual({ id: 5, firstName: 'Nadia', lastName: 'Rahman', email: 'nadia@example.com', phone: '+8801712345678', emailVerified: true, role: 'customer' })
+    expect(text).not.toMatch(/ACCESS|REFRESH/)
+    expect(response.headers.getSetCookie()).toContainEqual(expect.stringMatching(/^buynest_at=1%7CACCESS; Path=\/api; HttpOnly/))
+    expect(sentBody(calls[0])).toEqual({ email: 'nadia@example.com', password: 'Secret123', remember: true })
+    // The visitor's IP goes to Laravel only with the shared key, so its rate limits count per visitor.
+    expect(calls[0].init.headers).toMatchObject({ 'X-BuyNest-Bff': 'shared-key', 'X-Client-IP': '203.0.113.9' })
+  })
+
+  it('does not invent a client IP when the host gave none', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/login': { body: { data: { customer: CUSTOMER, tokens: TOKENS } } } })
+    await call('login', { method: 'POST', body: { email: 'a@b.co', password: 'x' } })
+    expect(calls[0].init.headers['X-Client-IP']).toBeUndefined()
+  })
+
+  it('sign-up sends snake_case to Laravel and returns where the code went', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/register': { status: 201, body: { message: 'Sent', data: { email: 'nadia@example.com', expires_in: 600, resend_in: 60 } } } })
+    const response = await call('register', {
+      method: 'POST',
+      body: { firstName: 'Nadia', lastName: 'Rahman', email: 'nadia@example.com', phone: '+8801712345678', password: 'Secret123', confirmPassword: 'Secret123', acceptTerms: true, role: 'admin' },
+    })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual({ email: 'nadia@example.com', expiresIn: 600, resendIn: 60, message: 'Sent' })
+    expect(sentBody(calls[0])).toEqual({
+      first_name: 'Nadia', last_name: 'Rahman', email: 'nadia@example.com', phone: '+8801712345678', password: 'Secret123', password_confirmation: 'Secret123', accept_terms: true,
+    })
+    expect(response.headers.getSetCookie()).toEqual([]) // not signed in until the email is confirmed
+  })
+
+  it('translates validation errors to the form field names', async () => {
+    fakeUpstream({ 'POST /api/v1/auth/register': { status: 422, body: { message: 'Invalid', errors: { first_name: ['Required'], password_confirmation: ['No match'], email: ['Taken'] } } } })
+    const response = await call('register', { method: 'POST', body: {} })
+    expect(response.status).toBe(422)
+    expect((await response.json()).errors).toEqual({ firstName: ['Required'], confirmPassword: ['No match'], email: ['Taken'] })
+  })
+
+  it('the emailed code signs the customer in', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/verify-email': { body: { data: { customer: CUSTOMER, tokens: TOKENS } } } })
+    const response = await call('verify-email', { method: 'POST', body: { email: 'nadia@example.com', code: '123456', remember: false } })
+    expect(response.status).toBe(200)
+    expect(response.headers.getSetCookie()).toContainEqual(expect.stringMatching(/^buynest_session=session;/))
+    expect(sentBody(calls[0])).toEqual({ email: 'nadia@example.com', code: '123456', remember: false })
+  })
+
+  it('an unconfirmed account gets 403 with the reason and where the new code went, and no cookies', async () => {
+    fakeUpstream({ 'POST /api/v1/auth/login': { status: 403, body: { message: 'Confirm first', code: 'email_unverified', data: { email: 'nadia@example.com', expires_in: 600, resend_in: 60 } } } })
+    const response = await call('login', { method: 'POST', body: { email: 'nadia@example.com', password: 'Secret123' } })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ message: 'Confirm first', code: 'email_unverified', data: { email: 'nadia@example.com', expiresIn: 600, resendIn: 60 } })
+    expect(response.headers.getSetCookie()).toEqual([])
+  })
+
+  it('password reset and resend pass through, with only known fields', async () => {
+    const calls = fakeUpstream({
+      'POST /api/v1/auth/forgot-password': { body: { message: 'If an account exists…', data: { email: 'n@x.co', expires_in: 600, resend_in: 60 } } },
+      'POST /api/v1/auth/reset-password': { body: { message: 'Changed' } },
+      'POST /api/v1/auth/resend-code': { body: { message: 'Sent', data: { email: 'n@x.co', expires_in: 600, resend_in: 60 } } },
+    })
+    expect((await (await call('forgot-password', { method: 'POST', body: { email: 'n@x.co' } })).json()).resendIn).toBe(60)
+    await call('reset-password', { method: 'POST', body: { email: 'n@x.co', code: '123456', password: 'New12345', confirmPassword: 'New12345' } })
+    expect(sentBody(calls[1])).toEqual({ email: 'n@x.co', code: '123456', password: 'New12345', password_confirmation: 'New12345' })
+    await call('resend-code', { method: 'POST', body: { email: 'n@x.co', purpose: 'anything-else' } })
+    expect(sentBody(calls[2]).purpose).toBe('verify_email')
+  })
+
+  it('profile edits send only name and phone (never email) for the session account', async () => {
+    const calls = fakeUpstream({ 'PATCH /api/v1/me': { body: { data: { ...CUSTOMER, phone: '+15550100100' } } } })
+    const response = await call('profile', { method: 'PUT', cookie: 'buynest_at=1|ACCESS', body: { firstName: 'Nadia', phone: '+15550100100', email: 'x@evil.co', id: 1 } })
+    expect((await response.json()).phone).toBe('+15550100100')
+    expect(sentBody(calls[0])).toEqual({ first_name: 'Nadia', phone: '+15550100100' })
+    expect(calls[0].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+  })
+
+  it('sign-out revokes the tokens in Laravel, then expires the cookies', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/logout': { body: { message: 'Signed out.' } } })
+    const response = await call('logout', { method: 'POST', cookie: 'buynest_at=1|ACCESS' })
+    expect(calls[0].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+    expect(response.headers.getSetCookie().every((cookie) => cookie.includes('Max-Age=0'))).toBe(true)
+  })
+
+  it('a blocked account (403 on /me) ends the session', async () => {
+    fakeUpstream({ 'GET /api/v1/me': { status: 403, body: { message: 'This account has been disabled.', code: 'account_disabled' } } })
+    const response = await call('me', { cookie: 'buynest_at=1|ACCESS' })
+    expect(response.status).toBe(403)
+    expect(response.headers.getSetCookie().every((cookie) => cookie.includes('Max-Age=0'))).toBe(true)
+  })
+
+  it('renews with the refresh token', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/auth/refresh': { body: { data: { tokens: { ...TOKENS, access_token: '3|NEW' } } } } })
+    const response = await call('refresh', { method: 'POST', cookie: 'buynest_rt=2|REFRESH; buynest_remember=1' })
+    expect(sentBody(calls[0])).toEqual({ refresh_token: '2|REFRESH' })
+    expect(response.headers.getSetCookie()).toContainEqual(expect.stringMatching(/^buynest_at=3%7CNEW; .*Max-Age=604800/))
+  })
+
+  it('admins sign in at the admin API; customers and blocking go through Laravel', async () => {
+    const calls = fakeUpstream({
+      'POST /api/admin/v1/auth/login': { body: { data: { admin: { id: 1, name: 'Store Admin', email: 'admin@buynest.test' }, tokens: TOKENS } } },
+      'GET /api/admin/v1/me': { body: { data: { id: 1, name: 'Store Admin', email: 'admin@buynest.test' } } },
+      'GET /api/admin/v1/customers': {
+        body: { data: [{ id: 5, first_name: 'Nadia', last_name: 'Rahman', email: 'n@x.co', phone: '+1555', email_verified_at: null, is_active: true, created_at: 'T', last_login_at: null }], meta: { total: 41 } },
+      },
+      'PATCH /api/admin/v1/customers/5': { body: { data: { id: 5, first_name: 'Nadia', last_name: 'Rahman', email: 'n@x.co', phone: '+1555', email_verified_at: 'T', is_active: false } } },
+    })
+    const login = await call('auth/login', { service: 'admin', method: 'POST', body: { email: 'admin@buynest.test', password: 'x' } })
+    expect(await login.json()).toMatchObject({ name: 'Store Admin', role: 'admin' })
+    expect(login.headers.getSetCookie()).toContainEqual(expect.stringMatching(/^buynest_admin_at=1%7CACCESS; Path=\/api\/admin;/))
+
+    const list = await (await call('customers?q=nadia&status=unverified&limit=20&skip=40', { service: 'admin', cookie: 'buynest_admin_at=1|ACCESS' })).json()
+    expect(list).toMatchObject({ total: 41, manageable: true, customers: [{ id: 5, firstName: 'Nadia', emailVerified: false, isActive: true }] })
+    const listCall = calls.find((entry) => entry.path === '/api/admin/v1/customers')
+    expect(listCall.init.headers.Authorization).toBe('Bearer 1|ACCESS')
+
+    const blocked = await call('customers/5', { service: 'admin', method: 'PATCH', cookie: 'buynest_admin_at=1|ACCESS', body: { isActive: false, email: 'x' } })
+    expect(await blocked.json()).toMatchObject({ id: 5, isActive: false })
+    expect(sentBody(calls.at(-1))).toEqual({ is_active: false })
+
+    const invalid = await call('customers/5', { service: 'admin', method: 'PATCH', cookie: 'buynest_admin_at=1|ACCESS', body: { isActive: 'no' } })
+    expect(invalid.status).toBe(422)
   })
 })

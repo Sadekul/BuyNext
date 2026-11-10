@@ -1,8 +1,7 @@
 /*
  * The admin app's only connection to the network: BuyNest's admin service
- * at /api/admin (and the sign-in service at /api/auth), on this same
- * address. The browser sends the HttpOnly session cookie by itself; this
- * code never sees a token.
+ * at /api/admin, on this same address. The browser sends the HttpOnly admin
+ * session cookies by itself; this code never sees a token.
  */
 
 const TIMEOUT_MS = 15_000
@@ -58,7 +57,7 @@ async function send(path, { method = 'GET', body, params, signal, keepalive = fa
 // One session renewal at a time, shared by every request that hit a 401.
 let renewal = null
 function renewSession() {
-  renewal ??= send('/api/auth/refresh', { method: 'POST', body: {} }).finally(() => {
+  renewal ??= send('/api/admin/auth/refresh', { method: 'POST', body: {} }).finally(() => {
     renewal = null
   })
   return renewal
@@ -73,7 +72,7 @@ export async function request(path, options) {
   try {
     return await send(path, options)
   } catch (error) {
-    if (!(error instanceof ApiError && error.status === 401) || path.startsWith('/api/auth/')) throw error
+    if (!(error instanceof ApiError && error.status === 401) || path.startsWith('/api/admin/auth/')) throw error
     try {
       await renewSession()
     } catch {
@@ -88,4 +87,5 @@ export const api = {
   post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
   put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
   delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
+  patch: (path, body, options) => request(path, { ...options, method: 'PATCH', body }),
 }

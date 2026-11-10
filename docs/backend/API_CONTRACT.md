@@ -1,6 +1,6 @@
 # BuyNest REST API contract (proposed, v1)
 
-The API the future Laravel backend must provide for the storefront. The frontend's Laravel provider (`frontend/src/services/providers/laravelProvider.js`) and adapter (`frontend/src/services/adapters/laravelAdapter.js`) are written against this document. **No backend exists yet**; this is the agreement both sides will build to.
+The API the Laravel backend ([backend/](../../backend/README.md)) provides for the storefront. The frontend's Laravel provider (`frontend/src/services/providers/laravelProvider.js`) and adapter (`frontend/src/services/adapters/laravelAdapter.js`) are written against this document. **Status (2026-11-10):** the authentication and customer-profile endpoints exist (backend phase 1, see [ACCOUNTS.md](ACCOUNTS.md)); the catalog, cart, and order endpoints below are still the agreement for phase 2.
 
 ## Conventions
 - Base path: `/api/v1`. JSON only (`Accept: application/json`).
@@ -28,15 +28,23 @@ The API the future Laravel backend must provide for the storefront. The frontend
 
 The frontend maps 422 `errors` onto form fields (`utils/serverErrors.js`, used by checkout).
 
-## Authentication (Laravel Sanctum, SPA mode)
-Same top-level domain as the storefront (e.g. `shop.buynest.com` + `api.buynest.com`), cookie-based:
-1. `GET /sanctum/csrf-cookie` → sets `XSRF-TOKEN`.
-2. `POST /login` `{ email, password, remember }` → session cookie (`HttpOnly`, `Secure`, `SameSite=Lax`).
-3. Every request: `credentials: 'include'`; writes send `X-XSRF-TOKEN` (done by `apiClient` when the provider sets `xsrfCookie`).
-4. `GET /api/v1/me` → the customer. `POST /logout` → destroys the session.
-5. `POST /register`, `POST /forgot-password`, `POST /reset-password` (Laravel Fortify/Breeze).
+## Authentication (built: Sanctum tokens behind the sign-in service)
+The browser never calls these endpoints or holds a token. The storefront's sign-in service (`frontend/server/`) calls them server to server and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies. (This replaced the earlier plan of Sanctum's cookie "SPA mode": the sign-in service already gave the browser the same protection, and tokens keep the API stateless.) Full design: [ACCOUNTS.md](ACCOUNTS.md).
 
-Server config: `SANCTUM_STATEFUL_DOMAINS`, `SESSION_DOMAIN`, CORS `supports_credentials: true` with an explicit allowed origin (never `*` together with credentials).
+| Method | Path | Body → answer |
+| --- | --- | --- |
+| POST | `/api/v1/auth/register` | `first_name, last_name, email, phone, password, password_confirmation, accept_terms` → `201 { data: { email, expires_in, resend_in } }`; a 6-digit code is emailed |
+| POST | `/api/v1/auth/verify-email` | `email, code, remember` → `{ data: { customer, tokens } }` |
+| POST | `/api/v1/auth/resend-code` | `email, purpose` → `{ data: { email, expires_in, resend_in } }` (same for every email) |
+| POST | `/api/v1/auth/login` | `email, password, remember` → `{ data: { customer, tokens } }`; unconfirmed email → `403 { code: "email_unverified", data }`; blocked → `403 { code: "account_disabled" }` |
+| POST | `/api/v1/auth/refresh` | `refresh_token` → `{ data: { tokens } }` (rotation: the old pair stops working) |
+| POST | `/api/v1/auth/forgot-password` | `email` → same answer for every email |
+| POST | `/api/v1/auth/reset-password` | `email, code, password, password_confirmation` → every device signed out |
+| POST | `/api/v1/auth/logout` | Bearer access token → this device signed out |
+
+`tokens`: `{ access_token, access_expires_in, refresh_token, refresh_expires_in, remember }`. Admins use the same shapes under `/api/admin/v1/auth/*` with their own table and tokens.
+
+**CustomerResource**: `{ id, first_name, last_name, email, phone, email_verified, created_at }`. Phone numbers are stored in international form (`+8801712345678`).
 
 ## Catalog (public)
 ### `GET /api/v1/products`
@@ -86,7 +94,7 @@ Server config: `SANCTUM_STATEFUL_DOMAINS`, `SESSION_DOMAIN`, CORS `supports_cred
 ## Customer (requires sign-in)
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET/PATCH | `/api/v1/me` | profile (allow-listed fields only, never password hashes) |
+| GET/PATCH | `/api/v1/me` | profile (allow-listed fields only, never password hashes). **Built.** PATCH: `first_name, last_name, phone` (a new email must be verified first) |
 | GET/PUT | `/api/v1/me/addresses` | saved addresses |
 | GET | `/api/v1/wishlist` | product IDs + summaries |
 | POST/DELETE | `/api/v1/wishlist/{productId}` | idempotent |

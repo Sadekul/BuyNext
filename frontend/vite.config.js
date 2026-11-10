@@ -57,6 +57,21 @@ function adminApp() {
   }
 }
 
+const CLIENT_IP_HEADERS = ['x-real-ip', 'x-forwarded-for', 'x-nf-client-connection-ip']
+
+/*
+ * Settings the server-side services read from process.env (never sent to the
+ * browser, except VITE_ACCOUNTS_BACKEND, which only names the accounts source):
+ *   VITE_ACCOUNTS_BACKEND  laravel | dummyjson (default)
+ *   BUYNEST_LARAVEL_URL    the Laravel API, default http://127.0.0.1:8000
+ *   BUYNEST_BFF_KEY        = the backend's BFF_SHARED_KEY (passes on visitor IPs)
+ * Values already in the environment win over .env files.
+ */
+function loadServerEnv(mode) {
+  const env = loadEnv(mode, import.meta.dirname, ['VITE_ACCOUNTS_BACKEND', 'BUYNEST_'])
+  for (const [name, value] of Object.entries(env)) process.env[name] ??= value
+}
+
 /*
  * Serves BuyNest's server-side services (server/api.js: sign-in at
  * /api/auth/*, admin at /api/admin/*) in `npm run dev` and `npm run preview`,
@@ -68,11 +83,15 @@ function apiServices() {
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)
     const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined
+    // The visitor's address comes from the connection, never from headers the
+    // browser sent (they could fake it to dodge the API's rate limits).
+    const headers = Object.entries(req.headers)
+      .filter(([name]) => !CLIENT_IP_HEADERS.includes(name))
+      .flatMap(([name, value]) => (Array.isArray(value) ? value.map((item) => [name, item]) : [[name, value]]))
+    if (req.socket.remoteAddress) headers.push(['x-real-ip', req.socket.remoteAddress.replace(/^::ffff:/, '')])
     const request = new Request(`http://${req.headers.host}${req.originalUrl ?? req.url}`, {
       method: req.method,
-      headers: Object.entries(req.headers).flatMap(([name, value]) =>
-        Array.isArray(value) ? value.map((item) => [name, item]) : [[name, value]],
-      ),
+      headers,
       body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
     })
     const response = await handleApiRequest(request)
@@ -128,21 +147,26 @@ function contentSecurityPolicy(mode) {
 }
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  plugins: [react(), apiServices(), adminApp(), contentSecurityPolicy(mode)],
-  server: {
-    // The admin dev server (see adminApp above); ws: hot reload for admin pages.
-    proxy: { '/admin/': { target: `http://localhost:${ADMIN_PORT}`, ws: true } },
-  },
-  // Preview serves the built admin from dist/admin instead (not the dev proxy).
-  preview: { proxy: {} },
-  // Vitest reuses this config, so tests compile JSX exactly like the app.
-  test: {
-    environment: 'jsdom', // a simulated browser DOM
-    setupFiles: ['./src/test/setup.js'],
-    css: false,
-    // A fake API URL: no test can reach the real (changing) DummyJSON API.
-    env: { VITE_API_BASE_URL: 'https://api.test', VITE_API_PROVIDER: 'dummyjson' },
-    restoreMocks: true,
-  },
-}))
+export default defineConfig(({ mode }) => {
+  if (!process.env.VITEST) loadServerEnv(mode)
+  return {
+    plugins: [react(), apiServices(), adminApp(), contentSecurityPolicy(mode)],
+    server: {
+      // The admin dev server (see adminApp above); ws: hot reload for admin pages.
+      proxy: { '/admin/': { target: `http://localhost:${ADMIN_PORT}`, ws: true } },
+    },
+    // Preview serves the built admin from dist/admin instead (not the dev proxy).
+    preview: { proxy: {} },
+    // Vitest reuses this config, so tests compile JSX exactly like the app.
+    test: {
+      environment: 'jsdom', // a simulated browser DOM
+      setupFiles: ['./src/test/setup.js'],
+      css: false,
+      // A fake API URL: no test can reach the real (changing) DummyJSON API.
+      // Unit tests run against the DummyJSON demo accounts whatever .env.local says;
+      // BuyNest-account screens are tested by mocking constants/accounts.js.
+      env: { VITE_API_BASE_URL: 'https://api.test', VITE_API_PROVIDER: 'dummyjson', VITE_ACCOUNTS_BACKEND: 'dummyjson' },
+      restoreMocks: true,
+    },
+  }
+})

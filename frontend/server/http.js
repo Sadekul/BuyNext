@@ -1,6 +1,7 @@
 /*
  * Shared plumbing for BuyNest's server-side services (sign-in and admin):
- * JSON responses, cookies, request bodies, and calls to DummyJSON.
+ * JSON responses, cookies, request bodies, and calls to DummyJSON and to
+ * BuyNest's Laravel API.
  * Web standard Request/Response only, so it runs on Node, Vercel, and Netlify.
  */
 
@@ -30,15 +31,15 @@ export async function readBody(request) {
   }
 }
 
-/** Calls DummyJSON. Resolves to { status, data }; network failures become a 502. */
-export async function upstream(path, { method = 'GET', token, body } = {}) {
+async function callJson(url, { method = 'GET', token, body, headers = {} }) {
   try {
-    const response = await fetch(`${UPSTREAM}${path}`, {
+    const response = await fetch(url, {
       method,
       headers: {
         Accept: 'application/json',
         ...(body !== undefined && { 'Content-Type': 'application/json' }),
         ...(token && { Authorization: `Bearer ${token}` }),
+        ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(15_000),
@@ -48,6 +49,34 @@ export async function upstream(path, { method = 'GET', token, body } = {}) {
   } catch {
     return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
   }
+}
+
+/** Calls DummyJSON. Resolves to { status, data }; network failures become a 502. */
+export const upstream = (path, options = {}) => callJson(`${UPSTREAM}${path}`, options)
+
+/**
+ * The visitor's IP address, from the header the host sets (Netlify, Vercel,
+ * or the dev server in vite.config.js, which replaces any value the browser sent).
+ */
+export function clientIp(request) {
+  const forwarded = request?.headers.get('x-nf-client-connection-ip') ?? request?.headers.get('x-real-ip') ?? request?.headers.get('x-forwarded-for')
+  return forwarded?.split(',')[0].trim() || null
+}
+
+/**
+ * Calls BuyNest's Laravel API (server to server). Resolves to { status, data }.
+ * With the shared key (BUYNEST_BFF_KEY = the backend's BFF_SHARED_KEY) it
+ * passes on the visitor's IP, so the API's rate limits count each visitor
+ * separately instead of everyone together.
+ */
+export function laravel(path, { request, ...options } = {}) {
+  const base = (process.env.BUYNEST_LARAVEL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+  const key = process.env.BUYNEST_BFF_KEY
+  const ip = clientIp(request)
+  return callJson(`${base}${path}`, {
+    ...options,
+    headers: key && ip ? { 'X-BuyNest-Bff': key, 'X-Client-IP': ip } : {},
+  })
 }
 
 /** Copies only the listed keys that exist: the allow-list pattern for anything sent to the browser. */

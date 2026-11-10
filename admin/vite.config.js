@@ -3,8 +3,8 @@ import { defineConfig } from 'vite'
 
 /*
  * BuyNest admin dashboard: a separate app, served under /admin/ on the
- * storefront's address so it shares the sign-in session (HttpOnly cookies)
- * and the /api services.
+ * storefront's address so it uses the same /api services. Admins have their
+ * own sign-in and session cookies, separate from customers'.
  * - `npm run dev` in frontend/ starts this dev server too and forwards
  *   /admin to it, so http://localhost:5173/admin/ just works.
  * - `npm run build` in frontend/ builds this app into frontend/dist/admin.
@@ -36,6 +36,8 @@ function contentSecurityPolicy() {
 
 export default defineConfig({
   base: '/admin/',
+  // Read the storefront's .env files, so both apps agree on VITE_ACCOUNTS_BACKEND.
+  envDir: '../frontend',
   plugins: [react(), contentSecurityPolicy()],
   server: {
     port: 5175,
@@ -53,5 +55,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     css: false,
     restoreMocks: true,
+    // Demo accounts in unit tests, whatever ../frontend/.env.local says.
+    env: { VITE_ACCOUNTS_BACKEND: 'dummyjson' },
   },
 })

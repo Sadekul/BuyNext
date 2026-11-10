@@ -9,9 +9,8 @@ A responsive React storefront: catalog with search and filters, product pages, c
 | Real (live API data) | Simulated (clearly labelled in the UI) |
 | --- | --- |
 | Products, categories, search, product details, reviews | Orders and payments: nothing is charged or shipped |
-| Sign-in with DummyJSON demo accounts (`emilys` / `emilyspass`), token refresh | Registration (DummyJSON doesn't save new users) |
-| Server price check before an order (`POST /carts/add`) | Password reset email (no API exists) |
-| | Profile name edit (not saved by DummyJSON) |
+| Accounts with `VITE_ACCOUNTS_BACKEND=laravel` (BuyNest's API, [../backend](../backend/README.md)): sign-up with name, email, phone, and an emailed 6-digit code; sign-in; password reset by code; profile name and phone saved | With the DummyJSON demo accounts (the default): registration, password reset, and profile edits |
+| Server price check before an order (`POST /carts/add`) | |
 
 Cart, wishlist, and demo orders live in the browser (`localStorage`). Each signed-in account has its own cart and wishlist; signing out shows an empty guest cart and wishlist, and guest items move into the account on sign-in. The backend must re-validate prices, stock, discounts, shipping, taxes, and totals before taking real orders.
 
@@ -143,14 +142,14 @@ Component ─▶ hook (useQuery / useCart / useAuth…)
 | POST | `/users/add` | Registration (simulated) |
 | POST | `/carts/add` | Server price check before a (simulated) order |
 
-Sign-in goes through BuyNest's own service at `/api/auth/*` ([server/authBff.js](server/authBff.js)): `POST login`, `GET me`, `POST refresh`, `PUT profile` (simulated), `POST logout`. It calls DummyJSON's `/auth/*` endpoints and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies, so no token ever reaches page JavaScript or browser storage. It runs inside `npm run dev` / `npm run preview`, and as a Vercel function (`api/auth/[action].js`) or Netlify function (`netlify/functions/api.mjs`) when deployed. The sign-in reply is allow-listed (`server/http.js` → `safeProfile`): DummyJSON's password, bank, and SSN fields never reach the browser. "Keep me signed in" makes the session last 7 days; otherwise it ends when the browser closes, and signing out (or the session ending) also deletes the account's saved cart, wishlist, and demo orders from the device.
+Sign-in goes through BuyNest's own service at `/api/auth/*` ([server/authBff.js](server/authBff.js)): `POST login`, `GET me`, `POST refresh`, `PUT profile`, `POST logout`, and with BuyNest accounts `POST register`, `verify-email`, `resend-code`, `forgot-password`, `reset-password`. It calls the accounts backend chosen by `VITE_ACCOUNTS_BACKEND` ([server/accounts/](server/accounts/index.js): Laravel, or DummyJSON's `/auth/*`) and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies, so no token ever reaches page JavaScript or browser storage. It runs inside `npm run dev` / `npm run preview`, and as a Vercel function (`api/auth/[action].js`) or Netlify function (`netlify/functions/api.mjs`) when deployed. The sign-in reply is allow-listed (`server/http.js` → `safeProfile`, `server/accounts/laravel.js`): password, bank, and SSN fields never reach the browser. With Laravel, the service also passes on the visitor's IP with a shared key (`BUYNEST_BFF_KEY`), so the API's rate limits count each visitor separately. How sign-up, codes, and tokens work: [docs/backend/ACCOUNTS.md](../docs/backend/ACCOUNTS.md). "Keep me signed in" makes the session last 7 days; otherwise it ends when the browser closes, and signing out (or the session ending) also deletes the account's saved cart, wishlist, and demo orders from the device.
 
-The shop owner's dashboard lives in [../admin](../admin/README.md). `npm run dev` here also starts it (http://localhost:5173/admin/), `npm run build` builds it into `dist/admin`, and its data comes from the admin API at `/api/admin/*` ([server/adminApi.js](server/adminApi.js)), which refuses any account whose role isn't "admin". Admins see a "Shop admin" link in their account area.
+The shop staff's dashboard lives in [../admin](../admin/README.md). `npm run dev` here also starts it (http://localhost:5173/admin/), `npm run build` builds it into `dist/admin`, and its data comes from the admin API at `/api/admin/*` ([server/adminApi.js](server/adminApi.js)). Admins have their own sign-in (`/api/admin/auth/*`) and their own cookies; a customer session never opens it.
 
 Switching to Laravel: `VITE_API_PROVIDER=laravel` (contract: [docs/backend/API_CONTRACT.md](../docs/backend/API_CONTRACT.md)).
 
 ## Quality
-- **Tests:** `npm test` runs 143 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
+- **Tests:** `npm test` runs 168 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
 - **Accessibility:** semantic landmarks, skip link, visible focus, labelled controls with linked errors, ARIA combobox search, native `<dialog>` modals, reduced-motion support. axe-core reports **no violations** on the main pages of the production build.
 - **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 124 KB gzipped.
 

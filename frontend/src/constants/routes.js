@@ -15,5 +15,6 @@ export const ROUTES = {
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',
+  verifyEmail: '/verify-email',
   componentLab: '/learn',
 }

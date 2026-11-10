@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient'
+import { REAL_ACCOUNTS } from '../constants/accounts'
 
 /*
  * Orders — SIMULATED. DummyJSON has no orders API, so BuyNest:
@@ -11,6 +12,14 @@ import { apiClient } from './apiClient'
  */
 
 /**
+ * DummyJSON's cart check only accepts its own demo users (ids 1 to 208). With
+ * BuyNest accounts, the price check (still DummyJSON until orders move to
+ * Laravel in phase 2) runs as demo user 1; the order itself keeps the real
+ * customer's id.
+ */
+const priceCheckUserId = (userId) => (REAL_ACCOUNTS ? 1 : userId)
+
+/**
  * Server price check for the cart lines. Returns the server's cart plus a
  * list of problems (missing products, list prices or discounts that differ
  * from the cart).
@@ -18,7 +27,7 @@ import { apiClient } from './apiClient'
 export async function verifyCartWithServer(items, userId, { signal } = {}) {
   const cart = await apiClient.post(
     '/carts/add',
-    { userId, products: items.map((item) => ({ id: item.productId, quantity: item.quantity })) },
+    { userId: priceCheckUserId(userId), products: items.map((item) => ({ id: item.productId, quantity: item.quantity })) },
     { signal },
   )
 

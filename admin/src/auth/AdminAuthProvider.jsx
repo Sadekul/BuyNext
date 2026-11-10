@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AdminAuthContext } from './adminAuthContext'
-import { STOREFRONT_PROFILE, SIGN_OUT_SIGNAL, checkAdminSession, endSession } from './session'
-import { ApiError, api } from '../api/client'
+import { ADMIN_SIGNAL, checkAdminSession, endSession, startSession } from './session'
 
 /*
  * Admin sign-in state for the whole dashboard.
- *   status: 'checking' | 'signedOut' | 'forbidden' (signed in, not an admin) | 'admin' | 'error'
+ *   status: 'checking' | 'signedOut' | 'forbidden' (the server refused this session) | 'admin' | 'error'
  *
  * Hiding screens here is only for convenience: the admin service checks the
- * account's role on every request, so a customer gets 403 from the API
+ * admin session on every request, so anyone else gets 401/403 from the API
  * even if they reach a page.
  */
 function AdminAuthProvider({ children }) {
   const queryClient = useQueryClient()
   const [session, setSession] = useState({ status: 'checking', user: null })
 
-  // Check the session on start, and whenever a storefront tab signs in or out.
+  // Check the session on start, and whenever another admin tab signs in or out.
   useEffect(() => {
     let controller = new AbortController()
     const check = () => {
@@ -27,7 +26,7 @@ function AdminAuthProvider({ children }) {
     }
     check()
     function handleStorage(event) {
-      if (event.key !== SIGN_OUT_SIGNAL && event.key !== STOREFRONT_PROFILE) return
+      if (event.key !== ADMIN_SIGNAL) return
       controller.abort()
       controller = new AbortController()
       check()
@@ -39,19 +38,10 @@ function AdminAuthProvider({ children }) {
     }
   }, [])
 
-  /** Signs in, then lets the server decide whether this account is an admin. */
-  const signIn = useCallback(async ({ username, password, remember }) => {
-    await api.post('/api/auth/login', { username, password, remember })
-    try {
-      const user = await api.get('/api/admin/me')
-      setSession({ status: 'admin', user })
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
-        endSession() // a customer account: don't leave it signed in from the admin page
-        throw new ApiError('This account is not a shop admin. Sign in with an admin account.', { status: 403 })
-      }
-      throw error
-    }
+  /** Signs in with an admin account. The server refuses customer accounts. */
+  const signIn = useCallback(async (credentials) => {
+    const user = await startSession(credentials)
+    setSession({ status: 'admin', user })
   }, [])
 
   const signOut = useCallback(() => {

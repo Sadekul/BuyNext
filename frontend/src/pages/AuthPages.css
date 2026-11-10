@@ -110,3 +110,29 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Email code: large, spaced digits that are easy to check against the email */
+.auth-code input {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.auth-link:disabled {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.auth-resend {
+  margin-top: var(--space-4);
+  text-align: center;
+}
+
+.auth-resend__status {
+  min-height: 1.5em; /* reserved, so the message doesn't push the layout */
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

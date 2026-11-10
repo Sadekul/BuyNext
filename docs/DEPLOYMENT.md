@@ -51,8 +51,13 @@ Both configs also set long-term caching for `/assets/*` and basic security heade
 | `VITE_API_BASE_URL` | `https://dummyjson.com` | `https://dummyjson.com` | `https://api.buynest.com` |
 | `VITE_API_PROVIDER` | `dummyjson` | `dummyjson` | `laravel` |
 | `VITE_SHOW_LEARNING_LAB` | (always on) | `false` | `false` |
+| `VITE_ACCOUNTS_BACKEND` | `laravel` | `dummyjson` | `laravel` |
+| `BUYNEST_LARAVEL_URL` (server only) | `http://127.0.0.1:8000` | — | the API's URL, reachable from the server functions |
+| `BUYNEST_BFF_KEY` (server only, secret) | in `.env.local` | — | the same value as the API's `BFF_SHARED_KEY` |
 
-With Laravel: the API must allow the storefront's origin in CORS with credentials, and the session cookie domain must cover both sites (see `docs/backend/API_CONTRACT.md`).
+Variables without the `VITE_` prefix are only read by the server functions (`frontend/server/`), never bundled into browser code: set them in the host's environment settings (Vercel/Netlify), not in a committed file.
+
+With Laravel accounts the browser never calls the API: only the server functions do, so the API needs no CORS settings for the storefront. Deploy the API itself with the [production checklist](../backend/README.md#production-checklist) (`APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer, the scheduler running).
 
 ## Release checklist
 - [ ] `npm run lint` passes, `npm test` passes

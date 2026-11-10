@@ -1,5 +1,5 @@
 // Sign-in sessions: HttpOnly cookies, "Keep me signed in", renewal, sign-out, other websites.
-import { BASE, DEMO_ADMIN, headerCounts, launch, reporter, storefrontSignIn, visible, watchErrors } from './lib.mjs'
+import { BASE, SHOPPER, headerCounts, launch, reporter, storefrontSignIn, visible, watchErrors } from './lib.mjs'
 
 const report = reporter('sessions')
 const { log } = report
@@ -15,12 +15,12 @@ const accountKeys = (page) => page.evaluate(() => Object.keys(localStorage).filt
 const allStorage = (page) => page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))
 // What survives closing the browser: only cookies with an expiry date.
 const afterBrowserRestart = (state) => ({ ...state, cookies: state.cookies.filter((cookie) => cookie.expires > 0) })
-const greeting = (page) => visible(page.getByRole('heading', { name: /Hi, Emily/ }), 10000)
+const greeting = (page) => visible(page.getByRole('heading', { name: new RegExp(`Hi, ${SHOPPER.firstName}`) }), 10000)
 
 // ---------- Not remembered ----------
 let ctx = await newContext()
 let page = await newPage(ctx)
-await storefrontSignIn(page, DEMO_ADMIN, { remember: false })
+await storefrontSignIn(page, SHOPPER, { remember: false })
 const access = (await ctx.cookies()).find((cookie) => cookie.name === 'buynest_at')
 log(
   access?.httpOnly && access.secure && access.sameSite === 'Strict' && access.path === '/api',
@@ -51,7 +51,7 @@ log(await page.locator('.site-header__action-label', { hasText: 'Sign in' }).isV
 log((await accountKeys(page)).length === 0, `after the browser restarts: account items deleted (${await accountKeys(page)})`)
 
 // Signed in again, then an explicit sign-out
-await storefrontSignIn(page, DEMO_ADMIN, { remember: false })
+await storefrontSignIn(page, SHOPPER, { remember: false })
 await save(page, 3)
 await page.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: 'Sign out' }).click()
@@ -66,7 +66,7 @@ await ctx.close()
 // ---------- Remembered ----------
 ctx = await newContext()
 page = await newPage(ctx)
-await storefrontSignIn(page, DEMO_ADMIN, { remember: true })
+await storefrontSignIn(page, SHOPPER, { remember: true })
 const refresh = (await ctx.cookies()).find((cookie) => cookie.name === 'buynest_rt')
 log(refresh?.expires > Date.now() / 1000 + 6 * 86400, '"Keep me signed in": the session lasts 7 days')
 await save(page, 4)
@@ -80,7 +80,7 @@ await page.getByRole('button', { name: 'Sign out' }).click()
 await page.waitForURL(`${BASE}/`)
 await page.waitForTimeout(300)
 log((await accountKeys(page)).length > 0, '"Keep me signed in": sign-out keeps the account items for next time')
-await storefrontSignIn(page, DEMO_ADMIN, { remember: true })
+await storefrontSignIn(page, SHOPPER, { remember: true })
 log((await headerCounts(page)).wishlist >= 1, `"Keep me signed in": items come back on sign-in (wishlist ${(await headerCounts(page)).wishlist})`)
 
 // Silent renewal: the access token expired, the refresh token is still valid
@@ -114,7 +114,7 @@ let kept = 0
 for (let run = 0; run < 5; run++) {
   ctx = await newContext()
   page = await newPage(ctx)
-  await storefrontSignIn(page, DEMO_ADMIN, { remember: true })
+  await storefrontSignIn(page, SHOPPER, { remember: true })
   await save(page, 4) // full page load right after signing in
   state = afterBrowserRestart(await ctx.storageState())
   await ctx.close()
@@ -137,7 +137,7 @@ for (let run = 0; run < RUNS; run++) {
   for (const mode of ['reload', 'close']) {
     ctx = await newContext()
     page = await newPage(ctx)
-    await storefrontSignIn(page, DEMO_ADMIN)
+    await storefrontSignIn(page, SHOPPER)
     await page.getByRole('button', { name: 'Sign out' }).click()
     if (mode === 'reload') {
       await page.goto(`${BASE}/account`)

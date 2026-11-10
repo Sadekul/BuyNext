@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { LuLock } from 'react-icons/lu'
+import { DEMO_ADMIN, ID_FIELD } from '../auth/accounts'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { Loading } from '../components/States'
-
-// A DummyJSON admin account (role "admin"), shown only in this demo setup.
-const DEMO_ADMIN = { username: 'emilys', password: 'emilyspass' }
 
 /** Same-app paths only: never "//other-site" (open redirect). */
 const safePath = (path) => (typeof path === 'string' && /^\/(?![/\\])/.test(path) ? path : '/')
@@ -14,7 +12,7 @@ function LoginPage() {
   const { status, signIn } = useAdminAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [values, setValues] = useState({ username: '', password: '', remember: false })
+  const [values, setValues] = useState({ [ID_FIELD.name]: '', password: '', remember: false })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -29,8 +27,8 @@ function LoginPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!values.username.trim() || !values.password) {
-      setError('Enter your username and password.')
+    if (!values[ID_FIELD.name].trim() || !values.password) {
+      setError(`Enter your ${ID_FIELD.label.toLowerCase()} and password.`)
       return
     }
     setBusy(true)
@@ -55,15 +53,23 @@ function LoginPage() {
       <form className="gate__card" onSubmit={handleSubmit} noValidate>
         <LuLock className="gate__icon" aria-hidden="true" />
         <h1>BuyNest Admin</h1>
-        <p>Sign in with a shop admin account.</p>
+        <p>Sign in with your shop admin account. Customer accounts can't sign in here.</p>
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
         <label className="field">
-          <span>Username</span>
-          <input name="username" autoComplete="username" value={values.username} onChange={update} />
+          <span>{ID_FIELD.label}</span>
+          <input
+            name={ID_FIELD.name}
+            type={ID_FIELD.type}
+            autoComplete={ID_FIELD.autoComplete}
+            autoCapitalize="none"
+            spellCheck={false}
+            value={values[ID_FIELD.name]}
+            onChange={update}
+          />
         </label>
         <label className="field">
           <span>Password</span>
@@ -76,12 +82,14 @@ function LoginPage() {
         <button type="submit" className="btn btn--primary btn--full" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="gate__hint">
-          Demo admin: <code>{DEMO_ADMIN.username}</code> / <code>{DEMO_ADMIN.password}</code>
-          <button type="button" className="link-button" onClick={() => setValues((current) => ({ ...current, ...DEMO_ADMIN }))}>
-            Use it
-          </button>
-        </p>
+        {DEMO_ADMIN && (
+          <p className="gate__hint">
+            Demo admin: <code>{DEMO_ADMIN[ID_FIELD.name]}</code> / <code>{DEMO_ADMIN.password}</code>
+            <button type="button" className="link-button" onClick={() => setValues((current) => ({ ...current, ...DEMO_ADMIN }))}>
+              Use it
+            </button>
+          </p>
+        )}
         <a href="/" className="gate__back">
           Back to the store
         </a>

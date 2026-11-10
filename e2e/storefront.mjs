@@ -1,8 +1,9 @@
 // Storefront shopping flows, end to end: browse, search, product page, cart, wishlist, checkout, orders.
 import {
   BASE,
-  DEMO_ADMIN,
+  SHOPPER,
   axeViolations,
+  fillEmptyAddress,
   headerCounts,
   launch,
   reporter,
@@ -131,7 +132,7 @@ await axe('cart')
 // ---------- Checkout → confirmation → order history ----------
 await page.goto(`${BASE}/checkout`, { waitUntil: 'networkidle' })
 log(/\/login/.test(page.url()), 'checkout: needs sign-in first')
-await storefrontSignIn(page, DEMO_ADMIN)
+await storefrontSignIn(page, SHOPPER)
 await page.goto(`${BASE}/checkout`, { waitUntil: 'networkidle' })
 const placeOrder = page.getByRole('button', { name: /^Place order · / })
 // The cart filled as a guest must have moved into the account at sign-in,
@@ -142,8 +143,7 @@ await page.getByLabel('Phone', { exact: true }).fill('abc')
 await placeOrder.click()
 log(await visible(page.getByText('Enter a valid phone number.')), 'checkout: invalid phone is flagged')
 await page.getByLabel('Phone', { exact: true }).fill('+1 555 010 2030')
-const postal = page.locator('[name="shipping.postalCode"]')
-if (!(await postal.inputValue())) await postal.fill('29112')
+await fillEmptyAddress(page)
 await axe('checkout')
 await placeOrder.click()
 await page.waitForURL(/\/order-confirmation\/BN-/, { timeout: 30000 }).catch(() => {})

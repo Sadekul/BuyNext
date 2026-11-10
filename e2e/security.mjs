@@ -1,5 +1,5 @@
 // Robustness and security: tampered browser data, edge cases, and (on the production build) the CSP.
-import { BASE, DEMO_ADMIN, isProductionBuild, launch, reporter, storefrontSignIn, visible, watchErrors } from './lib.mjs'
+import { BASE, LARAVEL, SHOPPER, fillEmptyAddress, isProductionBuild, launch, reporter, storefrontSignIn, visible, watchErrors } from './lib.mjs'
 
 const report = reporter('security and robustness')
 const { log } = report
@@ -52,8 +52,10 @@ await page.setViewportSize({ width: 1280, height: 900 })
 
 // Signed in: demo credentials, the cached profile, the guest-only sign-in page
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
-log(await page.getByText('Demo account:').isVisible(), 'demo account offered (DummyJSON builds only)')
-await storefrontSignIn(page, DEMO_ADMIN)
+// Demo credentials: DummyJSON builds always; BuyNest accounts only on the dev server, never in a production build.
+const offersDemo = !LARAVEL || !isProductionBuild
+log((await page.getByText('Demo account:').isVisible()) === offersDemo, `demo account ${offersDemo ? 'offered' : 'not offered'} (${LARAVEL ? 'BuyNest accounts' : 'DummyJSON'}, ${isProductionBuild ? 'production build' : 'dev server'})`)
+await storefrontSignIn(page, SHOPPER)
 const cached = await page.evaluate(() => JSON.parse(localStorage.getItem('buynest.session.v2')))
 log(cached && !('phone' in cached.user) && !('address' in cached.user), `cached profile has no phone or address (${Object.keys(cached?.user ?? {})})`)
 await page.goto(`${BASE}/login`)
@@ -77,6 +79,7 @@ await placeOrder.waitFor({ timeout: 20000 })
 const label = await placeOrder.textContent()
 log(!/\$0\.10/.test(label), `checkout re-checks prices on arrival (${label.trim()})`)
 log(await page.getByText(/changed since you added/).isVisible(), 'checkout explains that an item changed')
+await fillEmptyAddress(page)
 await page.route('**/carts/add', async (route) => {
   await new Promise((resolve) => setTimeout(resolve, 1500))
   await route.continue()

@@ -9,47 +9,53 @@ BuyNest is a modern e-commerce web application, built step by step as a professi
 ```
 buynest/
 ├── frontend/   # React + Vite storefront (phases 1–14 complete) and its server functions (sign-in, admin API)
-├── admin/      # React admin dashboard for the shop owner, served at /admin (demo data for now)
-├── backend/    # Future Laravel REST API (not started)
-├── e2e/        # Real-browser checks for the storefront and the admin dashboard
+├── admin/      # React admin dashboard for shop staff, served at /admin
+├── backend/    # Laravel 13 API + MySQL: customer and admin accounts (phase 1 of the backend)
+├── e2e/        # Real-browser checks for the storefront, sign-up, and the admin dashboard
+├── dev.sh      # Starts MySQL, the API, the store, and the admin in one terminal
 └── docs/       # Phase lessons, learning log, backend contract, deployment guide, SQA report
 ```
 
-## How the pieces will connect
+## How the pieces connect
 
 ```
-Admin dashboard ──save──▶ Laravel REST API ──▶ MySQL
-                                 │
-                          GET /api/products
-                                 ▼
-                        React BuyNest frontend ──▶ Customer
+Store pages ─┐                                     ┌─▶ Laravel API ──▶ MySQL   (accounts: real)
+             ├─▶ sign-in service (HttpOnly cookies)┤
+Admin pages ─┘   frontend/server                   └─▶ DummyJSON              (catalog, orders: demo until phase 2)
 ```
 
-During the learning phases the frontend talks to [DummyJSON](https://dummyjson.com), a public test API.
-DummyJSON never persists create/update/delete requests, so it is not a real database.
-All API calls go through `frontend/src/services/`. Switching to Laravel means setting `VITE_API_PROVIDER=laravel` and the base URL;
-the adapter for the proposed contract already exists. See [docs/backend/](docs/backend/).
+- **Accounts are real** (Laravel + MySQL): customers sign up with name, email, phone, and password, confirm their email with a 6-digit code, and can reset their password by code. Shop staff have **separate admin accounts**; a customer can never sign in to the admin. How and why: [docs/backend/ACCOUNTS.md](docs/backend/ACCOUNTS.md).
+- **The catalog and orders** still come from [DummyJSON](https://dummyjson.com), a public test API that never saves changes, until phase 2 moves them into MySQL.
+- All API calls go through `frontend/src/services/` and `frontend/server/`. See [docs/backend/](docs/backend/).
 
 ## Getting started
 
+First time: set up the API ([backend/README.md](backend/README.md#run-it)), then:
+
 ```bash
-cd admin && npm install && cd ..   # the admin dashboard's packages
-cd frontend
-npm install
-cp .env.example .env.local
-npm run dev        # store: http://localhost:5173 · admin: http://localhost:5173/admin/
-npm test           # 143 unit tests, offline
+cd admin && npm install && cd ..
+cd frontend && npm install && cp .env.example .env.local && cd ..
+# in frontend/.env.local: VITE_ACCOUNTS_BACKEND=laravel and BUYNEST_BFF_KEY (= BFF_SHARED_KEY in backend/.env)
+./dev.sh           # MySQL + API + store + admin
 ```
 
-`npm run dev` also starts the admin dashboard's dev server, so both open from the same address.
+| What | Address |
+| --- | --- |
+| Store | http://localhost:5173 |
+| Admin dashboard | http://localhost:5173/admin/ |
+| Test inbox (sign-up and reset codes) | http://127.0.0.1:8000/dev/mailbox |
 
-| Who | Address | Demo account |
+Local demo accounts (created by `php artisan db:seed`):
+
+| Who | Sign in at | Email / password |
 | --- | --- | --- |
-| Customers | http://localhost:5173 | any DummyJSON user, e.g. **averyp / averyppass** |
-| Shop owner (admin) | http://localhost:5173/admin/ | an account with role "admin", e.g. **emilys / emilyspass** |
+| Customer | http://localhost:5173/login | **customer@buynest.test / CustomerPass2026** |
+| Shop admin | http://localhost:5173/admin/ | **admin@buynest.test / AdminPass2026** |
 
-Customer accounts get "No admin access" at `/admin`, and the admin API refuses them (403) on every request.
-Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · Browser checks: [e2e/README.md](e2e/README.md).
+Or create your own customer at http://localhost:5173/register and read the code in the test inbox.
+
+Tests: `php artisan test` in backend/ (39), `npm test` in frontend/ (168) and admin/ (12), and the browser suites in e2e/.
+Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/README.md) · [backend/README.md](backend/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · Browser checks: [e2e/README.md](e2e/README.md).
 
 ## Progress
 
@@ -70,7 +76,10 @@ Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/REA
 | 13 | Testing and debugging | Done |
 | 14 | Deployment | Done (push and hosting pending your approval) |
 | — | SQA & security audit, account separation, secure-cookie sign-in | Done, see [docs/SQA_REPORT.md](docs/SQA_REPORT.md) |
-| — | Admin dashboard (demo data) | Done: overview, products (add/edit/delete, simulated), orders, customers; see [admin/README.md](admin/README.md) |
-| — | Laravel backend + real admin saving | Next project (not started) |
+| — | Admin dashboard | Done: overview, products (add/edit/delete, simulated), orders, customers; see [admin/README.md](admin/README.md) |
+| B1 | Backend phase 1: accounts (Laravel + MySQL) | Done: sign-up with email code, sign-in, password reset, separate admin accounts, block customers; see [docs/backend/ACCOUNTS.md](docs/backend/ACCOUNTS.md) |
+| B2 | Backend phase 2: catalog, real orders, customers' order history | Next |
+| B3 | Backend phase 3: invoices, shipments, refunds, coupons | Planned |
+| B4 | Backend phase 4: admin roles and permissions, content pages, reports, settings | Planned |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

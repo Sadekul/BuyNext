@@ -6,6 +6,7 @@ import AdminLayout from '../layouts/AdminLayout'
 import LoginPage from '../pages/LoginPage'
 import OverviewPage from '../pages/OverviewPage'
 import ProductFormPage from '../pages/ProductFormPage'
+import CustomersPage from '../pages/CustomersPage'
 
 /** The admin app's real providers and the routes the tests need, at `route`. */
 export function renderApp(route = '/') {
@@ -19,6 +20,7 @@ export function renderApp(route = '/') {
             <Route element={<AdminLayout />}>
               <Route index element={<OverviewPage />} />
               <Route path="products/new" element={<ProductFormPage />} />
+              <Route path="customers" element={<CustomersPage />} />
             </Route>
           </Routes>
         </AdminAuthProvider>
