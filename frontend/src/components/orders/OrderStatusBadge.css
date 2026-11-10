@@ -22,7 +22,10 @@
   background: var(--color-success-soft);
 }
 
-.order-badge--cancelled {
+.order-badge--cancelled,
+.order-badge--closed,
+.order-badge--refunded,
+.order-badge--partially_refunded {
   color: var(--color-text-muted);
   background: var(--color-bg-muted);
 }

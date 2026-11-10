@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Coupon;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -92,7 +93,7 @@ class CartPricingTest extends TestCase
 
     public function test_a_fixed_coupon_never_exceeds_the_subtotal(): void
     {
-        config(['buynest.store.coupons.SAVE20.min_subtotal_cents' => 0]);
+        Coupon::where('code', 'SAVE20')->update(['min_subtotal' => null]); // coupons live in the database since phase 3
 
         $this->assertTotals($this->validateCart([[$this->mascara, 1]], 'SAVE20'), 1, '8.94', '8.94', '4.99', '4.99');
     }

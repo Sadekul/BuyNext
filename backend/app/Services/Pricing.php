@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Coupon;
 use App\Models\Product;
 use Illuminate\Support\Collection;
 
@@ -66,7 +67,12 @@ class Pricing
      * With $lock (inside a DB transaction) the product rows are locked until
      * the transaction ends, so two checkouts can't sell the same last unit.
      */
-    public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false): CartQuote
+    /**
+     * $customerId / $email identify the shopper for per-customer coupon
+     * limits (the customer's id when signed in, else the guest's email; both
+     * null skips that check until checkout, where the email is required).
+     */
+    public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null, ?string $email = null): CartQuote
     {
         // The same product twice counts as one line (stock is checked on the sum).
         $quantities = [];
@@ -93,9 +99,11 @@ class Pricing
         $itemCount = array_sum(array_column($charged, 'quantity'));
         $subtotal = array_sum(array_column($charged, 'line_cents'));
 
-        [$coupon, $discount, $couponError] = $this->coupon($couponCode, $subtotal);
+        [$coupon, $discount, $couponError, $couponRecord] = $this->coupon($couponCode, $subtotal, $customerId, $email, $lock);
         $afterDiscount = $subtotal - $discount;
-        $freeShipping = $afterDiscount >= config('buynest.store.free_shipping_threshold_cents');
+        $freeStandard = $afterDiscount >= config('buynest.store.free_shipping_threshold_cents');
+        // A free_shipping coupon makes every method free (not just standard).
+        $freeEverything = $couponRecord?->type === 'free_shipping';
 
         $options = [];
         foreach (config('buynest.store.shipping_methods') as $id => $method) {
@@ -103,7 +111,7 @@ class Pricing
                 'id' => $id,
                 'label' => $method['label'],
                 'eta' => $method['eta'],
-                'price_cents' => $method['free_over_threshold'] && $freeShipping ? 0 : $method['price_cents'],
+                'price_cents' => $freeEverything || ($method['free_over_threshold'] && $freeStandard) ? 0 : $method['price_cents'],
             ];
         }
         $method = $options[$shippingMethod] ?? $options['standard'];
@@ -123,35 +131,31 @@ class Pricing
             shippingCents: $shipping,
             taxCents: $tax,
             totalCents: $afterDiscount + $shipping + $tax,
+            couponId: $couponRecord?->id,
         );
     }
 
     /**
-     * [coupon|null, discount cents, error|null]. Percent: rounded to the cent.
-     * Fixed: never more than the subtotal. Same messages as the storefront.
+     * [coupon|null, discount cents, error|null, Coupon|null]. The rules live in
+     * the coupons table (Coupon::problemFor() has the checks and messages).
+     * With $lock (checkout) the coupon row stays locked until the order is
+     * written, so two checkouts can't both take the last use.
      */
-    public function coupon(?string $code, int $subtotalCents): array
+    public function coupon(?string $code, int $subtotalCents, ?int $customerId = null, ?string $email = null, bool $lock = false): array
     {
-        $code = strtoupper(trim((string) $code));
+        $code = Coupon::normalize($code);
         if ($code === '') {
-            return [null, 0, null];
+            return [null, 0, null, null];
         }
 
-        $rule = config("buynest.store.coupons.{$code}");
-        if (! $rule) {
-            return [null, 0, 'This code is not valid.'];
-        }
-        if (isset($rule['min_subtotal_cents']) && $subtotalCents < $rule['min_subtotal_cents']) {
-            $minimum = rtrim(rtrim(self::format($rule['min_subtotal_cents']), '0'), '.');
-
-            return [null, 0, "Spend at least \${$minimum} to use this code."];
+        $query = Coupon::where('code', $code);
+        $record = ($lock ? $query->lockForUpdate() : $query)->first();
+        $problem = $record ? $record->problemFor($subtotalCents, $customerId, $email) : 'This code is not valid.';
+        if ($problem) {
+            return [null, 0, $problem, null];
         }
 
-        $discount = $rule['type'] === 'percent'
-            ? self::jsRound($subtotalCents * $rule['value'] / 100)
-            : $rule['value_cents'];
-
-        return [['code' => $code, 'description' => $rule['description']], min($discount, $subtotalCents), null];
+        return [['code' => $record->code, 'description' => $record->description], $record->discountCents($subtotalCents), null, $record];
     }
 
     /** Products by id, including deleted ones (so the cart can say "no longer available"). */

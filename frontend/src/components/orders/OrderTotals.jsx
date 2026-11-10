@@ -27,6 +27,13 @@ function OrderTotals({ totals, couponCode, shippingLabel }) {
         <dt>Total</dt>
         <dd>{formatPrice(totals.total)}</dd>
       </div>
+      {/* Orders with refunds (credit memos) show what came back. */}
+      {totals.refunded > 0 && (
+        <div className="cart-summary__saving">
+          <dt>Refunded</dt>
+          <dd>−{formatPrice(totals.refunded)}</dd>
+        </div>
+      )}
     </dl>
   )
 }

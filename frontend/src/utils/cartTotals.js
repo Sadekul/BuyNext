@@ -90,3 +90,29 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
     total: toDollars(afterDiscountCents + shippingCents),
   }
 }
+
+/**
+ * REAL_SHOP: the local totals (no coupon) with the server's answer from
+ * cart/validate laid over them: its prices, discount, shipping, and its
+ * verdict on the coupon. Until the answer arrives, no coupon is shown as
+ * applied. Free shipping is measured, like the server does, on the
+ * merchandise after the coupon.
+ */
+export function withServerPricing(localTotals, serverCart) {
+  if (!serverCart) return { ...localTotals, coupon: null, couponError: null }
+  const { totals } = serverCart
+  const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount)
+  const gapCents = toCents(SHIPPING_RULES.freeShippingThreshold) - afterDiscountCents
+  return {
+    ...localTotals,
+    itemCount: totals.itemCount,
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    shipping: totals.shipping,
+    total: totals.total,
+    coupon: serverCart.coupon,
+    couponError: serverCart.couponError,
+    // Free shipping already (threshold reached, or a free-shipping code): nothing left to add.
+    amountToFreeShipping: totals.shipping === 0 || gapCents <= 0 ? 0 : toDollars(gapCents),
+  }
+}

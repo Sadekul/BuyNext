@@ -1,15 +1,15 @@
-import { useId, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuArrowLeft } from 'react-icons/lu'
-import { adminKeys, getOrder, updateOrder } from '../api/admin'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { LuArrowLeft, LuExternalLink } from 'react-icons/lu'
+import { adminKeys, getOrder } from '../api/admin'
 import { LIVE_DATA } from '../api/mode'
-import ConfirmDialog from '../components/ConfirmDialog'
+import { InvoiceDialog, RefundDialog, ShipDialog, StatusDialog } from '../components/OrderActionDialogs'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
-import { NEXT_STATUSES, PAYMENT_METHODS, STATUS_ACTIONS, orderStatus, paymentStatus } from '../utils/orders'
+import { PAYMENT_METHODS, orderActions, orderStatus, paymentStatus } from '../utils/orders'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -138,59 +138,116 @@ function Address({ address }) {
   )
 }
 
-/** What was done, in words, for the notice afterwards. */
-function describeChange(changes, updated) {
-  if (changes.paymentStatus === 'paid') {
-    return changes.previousStatus === 'pending_payment' && updated.status === 'processing' ? 'Marked as paid; the order is now processing.' : 'Marked as paid.'
-  }
-  return `Status changed to ${orderStatus(changes.status).label}.`
+/** The order's invoices, shipments, and credit memos. */
+function Documents({ order }) {
+  const { invoices = [], shipments = [], creditMemos = [] } = order
+  if (invoices.length + shipments.length + creditMemos.length === 0) return <p className="muted documents">No invoices, shipments, or refunds yet.</p>
+  return (
+    <div className="documents">
+      {invoices.length > 0 && (
+        <section aria-labelledby="doc-invoices">
+          <h3 id="doc-invoices">Invoices</h3>
+          <ul>
+            {invoices.map((invoice) => (
+              <li key={invoice.number}>
+                <Link to={`/invoices/${invoice.number}`}>{invoice.number}</Link> · {formatMoney(invoice.amount)} · {formatDate(invoice.createdAt)}
+                {invoice.adminName && <span className="muted"> · by {invoice.adminName}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {shipments.length > 0 && (
+        <section aria-labelledby="doc-shipments">
+          <h3 id="doc-shipments">Shipments</h3>
+          <ul>
+            {shipments.map((shipment) => (
+              <li key={shipment.number}>
+                {shipment.number} · {shipment.carrierLabel} · {formatDate(shipment.createdAt)}
+                {shipment.trackingNumber && (
+                  <>
+                    {' · '}
+                    {shipment.trackingUrl ? (
+                      <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="external-link">
+                        {shipment.trackingNumber} <LuExternalLink aria-hidden="true" />
+                        <span className="visually-hidden"> (track with {shipment.carrierLabel}, opens in a new tab)</span>
+                      </a>
+                    ) : (
+                      shipment.trackingNumber
+                    )}
+                  </>
+                )}
+                {shipment.note && <p className="muted">{shipment.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {creditMemos.length > 0 && (
+        <section aria-labelledby="doc-memos">
+          <h3 id="doc-memos">Credit memos (refunds)</h3>
+          <ul>
+            {creditMemos.map((memo) => (
+              <li key={memo.number}>
+                <Link to={`/credit-memos/${memo.number}`}>{memo.number}</Link> · {formatMoney(memo.total)} · {formatDate(memo.createdAt)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
 }
 
+const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog }
+
 /**
- * A real order (BuyNest's API): items, customer, delivery, payment, history,
- * and the actions an admin may take. Only the allowed next statuses are
- * offered (the API refuses others); cancelling asks for confirmation because
- * it puts the stock back and can't be undone.
+ * A real order (BuyNest's API): items, customer, delivery, payment, its
+ * documents, history, and the actions an admin may take (utils/orders.js
+ * orderActions): Invoice records the payment, Ship the parcel, Refund a
+ * credit memo; delivered and cancelled are plain status changes. Each opens
+ * a dialog; afterwards the result is announced and focused.
  */
 function LiveOrderDetailPage() {
   const { orderId } = useParams()
   const queryClient = useQueryClient()
   const order = useQuery({ queryKey: adminKeys.order(orderId), queryFn: ({ signal }) => getOrder(orderId, { signal }) })
-  const [note, setNote] = useState('')
-  const [notify, setNotify] = useState(true)
-  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'delivered' | 'cancelled'
   const [notice, setNotice] = useState(null)
-  const noteId = useId()
+  const noticeRef = useRef(null)
+  const openerRef = useRef(null)
 
-  const change = useMutation({
-    mutationFn: (changes) => updateOrder(orderId, { status: changes.status, paymentStatus: changes.paymentStatus, note: note.trim() || undefined, notifyCustomer: notify }),
-    onSuccess: (updated, changes) => {
-      setConfirmCancel(false)
-      setNote('')
-      queryClient.setQueryData(adminKeys.order(orderId), updated)
-      queryClient.invalidateQueries({ queryKey: ['orders'] })
-      queryClient.invalidateQueries({ queryKey: adminKeys.overview })
-      const emailed = notify && ['shipped', 'delivered', 'cancelled'].includes(changes.status) ? ' The customer was emailed.' : ''
-      setNotice({ tone: 'success', text: `${describeChange(changes, updated)}${emailed}` })
-    },
-    onError: (error) => {
-      setConfirmCancel(false)
-      setNotice({ tone: 'error', text: error.fieldErrors?.status?.[0] ?? error.fieldErrors?.paymentStatus?.[0] ?? error.message })
-    },
-  })
+  // Move focus to the result, so keyboard and screen reader users hear it and continue from there.
+  useEffect(() => {
+    if (notice) noticeRef.current?.focus()
+  }, [notice])
 
   if (order.isPending) return <Loading label="Loading the order…" />
   if (order.error) return <ErrorState error={order.error} onRetry={order.refetch} />
 
   const data = order.data
-  const next = NEXT_STATUSES[data.status] ?? []
-  const canMarkPaid = data.paymentStatus !== 'paid' && data.status !== 'cancelled'
-  const busy = change.isPending
-  const run = (changes) => {
+  const actions = orderActions(data)
+  const nothingToDo = !Object.values(actions).some(Boolean)
+
+  function open(name, event) {
+    openerRef.current = event.currentTarget
     setNotice(null)
-    change.mutate({ ...changes, previousStatus: data.status })
+    setDialog(name)
+  }
+  function cancel() {
+    setDialog(null)
+    openerRef.current?.focus()
+  }
+  function done(message) {
+    setDialog(null)
+    // Everything that shows this order, its documents, stock, or totals.
+    for (const key of [adminKeys.order(orderId), ['orders'], adminKeys.overview, ['invoices'], ['credit-memos'], adminKeys.refundable(orderId), ['products'], ['product']]) {
+      queryClient.invalidateQueries({ queryKey: key })
+    }
+    setNotice(message)
   }
 
+  const Dialog = DIALOGS[dialog]
   return (
     <>
       <title>{`Order ${data.number} | BuyNest Admin`}</title>
@@ -207,11 +264,14 @@ function LiveOrderDetailPage() {
           </>
         }
       />
-      {notice && (
-        <p className={notice.tone === 'success' ? 'notice notice--success' : 'form-error'} role={notice.tone === 'success' ? 'status' : 'alert'}>
-          {notice.text}
-        </p>
-      )}
+      {/* Always rendered, so the announcement is heard. */}
+      <div role="status">
+        {notice && (
+          <p ref={noticeRef} tabIndex={-1} className="notice notice--success">
+            {notice}
+          </p>
+        )}
+      </div>
 
       <div className="panels">
         <section className="panel panel--wide" aria-labelledby="lines-title">
@@ -296,6 +356,22 @@ function LiveOrderDetailPage() {
                   <strong>{formatMoney(data.totals.total)}</strong>
                 </td>
               </tr>
+              {data.totals.paid !== undefined && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Paid (invoiced)
+                  </th>
+                  <td className="num">{formatMoney(data.totals.paid)}</td>
+                </tr>
+              )}
+              {data.totals.refunded > 0 && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Refunded
+                  </th>
+                  <td className="num">−{formatMoney(data.totals.refunded)}</td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </section>
@@ -305,46 +381,53 @@ function LiveOrderDetailPage() {
             Manage order
           </h2>
           <div className="order-actions">
-            {next.length === 0 && !canMarkPaid ? (
+            {nothingToDo ? (
               <p className="muted">Nothing left to do: this order is {orderStatus(data.status).label.toLowerCase()}.</p>
             ) : (
               <>
-                <div className="field">
-                  <label htmlFor={noteId}>Note (optional)</label>
-                  <textarea id={noteId} rows={3} maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)} aria-describedby={`${noteId}-hint`} />
-                  <span id={`${noteId}-hint`} className="field__hint">
-                    Added to the order history, which the customer can see (e.g. a tracking number).
-                  </span>
-                </div>
-                <label className="checkbox">
-                  <input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} />
-                  Email the customer
-                </label>
                 <div className="order-actions__buttons">
-                  {next
-                    .filter((status) => status !== 'cancelled')
-                    .map((status) => (
-                      <button key={status} type="button" className="btn btn--primary" disabled={busy} onClick={() => run({ status })}>
-                        {STATUS_ACTIONS[status]}
-                      </button>
-                    ))}
-                  {canMarkPaid && (
-                    <button type="button" className="btn btn--outline" disabled={busy} onClick={() => run({ paymentStatus: 'paid' })}>
-                      Mark as paid
+                  {actions.invoice && (
+                    <button type="button" className="btn btn--primary" onClick={(event) => open('invoice', event)}>
+                      Invoice
                     </button>
                   )}
-                  {next.includes('cancelled') && (
-                    <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setConfirmCancel(true)}>
+                  {actions.ship && (
+                    <button type="button" className="btn btn--primary" onClick={(event) => open('ship', event)}>
+                      Ship
+                    </button>
+                  )}
+                  {actions.deliver && (
+                    <button type="button" className="btn btn--primary" onClick={(event) => open('delivered', event)}>
+                      Mark as delivered
+                    </button>
+                  )}
+                  {actions.refund && (
+                    <button type="button" className="btn btn--outline" onClick={(event) => open('refund', event)}>
+                      Refund
+                    </button>
+                  )}
+                  {actions.cancel && (
+                    <button type="button" className="btn btn--danger" onClick={(event) => open('cancelled', event)}>
                       Cancel order
                     </button>
                   )}
                 </div>
                 {data.status === 'pending_payment' && (
-                  <p className="field__hint">No payment provider is connected yet: mark the order as paid once the money has arrived. It then moves to Processing.</p>
+                  <p className="field__hint">No payment provider is connected yet: invoice the order once the money has arrived. It then moves to Processing and can be shipped.</p>
+                )}
+                {actions.refund && !actions.cancel && ['pending_payment', 'processing'].includes(data.status) && (
+                  <p className="field__hint">This order is paid, so it can't be cancelled: refund it instead.</p>
                 )}
               </>
             )}
           </div>
+        </section>
+
+        <section className="panel" aria-labelledby="documents-title">
+          <h2 id="documents-title" className="panel__title">
+            Documents
+          </h2>
+          <Documents order={data} />
         </section>
 
         <section className="panel" aria-labelledby="customer-title">
@@ -414,15 +497,8 @@ function LiveOrderDetailPage() {
         </section>
       </div>
 
-      <ConfirmDialog
-        isOpen={confirmCancel}
-        title={`Cancel order ${data.number}?`}
-        message="The items go back into stock and the order can't be reopened."
-        confirmLabel="Cancel order"
-        busy={busy}
-        onConfirm={() => run({ status: 'cancelled' })}
-        onCancel={() => setConfirmCancel(false)}
-      />
+      {Dialog && <Dialog order={data} onDone={done} onCancel={cancel} />}
+      {(dialog === 'delivered' || dialog === 'cancelled') && <StatusDialog order={data} status={dialog} onDone={done} onCancel={cancel} />}
     </>
   )
 }

@@ -2,10 +2,14 @@
 
 use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\Admin\CouponController;
+use App\Http\Controllers\Api\Admin\CreditMemoController;
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
+use App\Http\Controllers\Api\Admin\InvoiceController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\OverviewController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\ShipmentController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
@@ -37,6 +41,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('me', [ProfileController::class, 'update']);
         Route::get('orders', [OrderController::class, 'index']);
         Route::get('orders/{number}', [OrderController::class, 'show']);
+        Route::get('orders/{number}/invoices/{invoice}', [OrderController::class, 'invoice']);
     });
 
     // Public: the catalog and cart pricing (no sign-in).
@@ -44,8 +49,9 @@ Route::prefix('v1')->group(function () {
         Route::get('products', [CatalogController::class, 'index']);
         Route::get('products/{id}', [CatalogController::class, 'show'])->whereNumber('id');
         Route::get('categories', [CatalogController::class, 'categories']);
-        Route::post('cart/validate', [CartController::class, 'validateCart']);
     });
+    // Cart pricing: public, but a customer token (optional) identifies the shopper for per-customer coupon limits.
+    Route::post('cart/validate', [CartController::class, 'validateCart'])->middleware(['customer.optional', 'throttle:api']);
 
     // Guests and customers both check out here (customer.optional: a token, if sent, must be a customer's).
     Route::post('orders', [OrderController::class, 'store'])->middleware(['customer.optional', 'throttle:orders']);
@@ -76,5 +82,21 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('orders', [AdminOrderController::class, 'index']);
         Route::get('orders/{number}', [AdminOrderController::class, 'show']);
         Route::patch('orders/{number}', [AdminOrderController::class, 'update']);
+
+        // Phase 3: order documents (invoice = payment, shipment = tracking, credit memo = refund).
+        Route::post('orders/{number}/invoices', [InvoiceController::class, 'store']);
+        Route::post('orders/{number}/shipments', [ShipmentController::class, 'store']);
+        Route::get('orders/{number}/refundable', [CreditMemoController::class, 'refundable']);
+        Route::post('orders/{number}/credit-memos', [CreditMemoController::class, 'store']);
+        Route::get('invoices', [InvoiceController::class, 'index']);
+        Route::get('invoices/{number}', [InvoiceController::class, 'show']);
+        Route::get('credit-memos', [CreditMemoController::class, 'index']);
+        Route::get('credit-memos/{number}', [CreditMemoController::class, 'show']);
+
+        Route::get('coupons', [CouponController::class, 'index']);
+        Route::post('coupons', [CouponController::class, 'store']);
+        Route::get('coupons/{id}', [CouponController::class, 'show'])->whereNumber('id');
+        Route::patch('coupons/{id}', [CouponController::class, 'update'])->whereNumber('id');
+        Route::delete('coupons/{id}', [CouponController::class, 'destroy'])->whereNumber('id');
     });
 });

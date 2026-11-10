@@ -42,7 +42,7 @@ const toAddress = (address) =>
 
 // ---- API → browser ----
 
-const fromAddress = (raw) =>
+export const fromAddress = (raw) =>
   raw && {
     firstName: raw.first_name ?? '',
     lastName: raw.last_name ?? '',
@@ -61,6 +61,9 @@ export const fromTotals = (raw = {}) => ({
   shipping: money(raw.shipping) ?? 0,
   tax: money(raw.tax) ?? 0,
   total: money(raw.total) ?? 0,
+  // Orders (phase 3): what was paid (invoices) and refunded (credit memos). Carts have neither.
+  ...(raw.paid !== undefined && { paid: money(raw.paid) ?? 0 }),
+  ...(raw.refunded !== undefined && { refunded: money(raw.refunded) ?? 0 }),
 })
 
 /** A cart or order line: the storefront's item shape (title, thumbnail) plus the server's prices. */
@@ -95,6 +98,34 @@ export function fromCart(raw = {}) {
   }
 }
 
+// Tracking links become <a href>: only https addresses get through (never javascript: or http:).
+const httpsUrl = (value) => (typeof value === 'string' && /^https:\/\/[^\s]+$/.test(value) ? value : null)
+
+/** ShipmentResource → a shipment, as customers see it. */
+export const fromShipment = (raw) => ({
+  number: raw.number,
+  carrier: raw.carrier,
+  carrierLabel: raw.carrier_label ?? raw.carrier,
+  trackingNumber: raw.tracking_number ?? null,
+  trackingUrl: httpsUrl(raw.tracking_url),
+  createdAt: raw.created_at,
+})
+export const fromInvoiceSummary = (raw) => ({ number: raw.number, amount: money(raw.amount), createdAt: raw.created_at })
+export const fromCreditMemoSummary = (raw) => ({ number: raw.number, total: money(raw.total), createdAt: raw.created_at })
+
+/** InvoiceResource → the printable invoice (customers: no admin name or internal note). */
+export function fromInvoice(raw) {
+  return {
+    number: raw.number,
+    orderNumber: raw.order_number,
+    amount: money(raw.amount),
+    createdAt: raw.created_at,
+    billingAddress: fromAddress(raw.billing_address),
+    items: (raw.items ?? []).map(fromLine),
+    totals: fromTotals(raw.totals),
+  }
+}
+
 const fromHistory = (raw) => ({
   status: raw.status,
   paymentStatus: raw.payment_status ?? null,
@@ -119,6 +150,10 @@ export function fromOrder(raw) {
     totals: fromTotals(raw.totals),
     placedAt: raw.placed_at,
     ...(raw.history && { history: raw.history.map(fromHistory) }),
+    // Phase 3 documents; older answers have none.
+    shipments: (raw.shipments ?? []).map(fromShipment),
+    invoices: (raw.invoices ?? []).map(fromInvoiceSummary),
+    creditMemos: (raw.credit_memos ?? []).map(fromCreditMemoSummary),
   }
 }
 
@@ -143,13 +178,22 @@ export function failed({ status, data }) {
 const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) ? { ok: true, status: result.status, data: map(result.data) } : failed(result))
 
 export const laravelShop = {
-  /** { items: [{ productId, quantity }], couponCode, shippingMethod } → priced cart. */
-  async validateCart(body, request) {
-    const result = await laravel('/api/v1/cart/validate', {
-      method: 'POST',
-      request,
-      body: { items: toItems(body.items), coupon_code: str(body.couponCode) || null, shipping_method: str(body.shippingMethod) ?? 'standard' },
-    })
+  /**
+   * { items: [{ productId, quantity }], couponCode, shippingMethod, email? } → priced cart.
+   * The customer's token (when signed in) or a guest's email lets the API
+   * check per-customer coupon limits before checkout.
+   */
+  async validateCart(body, token, request) {
+    const email = str(body.email)?.trim().slice(0, 254)
+    const payload = {
+      items: toItems(body.items),
+      coupon_code: str(body.couponCode) || null,
+      shipping_method: str(body.shippingMethod) ?? 'standard',
+      ...(email && { email }),
+    }
+    let result = await laravel('/api/v1/cart/validate', { method: 'POST', token, request, body: payload })
+    // An expired session shouldn't stop the cart from being priced: ask again as a guest.
+    if (result.status === 401 && token) result = await laravel('/api/v1/cart/validate', { method: 'POST', request, body: payload })
     return answer(result, [200], (data) => fromCart(data.data))
   },
 
@@ -188,6 +232,12 @@ export const laravelShop = {
   async getOrder(token, number, request) {
     const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}`, { token, request })
     return answer(result, [200], (data) => fromOrder(data.data))
+  },
+
+  /** One invoice of the customer's own order (someone else's → 404). */
+  async getInvoice(token, number, invoice, request) {
+    const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}`, { token, request })
+    return answer(result, [200], (data) => fromInvoice(data.data))
   },
 
   async lookupOrder(body, request) {

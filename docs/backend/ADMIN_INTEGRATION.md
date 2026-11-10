@@ -2,6 +2,8 @@
 
 How the React admin dashboard, the Laravel API, and the storefront fit together.
 
+> **Update (2026-11-11, backend phase 3):** orders now follow Magento's documents: Invoice (records the payment), Ship (carrier and tracking number), and Refund (credit memo: some or all items, shipping, an adjustment, optional restock). Coupons are managed under Marketing → Coupons. See [PHASE3_CONTRACT.md](PHASE3_CONTRACT.md).
+>
 > **Update (2026-11-10, backend phase 2):** products, categories, orders, and the overview are real too (Laravel `/api/admin/v1/*`): product saves and deletes are stored, products have a status (active, draft, archived), and orders can be shipped, delivered, marked paid, or cancelled (restocking), with a history of who did what. See [PHASE2_CONTRACT.md](PHASE2_CONTRACT.md).
 >
 > **Update (2026-11-10, backend phase 1):** admins are now real accounts in Laravel's `admins` table, separate from customers, with their own sign-in (`/api/admin/v1/auth/*`) and their own cookies. The customers page lists the real sign-ups and can block/unblock them (`/api/admin/v1/customers`). Products, orders, and the overview still use the demo data below until phase 2. See [ACCOUNTS.md](ACCOUNTS.md).

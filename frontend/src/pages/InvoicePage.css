@@ -1,0 +1,178 @@
+.invoice-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 52rem;
+}
+
+.invoice-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.invoice-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+
+.invoice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8, 2rem);
+  color: var(--color-text);
+  background: var(--color-bg, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.invoice__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.invoice__brand {
+  font-family: var(--font-heading, inherit);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+}
+
+.invoice__meta h1 {
+  font-size: var(--text-2xl);
+}
+
+.invoice__meta dl {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.invoice__meta dl div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.invoice__meta dt {
+  color: var(--color-text-muted);
+}
+
+.invoice__subheading {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.invoice__address {
+  font-style: normal;
+  line-height: 1.6;
+}
+
+.invoice__muted {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.invoice__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice__table th,
+.invoice__table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.invoice__table thead th {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.invoice__table tfoot th {
+  font-weight: 400;
+  text-align: right;
+  border-bottom: none;
+}
+
+.invoice__table tfoot td {
+  border-bottom: none;
+}
+
+.invoice__table .invoice__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.invoice__total th,
+.invoice__total td {
+  font-weight: 700;
+  border-top: 2px solid var(--color-text);
+}
+
+@media (max-width: 600px) {
+  .invoice {
+    padding: var(--space-4);
+  }
+
+  .invoice__table th,
+  .invoice__table td {
+    padding: var(--space-2) var(--space-1);
+  }
+}
+
+/*
+ * Printing: only the invoice. Everything else on the page (site header,
+ * footer, buttons) is hidden; black on white, no box.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .invoice,
+  .invoice * {
+    visibility: visible;
+  }
+
+  .invoice {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    background: #fff;
+    border: none;
+  }
+
+  .invoice__muted,
+  .invoice__table thead th,
+  .invoice__subheading,
+  .invoice__meta dt {
+    color: #333;
+  }
+
+  .invoice__table th,
+  .invoice__table td {
+    border-color: #999;
+  }
+
+  .invoice__total th,
+  .invoice__total td {
+    border-top-color: #000;
+  }
+
+  .invoice-page__actions {
+    display: none;
+  }
+}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CreditMemo;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -18,9 +19,10 @@ class OverviewController extends Controller
     {
         $threshold = config('buynest.store.low_stock_threshold');
 
-        // Cancelled orders aren't revenue.
+        // Cancelled orders aren't revenue, and refunds (credit memos) are taken off it.
         $counted = Order::where('status', '!=', 'cancelled');
-        $revenueCents = Pricing::toCents((string) ($counted->clone()->sum('grand_total') ?? 0));
+        $revenueCents = Pricing::toCents((string) ($counted->clone()->sum('grand_total') ?? 0))
+            - Pricing::toCents((string) (CreditMemo::sum('total') ?? 0));
         $countedOrders = $counted->clone()->count();
         $byStatus = Order::selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 

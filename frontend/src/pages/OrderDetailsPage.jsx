@@ -22,7 +22,7 @@ function NotFound() {
   )
 }
 
-function OrderSection({ order }) {
+function OrderSection({ order, invoiceLink }) {
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
@@ -33,7 +33,7 @@ function OrderSection({ order }) {
       <h2 id="order-details-title" className="orders__title">
         Order {id}
       </h2>
-      <OrderDetailsView order={order} />
+      <OrderDetailsView order={order} invoiceLink={invoiceLink} />
     </section>
   )
 }
@@ -54,7 +54,8 @@ function ServerOrderDetailsPage() {
   if (request.isPending) return <Loader label="Loading the order…" />
   if (request.error?.status === 404) return <NotFound />
   if (request.error) return <ErrorMessage title="We couldn't load this order" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
-  return <OrderSection order={request.data} />
+  // The customer's own order: its invoices open as printable pages.
+  return <OrderSection order={request.data} invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)} />
 }
 
 /** /account/orders/:orderId */

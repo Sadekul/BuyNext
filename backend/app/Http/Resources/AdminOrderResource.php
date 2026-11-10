@@ -22,6 +22,29 @@ class AdminOrderResource extends OrderResource
         ];
     }
 
+    /** Staff see who created each document, its note, and the full credit memos. */
+    protected function documents(Request $request): array
+    {
+        return [
+            'invoices' => $this->invoices->map(fn ($invoice) => [
+                'number' => $invoice->number,
+                'amount' => $invoice->amount,
+                'created_at' => $invoice->created_at?->toIso8601ZuluString(),
+                'admin_name' => $invoice->admin?->name,
+                'note' => $invoice->note,
+            ])->values(),
+            'shipments' => $this->shipments->map(fn ($shipment) => (new ShipmentResource($shipment->setRelation('order', $this->resource)))
+                ->toArray($request))->values(),
+            'credit_memos' => $this->creditMemos->map(fn ($memo) => (new CreditMemoResource($memo->setRelation('order', $this->resource)))
+                ->toArray($request))->values(),
+        ];
+    }
+
+    protected function forCustomer(): bool
+    {
+        return false;
+    }
+
     protected function historyEntry($entry): array
     {
         return [

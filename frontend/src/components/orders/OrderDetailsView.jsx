@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+import { LuExternalLink, LuFileText, LuUndo2 } from 'react-icons/lu'
 import OrderHistory from './OrderHistory'
 import OrderItems from './OrderItems'
 import OrderStatus from './OrderStatus'
@@ -28,13 +30,93 @@ function AddressBlock({ address }) {
   )
 }
 
+/** Shipments with carrier, tracking number, and a link to the carrier's tracking page (new tab). */
+function Shipments({ shipments }) {
+  if (!shipments?.length) return null
+  return (
+    <>
+      <h3 className="order-view__subheading">{shipments.length === 1 ? 'Shipment' : 'Shipments'}</h3>
+      <ul className="order-view__documents">
+        {shipments.map((shipment) => (
+          <li key={shipment.number}>
+            <p>
+              <strong>{shipment.carrierLabel}</strong>
+              {shipment.trackingNumber ? ` · tracking number ${shipment.trackingNumber}` : ' · no tracking number'}
+            </p>
+            <p className="order-view__muted">Shipped {formatDate(shipment.createdAt)}</p>
+            {shipment.trackingUrl && (
+              // noopener: the carrier's page can't reach back into this tab.
+              <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="order-view__link">
+                Track with {shipment.carrierLabel} <LuExternalLink aria-hidden="true" />
+                <span className="visually-hidden"> (opens in a new tab)</span>
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/** Invoices (payments recorded); linked to the printable page when the viewer may open it (customers, not guests). */
+function Invoices({ invoices, invoiceLink }) {
+  if (!invoices?.length) return null
+  return (
+    <>
+      <h3 className="order-view__subheading">{invoices.length === 1 ? 'Invoice' : 'Invoices'}</h3>
+      <ul className="order-view__documents">
+        {invoices.map((invoice) => (
+          <li key={invoice.number}>
+            <p className="order-view__row">
+              {invoiceLink ? (
+                <Link to={invoiceLink(invoice.number)} className="order-view__link">
+                  <LuFileText aria-hidden="true" /> Invoice {invoice.number}
+                </Link>
+              ) : (
+                <span>Invoice {invoice.number}</span>
+              )}
+              <strong>{formatPrice(invoice.amount)}</strong>
+            </p>
+            <p className="order-view__muted">Issued {formatDate(invoice.createdAt)}</p>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+function Refunds({ creditMemos }) {
+  if (!creditMemos?.length) return null
+  return (
+    <>
+      <h3 className="order-view__subheading">{creditMemos.length === 1 ? 'Refund' : 'Refunds'}</h3>
+      <ul className="order-view__documents">
+        {creditMemos.map((memo) => (
+          <li key={memo.number}>
+            <p className="order-view__row">
+              <span>
+                <LuUndo2 aria-hidden="true" /> Refund {memo.number}
+              </span>
+              <strong>{formatPrice(memo.total)}</strong>
+            </p>
+            <p className="order-view__muted">{formatDate(memo.createdAt)}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="order-view__muted">Refunds are returned by the method you paid with; your bank may take a few days to show them.</p>
+    </>
+  )
+}
+
 /**
  * Everything about one order; used by the confirmation, order details, and
  * order tracking pages. Works with real orders from BuyNest's API (`number`,
  * `history`, `paymentStatus`) and with demo orders saved in this browser
- * (`id`, `contact`, `isSimulated`).
+ * (`id`, `contact`, `isSimulated`). Real orders also list their shipments,
+ * invoices, and refunds; `invoiceLink(number)` (customers only) links each
+ * invoice to its printable page.
  */
-function OrderDetailsView({ order }) {
+function OrderDetailsView({ order, invoiceLink }) {
   const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod)
   const contact = order.contact ?? { email: order.email, phone: order.phone }
   const isReal = !order.isSimulated
@@ -48,7 +130,7 @@ function OrderDetailsView({ order }) {
         </div>
         {isReal && <OrderStatusBadge status={order.status} />}
         {/* A cancelled order has no steps left: the status above says it all. */}
-        {order.status !== 'cancelled' && <OrderStatus status={order.status} />}
+        {!['cancelled', 'closed'].includes(order.status) && <OrderStatus status={order.status} />}
         {isReal && <OrderHistory history={order.history} />}
         {order.isSimulated && (
           <p className="order-view__demo">
@@ -68,6 +150,7 @@ function OrderDetailsView({ order }) {
           <p className="order-view__muted">
             {contact.email} · {contact.phone}
           </p>
+          <Shipments shipments={order.shipments} />
         </section>
         <section className="order-view__card" aria-labelledby="order-payment-title">
           <h2 id="order-payment-title">Payment</h2>
@@ -86,6 +169,8 @@ function OrderDetailsView({ order }) {
           )}
           <h3 className="order-view__subheading">Billing address</h3>
           <AddressBlock address={order.billingAddress} />
+          <Invoices invoices={order.invoices} invoiceLink={invoiceLink} />
+          <Refunds creditMemos={order.creditMemos} />
         </section>
       </div>
 

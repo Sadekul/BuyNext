@@ -58,3 +58,33 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.order-view__documents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-view__documents li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.order-view__documents svg {
+  vertical-align: -0.125em;
+}
+
+.order-view__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  font-weight: 600;
+}

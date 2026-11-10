@@ -894,3 +894,115 @@
   gap: var(--space-2);
   color: var(--color-text);
 }
+
+/* ---------- Form dialogs (invoice, ship, refund) ---------- */
+.form-dialog {
+  width: min(32rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+.form-dialog--wide {
+  width: min(48rem, calc(100% - 2rem));
+}
+
+.form-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.form-dialog .form-error {
+  margin-top: var(--space-4);
+}
+
+.refund-table input {
+  width: 5.5rem;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  text-align: right;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.refund-table input[aria-invalid='true'] {
+  border-color: var(--color-sale);
+}
+
+.refund-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-weight: 700;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.documents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.documents h3 {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.documents ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.notice:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Nav groups (Sales, Marketing): flat on small screens, headed in the sidebar. */
+.admin__nav-group,
+.admin__nav-group > .admin__nav {
+  display: contents;
+}
+
+.admin__nav-heading {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .admin__nav-group {
+    display: block;
+  }
+
+  .admin__nav-group > .admin__nav {
+    display: flex;
+  }
+
+  .admin__nav-heading {
+    display: block;
+    margin: var(--space-3) 0 var(--space-1);
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+}

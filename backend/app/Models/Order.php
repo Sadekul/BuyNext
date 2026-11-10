@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Pricing;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,15 +25,23 @@ class Order extends Model
     /** @use HasFactory<OrderFactory> */
     use HasFactory;
 
-    public const STATUSES = ['pending_payment', 'processing', 'shipped', 'delivered', 'cancelled'];
+    /** closed = fully refunded (final); only a credit memo gets an order there. */
+    public const STATUSES = ['pending_payment', 'processing', 'shipped', 'delivered', 'cancelled', 'closed'];
 
-    /** Where an admin may move an order from each status. Anything else is refused. */
+    public const PAYMENT_STATUSES = ['unpaid', 'paid', 'partially_refunded', 'refunded'];
+
+    /**
+     * Where an admin may move an order from each status with PATCH. Anything
+     * else is refused. (Cancelling is also refused once there is an invoice,
+     * and `closed` is reached only through a full credit memo.)
+     */
     public const TRANSITIONS = [
         'pending_payment' => ['processing', 'cancelled'],
         'processing' => ['shipped', 'cancelled'],
         'shipped' => ['delivered'],
         'delivered' => [],
         'cancelled' => [],
+        'closed' => [],
     ];
 
     protected function casts(): array
@@ -62,6 +71,36 @@ class Order extends Model
     public function history(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class)->orderBy('id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class)->orderBy('id');
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class)->orderBy('id');
+    }
+
+    public function creditMemos(): HasMany
+    {
+        return $this->hasMany(CreditMemo::class)->orderBy('id');
+    }
+
+    /** What resources need to show an order with its documents (eager load, no N+1). */
+    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem'];
+
+    /** Money recorded by invoices, in cents. */
+    public function paidCents(): int
+    {
+        return $this->invoices->sum(fn (Invoice $invoice) => Pricing::toCents($invoice->amount));
+    }
+
+    /** Money given back by credit memos, in cents. */
+    public function refundedCents(): int
+    {
+        return $this->creditMemos->sum(fn (CreditMemo $memo) => Pricing::toCents($memo->total));
     }
 
     public static function numberFor(int $id): string

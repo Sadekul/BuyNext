@@ -27,6 +27,7 @@ const OrderDetailsPage = lazy(() => import('../pages/OrderDetailsPage'))
 const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
 const TrackOrderPage = lazy(() => import('../pages/TrackOrderPage'))
+const InvoicePage = lazy(() => import('../pages/InvoicePage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -76,6 +77,8 @@ function AppRoutes() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:orderId" element={<OrderDetailsPage />} />
           </Route>
+          {/* Outside the account layout: the invoice prints on its own. */}
+          {REAL_SHOP && <Route path="account/orders/:orderId/invoices/:invoiceNumber" element={<InvoicePage />} />}
         </Route>
         {SHOW_LEARNING_LAB && <Route path="learn" element={<ComponentLabPage />} />}
         <Route path="*" element={<NotFoundPage />} />

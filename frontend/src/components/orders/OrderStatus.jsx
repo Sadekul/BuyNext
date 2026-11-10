@@ -19,7 +19,8 @@ const STEP_OF = { placed: 0, pending_payment: 0, processing: 1, shipped: 2, deli
  * cancelled order has no next step, so it shows its status instead.
  */
 function OrderStatus({ status }) {
-  if (status === 'cancelled') return <OrderStatusBadge status={status} />
+  // Cancelled and closed (fully refunded) orders have no next step.
+  if (status === 'cancelled' || status === 'closed') return <OrderStatusBadge status={status} />
   const currentIndex = STEP_OF[status] ?? 0
 
   return (

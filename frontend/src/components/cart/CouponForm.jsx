@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { LuTicket, LuX } from 'react-icons/lu'
 import Button from '../ui/Button'
+import { REAL_SHOP } from '../../constants/shop'
 import './CouponForm.css'
 
 /**
@@ -8,8 +9,9 @@ import './CouponForm.css'
  * lives in the cart. Validation messages come from the cart totals.
  * `disabled` locks it while checkout is placing the order, so the total
  * can't change between clicking "Place order" and recording it.
+ * `checking`: the server is deciding about the code (REAL_SHOP).
  */
-function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disabled = false }) {
+function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disabled = false, checking = false }) {
   const [draft, setDraft] = useState('')
   const inputId = useId()
   const messageId = useId()
@@ -22,7 +24,8 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disab
   }
 
   let message = null
-  if (appliedCode) message = couponError ? `${appliedCode}: ${couponError}` : coupon && `${appliedCode}: ${coupon.description}`
+  if (appliedCode && checking && !coupon && !couponError) message = `Checking ${appliedCode}…`
+  else if (appliedCode) message = couponError ? `${appliedCode}: ${couponError}` : coupon && `${appliedCode}: ${coupon.description}`
 
   return (
     <div className="coupon-form">
@@ -32,7 +35,7 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disab
             <LuTicket aria-hidden="true" />
             <span>
               <strong>{appliedCode}</strong>
-              {couponError ? ` — ${couponError}` : coupon && ` — ${coupon.description}`}
+              {couponError ? ` — ${couponError}` : coupon ? ` — ${coupon.description}` : checking && ' — checking…'}
             </span>
           </p>
           <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={`Remove code ${appliedCode}`}>
@@ -57,7 +60,7 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disab
             </Button>
           </div>
           <p id={messageId} className="coupon-form__hint">
-            Demo codes: NEST10, SAVE20
+            {REAL_SHOP ? 'Codes are checked by our server.' : 'Demo codes: NEST10, SAVE20'}
           </p>
           </fieldset>
         </form>

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuArrowLeft } from 'react-icons/lu'
 import { adminKeys, createProduct, getCategories, getProduct, updateProduct } from '../api/admin'
 import DemoNotice from '../components/DemoNotice'
+import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
@@ -177,31 +178,6 @@ function StockHint({ stock }) {
     <>
       Now: <StatusBadge stock={stock} />
     </>
-  )
-}
-
-/**
- * Label + control + hint + error. `children` is a function that receives the
- * id and aria attributes for the control, so the label and messages are wired up.
- */
-function Field({ label, error, hint, className = '', children }) {
-  const id = useId()
-  const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
-  return (
-    <div className={`field ${className}`}>
-      <label htmlFor={id}>{label}</label>
-      {children({ id, 'aria-invalid': error ? true : undefined, 'aria-describedby': describedBy })}
-      {hint && (
-        <span id={`${id}-hint`} className="field__hint">
-          {hint}
-        </span>
-      )}
-      {error && (
-        <span id={`${id}-error`} className="field__error">
-          {error}
-        </span>
-      )}
-    </div>
   )
 }
 

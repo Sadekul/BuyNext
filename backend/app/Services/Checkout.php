@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Mail\OrderPlacedMail;
+use App\Models\Coupon;
+use App\Models\CouponRedemption;
 use App\Models\Customer;
 use App\Models\Order;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -13,8 +15,9 @@ use Throwable;
 
 /**
  * Places an order, all in one database transaction:
- * lock the products → price again → check stock → take the stock →
- * write the order, its items, and its first history entry.
+ * lock the products (and the coupon) → price again → check stock → take
+ * the stock → write the order, its items, the coupon use, and its first
+ * history entry.
  * If anything fails, the transaction rolls back and nothing is kept.
  */
 class Checkout
@@ -28,7 +31,8 @@ class Checkout
     public function place(array $data, ?Customer $customer): Order
     {
         $order = DB::transaction(function () use ($data, $customer) {
-            $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'], lock: true);
+            $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
+                lock: true, customerId: $customer?->id, email: $data['email']);
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
@@ -104,6 +108,18 @@ class Checkout
                 'sale_price' => Pricing::format($line['sale_cents']),
                 'quantity' => $line['quantity'],
                 'line_total' => Pricing::format($line['line_cents']),
+            ]);
+        }
+
+        // Count the coupon use. Its row was locked by quote(), so the usage
+        // limits checked there still hold: no other checkout can get in between.
+        if ($quote->couponId) {
+            Coupon::whereKey($quote->couponId)->increment('times_used');
+            CouponRedemption::create([
+                'coupon_id' => $quote->couponId,
+                'order_id' => $order->id,
+                'customer_id' => $customer?->id,
+                'email' => $data['email'],
             ]);
         }
 

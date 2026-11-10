@@ -14,6 +14,7 @@ import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { useProductRefresh } from '../hooks/useProductRefresh'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
 import { productKeys } from '../queries/productQueries'
@@ -42,6 +43,9 @@ const SERVER_FIELD_MAP = {
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`shippingAddress.${field}`, `shipping.${field}`])),
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`billingAddress.${field}`, `billing.${field}`])),
 }
+
+// Good enough to send to cart/validate; the order itself is validated properly.
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
 
 const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
 
@@ -170,18 +174,25 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
   })
 
   // useWatch subscribes to just these fields, for the live summary and cards.
-  const [shippingMethod, billingSameAsShipping, paymentMethod] = useWatch({
+  const [shippingMethod, billingSameAsShipping, paymentMethod, email] = useWatch({
     control,
-    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod'],
+    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email'],
   })
 
+  // A guest's email goes with the pricing request, so "one use per customer"
+  // codes are checked before the order (signed-in customers: the session).
+  // Debounced: one request after typing stops, not one per keystroke.
+  const guestEmail = useDebouncedValue(REAL_SHOP && !isAuthenticated ? (email ?? '').trim().toLowerCase() : '', 600)
+
   // REAL_SHOP: the server's prices are the ones shown and charged. The local
-  // calculation (same rules) fills in until the first answer arrives.
-  const pricingInput = { items: cart.items, couponCode: cart.couponCode, shippingMethod }
+  // calculation (same rules, but no coupon: the server decides about those)
+  // fills in until the first answer arrives.
+  const pricingInput = { items: cart.items, couponCode: cart.couponCode, shippingMethod, email: looksLikeEmail(guestEmail) ? guestEmail : undefined }
   const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
   const serverCart = REAL_SHOP ? pricing.data : null
 
-  const localTotals = calculateCartTotals(cart.items, cart.couponCode, shippingMethod)
+  const localCoupon = REAL_SHOP ? null : cart.couponCode
+  const localTotals = calculateCartTotals(cart.items, localCoupon, shippingMethod)
   const totals = serverCart ? serverCart.totals : localTotals
   const coupon = serverCart ? serverCart.coupon : localTotals.coupon
   const couponError = serverCart ? serverCart.couponError : localTotals.couponError
@@ -190,7 +201,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
   const changedCount = cart.items.filter((item) => item.notice).length
   const shippingOptions = SHIPPING_METHODS.map((method) => {
     const serverPrice = serverCart?.shippingOptions.find((option) => option.id === method.id)?.price
-    const price = serverPrice ?? calculateCartTotals(cart.items, cart.couponCode, method.id).shipping
+    const price = serverPrice ?? calculateCartTotals(cart.items, localCoupon, method.id).shipping
     return { ...method, description: method.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
   })
   const isPricing = REAL_SHOP && (pricing.isPending || pricing.isFetching)
@@ -353,6 +364,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
             onApply={cart.applyCoupon}
             onRemove={cart.removeCoupon}
             disabled={isSubmitting}
+            checking={isPricing}
           />
 
           {changedCount > 0 && (

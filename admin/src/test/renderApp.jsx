@@ -10,6 +10,10 @@ import CustomersPage from '../pages/CustomersPage'
 import ProductsPage from '../pages/ProductsPage'
 import OrdersPage from '../pages/OrdersPage'
 import OrderDetailPage from '../pages/OrderDetailPage'
+import { CreditMemoDetailPage, CreditMemosPage, InvoiceDetailPage, InvoicesPage } from '../pages/SalesDocumentsPages'
+import CouponsPage from '../pages/CouponsPage'
+import CouponFormPage from '../pages/CouponFormPage'
+import { LIVE_DATA } from '../api/mode'
 
 /** The admin app's real providers and the routes the tests need, at `route`. */
 export function renderApp(route = '/') {
@@ -28,6 +32,17 @@ export function renderApp(route = '/') {
               <Route path="orders" element={<OrdersPage />} />
               <Route path="orders/:orderId" element={<OrderDetailPage />} />
               <Route path="customers" element={<CustomersPage />} />
+              {LIVE_DATA && (
+                <>
+                  <Route path="invoices" element={<InvoicesPage />} />
+                  <Route path="invoices/:number" element={<InvoiceDetailPage />} />
+                  <Route path="credit-memos" element={<CreditMemosPage />} />
+                  <Route path="credit-memos/:number" element={<CreditMemoDetailPage />} />
+                  <Route path="coupons" element={<CouponsPage />} />
+                  <Route path="coupons/new" element={<CouponFormPage />} />
+                  <Route path="coupons/:couponId" element={<CouponFormPage />} />
+                </>
+              )}
             </Route>
           </Routes>
         </AdminAuthProvider>

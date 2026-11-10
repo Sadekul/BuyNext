@@ -1,8 +1,9 @@
-import { LuArchive, LuBan, LuCircleCheck, LuClock, LuPackage, LuPackageCheck, LuPencilLine, LuTruck } from 'react-icons/lu'
+import { LuArchive, LuBan, LuCalendarClock, LuCircleCheck, LuCircleSlash, LuClock, LuLock, LuPackage, LuPackageCheck, LuPencilLine, LuTruck, LuUndo2 } from 'react-icons/lu'
 
 /*
  * Order, payment, and product statuses for StatusBadge: icon + words, the
- * tone only adds colour. Rules from docs/backend/PHASE2_CONTRACT.md.
+ * tone only adds colour. Rules from docs/backend/PHASE2_CONTRACT.md and
+ * PHASE3_CONTRACT.md (closed, refunds, coupons).
  */
 export const ORDER_STATUSES = {
   pending_payment: { label: 'Awaiting payment', tone: 'warning', icon: LuClock },
@@ -10,11 +11,14 @@ export const ORDER_STATUSES = {
   shipped: { label: 'Shipped', tone: 'info', icon: LuTruck },
   delivered: { label: 'Delivered', tone: 'success', icon: LuPackageCheck },
   cancelled: { label: 'Cancelled', tone: 'neutral', icon: LuBan },
+  closed: { label: 'Closed (refunded)', tone: 'neutral', icon: LuLock },
 }
 
 export const PAYMENT_STATUSES = {
   unpaid: { label: 'Unpaid', tone: 'warning', icon: LuClock },
   paid: { label: 'Paid', tone: 'success', icon: LuCircleCheck },
+  partially_refunded: { label: 'Partly refunded', tone: 'warning', icon: LuUndo2 },
+  refunded: { label: 'Refunded', tone: 'neutral', icon: LuUndo2 },
 }
 
 export const PRODUCT_STATUSES = {
@@ -28,21 +32,38 @@ export const orderStatus = (status) => ORDER_STATUSES[status] ?? unknown(status)
 export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? unknown(status)
 export const productStatus = (status) => PRODUCT_STATUSES[status] ?? unknown(status)
 
-/** The status changes an admin may make (the API refuses anything else with a 422). */
-export const NEXT_STATUSES = {
-  pending_payment: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
-  delivered: [],
-  cancelled: [],
+/**
+ * What an admin may do with a real order (phase 3). Payment is recorded with
+ * an invoice, shipping with a shipment, refunds with a credit memo; the plain
+ * status change is left for "delivered" and "cancelled". The API refuses
+ * anything else with a 422, whatever this shows.
+ */
+export function orderActions(order) {
+  const invoiced = (order.invoices?.length ?? 0) > 0 || ['paid', 'partially_refunded', 'refunded'].includes(order.paymentStatus)
+  const shipped = (order.shipments?.length ?? 0) > 0
+  return {
+    invoice: !invoiced && ['pending_payment', 'processing', 'shipped', 'delivered'].includes(order.status),
+    // From processing only: a card/PayPal order is invoiced first; cash on delivery starts processing unpaid.
+    ship: order.status === 'processing' && !shipped,
+    deliver: order.status === 'shipped',
+    refund: ['paid', 'partially_refunded'].includes(order.paymentStatus),
+    // Once paid, money has to go back with a refund instead.
+    cancel: ['pending_payment', 'processing'].includes(order.status) && !invoiced,
+  }
 }
 
-/** Button labels for each target status. */
-export const STATUS_ACTIONS = {
-  processing: 'Start processing',
-  shipped: 'Mark as shipped',
-  delivered: 'Mark as delivered',
-  cancelled: 'Cancel order',
+export const CARRIERS = { dhl: 'DHL', fedex: 'FedEx', ups: 'UPS', usps: 'USPS', other: 'Other carrier' }
+
+export const COUPON_TYPES = { percent: 'Percent off', fixed: 'Fixed amount off', free_shipping: 'Free shipping' }
+
+export const COUPON_STATUSES = {
+  active: { label: 'Active', tone: 'success', icon: LuCircleCheck },
+  inactive: { label: 'Disabled', tone: 'neutral', icon: LuCircleSlash },
+  scheduled: { label: 'Scheduled', tone: 'info', icon: LuCalendarClock },
+  expired: { label: 'Expired', tone: 'warning', icon: LuClock },
+  used_up: { label: 'Used up', tone: 'warning', icon: LuBan },
 }
+export const couponStatus = (status) => COUPON_STATUSES[status] ?? unknown(status)
+export const COUPON_FILTERS = Object.fromEntries(Object.entries(COUPON_STATUSES).map(([status, { label }]) => [status, label]))
 
 export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery' }

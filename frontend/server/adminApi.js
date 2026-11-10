@@ -38,6 +38,23 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  *   GET    /api/admin/orders?q&status&paymentStatus&limit&skip   (filters: Laravel only)
  *   GET    /api/admin/orders/:id          (Laravel: the order number, e.g. BN-100001)
  *   PATCH  /api/admin/orders/:number      { status?, paymentStatus?, note?, notifyCustomer? } (Laravel only)
+ *
+ * Phase 3 (Laravel only; docs/backend/PHASE3_CONTRACT.md):
+ *   POST   /api/admin/orders/:number/invoices      { note?, notifyCustomer? } → 201 { invoice }
+ *   POST   /api/admin/orders/:number/shipments     { carrier, trackingNumber?, note?, notifyCustomer? } → 201 { shipment }
+ *   POST   /api/admin/orders/:number/credit-memos  { items: [{ orderItemId, quantity }], shippingRefund, adjustment,
+ *                                                   restock, note?, notifyCustomer? } → 201 { creditMemo }
+ *   GET    /api/admin/orders/:number/refundable    → { items: [{ orderItemId, name, sku, ordered, refunded, refundable, unitRefund }],
+ *                                                     shippingRefundable, maxTotal }
+ *   GET    /api/admin/invoices?q&limit&skip        → { invoices, total, limit, skip }
+ *   GET    /api/admin/invoices/:number             (INV-100001)
+ *   GET    /api/admin/credit-memos?q&limit&skip    → { creditMemos, total, limit, skip }
+ *   GET    /api/admin/credit-memos/:number         (CM-100001)
+ *   GET    /api/admin/coupons?q&status&limit&skip  (status: active | inactive | scheduled | expired | used_up)
+ *   POST   /api/admin/coupons                      → 201 { coupon } (validated)
+ *   GET    /api/admin/coupons/:id
+ *   PATCH  /api/admin/coupons/:id                  → { coupon } (validated, partial)
+ *   DELETE /api/admin/coupons/:id                  → { deleted: true } or, once used, { disabled: true, coupon }
  *   GET    /api/admin/customers?q&status&limit&skip
  *   PATCH  /api/admin/customers/:id      { isActive } → block or unblock (Laravel accounts only)
  */
@@ -68,6 +85,14 @@ function pageParams(url) {
 
 const isId = (value) => /^\d{1,9}$/.test(value ?? '')
 const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
+const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
+const isCreditMemoNumber = (value) => /^CM-\d{1,12}$/.test(value ?? '')
+// How each resource's records are addressed in the URL; anything else is a 404 before any upstream call.
+const ID_FORMATS = { orders: (value) => isId(value) || isOrderNumber(value), invoices: isInvoiceNumber, 'credit-memos': isCreditMemoNumber }
+const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable']
+const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
+const COUPON_TYPES = ['percent', 'fixed', 'free_shipping']
+const COUPON_FILTERS = ['active', 'inactive', 'scheduled', 'expired', 'used_up']
 const notFound = (what = 'That item') => json({ message: `${what} was not found.` }, 404)
 const passThrough = ({ status, data }) => json({ message: data?.message ?? 'The request failed.' }, status)
 
@@ -112,6 +137,101 @@ export function validateProduct(body, { partial }) {
 const invalid = (errors) => json({ message: 'Please check the highlighted fields.', errors }, 422)
 // An empty brand means "no brand" (the API creates brands by name).
 const withoutBlankBrand = (values) => (values.brand === '' ? { ...values, brand: null } : values)
+
+const LIVE_ONLY = 'This needs the BuyNest backend; the demo orders have no invoices, shipments, refunds, or coupons.'
+const liveOnly = () => json({ message: LIVE_ONLY }, 404)
+const isMoney = (value, { min = 0, max = 1_000_000 } = {}) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max && hasCents(value)
+const optionalNote = (body, errors) => {
+  if (body.note !== undefined && body.note !== null && (typeof body.note !== 'string' || body.note.length > 1000)) errors.note = ['Keep the note under 1000 characters.']
+  return typeof body.note === 'string' ? body.note.trim() || undefined : undefined
+}
+
+/** Invoice: only a note and the email choice; the amount is always the order's total (phase 3). */
+export function validateInvoice(body) {
+  const errors = {}
+  const note = optionalNote(body, errors)
+  return Object.keys(errors).length > 0 ? { errors } : { values: { note, notifyCustomer: body.notifyCustomer !== false } }
+}
+
+export function validateShipment(body) {
+  const errors = {}
+  if (!CARRIERS.includes(body.carrier)) errors.carrier = ['Choose a carrier.']
+  const tracking = typeof body.trackingNumber === 'string' ? body.trackingNumber.trim() : ''
+  if (body.trackingNumber !== undefined && body.trackingNumber !== null && typeof body.trackingNumber !== 'string') errors.trackingNumber = ['Enter the tracking number as text.']
+  else if (tracking && !/^[A-Za-z0-9][A-Za-z0-9 -]{0,63}$/.test(tracking)) errors.trackingNumber = ['Use up to 64 letters, digits, spaces, or dashes.']
+  const note = optionalNote(body, errors)
+  if (Object.keys(errors).length > 0) return { errors }
+  return { values: { carrier: body.carrier, trackingNumber: tracking || undefined, note, notifyCustomer: body.notifyCustomer !== false } }
+}
+
+/**
+ * Credit memo: the shape only. The API checks the amounts against what was
+ * paid and already refunded (422 with its own messages).
+ */
+export function validateCreditMemo(body) {
+  const errors = {}
+  const items = []
+  if (body.items !== undefined && (!Array.isArray(body.items) || body.items.length > 200)) errors.items = ['Choose the items to refund.']
+  else {
+    for (const [index, item] of (body.items ?? []).entries()) {
+      if (!Number.isInteger(item?.orderItemId) || item.orderItemId < 1) errors[`items.${index}.orderItemId`] = ['Choose an item of this order.']
+      else if (!Number.isInteger(item.quantity) || item.quantity < 0 || item.quantity > 100_000) errors[`items.${index}.quantity`] = ['Enter a whole number of units.']
+      else if (item.quantity > 0) items.push({ orderItemId: item.orderItemId, quantity: item.quantity })
+    }
+  }
+  const shippingRefund = body.shippingRefund ?? 0
+  const adjustment = body.adjustment ?? 0
+  if (!isMoney(shippingRefund)) errors.shippingRefund = ['Enter a shipping refund of 0 or more, with at most 2 decimals.']
+  if (!isMoney(adjustment, { min: -1_000_000 })) errors.adjustment = ['Enter an adjustment with at most 2 decimals (negative to keep a fee).']
+  if (body.restock !== undefined && typeof body.restock !== 'boolean') errors.restock = ['Choose whether to return the items to stock.']
+  const note = optionalNote(body, errors)
+  if (Object.keys(errors).length > 0) return { errors }
+  if (items.length === 0 && shippingRefund === 0 && adjustment <= 0) return { errors: { items: ['Choose at least one item, or refund shipping or an amount.'] } }
+  return { values: { items, shippingRefund, adjustment, restock: body.restock === true, note, notifyCustomer: body.notifyCustomer !== false } }
+}
+
+const nullable = (rule) => (value) => (value === null ? null : rule(value))
+const isDate = (value) => typeof value === 'string' && value.length <= 40 && /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(value) && !Number.isNaN(Date.parse(value))
+const COUPON_RULES = {
+  code: (value) => (typeof value === 'string' && /^[A-Za-z0-9_-]{3,40}$/.test(value.trim()) ? null : 'Use 3 to 40 letters, digits, dashes, or underscores.'),
+  // Empty: the API writes one from the rules ("10% off your order").
+  description: nullable((value) => (typeof value === 'string' && value.trim().length <= 255 ? null : 'Keep the description under 255 characters (shoppers see it).')),
+  type: (value) => (COUPON_TYPES.includes(value) ? null : 'Choose percent, fixed amount, or free shipping.'),
+  value: (value) => (isMoney(value) ? null : 'Enter a value of 0 or more with at most 2 decimals.'),
+  minSubtotal: nullable((value) => (isMoney(value) ? null : 'Enter a minimum of 0 or more with at most 2 decimals, or leave it empty.')),
+  startsAt: nullable((value) => (isDate(value) ? null : 'Enter a valid start date, or leave it empty.')),
+  endsAt: nullable((value) => (isDate(value) ? null : 'Enter a valid end date, or leave it empty.')),
+  usageLimit: nullable((value) => (Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? null : 'Enter a whole number from 1, or leave it empty for no limit.')),
+  usageLimitPerCustomer: nullable((value) => (Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? null : 'Enter a whole number from 1, or leave it empty for no limit.')),
+  isActive: (value) => (typeof value === 'boolean' ? null : 'Choose whether the code can be used.'),
+}
+
+/** Coupon writes, Laravel-style errors. Cross-field rules (value per type, dates in order) when both fields are sent. */
+export function validateCoupon(body, { partial }) {
+  const errors = {}
+  const values = {}
+  for (const [field, rule] of Object.entries(COUPON_RULES)) {
+    if (body[field] === undefined) {
+      if (!partial && ['code', 'type'].includes(field)) errors[field] = [rule(undefined)]
+      continue
+    }
+    const problem = rule(body[field])
+    if (problem) errors[field] = [problem]
+    else values[field] = typeof body[field] === 'string' ? body[field].trim() : body[field]
+  }
+  if (values.code) values.code = values.code.toUpperCase()
+  if (values.description === '') values.description = null
+  if (values.type === 'free_shipping') values.value = 0 // free shipping has no amount
+  else if (values.type && values.value === undefined && !errors.value && !partial) errors.value = ['Enter the discount.']
+  if (values.type === 'percent' && values.value !== undefined && (values.value < 1 || values.value > 100)) errors.value = ['Enter a percentage from 1 to 100.']
+  if (values.type === 'fixed' && values.value !== undefined && values.value <= 0) errors.value = ['Enter an amount above 0.']
+  if (values.startsAt && values.endsAt && Date.parse(values.endsAt) <= Date.parse(values.startsAt)) errors.endsAt = ['The end must be after the start.']
+  if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) errors.code = ['Change at least one field.']
+  return Object.keys(errors).length > 0 ? { errors } : { values }
+}
+
+/** ?q&limit&skip for the document lists. */
+const listFilters = (url) => ({ q: url.searchParams.get('q')?.trim().slice(0, 100) || undefined, ...pageParams(url) })
 
 const ROUTES = {
   async 'GET me'(ctx) {
@@ -298,6 +418,82 @@ const ROUTES = {
     return fromLaravel(await laravelAdminData.updateOrder(ctx.token, ctx.id, changes, ctx.request))
   },
 
+  async 'POST orders/:id/invoices'(ctx) {
+    if (!realData()) return liveOnly()
+    const { values, errors } = validateInvoice(await readBody(ctx.request))
+    if (errors) return invalid(errors)
+    return fromLaravel(await laravelAdminData.createInvoice(ctx.token, ctx.id, values, ctx.request), 201)
+  },
+
+  async 'POST orders/:id/shipments'(ctx) {
+    if (!realData()) return liveOnly()
+    const { values, errors } = validateShipment(await readBody(ctx.request))
+    if (errors) return invalid(errors)
+    return fromLaravel(await laravelAdminData.createShipment(ctx.token, ctx.id, values, ctx.request), 201)
+  },
+
+  async 'POST orders/:id/credit-memos'(ctx) {
+    if (!realData()) return liveOnly()
+    const { values, errors } = validateCreditMemo(await readBody(ctx.request))
+    if (errors) return invalid(errors)
+    return fromLaravel(await laravelAdminData.createCreditMemo(ctx.token, ctx.id, values, ctx.request), 201)
+  },
+
+  async 'GET orders/:id/refundable'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.refundable(ctx.token, ctx.id, ctx.request))
+  },
+
+  async 'GET invoices'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.listInvoices(ctx.token, listFilters(ctx.url), ctx.request))
+  },
+
+  async 'GET invoices/:id'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.getInvoice(ctx.token, ctx.id, ctx.request))
+  },
+
+  async 'GET credit-memos'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.listCreditMemos(ctx.token, listFilters(ctx.url), ctx.request))
+  },
+
+  async 'GET credit-memos/:id'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.getCreditMemo(ctx.token, ctx.id, ctx.request))
+  },
+
+  async 'GET coupons'(ctx) {
+    if (!realData()) return liveOnly()
+    const filters = { ...listFilters(ctx.url), status: oneOf(ctx.url.searchParams.get('status'), COUPON_FILTERS) }
+    return fromLaravel(await laravelAdminData.listCoupons(ctx.token, filters, ctx.request))
+  },
+
+  async 'POST coupons'(ctx) {
+    if (!realData()) return liveOnly()
+    const { values, errors } = validateCoupon(await readBody(ctx.request), { partial: false })
+    if (errors) return invalid(errors)
+    return fromLaravel(await laravelAdminData.createCoupon(ctx.token, values, ctx.request), 201)
+  },
+
+  async 'GET coupons/:id'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.getCoupon(ctx.token, ctx.id, ctx.request))
+  },
+
+  async 'PATCH coupons/:id'(ctx) {
+    if (!realData()) return liveOnly()
+    const { values, errors } = validateCoupon(await readBody(ctx.request), { partial: true })
+    if (errors) return invalid(errors)
+    return fromLaravel(await laravelAdminData.updateCoupon(ctx.token, ctx.id, values, ctx.request))
+  },
+
+  async 'DELETE coupons/:id'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.deleteCoupon(ctx.token, ctx.id, ctx.request), 200)
+  },
+
   async 'GET customers'(ctx) {
     const { url } = ctx
     const { limit, skip } = pageParams(url)
@@ -329,13 +525,20 @@ const ROUTES = {
   },
 }
 
-/** /api/admin/<resource>[/<id>] → route key like "PUT products/:id". Orders also go by number (BN-100001). */
+/**
+ * /api/admin/<resource>[/<id>[/<document>]] → route key like "PUT products/:id"
+ * or "POST orders/:id/invoices". Orders also go by number (BN-100001),
+ * invoices and credit memos only by theirs (INV-…, CM-…).
+ */
 function matchRoute(method, segments) {
-  const [resource, id, ...rest] = segments
+  const [resource, id, document, ...rest] = segments
   if (rest.length > 0) return null
   if (id === undefined) return { route: ROUTES[`${method} ${resource}`] }
-  if (!isId(id) && !(resource === 'orders' && isOrderNumber(id))) return null
-  return { route: ROUTES[`${method} ${resource}/:id`], id }
+  if (!(ID_FORMATS[resource] ?? isId)(id)) return null
+  if (document === undefined) return { route: ROUTES[`${method} ${resource}/:id`], id }
+  // Documents belong to an order, addressed by its number.
+  if (resource !== 'orders' || !isOrderNumber(id) || !ORDER_DOCUMENTS.includes(document)) return null
+  return { route: ROUTES[`${method} orders/:id/${document}`], id }
 }
 
 /** The admin session routes: no permission check (they create or end the session). */

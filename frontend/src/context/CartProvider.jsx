@@ -6,6 +6,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys'
 import { useAuth } from '../hooks/useAuth'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
+import { REAL_SHOP } from '../constants/shop'
 
 const STORAGE_OPTIONS = {
   storageKey: STORAGE_KEYS.cart,
@@ -63,7 +64,9 @@ function CartProvider({ children }) {
     () => ({
       items: cart.items,
       couponCode: cart.couponCode,
-      totals: calculateCartTotals(cart.items, cart.couponCode),
+      // With BuyNest's API the server decides about coupons (cart page and
+      // checkout ask it); the local table in constants/store.js is demo-only.
+      totals: calculateCartTotals(cart.items, REAL_SHOP ? null : cart.couponCode),
       isCartOpen,
       addItem,
       updateQuantity,

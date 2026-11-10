@@ -1,5 +1,5 @@
 import { laravel } from '../http.js'
-import { camelPath, fromOrder } from './laravel.js'
+import { camelPath, fromAddress, fromLine, fromOrder, fromShipment, fromTotals } from './laravel.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -121,6 +121,9 @@ function adminOrderDetail(raw) {
     subtotal: order.totals.subtotal,
     total: order.totals.total,
     items: order.totals.itemCount,
+    shipments: (raw.shipments ?? []).map(adminShipment),
+    invoices: (raw.invoices ?? []).map(adminInvoice),
+    creditMemos: (raw.credit_memos ?? []).map(adminCreditMemo),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -134,6 +137,109 @@ function adminOrderDetail(raw) {
 }
 
 const pageOf = ({ limit, skip }) => ({ page: Math.floor(skip / limit) + 1, perPage: limit })
+
+/** ?search&page&per_page (+ extra filters) for the admin's list endpoints. */
+function listParams({ q, limit, skip, ...filters }) {
+  const { page, perPage } = pageOf({ limit, skip })
+  const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+  if (q) params.set('search', q)
+  for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value)
+  return params
+}
+
+// ---- phase 3 documents (docs/backend/PHASE3_CONTRACT.md) ----
+
+const adminShipment = (raw) => ({ ...fromShipment(raw), orderNumber: raw.order_number ?? null, adminName: raw.admin_name ?? null, note: raw.note ?? null })
+
+/** InvoiceResource → the admin's invoice (lists may leave out the items and totals). */
+export function adminInvoice(raw) {
+  return {
+    number: raw.number,
+    orderNumber: raw.order_number ?? null,
+    amount: money(raw.amount),
+    createdAt: raw.created_at,
+    adminName: raw.admin_name ?? null,
+    note: raw.note ?? null,
+    ...(raw.billing_address && { billingAddress: fromAddress(raw.billing_address) }),
+    ...(raw.items && { items: raw.items.map(fromLine) }),
+    ...(raw.totals && { totals: fromTotals(raw.totals) }),
+  }
+}
+
+/** CreditMemoResource → the admin's credit memo. */
+export function adminCreditMemo(raw) {
+  return {
+    number: raw.number,
+    orderNumber: raw.order_number ?? null,
+    items: (raw.items ?? []).map((item) => ({ name: item.name, sku: item.sku ?? null, quantity: item.quantity, amount: money(item.amount) })),
+    subtotal: money(raw.subtotal),
+    shippingRefund: money(raw.shipping_refund) ?? 0,
+    adjustment: money(raw.adjustment) ?? 0,
+    total: money(raw.total),
+    restocked: raw.restocked === true,
+    createdAt: raw.created_at,
+    adminName: raw.admin_name ?? null,
+    note: raw.note ?? null,
+  }
+}
+
+/** /refundable → the refund form's limits. */
+function refundLimits(raw) {
+  return {
+    items: (raw.items ?? []).map((item) => ({
+      orderItemId: item.order_item_id,
+      name: item.name,
+      sku: item.sku ?? null,
+      ordered: item.ordered,
+      refunded: item.refunded,
+      refundable: item.refundable,
+      unitRefund: money(item.unit_refund),
+    })),
+    shippingRefundable: money(raw.shipping_refundable) ?? 0,
+    maxTotal: money(raw.max_total) ?? 0,
+  }
+}
+
+/** CouponResource → the admin's coupon. */
+export function adminCoupon(raw) {
+  return {
+    id: raw.id,
+    code: raw.code,
+    description: raw.description ?? '',
+    type: raw.type,
+    value: money(raw.value) ?? 0,
+    minSubtotal: money(raw.min_subtotal),
+    startsAt: raw.starts_at ?? null,
+    endsAt: raw.ends_at ?? null,
+    usageLimit: raw.usage_limit ?? null,
+    usageLimitPerCustomer: raw.usage_limit_per_customer ?? null,
+    timesUsed: raw.times_used ?? 0,
+    isActive: raw.is_active === true,
+    status: raw.status,
+    createdAt: raw.created_at ?? null,
+    updatedAt: raw.updated_at ?? null,
+  }
+}
+
+// Coupon form field → API field. Money goes as 2-decimal strings, like every amount in the API.
+const COUPON_FIELDS = {
+  code: 'code',
+  description: 'description',
+  type: 'type',
+  value: 'value',
+  minSubtotal: 'min_subtotal',
+  startsAt: 'starts_at',
+  endsAt: 'ends_at',
+  usageLimit: 'usage_limit',
+  usageLimitPerCustomer: 'usage_limit_per_customer',
+  isActive: 'is_active',
+}
+const COUPON_MONEY = ['value', 'minSubtotal']
+const toCouponBody = (values) =>
+  Object.fromEntries(
+    Object.entries(values).map(([field, value]) => [COUPON_FIELDS[field], COUPON_MONEY.includes(field) && typeof value === 'number' ? value.toFixed(2) : value]),
+  )
+const cents = (value) => (typeof value === 'number' ? value.toFixed(2) : undefined)
 
 export const laravelAdminData = {
   async overview(token, request) {
@@ -227,6 +333,82 @@ export const laravelAdminData = {
 
   async getOrder(token, number, request) {
     return answer(await laravel(`/api/admin/v1/orders/${number}`, { token, request }), [200], (data) => adminOrderDetail(data.data))
+  },
+
+  /** { note?, notifyCustomer } → 201 { invoice }. Records the payment (pending_payment → processing). */
+  async createInvoice(token, number, { note, notifyCustomer }, request) {
+    const result = await laravel(`/api/admin/v1/orders/${number}/invoices`, { method: 'POST', token, request, body: { ...(note && { note }), notify_customer: notifyCustomer } })
+    return answer(result, [200, 201], (data) => ({ invoice: adminInvoice(data.data), live: true }), ORDER_FIELDS)
+  },
+
+  /** { carrier, trackingNumber?, note?, notifyCustomer } → 201 { shipment }. */
+  async createShipment(token, number, { carrier, trackingNumber, note, notifyCustomer }, request) {
+    const body = { carrier, ...(trackingNumber && { tracking_number: trackingNumber }), ...(note && { note }), notify_customer: notifyCustomer }
+    const result = await laravel(`/api/admin/v1/orders/${number}/shipments`, { method: 'POST', token, request, body })
+    return answer(result, [200, 201], (data) => ({ shipment: adminShipment(data.data), live: true }), ORDER_FIELDS)
+  },
+
+  /** { items: [{ orderItemId, quantity }], shippingRefund, adjustment, restock, note?, notifyCustomer } → 201 { creditMemo }. */
+  async createCreditMemo(token, number, memo, request) {
+    const body = {
+      items: memo.items.map((item) => ({ order_item_id: item.orderItemId, quantity: item.quantity })),
+      shipping_refund: cents(memo.shippingRefund),
+      adjustment: cents(memo.adjustment),
+      restock: memo.restock,
+      ...(memo.note && { note: memo.note }),
+      notify_customer: memo.notifyCustomer,
+    }
+    const result = await laravel(`/api/admin/v1/orders/${number}/credit-memos`, { method: 'POST', token, request, body })
+    return answer(result, [200, 201], (data) => ({ creditMemo: adminCreditMemo(data.data), live: true }), ORDER_FIELDS)
+  },
+
+  async refundable(token, number, request) {
+    return answer(await laravel(`/api/admin/v1/orders/${number}/refundable`, { token, request }), [200], (data) => refundLimits(data.data))
+  },
+
+  async listInvoices(token, filters, request) {
+    const result = await laravel(`/api/admin/v1/invoices?${listParams(filters)}`, { token, request })
+    return answer(result, [200], (data) => ({ invoices: data.data.map(adminInvoice), total: data.meta?.total ?? data.data.length, limit: filters.limit, skip: filters.skip, live: true }))
+  },
+
+  async getInvoice(token, number, request) {
+    return answer(await laravel(`/api/admin/v1/invoices/${number}`, { token, request }), [200], (data) => ({ ...adminInvoice(data.data), live: true }))
+  },
+
+  async listCreditMemos(token, filters, request) {
+    const result = await laravel(`/api/admin/v1/credit-memos?${listParams(filters)}`, { token, request })
+    return answer(result, [200], (data) => ({ creditMemos: data.data.map(adminCreditMemo), total: data.meta?.total ?? data.data.length, limit: filters.limit, skip: filters.skip, live: true }))
+  },
+
+  async getCreditMemo(token, number, request) {
+    return answer(await laravel(`/api/admin/v1/credit-memos/${number}`, { token, request }), [200], (data) => ({ ...adminCreditMemo(data.data), live: true }))
+  },
+
+  async listCoupons(token, filters, request) {
+    const result = await laravel(`/api/admin/v1/coupons?${listParams(filters)}`, { token, request })
+    return answer(result, [200], (data) => ({ coupons: data.data.map(adminCoupon), total: data.meta?.total ?? data.data.length, limit: filters.limit, skip: filters.skip, live: true }))
+  },
+
+  async getCoupon(token, id, request) {
+    return answer(await laravel(`/api/admin/v1/coupons/${id}`, { token, request }), [200], (data) => ({ ...adminCoupon(data.data), live: true }))
+  },
+
+  async createCoupon(token, values, request) {
+    const result = await laravel('/api/admin/v1/coupons', { method: 'POST', token, request, body: toCouponBody(values) })
+    return answer(result, [200, 201], (data) => ({ coupon: adminCoupon(data.data), live: true }))
+  },
+
+  async updateCoupon(token, id, values, request) {
+    const result = await laravel(`/api/admin/v1/coupons/${id}`, { method: 'PATCH', token, request, body: toCouponBody(values) })
+    return answer(result, [200], (data) => ({ coupon: adminCoupon(data.data), live: true }))
+  },
+
+  /** A used coupon is only disabled (200 with the coupon, so past orders keep it); an unused one is deleted (204). */
+  async deleteCoupon(token, id, request) {
+    const result = await laravel(`/api/admin/v1/coupons/${id}`, { method: 'DELETE', token, request })
+    return answer(result, [200, 204], (data) =>
+      result.status === 200 && data?.data ? { id: Number(id), disabled: true, coupon: adminCoupon(data.data), live: true } : { id: Number(id), deleted: true, live: true },
+    )
   },
 
   /** { status?, paymentStatus?, note?, notifyCustomer? } → the updated order. */

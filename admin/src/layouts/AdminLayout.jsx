@@ -1,16 +1,46 @@
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
-import { LuBoxes, LuExternalLink, LuLayoutDashboard, LuLogOut, LuReceipt, LuUsers } from 'react-icons/lu'
+import { LuBoxes, LuExternalLink, LuFileText, LuLayoutDashboard, LuLogOut, LuReceipt, LuTicketPercent, LuUndo2, LuUsers } from 'react-icons/lu'
+import { LIVE_DATA } from '../api/mode'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { Loading } from '../components/States'
 import AccessDenied from '../pages/AccessDenied'
 import { fullName } from '../utils/format'
 
-const NAV = [
+const DEMO_NAV = [
   { to: '/', label: 'Overview', icon: LuLayoutDashboard, end: true },
   { to: '/products', label: 'Products', icon: LuBoxes },
   { to: '/orders', label: 'Orders', icon: LuReceipt },
   { to: '/customers', label: 'Customers', icon: LuUsers },
 ]
+
+// Real data (phase 3) adds the sales documents and coupons, grouped like Magento's admin.
+const LIVE_NAV = [
+  { to: '/', label: 'Overview', icon: LuLayoutDashboard, end: true },
+  { to: '/products', label: 'Products', icon: LuBoxes },
+  {
+    heading: 'Sales',
+    items: [
+      { to: '/orders', label: 'Orders', icon: LuReceipt },
+      { to: '/invoices', label: 'Invoices', icon: LuFileText },
+      { to: '/credit-memos', label: 'Credit memos', icon: LuUndo2 },
+    ],
+  },
+  { heading: 'Marketing', items: [{ to: '/coupons', label: 'Coupons', icon: LuTicketPercent }] },
+  { to: '/customers', label: 'Customers', icon: LuUsers },
+]
+
+const NAV = LIVE_DATA ? LIVE_NAV : DEMO_NAV
+
+function NavItem({ to, label, icon: Icon, end }) {
+  return (
+    <li>
+      <NavLink to={to} end={end} className="admin__nav-link">
+        <Icon aria-hidden="true" />
+        {label}
+      </NavLink>
+    </li>
+  )
+}
 
 /**
  * Dashboard shell, shown only to admins. Everyone else sees sign-in or
@@ -51,14 +81,22 @@ function AdminLayout() {
         </p>
         <nav aria-label="Admin">
           <ul className="admin__nav">
-            {NAV.map(({ to, label, icon: Icon, end }) => (
-              <li key={to}>
-                <NavLink to={to} end={end} className="admin__nav-link">
-                  <Icon aria-hidden="true" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
+            {NAV.map((entry) =>
+              entry.heading ? (
+                <li key={entry.heading} className="admin__nav-group">
+                  <span id={`nav-${entry.heading}`} className="admin__nav-heading">
+                    {entry.heading}
+                  </span>
+                  <ul className="admin__nav" aria-labelledby={`nav-${entry.heading}`}>
+                    {entry.items.map((item) => (
+                      <NavItem key={item.to} {...item} />
+                    ))}
+                  </ul>
+                </li>
+              ) : (
+                <NavItem key={entry.to} {...entry} />
+              ),
+            )}
           </ul>
         </nav>
         <div className="admin__account">

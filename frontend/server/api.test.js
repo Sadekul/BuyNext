@@ -494,6 +494,67 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
     expect(sentBody(calls[0])).toEqual({ number: 'BN-100001', email: 'guest@example.com' })
   })
 
+  it('cart/validate sends the customer token when signed in, and a guest email otherwise', async () => {
+    const calls = fakeUpstream({ 'POST /api/v1/cart/validate': { body: { data: { ...CART, coupon: null, coupon_error: "You've already used this code." } } } })
+    const guest = await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [{ productId: 1, quantity: 2 }], couponCode: 'NEST10', email: ' ava@example.com ', total: 1 } })
+    expect((await guest.json()).couponError).toBe("You've already used this code.")
+    expect(sentBody(calls[0])).toEqual({ items: [{ product_id: 1, quantity: 2 }], coupon_code: 'NEST10', shipping_method: 'standard', email: 'ava@example.com' })
+    expect(calls[0].init.headers.Authorization).toBeUndefined()
+
+    await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [], couponCode: 'NEST10' }, cookie: 'buynest_at=1|ACCESS' })
+    expect(calls[1].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+  })
+
+  it('cart/validate is asked again as a guest when the session expired', async () => {
+    const calls = fakeUpstream({})
+    vi.stubGlobal('fetch', async (url, init = {}) => {
+      calls.push({ init })
+      const status = init.headers.Authorization ? 401 : 200
+      return new Response(JSON.stringify(status === 401 ? { message: 'Unauthenticated.' } : { data: CART }), { status, headers: { 'Content-Type': 'application/json' } })
+    })
+    const response = await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [] }, cookie: 'buynest_at=old' })
+    expect(response.status).toBe(200)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('orders carry shipments (https tracking links only), invoices, and refunds', async () => {
+    const shipped = {
+      ...ORDER, status: 'shipped', payment_status: 'partially_refunded', totals: { ...TOTALS, paid: '21.08', refunded: '5.00' },
+      shipments: [
+        { number: 'SHP-100001', order_number: 'BN-100001', carrier: 'ups', carrier_label: 'UPS', tracking_number: '1Z999', tracking_url: 'https://www.ups.com/track?tracknum=1Z999', created_at: 'T1', admin_name: 'Store Admin', note: null },
+        { number: 'SHP-100002', carrier: 'other', carrier_label: 'Other', tracking_number: 'X', tracking_url: 'javascript:alert(1)', created_at: 'T2' },
+      ],
+      invoices: [{ number: 'INV-100001', amount: '21.08', created_at: 'T0' }],
+      credit_memos: [{ number: 'CM-100001', total: '5.00', created_at: 'T3' }],
+    }
+    fakeUpstream({ 'GET /api/v1/orders/BN-100001': { body: { data: shipped } } })
+    const order = await (await call('orders/BN-100001', { service: 'shop', cookie: 'buynest_at=1|ACCESS' })).json()
+    expect(order.shipments).toEqual([
+      { number: 'SHP-100001', carrier: 'ups', carrierLabel: 'UPS', trackingNumber: '1Z999', trackingUrl: 'https://www.ups.com/track?tracknum=1Z999', createdAt: 'T1' },
+      { number: 'SHP-100002', carrier: 'other', carrierLabel: 'Other', trackingNumber: 'X', trackingUrl: null, createdAt: 'T2' },
+    ])
+    expect(order.invoices).toEqual([{ number: 'INV-100001', amount: 21.08, createdAt: 'T0' }])
+    expect(order.creditMemos).toEqual([{ number: 'CM-100001', total: 5, createdAt: 'T3' }])
+    expect(order.totals).toMatchObject({ paid: 21.08, refunded: 5 })
+    expect(JSON.stringify(order)).not.toContain('Store Admin')
+  })
+
+  it("shows a customer's own invoice, only with the session and well-formed numbers", async () => {
+    const invoice = { number: 'INV-100001', order_number: 'BN-100001', amount: '21.08', created_at: 'T', admin_name: 'Store Admin', note: 'internal', billing_address: ADDRESS, items: [LINE], totals: TOTALS }
+    const calls = fakeUpstream({ 'GET /api/v1/orders/BN-100001/invoices/INV-100001': { body: { data: invoice } } })
+    expect((await call('orders/BN-100001/invoices/INV-100001', { service: 'shop' })).status).toBe(401)
+    const response = await call('orders/BN-100001/invoices/INV-100001', { service: 'shop', cookie: 'buynest_at=1|ACCESS' })
+    const body = await response.json()
+    expect(body).toMatchObject({ number: 'INV-100001', orderNumber: 'BN-100001', amount: 21.08, billingAddress: { firstName: 'Ava' }, items: [{ title: 'Mascara', lineTotal: 17.88 }], totals: { total: 21.08 } })
+    expect(body).not.toHaveProperty('adminName')
+    expect(body).not.toHaveProperty('note')
+    expect(calls[0].init.headers.Authorization).toBe('Bearer 1|ACCESS')
+    for (const path of ['orders/BN-100001/invoices/CM-1', 'orders/BN-100001/invoices/INV-1/x', 'orders/1/invoices/INV-1', 'orders/BN-100001/shipments/SHP-1']) {
+      expect((await call(path, { service: 'shop', cookie: 'buynest_at=1|ACCESS' })).status).toBe(404)
+    }
+    expect(calls).toHaveLength(1)
+  })
+
   describe('admin data from Laravel', () => {
     const ADMIN_ME = { 'GET /api/admin/v1/me': { body: { data: { id: 1, name: 'Store Admin', email: 'admin@buynest.test' } } } }
     const admin = (action, options = {}) => call(action, { service: 'admin', cookie: 'buynest_admin_at=9|ADMIN', ...options })
@@ -568,11 +629,143 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
       })
     })
 
+    it('invoices and ships an order, forwarding only allowed fields', async () => {
+      const invoice = { number: 'INV-100001', order_number: 'BN-100001', amount: '21.08', created_at: 'T', admin_name: 'Store Admin', note: null }
+      const shipment = { number: 'SHP-100001', order_number: 'BN-100001', carrier: 'dhl', carrier_label: 'DHL', tracking_number: 'JD0123', tracking_url: 'https://www.dhl.com/en/express/tracking.html?AWB=JD0123', created_at: 'T', admin_name: 'Store Admin', note: 'Box 1' }
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'POST /api/admin/v1/orders/BN-100001/invoices': { status: 201, body: { data: invoice } },
+        'POST /api/admin/v1/orders/BN-100001/shipments': { status: 201, body: { data: shipment } },
+      })
+      const invoiced = await admin('orders/BN-100001/invoices', { method: 'POST', body: { note: ' Paid by transfer ', notifyCustomer: false, amount: 1 } })
+      expect(invoiced.status).toBe(201)
+      expect(await invoiced.json()).toEqual({ invoice: { number: 'INV-100001', orderNumber: 'BN-100001', amount: 21.08, createdAt: 'T', adminName: 'Store Admin', note: null }, live: true })
+      expect(sentBody(calls.at(-1))).toEqual({ note: 'Paid by transfer', notify_customer: false })
+
+      const shipped = await admin('orders/BN-100001/shipments', { method: 'POST', body: { carrier: 'dhl', trackingNumber: ' JD0123 ', note: 'Box 1', status: 'delivered' } })
+      expect((await shipped.json()).shipment).toMatchObject({ carrierLabel: 'DHL', trackingNumber: 'JD0123', trackingUrl: expect.stringMatching(/^https:/), adminName: 'Store Admin', note: 'Box 1' })
+      expect(sentBody(calls.at(-1))).toEqual({ carrier: 'dhl', tracking_number: 'JD0123', note: 'Box 1', notify_customer: true })
+
+      const before = calls.length
+      expect((await admin('orders/BN-100001/shipments', { method: 'POST', body: { carrier: 'pigeon' } })).status).toBe(422)
+      expect((await (await admin('orders/BN-100001/shipments', { method: 'POST', body: { carrier: 'ups', trackingNumber: '<script>' } })).json()).errors).toHaveProperty('trackingNumber')
+      expect(calls.length - before).toBe(2) // only the session checks: nothing reached the API
+    })
+
+    it('passes the API refusal of a second invoice through as a 422 message', async () => {
+      fakeUpstream({ ...ADMIN_ME, 'POST /api/admin/v1/orders/BN-100001/invoices': { status: 422, body: { message: 'This order already has an invoice.', errors: { order: ['This order already has an invoice.'] } } } })
+      const response = await admin('orders/BN-100001/invoices', { method: 'POST', body: {} })
+      expect(response.status).toBe(422)
+      expect(await response.json()).toEqual({ message: 'This order already has an invoice.', errors: { order: ['This order already has an invoice.'] } })
+    })
+
+    it('shows refund limits and creates a credit memo with money as strings', async () => {
+      const limits = { items: [{ order_item_id: 11, name: 'Mascara', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unit_refund: '8.04' }], shipping_refundable: '4.99', max_total: '21.08' }
+      const memo = { number: 'CM-100001', order_number: 'BN-100001', items: [{ name: 'Mascara', sku: 'BEA-1', quantity: 1, amount: '8.04' }], subtotal: '8.04', shipping_refund: '4.99', adjustment: '-1.00', total: '12.03', restocked: true, created_at: 'T', admin_name: 'Store Admin', note: null }
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/orders/BN-100001/refundable': { body: { data: limits } },
+        'POST /api/admin/v1/orders/BN-100001/credit-memos': { status: 201, body: { data: memo } },
+      })
+      expect(await (await admin('orders/BN-100001/refundable')).json()).toEqual({
+        items: [{ orderItemId: 11, name: 'Mascara', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unitRefund: 8.04 }],
+        shippingRefundable: 4.99,
+        maxTotal: 21.08,
+      })
+      const created = await admin('orders/BN-100001/credit-memos', {
+        method: 'POST',
+        body: { items: [{ orderItemId: 11, quantity: 1, amount: 99 }, { orderItemId: 12, quantity: 0 }], shippingRefund: 4.99, adjustment: -1, restock: true, total: 999 },
+      })
+      expect(created.status).toBe(201)
+      expect((await created.json()).creditMemo).toMatchObject({ number: 'CM-100001', shippingRefund: 4.99, adjustment: -1, total: 12.03, restocked: true, items: [{ name: 'Mascara', amount: 8.04 }] })
+      expect(sentBody(calls.at(-1))).toEqual({ items: [{ order_item_id: 11, quantity: 1 }], shipping_refund: '4.99', adjustment: '-1.00', restock: true, notify_customer: true })
+
+      expect((await admin('orders/BN-100001/credit-memos', { method: 'POST', body: { items: [], shippingRefund: 0 } })).status).toBe(422)
+      expect((await admin('orders/BN-100001/credit-memos', { method: 'POST', body: { items: [{ orderItemId: 11, quantity: 1.5 }] } })).status).toBe(422)
+      expect((await admin('orders/BN-100001/credit-memos', { method: 'POST', body: { items: [{ orderItemId: 11, quantity: 1 }], shippingRefund: 1.001 } })).status).toBe(422)
+    })
+
+    it('maps API field errors on a credit memo to the form names', async () => {
+      fakeUpstream({ ...ADMIN_ME, 'POST /api/admin/v1/orders/BN-100001/credit-memos': { status: 422, body: { message: 'Invalid', errors: { 'items.0.quantity': ['Only 1 can be refunded.'], shipping_refund: ['At most $0.00.'] } } } })
+      const response = await admin('orders/BN-100001/credit-memos', { method: 'POST', body: { items: [{ orderItemId: 11, quantity: 2 }], shippingRefund: 1 } })
+      expect((await response.json()).errors).toEqual({ 'items.0.quantity': ['Only 1 can be refunded.'], shippingRefund: ['At most $0.00.'] })
+    })
+
+    it('lists and shows invoices and credit memos by their numbers only', async () => {
+      const invoice = { number: 'INV-100001', order_number: 'BN-100001', amount: '21.08', created_at: 'T', admin_name: 'Store Admin', note: null, billing_address: ADDRESS, items: [LINE], totals: TOTALS }
+      const memo = { number: 'CM-100001', order_number: 'BN-100001', items: [], subtotal: '0.00', shipping_refund: '4.99', adjustment: '0.00', total: '4.99', restocked: false, created_at: 'T', admin_name: 'Store Admin', note: null }
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/invoices': { body: { data: [invoice], meta: { total: 41 } } },
+        'GET /api/admin/v1/invoices/INV-100001': { body: { data: invoice } },
+        'GET /api/admin/v1/credit-memos': { body: { data: [memo], meta: { total: 1 } } },
+        'GET /api/admin/v1/credit-memos/CM-100001': { body: { data: memo } },
+      })
+      const list = await (await admin('invoices?q=BN-1&limit=20&skip=40&evil=1')).json()
+      expect(list).toMatchObject({ total: 41, live: true, invoices: [{ number: 'INV-100001', orderNumber: 'BN-100001', amount: 21.08 }] })
+      expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '3', per_page: '20', search: 'BN-1' })
+      expect(await (await admin('invoices/INV-100001')).json()).toMatchObject({ number: 'INV-100001', billingAddress: { city: 'Springfield' }, items: [{ title: 'Mascara' }], totals: { total: 21.08 } })
+      expect(await (await admin('credit-memos')).json()).toMatchObject({ total: 1, creditMemos: [{ number: 'CM-100001', shippingRefund: 4.99 }] })
+      expect(await (await admin('credit-memos/CM-100001')).json()).toMatchObject({ number: 'CM-100001', total: 4.99, restocked: false })
+
+      const before = calls.length
+      for (const path of ['invoices/1', 'invoices/CM-100001', 'credit-memos/INV-1', 'orders/BN-1/notes', 'orders/12/invoices', 'invoices/INV-1/x']) {
+        expect((await admin(path)).status).toBe(404)
+      }
+      expect(calls.length).toBe(before) // refused before any session check or upstream call
+    })
+
+    it('manages coupons: filters, validation, upper-case codes, and disable vs delete', async () => {
+      const coupon = { id: 3, code: 'WINTER5', description: '$5 off', type: 'fixed', value: '5.00', min_subtotal: '25.00', starts_at: null, ends_at: '2026-12-31T23:59:00Z', usage_limit: 100, usage_limit_per_customer: 1, times_used: 0, is_active: true, status: 'active', created_at: 'T', updated_at: 'T' }
+      let deleted = 204
+      const calls = fakeUpstream({
+        ...ADMIN_ME,
+        'GET /api/admin/v1/coupons': { body: { data: [coupon], meta: { total: 1 } } },
+        'POST /api/admin/v1/coupons': { status: 201, body: { data: coupon } },
+        'PATCH /api/admin/v1/coupons/3': { body: { data: { ...coupon, is_active: false, status: 'inactive' } } },
+      })
+      const list = await (await admin('coupons?status=expired&q=win')).json()
+      expect(list.coupons[0]).toEqual({ id: 3, code: 'WINTER5', description: '$5 off', type: 'fixed', value: 5, minSubtotal: 25, startsAt: null, endsAt: '2026-12-31T23:59:00Z', usageLimit: 100, usageLimitPerCustomer: 1, timesUsed: 0, isActive: true, status: 'active', createdAt: 'T', updatedAt: 'T' })
+      expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '1', per_page: '20', search: 'win', status: 'expired' })
+      await admin('coupons?status=used_up')
+      expect(new URLSearchParams(calls.at(-1).search).get('status')).toBe('used_up')
+      await admin('coupons?status=bogus')
+      expect(new URLSearchParams(calls.at(-1).search).has('status')).toBe(false)
+
+      const created = await admin('coupons', { method: 'POST', body: { code: ' winter5 ', description: '$5 off', type: 'fixed', value: 5, minSubtotal: 25, endsAt: '2026-12-31T23:59:00Z', usageLimit: 100, usageLimitPerCustomer: 1, isActive: true, timesUsed: 50 } })
+      expect(created.status).toBe(201)
+      expect(sentBody(calls.at(-1))).toEqual({ code: 'WINTER5', description: '$5 off', type: 'fixed', value: '5.00', min_subtotal: '25.00', ends_at: '2026-12-31T23:59:00Z', usage_limit: 100, usage_limit_per_customer: 1, is_active: true })
+
+      const invalid = await (await admin('coupons', { method: 'POST', body: { code: 'x', type: 'percent', value: 150, startsAt: '2026-12-01', endsAt: '2026-11-01', description: 'Big' } })).json()
+      expect(Object.keys(invalid.errors).sort()).toEqual(['code', 'endsAt', 'value'])
+      const free = await admin('coupons', { method: 'POST', body: { code: 'SHIPFREE', description: '', type: 'free_shipping', value: 9 } })
+      expect(free.status).toBe(201)
+      expect(sentBody(calls.at(-1))).toMatchObject({ value: '0.00', description: null }) // the API writes a description
+
+      const disabled = await admin('coupons/3', { method: 'PATCH', body: { isActive: false } })
+      expect((await disabled.json()).coupon).toMatchObject({ isActive: false, status: 'inactive' })
+      expect(sentBody(calls.at(-1))).toEqual({ is_active: false })
+      expect((await admin('coupons/3', { method: 'PATCH', body: {} })).status).toBe(422)
+
+      vi.stubGlobal('fetch', async (url) => {
+        const { pathname } = new URL(url)
+        if (pathname === '/api/admin/v1/me') return new Response(JSON.stringify(ADMIN_ME['GET /api/admin/v1/me'].body), { status: 200 })
+        return deleted === 204 ? new Response(null, { status: 204 }) : new Response(JSON.stringify({ data: { ...coupon, times_used: 4, is_active: false } }), { status: 200 })
+      })
+      expect(await (await admin('coupons/3', { method: 'DELETE' })).json()).toEqual({ id: 3, deleted: true, live: true })
+      deleted = 200
+      expect(await (await admin('coupons/3', { method: 'DELETE' })).json()).toMatchObject({ id: 3, disabled: true, coupon: { timesUsed: 4, isActive: false } })
+      expect((await admin('coupons/WINTER5', { method: 'DELETE' })).status).toBe(404)
+    })
+
     it('demo mode refuses order changes and order numbers', async () => {
       vi.stubEnv('VITE_API_PROVIDER', 'dummyjson')
       fakeUpstream(ADMIN_ME)
       expect((await admin('orders/BN-100001', { method: 'PATCH', body: { status: 'shipped' } })).status).toBe(404)
       expect((await admin('orders/BN-100001')).status).toBe(404)
+      for (const [path, method] of [['orders/BN-100001/invoices', 'POST'], ['invoices', 'GET'], ['coupons', 'GET'], ['coupons/1', 'DELETE']]) {
+        expect((await admin(path, { method, body: method === 'GET' ? undefined : {} })).status).toBe(404)
+      }
     })
   })
 })

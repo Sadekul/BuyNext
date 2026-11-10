@@ -7,7 +7,7 @@ import './CartSummary.css'
  * Order summary. Every number comes from calculateCartTotals();
  * this component only displays them. `children` holds the action buttons.
  */
-function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, children }) {
+function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isCheckingCoupon = false, children }) {
   return (
     <section className="cart-summary" aria-labelledby="cart-summary-title">
       <h2 id="cart-summary-title" className="cart-summary__title">
@@ -53,6 +53,7 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, childr
         couponError={totals.couponError}
         onApply={onApplyCoupon}
         onRemove={onRemoveCoupon}
+        checking={isCheckingCoupon}
       />
 
       {children && <div className="cart-summary__actions">{children}</div>}

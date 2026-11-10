@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PlaceOrderRequest;
+use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\OrderResource;
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Services\Checkout;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +34,7 @@ class OrderController extends Controller
         $data = $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:50']]);
 
         $orders = Order::where('customer_id', $request->user()->id)
-            ->with('items')
+            ->with(['items', ...Order::DOCUMENTS])
             ->latest('id')
             ->paginate($data['per_page'] ?? 10)
             ->withQueryString();
@@ -45,10 +47,24 @@ class OrderController extends Controller
     {
         $order = Order::where('number', strtoupper($number))
             ->where('customer_id', $request->user()->id)
-            ->with(['items', 'history'])
+            ->with(['items', 'history', ...Order::DOCUMENTS])
             ->first();
 
         return $order ? new OrderResource($order) : response()->json(['message' => 'Order not found.'], 404);
+    }
+
+    /**
+     * GET /api/v1/orders/{number}/invoices/{invoice} - for the printable invoice page.
+     * Only the customer's own orders; anything else is "not found".
+     */
+    public function invoice(Request $request, string $number, string $invoice): InvoiceResource|JsonResponse
+    {
+        $found = Invoice::where('number', strtoupper($invoice))
+            ->whereHas('order', fn ($q) => $q->where('number', strtoupper($number))->where('customer_id', $request->user()->id))
+            ->with(['order.items', 'order.invoices', 'order.creditMemos'])
+            ->first();
+
+        return $found ? (new InvoiceResource($found))->forCustomer() : response()->json(['message' => 'Invoice not found.'], 404);
     }
 
     /** POST /api/v1/orders/lookup { number, email } - for guests. Same 404 whichever part is wrong. */
@@ -59,7 +75,7 @@ class OrderController extends Controller
             'email' => ['required', 'string', 'email', 'max:190'],
         ]);
 
-        $order = Order::where('number', strtoupper(trim($data['number'])))->with(['items', 'history'])->first();
+        $order = Order::where('number', strtoupper(trim($data['number'])))->with(['items', 'history', ...Order::DOCUMENTS])->first();
 
         return $order && mb_strtolower($order->email) === mb_strtolower(trim($data['email']))
             ? new OrderResource($order)

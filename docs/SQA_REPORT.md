@@ -115,10 +115,22 @@ Behaviour decided on the way: a 401 on a customer's order renews the session onc
 
 Checks: backend 79 feature tests; frontend 190 unit tests (47 for the server services); admin 17; browser checks with the new `orders.mjs` (guest and customer orders, stock, emails, tracking, someone else's order refused, admin ship/deliver/paid/cancel with restock, price change mid-checkout, Draft products hidden).
 
+## Backend phase 3 (invoices, shipments, refunds, coupons) — 2026-11-11
+
+Built by two agents in parallel against [backend/PHASE3_CONTRACT.md](backend/PHASE3_CONTRACT.md) (both were paused by the usage limit and resumed where they stopped), then integrated and verified. Refund math is in integer cents: each line's share of the order coupon is split so the shares add up exactly to the discount, and a full refund always equals what was paid, whatever order units are refunded in. Coupon use is counted inside the checkout transaction with a row lock (three parallel checkouts on a single-use code: one order, two refusals) and released when an order is cancelled.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| P1 | Medium | Orders marked paid in phase 2 had no invoice, so phase 3 saw them as paid $0: they couldn't be refunded, and a second invoice could be created for them | Migration gives each one its missing invoice; invoicing is refused for any order whose payment is already recorded (tests for both) |
+| P2 | Low | Customer-visible shipment and invoice data could have included the admin's name and internal notes | Customers see notes only when they were emailed, never the admin's name |
+| P3 | Test | The refund check assumed refunding the only unit closes the order; shipping still had to be refunded | Correct behaviour; the check refunds the shipping too |
+
+Checks: backend 108 feature tests; frontend 205; admin 24; browser checks with the new `documents.mjs`.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
-- With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin records the payment (invoices in phase 3). Tax is 0 until phase 4.
+- With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin creates the invoice, and refunds record money the shop returns by the original method. Tax is 0 until phase 4.
 - Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
 - Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database.

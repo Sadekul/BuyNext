@@ -13,6 +13,7 @@ export const ROUTES = {
   account: '/account',
   orders: '/account/orders',
   orderDetails: (orderId) => `/account/orders/${orderId}`,
+  invoice: (orderId, invoiceNumber) => `/account/orders/${orderId}/invoices/${invoiceNumber}`,
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',

@@ -44,7 +44,7 @@ return [
      * Store rules. Every amount is in whole CENTS (499 = $4.99), because
      * integers add up exactly and floats don't. App\Services\Pricing is the
      * only code that reads these money rules. They move into the admin in
-     * phase 3/4.
+     * phase 4.
      */
     'store' => [
         'currency' => 'USD',
@@ -60,11 +60,7 @@ return [
             'nextDay' => ['label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price_cents' => 2499, 'free_over_threshold' => false],
         ],
 
-        // Codes are matched case-insensitively (stored upper case here).
-        'coupons' => [
-            'NEST10' => ['type' => 'percent', 'value' => 10, 'description' => '10% off your order'],
-            'SAVE20' => ['type' => 'fixed', 'value_cents' => 2000, 'min_subtotal_cents' => 15000, 'description' => '$20 off orders of $150 or more'],
-        ],
+        // Coupons live in the database since phase 3 (coupons table, admin: Marketing → Coupons).
 
         'payment_methods' => [
             'card' => 'Credit or debit card',

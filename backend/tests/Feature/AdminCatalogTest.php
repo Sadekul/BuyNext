@@ -148,7 +148,7 @@ class AdminCatalogTest extends TestCase
         $this->assertSame(2, $data['orders']['total']);
         $this->assertSame(2, $data['orders']['units_sold']);
         $this->assertSame('44.99', $data['orders']['average_order']);
-        $this->assertSame(['pending_payment' => 0, 'processing' => 1, 'shipped' => 0, 'delivered' => 0, 'cancelled' => 1], $data['orders']['by_status']);
+        $this->assertSame(['pending_payment' => 0, 'processing' => 1, 'shipped' => 0, 'delivered' => 0, 'cancelled' => 1, 'closed' => 0], $data['orders']['by_status']);
         $this->assertSame(['total' => 2], $data['customers']);
         $this->assertSame(10, $data['low_stock_threshold']);
         $this->assertSame([0, 1], array_column($data['low_stock_products'], 'stock_quantity'));

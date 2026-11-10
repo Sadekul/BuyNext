@@ -21,9 +21,13 @@ const cartLines = (items) => items.filter((item) => !item.isUnavailable).map((it
 /**
  * POST /api/shop/cart/validate → { lines, problems, coupon, couponError, shippingOptions, totals }.
  * `problems`: [{ productId, code: unavailable | insufficient_stock | below_minimum, message }].
+ * The server decides whether the coupon applies (`coupon` or `couponError`). A
+ * guest's `email` lets it check "one use per customer" before checkout; a
+ * signed-in customer is recognised by the session cookie.
  */
-export function validateCart({ items, couponCode, shippingMethod }, { signal } = {}) {
-  return apiClient.post('/api/shop/cart/validate', { items: cartLines(items), couponCode: couponCode || null, shippingMethod }, { ...SHOP, signal })
+export function validateCart({ items, couponCode, shippingMethod, email }, { signal } = {}) {
+  const body = { items: cartLines(items), couponCode: couponCode || null, shippingMethod, ...(email && { email }) }
+  return apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
 }
 
 /**
@@ -58,6 +62,11 @@ export function getOrders({ page = 1, signal } = {}) {
 /** GET /api/shop/orders/:number → one of the signed-in customer's orders (404 otherwise). */
 export function getOrder(number, { signal } = {}) {
   return apiClient.get(`/api/shop/orders/${encodeURIComponent(number)}`, { ...SHOP, signal })
+}
+
+/** GET /api/shop/orders/:number/invoices/:invoice → a printable invoice of the customer's own order (404 otherwise). */
+export function getInvoice(number, invoice, { signal } = {}) {
+  return apiClient.get(`/api/shop/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}`, { ...SHOP, signal })
 }
 
 /** POST /api/shop/orders/lookup { number, email } → the order (guests). 404 when either doesn't match. */

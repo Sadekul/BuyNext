@@ -22,6 +22,7 @@ final readonly class CartQuote
         public int $shippingCents,
         public int $taxCents,
         public int $totalCents,
+        public ?int $couponId = null, // the coupons row applied (checkout counts the use)
     ) {}
 
     public function hasProblems(): bool

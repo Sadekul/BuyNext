@@ -1,5 +1,5 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
-import { getOrder, getOrders, validateCart } from '../services/shopService'
+import { getInvoice, getOrder, getOrders, validateCart } from '../services/shopService'
 
 /*
  * The signed-in customer's orders from BuyNest's API (REAL_SHOP). The user id
@@ -10,6 +10,7 @@ export const orderKeys = {
   all: ['orders'],
   list: (userId, page) => ['orders', userId, 'list', page],
   detail: (userId, number) => ['orders', userId, 'detail', number],
+  invoice: (userId, number, invoice) => ['orders', userId, 'invoice', number, invoice],
 }
 
 /** One page of orders, newest first. `authorizedRequest` (useAuth) renews the session on 401. */
@@ -28,17 +29,25 @@ export const orderQuery = (userId, number, authorizedRequest) =>
     staleTime: 30_000,
   })
 
+export const invoiceQuery = (userId, number, invoice, authorizedRequest) =>
+  queryOptions({
+    queryKey: orderKeys.invoice(userId, number, invoice),
+    queryFn: ({ signal }) => authorizedRequest(() => getInvoice(number, invoice, { signal })),
+    staleTime: 5 * 60_000, // an invoice never changes
+  })
+
 /**
  * The server's price for the cart (POST /api/shop/cart/validate). A query,
  * not a mutation: it changes nothing, and the checkout re-asks whenever the
  * lines, coupon, or delivery method change. The key holds only ids and
  * quantities, so a refreshed product snapshot doesn't trigger a new request.
  */
-export const cartPricingKey = ({ items, couponCode, shippingMethod }) => [
+export const cartPricingKey = ({ items, couponCode, shippingMethod, email }) => [
   'cart-pricing',
   items.filter((item) => !item.isUnavailable).map((item) => `${item.productId}x${item.quantity}`),
   couponCode ?? null,
   shippingMethod,
+  email ?? null, // a guest's email can change whether a code applies (one use per customer)
 ]
 
 export const cartPricingQuery = (input) =>

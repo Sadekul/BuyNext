@@ -16,6 +16,13 @@ export const adminKeys = {
   orders: (params) => ['orders', params],
   order: (id) => ['order', String(id)],
   customers: (params) => ['customers', params],
+  refundable: (number) => ['refundable', String(number)],
+  invoices: (params) => ['invoices', params],
+  invoice: (number) => ['invoice', String(number)],
+  creditMemos: (params) => ['credit-memos', params],
+  creditMemo: (number) => ['credit-memo', String(number)],
+  coupons: (params) => ['coupons', params],
+  coupon: (id) => ['coupon', String(id)],
 }
 
 export const getOverview = ({ signal } = {}) => api.get('/api/admin/overview', { signal })
@@ -32,3 +39,26 @@ export const updateOrder = (number, changes) => api.patch(`/api/admin/orders/${n
 export const getCustomers = (params, { signal } = {}) => api.get('/api/admin/customers', { params, signal })
 /** Block (isActive false) or unblock a customer. Blocking signs them out everywhere. BuyNest accounts only. */
 export const updateCustomer = (id, values) => api.patch(`/api/admin/customers/${id}`, values)
+
+/*
+ * Phase 3 documents (docs/backend/PHASE3_CONTRACT.md), real orders only.
+ * An invoice records the payment, a shipment the parcel, a credit memo a refund.
+ */
+/** { note?, notifyCustomer } → { invoice }. */
+export const createInvoice = (number, values) => api.post(`/api/admin/orders/${number}/invoices`, values)
+/** { carrier, trackingNumber?, note?, notifyCustomer } → { shipment }. */
+export const createShipment = (number, values) => api.post(`/api/admin/orders/${number}/shipments`, values)
+/** { items: [{ orderItemId, quantity }], shippingRefund, adjustment, restock, note?, notifyCustomer } → { creditMemo }. */
+export const createCreditMemo = (number, values) => api.post(`/api/admin/orders/${number}/credit-memos`, values)
+/** What can still be refunded: { items: [{ orderItemId, name, sku, ordered, refunded, refundable, unitRefund }], shippingRefundable, maxTotal }. */
+export const getRefundable = (number, { signal } = {}) => api.get(`/api/admin/orders/${number}/refundable`, { signal })
+export const getInvoices = (params, { signal } = {}) => api.get('/api/admin/invoices', { params, signal })
+export const getInvoice = (number, { signal } = {}) => api.get(`/api/admin/invoices/${number}`, { signal })
+export const getCreditMemos = (params, { signal } = {}) => api.get('/api/admin/credit-memos', { params, signal })
+export const getCreditMemo = (number, { signal } = {}) => api.get(`/api/admin/credit-memos/${number}`, { signal })
+export const getCoupons = (params, { signal } = {}) => api.get('/api/admin/coupons', { params, signal })
+export const getCoupon = (id, { signal } = {}) => api.get(`/api/admin/coupons/${id}`, { signal })
+export const createCoupon = (values) => api.post('/api/admin/coupons', values)
+export const updateCoupon = (id, values) => api.patch(`/api/admin/coupons/${id}`, values)
+/** Deletes an unused coupon ({ deleted: true }); one already used is only disabled ({ disabled: true, coupon }). */
+export const deleteCoupon = (id) => api.delete(`/api/admin/coupons/${id}`)
