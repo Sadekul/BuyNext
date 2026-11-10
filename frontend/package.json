@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run build:admin",
     "lint": "eslint .",
+    "build:admin": "npm --prefix ../admin run build -- --outDir ../frontend/dist/admin --emptyOutDir",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -36,7 +36,7 @@ const SESSION_HINT_COOKIE = 'buynest_session'
 
 // Only these profile fields are written to storage. Phone and address stay in
 // memory (pages fetch them fresh from /api/auth/me).
-const STORED_USER_FIELDS = ['id', 'username', 'firstName', 'lastName', 'email', 'image']
+const STORED_USER_FIELDS = ['id', 'username', 'firstName', 'lastName', 'email', 'image', 'role']
 
 // Errors that mean "this session is no longer valid". Anything else (offline,
 // timeout, 5xx, rate limiting) says nothing about the session, so it is kept.
@@ -130,9 +130,15 @@ function AuthProvider({ children }) {
   }, [session, queryClient])
 
   // Keep every tab on the same account. Cookies are shared by all tabs; the
-  // cached profile's `storage` event tells the other tabs what happened.
+  // cached profile's `storage` event tells the other tabs what happened, and
+  // the admin dashboard (../admin) sends STORAGE_KEYS.signOutSignal when an
+  // admin signs out there.
   useEffect(() => {
     function handleStorage(event) {
+      if (event.key === STORAGE_KEYS.signOutSignal) {
+        setSession((current) => (current.status === 'anonymous' ? current : ANONYMOUS))
+        return
+      }
       if (event.key !== STORAGE_KEYS.profile) return
       const cached = readCachedProfile()
       const hint = readSessionHint()

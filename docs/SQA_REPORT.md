@@ -66,8 +66,24 @@ Two bugs found while verifying K1/K3, both fixed with regression tests:
 
 DummyJSON check behind this design: it reflects any `Origin` with `Access-Control-Allow-Credentials: true`, so a plain proxy of its API on our domain would have let other websites try credentialed reads. The service only exposes five sign-in endpoints, rejects `Sec-Fetch-Site: cross-site`, and sends no CORS headers.
 
+## Admin dashboard round — 2026-11-10
+
+Built: the shop owner's dashboard (`admin/`, at `/admin/`) on demo data, with an admin API (`frontend/server/adminApi.js`) that checks the role on every request. Found and fixed while verifying it:
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| D1 | Medium | The sign-in service passed DummyJSON's full user record to the browser: password, card, bank, SSN, IP (the storefront dropped them, but any script on the page could have read them) | The server sends only allow-listed profile fields (`safeProfile`); customer lists in the admin are allow-listed too |
+| D2 | Medium | Signing in, then reloading straight away, could lose the cart filled before signing in (the guest copy was deleted before the merged account copy was saved) | The merged copy is written first, the guest copy removed second; regression test proves the order |
+| D3 | Medium | Prices like 19.99 failed "at most 2 decimals" (19.99 × 100 = 1998.9999… in floating point), in the browser and on the server | Compared with a tolerance in both places; 19.99, 0.1, 1234.56 accepted, 19.999 rejected |
+| D4 | Low | Right after signing in, the app didn't know the account's role (DummyJSON's login reply omits it), so admins saw no "Shop admin" link until a reload | The sign-in service returns the full safe profile at sign-in |
+| D5 | Low | The account area scrolled sideways on phones once a fourth link was added | The layout column is capped at the screen width; the links wrap |
+| D6 | Low | Admin pages: phone layout overflow (grid column and a hidden table label), a 4.41:1 badge contrast, missing `main` landmark on sign-in | Fixed; axe reports 0 violations on all admin pages, no sideways scroll at 390px |
+
+Checks: frontend 143 unit tests (20 of them for the server services), admin 8 unit tests, and the browser checks in `e2e/` (storefront, accounts, sessions, security, motion, admin, Laravel mode), against both the dev server and the production build.
+
 ## Known limits (by design, documented)
 
 - Orders, payment and stock are simulated in the browser (K2: kept simulated by decision, until the Laravel backend). The Laravel backend must recompute every amount on the server; the frontend checks only protect honest customers from stale data.
 - In Laravel mode, sign-in still goes through the DummyJSON sign-in service until Laravel's Sanctum endpoints exist (see `docs/backend/API_CONTRACT.md`).
-- The Vercel and Netlify function wrappers are verified locally only; confirm sign-in once after the first deploy (see `docs/DEPLOYMENT.md`).
+- The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
+- Admin edits are simulated: DummyJSON accepts product changes but never stores them, and the store's demo orders live in each customer's browser, so the admin can't list them. Both change with the Laravel backend.

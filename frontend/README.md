@@ -143,12 +143,14 @@ Component ─▶ hook (useQuery / useCart / useAuth…)
 | POST | `/users/add` | Registration (simulated) |
 | POST | `/carts/add` | Server price check before a (simulated) order |
 
-Sign-in goes through BuyNest's own service at `/api/auth/*` ([server/authBff.js](server/authBff.js)): `POST login`, `GET me`, `POST refresh`, `PUT profile` (simulated), `POST logout`. It calls DummyJSON's `/auth/*` endpoints and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies, so no token ever reaches page JavaScript or browser storage. It runs inside `npm run dev` / `npm run preview`, and as a Vercel function (`api/auth/[action].js`) or Netlify function (`netlify/functions/auth.mjs`) when deployed. "Keep me signed in" makes the session last 7 days; otherwise it ends when the browser closes, and signing out (or the session ending) also deletes the account's saved cart, wishlist, and demo orders from the device.
+Sign-in goes through BuyNest's own service at `/api/auth/*` ([server/authBff.js](server/authBff.js)): `POST login`, `GET me`, `POST refresh`, `PUT profile` (simulated), `POST logout`. It calls DummyJSON's `/auth/*` endpoints and keeps the tokens in HttpOnly, Secure, SameSite=Strict cookies, so no token ever reaches page JavaScript or browser storage. It runs inside `npm run dev` / `npm run preview`, and as a Vercel function (`api/auth/[action].js`) or Netlify function (`netlify/functions/api.mjs`) when deployed. The sign-in reply is allow-listed (`server/http.js` → `safeProfile`): DummyJSON's password, bank, and SSN fields never reach the browser. "Keep me signed in" makes the session last 7 days; otherwise it ends when the browser closes, and signing out (or the session ending) also deletes the account's saved cart, wishlist, and demo orders from the device.
+
+The shop owner's dashboard lives in [../admin](../admin/README.md). `npm run dev` here also starts it (http://localhost:5173/admin/), `npm run build` builds it into `dist/admin`, and its data comes from the admin API at `/api/admin/*` ([server/adminApi.js](server/adminApi.js)), which refuses any account whose role isn't "admin". Admins see a "Shop admin" link in their account area.
 
 Switching to Laravel: `VITE_API_PROVIDER=laravel` (contract: [docs/backend/API_CONTRACT.md](../docs/backend/API_CONTRACT.md)).
 
 ## Quality
-- **Tests:** `npm test` runs 133 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
+- **Tests:** `npm test` runs 143 tests (reducers, utilities, schema, API client, adapter, components, page flows) with the network mocked.
 - **Accessibility:** semantic landmarks, skip link, visible focus, labelled controls with linked errors, ARIA combobox search, native `<dialog>` modals, reduced-motion support. axe-core reports **no violations** on the main pages of the production build.
 - **Performance:** route-level code splitting (checkout libraries and account pages load on demand), `React.memo` product cards, lazy images, cached server data. Initial JavaScript ≈ 124 KB gzipped.
 

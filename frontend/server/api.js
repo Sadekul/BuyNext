@@ -1,0 +1,31 @@
+import { json, readCookies } from './http.js'
+import { AUTH_ROUTES } from './authBff.js'
+import { handleAdminRequest } from './adminApi.js'
+
+/*
+ * Entry point for BuyNest's server-side services, on the storefront's own
+ * address. The same function runs in `npm run dev` / `npm run preview`
+ * (vite.config.js), as Vercel functions (api/), and as a Netlify function
+ * (netlify/functions/api.mjs):
+ *   /api/auth/*   sign-in service (authBff.js)
+ *   /api/admin/*  admin service, admins only (adminApi.js)
+ */
+export async function handleApiRequest(request) {
+  // Only BuyNest's own pages may call these services. Browsers label requests
+  // that start on another website "cross-site" (Fetch Metadata), on top of
+  // the SameSite=Strict cookies.
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return json({ message: 'Forbidden.' }, 403)
+
+  const url = new URL(request.url)
+  const segments = url.pathname.split('/').filter(Boolean) // ["api", "auth", "login"]
+  const cookies = readCookies(request)
+
+  if (segments[0] === 'api' && segments[1] === 'auth' && segments.length === 3) {
+    const route = AUTH_ROUTES[`${request.method} ${segments[2]}`]
+    return route ? route(request, cookies) : json({ message: 'Not found.' }, 404)
+  }
+  if (segments[0] === 'api' && segments[1] === 'admin') {
+    return handleAdminRequest(request, segments.slice(2), cookies)
+  }
+  return json({ message: 'Not found.' }, 404)
+}

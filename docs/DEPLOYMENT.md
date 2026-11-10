@@ -28,19 +28,21 @@ Both configs also set long-term caching for `/assets/*` and basic security heade
 
 **Content-Security-Policy.** `npm run build` adds a CSP `<meta>` tag to `dist/index.html` (see `vite.config.js`). It allows scripts and styles only from the site itself (plus Google Fonts), images from the site, `cdn.dummyjson.com` and the API, and network requests only to the site and the origin in `VITE_API_BASE_URL`. Because the API origin is read at build time, a Laravel build gets the right policy automatically. If you add another image host, analytics, or a payment script, add its origin there, or the browser will block it. The dev server has no CSP, because hot reload needs inline scripts.
 
-**Sign-in service.** Sign-in needs a small server function at `/api/auth/*` ([server/authBff.js](../frontend/server/authBff.js)); it keeps the session in HttpOnly cookies so no token reaches the browser. Both hosts pick it up from the repo with no extra settings: Vercel from `frontend/api/auth/[action].js`, Netlify from `frontend/netlify/functions/auth.mjs` (its `config.path` maps it to `/api/auth/:action`). Static hosts without functions (Nginx, Apache, S3) need that service run somewhere and proxied at `/api/auth/` on the same domain, or sign-in won't work. The cookies are `Secure`, so the site must be served over HTTPS (`http://localhost` is the exception browsers allow).
+**Server functions (sign-in and admin API).** BuyNest needs two small server-side services on its own domain, both in [server/api.js](../frontend/server/api.js): the sign-in service at `/api/auth/*` (keeps the session in HttpOnly cookies, so no token reaches the browser) and the admin API at `/api/admin/*` (checks the admin role on every request). Both hosts pick them up from the repo with no extra settings: Vercel from `frontend/api/auth/[action].js` and `frontend/api/admin/[...path].js`, Netlify from `frontend/netlify/functions/api.mjs` (its `config.path` maps it to `/api/auth/:action` and `/api/admin/*`). Static hosts without functions (Nginx, Apache, S3) need that service run somewhere and proxied at `/api/` on the same domain, or sign-in and the admin won't work. The cookies are `Secure`, so the site must be served over HTTPS (`http://localhost` is the exception browsers allow).
 
-> **Verified locally only.** The service, cookies, sign-out, and session renewal are tested in `npm run dev` and `npm run preview` (unit tests in `server/authBff.test.js` plus browser checks). The Vercel and Netlify function wrappers are two-line adapters around the same code, but they have not been run on a real deployment yet: after the first deploy, sign in, reload, and sign out once to confirm.
+**Admin dashboard.** `npm run build` builds the store into `dist/` and the admin app (`../admin`) into `dist/admin/`, so the admin needs its packages installed before the build (see the host steps below). `/admin/*` is routed to the admin app (`vercel.json`, `public/_redirects`) and sent with `X-Robots-Tag: noindex` so search engines skip it.
+
+> **Verified locally only.** The services, cookies, sign-out, session renewal, and the admin API are tested in `npm run dev` and `npm run preview` (unit tests in `server/api.test.js`, plus the browser checks in `e2e/`). The Vercel and Netlify function wrappers are two-line adapters around the same code, but they have not run on a real deployment yet: after the first deploy, sign in on the store, reload, open `/admin/`, and sign out once to confirm.
 
 ## Vercel
 1. Import the GitHub repository.
-2. **Root directory:** `frontend`. Framework preset: Vite (build `npm run build`, output `dist`; also set in `vercel.json`).
+2. **Root directory:** `frontend`. Framework preset: Vite (build `npm run build`, output `dist`; also set in `vercel.json`, whose `installCommand` also installs `../admin`). Keep "Include source files outside of the Root Directory" enabled (the default): the build needs `../admin`.
 3. Environment variables: `VITE_API_BASE_URL=https://dummyjson.com` (and later `VITE_API_PROVIDER=laravel` + your API URL).
 4. Deploy. Every pull request gets a preview URL.
 
 ## Netlify
 1. Add the site from GitHub.
-2. **Base directory:** `frontend` · **Build command:** `npm run build` · **Publish directory:** `frontend/dist`.
+2. **Base directory:** `frontend` · **Build command:** `npm --prefix ../admin ci && npm run build` (installs the admin app's packages first) · **Publish directory:** `frontend/dist`.
 3. Environment variables as above. `public/_redirects` and `public/_headers` are picked up automatically.
 
 ## Environment variables per environment

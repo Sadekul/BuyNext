@@ -1,14 +1,69 @@
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { connect } from 'node:net'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
-import { handleAuthRequest } from './server/authBff.js'
+import { handleApiRequest } from './server/api.js'
 
 /*
- * Serves the sign-in service (server/authBff.js) at /api/auth/* in
- * `npm run dev` and `npm run preview`, the way the Vercel/Netlify functions
- * do in production. Converts Node's request/response to the Web standard
+ * The shop owner's dashboard (../admin, a separate React app) at /admin/:
+ * - `npm run dev` also starts the admin dev server (port 5175) and forwards
+ *   /admin/ to it, so http://localhost:5173/admin/ works with one command.
+ * - `npm run build` builds it into dist/admin; `npm run preview` serves it.
+ */
+const ADMIN_DIR = fileURLToPath(new URL('../admin/', import.meta.url))
+const ADMIN_PORT = 5175
+
+const isPortInUse = (port) =>
+  new Promise((resolve) => {
+    const socket = connect(port, 'localhost')
+    socket.once('connect', () => {
+      socket.end()
+      resolve(true)
+    })
+    socket.once('error', () => resolve(false))
+  })
+
+// "/admin" → "/admin/" (the app's base path).
+function redirectAdminRoot(req, res, next) {
+  if (req.url !== '/admin') return next()
+  res.statusCode = 302
+  res.setHeader('Location', '/admin/')
+  res.end()
+}
+
+function adminApp() {
+  return {
+    name: 'buynest-admin-app',
+    async configureServer(server) {
+      server.middlewares.use(redirectAdminRoot)
+      const viteBin = `${ADMIN_DIR}node_modules/vite/bin/vite.js`
+      if (process.env.VITEST || !existsSync(viteBin)) return // tests, or admin deps not installed
+      // Already running (e.g. this dev server restarted after a config change): reuse it.
+      if (await isPortInUse(ADMIN_PORT)) return
+      const child = spawn(process.execPath, [viteBin], { cwd: ADMIN_DIR, stdio: ['ignore', 'inherit', 'inherit'] })
+      process.once('exit', () => child.kill())
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(redirectAdminRoot)
+      // Admin pages are client-side routes: serve the admin app's index.html for them.
+      server.middlewares.use((req, res, next) => {
+        const path = req.url.split('?')[0]
+        if (path.startsWith('/admin/') && !path.slice(path.lastIndexOf('/')).includes('.')) req.url = '/admin/index.html'
+        next()
+      })
+    },
+  }
+}
+
+/*
+ * Serves BuyNest's server-side services (server/api.js: sign-in at
+ * /api/auth/*, admin at /api/admin/*) in `npm run dev` and `npm run preview`,
+ * the way the Vercel/Netlify functions do in production. Converts Node's request/response to the Web standard
  * Request/Response the service is written against.
  */
-function authService() {
+function apiServices() {
   async function middleware(req, res) {
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)
@@ -20,7 +75,7 @@ function authService() {
       ),
       body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
     })
-    const response = await handleAuthRequest(request)
+    const response = await handleApiRequest(request)
     res.statusCode = response.status
     response.headers.forEach((value, name) => {
       if (name !== 'set-cookie') res.setHeader(name, value)
@@ -31,9 +86,9 @@ function authService() {
   }
   // No return value: Vite would call a returned function as a post-middleware hook.
   const mount = (server) => {
-    server.middlewares.use('/api/auth', middleware)
+    server.middlewares.use('/api', middleware)
   }
-  return { name: 'buynest-auth-service', configureServer: mount, configurePreviewServer: mount }
+  return { name: 'buynest-api-services', configureServer: mount, configurePreviewServer: mount }
 }
 
 /*
@@ -74,7 +129,13 @@ function contentSecurityPolicy(mode) {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), authService(), contentSecurityPolicy(mode)],
+  plugins: [react(), apiServices(), adminApp(), contentSecurityPolicy(mode)],
+  server: {
+    // The admin dev server (see adminApp above); ws: hot reload for admin pages.
+    proxy: { '/admin/': { target: `http://localhost:${ADMIN_PORT}`, ws: true } },
+  },
+  // Preview serves the built admin from dist/admin instead (not the dev proxy).
+  preview: { proxy: {} },
   // Vitest reuses this config, so tests compile JSX exactly like the app.
   test: {
     environment: 'jsdom', // a simulated browser DOM

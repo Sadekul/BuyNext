@@ -85,6 +85,7 @@ export function normalizeUser(raw) {
     lastName: raw.lastName ?? '',
     email: raw.email ?? '',
     image: raw.image ?? null,
+    role: raw.role ?? 'user', // "admin" accounts can open the shop dashboard (/admin)
     phone: raw.phone ?? null, // only in /auth/me
     address, // only in /auth/me
   }

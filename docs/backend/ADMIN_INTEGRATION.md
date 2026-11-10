@@ -1,6 +1,8 @@
 # Admin backend integration
 
-How the future React admin dashboard, the Laravel API, and the storefront fit together.
+How the React admin dashboard, the Laravel API, and the storefront fit together.
+
+> **Status (2026-11-10):** the admin dashboard exists ([admin/](../../admin/README.md), served at `/admin/`) and runs on demo data through BuyNest's own admin API, `frontend/server/adminApi.js` (`/api/admin/*`). That API already does what the Laravel version must do: it checks the signed-in account's role on every request (403 for customers), validates product writes with Laravel-style 422 errors, and allow-lists every field sent to the browser. DummyJSON doesn't store changes, so edits are simulated. When Laravel exists, its endpoints replace that file (same shapes, real saves, a Policy instead of the role check), and the dashboard keeps working without changes.
 
 ## The flow
 ```

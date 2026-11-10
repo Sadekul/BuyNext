@@ -1,8 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
 import { ownerStorageKey, readJson, removeKey, writeJson } from '../utils/storage'
 
-const MERGE_GUEST = 'persistent/mergeGuest'
-
 const hasNoItems = (state) => state.items.length === 0
 const takeAllGuest = (guest) => ({ moved: guest, remaining: null })
 
@@ -42,11 +40,8 @@ export function usePersistentReducer(reducer, options, ownerId = null) {
   const activeKey = ownerStorageKey(storageKey, ownerId)
   const load = (key) => sanitize(readJson(key, emptyState))
 
-  const [state, dispatch] = useReducer(
-    (current, action) => (action.type === MERGE_GUEST ? mergeGuest(current, action.guest) : reducer(current, action)),
-    undefined,
-    () => load(activeKey), // lazy initializer: read storage on the first render only
-  )
+  // Lazy initializer: read storage on the first render only.
+  const [state, dispatch] = useReducer(reducer, undefined, () => load(activeKey))
 
   // The owner changed: show their saved copy. Adjusting state DURING render
   // (not in an effect) means React never commits a frame, or saves to
@@ -65,15 +60,25 @@ export function usePersistentReducer(reducer, options, ownerId = null) {
   // Signed in with guest items waiting: move them into the account.
   // `takeGuest` picks what belongs to this account (default: everything);
   // whatever it leaves stays in the guest copy.
+  // Storage is updated HERE, in order: the merged account copy is written
+  // first, the guest copy removed second. There is never a moment when the
+  // items exist in neither (a reload right after signing in used to lose
+  // them, because the merged state was only saved after the next render).
+  // The account copy in storage equals `state` here: the save effect above
+  // runs first in the same commit.
   useEffect(() => {
     if (activeKey === storageKey || !mergeGuest) return
     const guest = sanitize(readJson(storageKey, emptyState))
     if (isEmpty(guest)) return
     const { moved, remaining } = takeGuest(guest, ownerId)
-    if (!isEmpty(moved)) dispatch({ type: MERGE_GUEST, guest: moved })
+    if (!isEmpty(moved)) {
+      const merged = mergeGuest(sanitize(readJson(activeKey, emptyState)), moved)
+      writeJson(activeKey, merged)
+      dispatch({ type: replaceActionType, state: merged })
+    }
     if (remaining && !isEmpty(remaining)) writeJson(storageKey, remaining)
     else removeKey(storageKey)
-  }, [activeKey, storageKey, ownerId, emptyState, sanitize, mergeGuest, takeGuest, isEmpty])
+  }, [activeKey, storageKey, ownerId, emptyState, sanitize, replaceActionType, mergeGuest, takeGuest, isEmpty])
 
   // The `storage` event fires in OTHER tabs when this key changes.
   useEffect(() => {

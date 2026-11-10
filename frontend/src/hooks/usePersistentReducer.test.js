@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePersistentReducer } from './usePersistentReducer'
 import { CART_ACTIONS, EMPTY_CART, cartReducer, mergeCarts, sanitizeCart } from '../reducers/cartReducer'
@@ -43,6 +43,21 @@ describe('usePersistentReducer ownership', () => {
     expect(cart.items.map((item) => [item.productId, item.quantity])).toEqual([[1, 3], [2, 1]]) // larger quantity kept
     expect(cart.couponCode).toBe('NEST10')
     expect(window.localStorage.getItem('test.cart')).toBeNull()
+  })
+
+  // Regression: the merged cart used to reach storage only after the next
+  // render, after the guest copy was already deleted: a reload in between lost it.
+  it('writes the merged account copy to storage before deleting the guest copy', () => {
+    window.localStorage.setItem('test.cart', JSON.stringify({ items: [line(9, 2)], couponCode: null }))
+    const { rerender } = renderCart(null)
+    let accountCopyWhenGuestRemoved = null
+    const realRemove = Storage.prototype.removeItem
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function remove(key) {
+      if (key === 'test.cart') accountCopyWhenGuestRemoved = stored('test.cart.user-1')
+      return realRemove.call(this, key)
+    })
+    rerender({ owner: 1 })
+    expect(ids(accountCopyWhenGuestRemoved)).toEqual([9])
   })
 
   it('saves changes under the current owner only', () => {

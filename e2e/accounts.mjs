@@ -1,0 +1,117 @@
+// Account separation: what one customer's session leaves behind for the next person on the device.
+import {
+  BASE,
+  DEMO_ADMIN,
+  DEMO_ADMIN_2,
+  headerCounts,
+  launch,
+  reporter,
+  storefrontSignIn,
+  storefrontSignOut,
+  watchErrors,
+} from './lib.mjs'
+
+const report = reporter('account separation')
+const { log } = report
+const browser = await launch()
+const errors = []
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const page = watchErrors(await ctx.newPage(), errors)
+
+const wishlistTitles = async (p) => {
+  await p.goto(`${BASE}/wishlist`, { waitUntil: 'networkidle' })
+  return p.getByRole('button', { name: /Remove .* from wishlist/ }).count()
+}
+const addToCart = async (p, id) => {
+  await p.goto(`${BASE}/products/${id}`, { waitUntil: 'networkidle' })
+  await p.locator('.product-details').getByRole('button', { name: 'Add to cart' }).click()
+  await p.keyboard.press('Escape')
+}
+const save = async (p, id) => {
+  await p.goto(`${BASE}/products/${id}`, { waitUntil: 'networkidle' })
+  await p.locator('.product-details .wishlist-button--button').click()
+}
+
+// 0. A guest saves one product and adds one to the cart
+await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+await save(page, 2)
+await addToCart(page, 123)
+
+// 1. Emily signs in: her guest items come with her
+await storefrontSignIn(page, DEMO_ADMIN)
+let counts = await headerCounts(page)
+log(counts.wishlist === 1 && counts.cart >= 1, `guest items carried into the account on sign-in (${JSON.stringify(counts)})`)
+
+// 2. Emily saves two more and adds to the cart
+await save(page, 3)
+await save(page, 4)
+await addToCart(page, 121)
+const emily = await headerCounts(page)
+
+// 3. Emily signs out: the next person sees nothing of hers
+await storefrontSignOut(page)
+counts = await headerCounts(page)
+log(counts.wishlist === 0, `after sign-out, header wishlist count is 0 (${counts.wishlist})`)
+log(counts.cart === 0, `after sign-out, header cart count is 0 (${counts.cart})`)
+log((await wishlistTitles(page)) === 0, 'after sign-out, /wishlist page is empty')
+await page.goto(`${BASE}/cart`, { waitUntil: 'networkidle' })
+log(await page.getByText('Your cart is empty').first().isVisible(), 'after sign-out, /cart page is empty')
+await page.goto(`${BASE}/account/orders`, { waitUntil: 'networkidle' })
+log(/\/login/.test(page.url()), 'after sign-out, account pages redirect to sign-in')
+const leftovers = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))
+log(!/token|eyJ/i.test(leftovers) && !leftovers.includes('buynest.session'), 'after sign-out, no session or token left in browser storage')
+
+// 4. Michael signs in on the same browser: none of Emily's data
+await storefrontSignIn(page, DEMO_ADMIN_2)
+counts = await headerCounts(page)
+log(counts.wishlist === 0 && counts.cart === 0, `another account sees none of Emily's wishlist/cart (${JSON.stringify(counts)})`)
+await page.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
+log(await page.getByRole('heading', { name: /Hi, Michael/ }).isVisible(), 'profile shows the new account, not a cached one')
+await page.goto(`${BASE}/account/orders`, { waitUntil: 'networkidle' })
+log((await page.locator('.orders__item').count()) === 0, "another account sees none of Emily's orders")
+await storefrontSignOut(page)
+
+// 5. Emily signs back in ("Keep me signed in" was on): her wishlist and cart are back
+await storefrontSignIn(page, DEMO_ADMIN)
+counts = await headerCounts(page)
+log(counts.wishlist === emily.wishlist && counts.cart === emily.cart, `Emily's wishlist and cart return on sign-in (${JSON.stringify(counts)} vs ${JSON.stringify(emily)})`)
+
+// 6. Sign-out in another tab clears this tab too
+const tab2 = watchErrors(await ctx.newPage(), errors)
+await tab2.goto(`${BASE}/wishlist`, { waitUntil: 'networkidle' })
+await storefrontSignOut(page)
+await tab2.waitForTimeout(800)
+counts = await headerCounts(tab2)
+log(counts.wishlist === 0 && counts.cart === 0, `sign-out in one tab empties the other tab's wishlist/cart (${JSON.stringify(counts)})`)
+log((await tab2.getByRole('button', { name: /Remove .* from wishlist/ }).count()) === 0, 'the other tab no longer shows the wishlist items')
+
+// 7. Sign-in in one tab signs the other tab in
+await tab2.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+await storefrontSignIn(page, DEMO_ADMIN)
+log(await tab2.getByText('Hi, Emily').waitFor({ timeout: 10000 }).then(() => true, () => false), 'sign-in in one tab signs the other tab in')
+await tab2.close()
+
+// 8. An expired session (both HttpOnly cookies gone, the page's hint left) behaves like a sign-out
+await ctx.clearCookies({ name: 'buynest_at' })
+await ctx.clearCookies({ name: 'buynest_rt' })
+await page.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
+await page.waitForURL(/\/login/, { timeout: 15000 })
+counts = await headerCounts(page)
+log(counts.wishlist === 0 && counts.cart === 0, `expired session hides the account's wishlist/cart (${JSON.stringify(counts)})`)
+log(await page.getByText(/session has expired/i).isVisible(), 'expired session explains why on the sign-in page')
+
+// 9. Lists saved by the old version (one shared slot) move into the account, not back to the next visitor
+await storefrontSignIn(page, DEMO_ADMIN)
+await page.evaluate(() =>
+  localStorage.setItem('buynest.wishlist.v1', JSON.stringify({ items: [{ productId: 9, title: 'Old shared item', price: 5, addedAt: Date.now() }] })),
+)
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(500)
+const keys = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('buynest.wishlist')))
+log(!keys.includes('buynest.wishlist.v1'), `old shared wishlist moved into the account, guest slot cleared (${keys})`)
+await storefrontSignOut(page)
+log((await headerCounts(page)).wishlist === 0, 'after sign-out the old shared items are not shown')
+
+log(errors.length === 0, `no page errors ${JSON.stringify(errors)}`)
+report.done()
+await browser.close()

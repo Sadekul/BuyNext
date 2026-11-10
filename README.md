@@ -8,10 +8,11 @@ BuyNest is a modern e-commerce web application, built step by step as a professi
 
 ```
 buynest/
-├── frontend/   # React + Vite storefront (phases 1–14 complete)
+├── frontend/   # React + Vite storefront (phases 1–14 complete) and its server functions (sign-in, admin API)
+├── admin/      # React admin dashboard for the shop owner, served at /admin (demo data for now)
 ├── backend/    # Future Laravel REST API (not started)
-├── admin/      # Future React admin dashboard (not started)
-└── docs/       # Phase lessons, learning log, backend contract, deployment guide
+├── e2e/        # Real-browser checks for the storefront and the admin dashboard
+└── docs/       # Phase lessons, learning log, backend contract, deployment guide, SQA report
 ```
 
 ## How the pieces will connect
@@ -32,14 +33,23 @@ the adapter for the proposed contract already exists. See [docs/backend/](docs/b
 ## Getting started
 
 ```bash
+cd admin && npm install && cd ..   # the admin dashboard's packages
 cd frontend
 npm install
 cp .env.example .env.local
-npm run dev        # http://localhost:5173
-npm test           # 94 tests, offline
+npm run dev        # store: http://localhost:5173 · admin: http://localhost:5173/admin/
+npm test           # 143 unit tests, offline
 ```
 
-Demo sign-in: **emilys / emilyspass**. Details: [frontend/README.md](frontend/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`npm run dev` also starts the admin dashboard's dev server, so both open from the same address.
+
+| Who | Address | Demo account |
+| --- | --- | --- |
+| Customers | http://localhost:5173 | any DummyJSON user, e.g. **averyp / averyppass** |
+| Shop owner (admin) | http://localhost:5173/admin/ | an account with role "admin", e.g. **emilys / emilyspass** |
+
+Customer accounts get "No admin access" at `/admin`, and the admin API refuses them (403) on every request.
+Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · Browser checks: [e2e/README.md](e2e/README.md).
 
 ## Progress
 
@@ -59,6 +69,8 @@ Demo sign-in: **emilys / emilyspass**. Details: [frontend/README.md](frontend/RE
 | 12 | Admin backend integration (frontend side) | Done |
 | 13 | Testing and debugging | Done |
 | 14 | Deployment | Done (push and hosting pending your approval) |
-| — | SQA & security audit | Done: 16 issues fixed, see [docs/SQA_REPORT.md](docs/SQA_REPORT.md) |
+| — | SQA & security audit, account separation, secure-cookie sign-in | Done, see [docs/SQA_REPORT.md](docs/SQA_REPORT.md) |
+| — | Admin dashboard (demo data) | Done: overview, products (add/edit/delete, simulated), orders, customers; see [admin/README.md](admin/README.md) |
+| — | Laravel backend + real admin saving | Next project (not started) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

@@ -1,3 +1,7 @@
-# Netlify SPA fallback: serve index.html for every route so React Router can
-# handle deep links like /products/123 on refresh. (Real files are served first.)
-/*    /index.html   200
+# Netlify routing. Real files (and the /api functions) are served first.
+# The shop owner's dashboard is its own app under /admin/.
+/admin       /admin/             302
+/admin/*     /admin/index.html   200
+# Storefront: serve index.html for every route so React Router can handle
+# deep links like /products/123 on refresh.
+/*           /index.html         200

@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
   // The signed-in customer's name and avatar for the header. No tokens: the
   // session itself lives in HttpOnly cookies (server/authBff.js).
   profile: 'buynest.session.v2',
+  // Written by the admin dashboard when an admin signs out there.
+  signOutSignal: 'buynest.signal.signout',
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */

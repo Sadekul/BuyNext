@@ -18,14 +18,17 @@
 
 .account__layout {
   display: grid;
+  /* minmax(0, …): the column stays as wide as the screen instead of growing
+     to fit the row of links (which pushed the page sideways on phones). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   align-items: start;
 }
 
 .account__nav-list {
   display: flex;
+  flex-wrap: wrap; /* every account link stays visible on small screens */
   gap: var(--space-2);
-  overflow-x: auto;
 }
 
 .account__link {

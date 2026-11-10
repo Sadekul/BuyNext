@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import { LuHeart, LuLogOut, LuPackage, LuUser } from 'react-icons/lu'
+import { LuHeart, LuLayoutDashboard, LuLogOut, LuPackage, LuUser } from 'react-icons/lu'
 import { useAuth } from '../hooks/useAuth'
 import { ROUTES } from '../constants/routes'
 import { cn } from '../utils/classNames'
@@ -39,6 +39,16 @@ function AccountLayout() {
                 </NavLink>
               </li>
             ))}
+            {/* The dashboard is a separate app: a normal link. The admin service
+                checks the role again on every request. */}
+            {user.role === 'admin' && (
+              <li>
+                <a href="/admin/" className="account__link">
+                  <LuLayoutDashboard aria-hidden="true" />
+                  Shop admin
+                </a>
+              </li>
+            )}
             <li>
               <button type="button" className="account__link account__logout" onClick={handleLogout}>
                 <LuLogOut aria-hidden="true" />

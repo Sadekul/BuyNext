@@ -1,6 +1,6 @@
-// Vercel function for /api/auth/<action>: the BuyNest sign-in service (server/authBff.js).
-import { handleAuthRequest } from '../../server/authBff.js'
+// Vercel function for /api/auth/<action>: BuyNest's sign-in service (server/api.js).
+import { handleApiRequest } from '../../server/api.js'
 
-export const GET = handleAuthRequest
-export const POST = handleAuthRequest
-export const PUT = handleAuthRequest
+export const GET = handleApiRequest
+export const POST = handleApiRequest
+export const PUT = handleApiRequest
