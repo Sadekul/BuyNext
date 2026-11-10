@@ -1,6 +1,12 @@
 import { COUPONS, SHIPPING_METHODS, SHIPPING_RULES } from '../constants/store'
 import { getProductPricing } from './pricing'
 
+const DEMO_RULES = {
+  shippingMethods: SHIPPING_METHODS,
+  standardShippingCost: SHIPPING_RULES.standardShippingCost,
+  freeShippingThreshold: SHIPPING_RULES.freeShippingThreshold,
+}
+
 /*
  * Cart math, done in whole CENTS to avoid floating-point errors
  * (0.1 + 0.2 !== 0.3 in JavaScript). Convert back to dollars at the end.
@@ -47,9 +53,11 @@ function amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents) {
  * Totals for the purchasable lines of a cart.
  * Unavailable lines (`isUnavailable`) are listed but never charged.
  * `shippingMethodId`: 'standard' follows the free-shipping threshold;
- * other methods have a flat price (constants/store.js).
+ * other methods have a flat price. `rules` are the store's shipping rules:
+ * the demo's constants/store.js, or the server's settings in REAL_SHOP
+ * (hooks/useStoreSettings.js).
  */
-export function calculateCartTotals(items, couponCode = null, shippingMethodId = 'standard') {
+export function calculateCartTotals(items, couponCode = null, shippingMethodId = 'standard', rules = DEMO_RULES) {
   const lines = items.filter((item) => !item.isUnavailable)
   const unavailableCount = items.length - lines.length
 
@@ -65,13 +73,16 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
 
   const { coupon, discountCents, error: couponError } = evaluateCoupon(couponCode, subtotalCents)
   const afterDiscountCents = subtotalCents - discountCents
-  const thresholdCents = toCents(SHIPPING_RULES.freeShippingThreshold)
-  const qualifiesForFreeShipping = afterDiscountCents >= thresholdCents
-  const method = SHIPPING_METHODS.find((option) => option.id === shippingMethodId) ?? SHIPPING_METHODS[0]
+  const methods = rules.shippingMethods.length > 0 ? rules.shippingMethods : SHIPPING_METHODS
+  // Free shipping is a standard-delivery rule: without standard delivery (or a threshold) there is none.
+  const freeShippingThreshold = methods.some((option) => option.id === 'standard') ? rules.freeShippingThreshold : null
+  const thresholdCents = freeShippingThreshold === null ? null : toCents(freeShippingThreshold)
+  const qualifiesForFreeShipping = thresholdCents !== null && afterDiscountCents >= thresholdCents
+  const method = methods.find((option) => option.id === shippingMethodId) ?? methods[0]
   let shippingCents = 0
   if (itemCount > 0) {
     if (method.price !== null) shippingCents = toCents(method.price)
-    else if (!qualifiesForFreeShipping) shippingCents = toCents(SHIPPING_RULES.standardShippingCost)
+    else if (!qualifiesForFreeShipping) shippingCents = toCents(rules.standardShippingCost)
   }
 
   return {
@@ -86,7 +97,8 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
     discount: toDollars(discountCents),
     shippingMethod: method,
     shipping: toDollars(shippingCents),
-    amountToFreeShipping: toDollars(amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents)),
+    freeShippingThreshold,
+    amountToFreeShipping: thresholdCents === null ? null : toDollars(amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents)),
     total: toDollars(afterDiscountCents + shippingCents),
   }
 }
@@ -101,17 +113,24 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
 export function withServerPricing(localTotals, serverCart) {
   if (!serverCart) return { ...localTotals, coupon: null, couponError: null }
   const { totals } = serverCart
-  const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount)
-  const gapCents = toCents(SHIPPING_RULES.freeShippingThreshold) - afterDiscountCents
-  return {
+  const base = {
     ...localTotals,
     itemCount: totals.itemCount,
     subtotal: totals.subtotal,
     discount: totals.discount,
     shipping: totals.shipping,
+    tax: totals.tax,
     total: totals.total,
     coupon: serverCart.coupon,
     couponError: serverCart.couponError,
+  }
+  const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount)
+  // Totals built without store rules (older callers) use the demo threshold.
+  const freeShippingThreshold = localTotals.freeShippingThreshold === undefined ? SHIPPING_RULES.freeShippingThreshold : localTotals.freeShippingThreshold
+  if (freeShippingThreshold === null) return { ...base, amountToFreeShipping: null }
+  const gapCents = toCents(freeShippingThreshold) - afterDiscountCents
+  return {
+    ...base,
     // Free shipping already (threshold reached, or a free-shipping code): nothing left to add.
     amountToFreeShipping: totals.shipping === 0 || gapCents <= 0 ? 0 : toDollars(gapCents),
   }

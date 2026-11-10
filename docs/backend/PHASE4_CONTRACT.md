@@ -1,5 +1,7 @@
 # Backend phase 4 contract: admin roles, content, reports, settings
 
+**Status: built (2026-11-12).** Where this page left a shape open, the implementation's choice is documented in [backend/README.md](../../backend/README.md). Notable additions: only an Owner can give the Owner role or change an Owner's account (so `admins.manage` can't be used to promote yourself), and with tax enabled, refunds include each line's and the shipping's share of the tax.
+
 The last backend phase. It builds on phases 1 to 3 and keeps their conventions (`snake_case`, money as 2-decimal strings, `{ data }`, Laravel 422 errors, admin token on `/api/admin/v1`). Modeled on Magento's **System → Permissions** (users and roles), **Content → Pages / Blocks**, **Reports**, and **Stores → Configuration**.
 
 ## 1. Admin users, roles, and permissions

@@ -1,7 +1,7 @@
 import { formatPrice } from '../../utils/formatters'
 
 /** Totals rows shared by checkout, confirmation, and order details. Reuses CartSummary's styles. */
-function OrderTotals({ totals, couponCode, shippingLabel }) {
+function OrderTotals({ totals, couponCode, shippingLabel, showTax = true }) {
   return (
     <dl className="cart-summary__rows">
       <div>
@@ -18,11 +18,13 @@ function OrderTotals({ totals, couponCode, shippingLabel }) {
         <dt>Shipping{shippingLabel && ` (${shippingLabel})`}</dt>
         <dd>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>
       </div>
-      <div>
-        <dt>Taxes</dt>
-        {/* Server-priced totals include the tax (none yet); the demo can't know it. */}
-        <dd>{typeof totals.tax === 'number' ? formatPrice(totals.tax) : 'Calculated by our servers'}</dd>
-      </div>
+      {/* Server-priced totals include the tax; the demo can't know it. Checkout hides the line when the store charges no tax. */}
+      {showTax && (
+        <div>
+          <dt>Taxes</dt>
+          <dd>{typeof totals.tax === 'number' ? formatPrice(totals.tax) : 'Calculated by our servers'}</dd>
+        </div>
+      )}
       <div className="cart-summary__total">
         <dt>Total</dt>
         <dd>{formatPrice(totals.total)}</dd>

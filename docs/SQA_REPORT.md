@@ -127,10 +127,25 @@ Built by two agents in parallel against [backend/PHASE3_CONTRACT.md](backend/PHA
 
 Checks: backend 108 feature tests; frontend 205; admin 24; browser checks with the new `documents.mjs`.
 
+## Backend phase 4 (roles, audit, content, reports, settings) — 2026-11-12
+
+Built by three agents in parallel (backend; admin app with the sign-in service; storefront) against [backend/PHASE4_CONTRACT.md](backend/PHASE4_CONTRACT.md), then integrated and verified. Security points checked in the browser: a Sales staff admin's menu, pages, and API calls are limited (403 `permission_denied` naming the permission); a test fails if any admin route lacks a permission; content HTML with a script, an `onclick`, and a `javascript:` link is cleaned on save and nothing runs in the store; the audit log never stores passwords; deactivating an admin signs them out; CSV exports guard against formula injection.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| R1 | Medium | With `admins.manage`, an admin could have given themselves the Owner role | Only an Owner can give the Owner role or change an Owner's account (backend rule and tests) |
+| R2 | Medium | The longer admin menu didn't fit a 900 px-tall screen: the sidebar couldn't scroll, so the account links spilled out of it (unreadable, and unreachable on shorter screens) | The sidebar scrolls within itself on its own dark background |
+| R3 | Low | Accessibility on the new admin screens: the role label's contrast (3.75:1), banner title fields without a label (an `id` override broke the label link), and the "You don't have access" page without a level-1 heading | Fixed; axe clean on every new admin screen |
+| R4 | Low | The store's tax line would always have shown $0: the sign-in service didn't forward the shipping country, nor the `guest_checkout_disabled` code | Both forwarded, with tests |
+| R5 | Test | Two storefront unit tests failed once while the machine was busy and passed in eight reruns, including under load | Not reproducible; watch for timing-sensitive tests |
+
+Checks: backend 162 feature tests; frontend 233 unit tests; admin 37; browser checks with the new `system.mjs`.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
 - With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin creates the invoice, and refunds record money the shop returns by the original method. Tax is 0 until phase 4.
 - Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
+- The local database keeps a few records from the agents' and browser checks' verification: test orders and invoices, deactivated test admins (for example "Verify Viewer" and "Smoke Sales"), and disabled test coupons.
 - Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database.

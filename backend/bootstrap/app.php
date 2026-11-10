@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureTokenKind;
 use App\Http\Middleware\OptionalCustomer;
 use App\Http\Middleware\TrustBffClientIp;
@@ -19,10 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Runs first, so rate limits see the visitor's address (see the class).
         $middleware->api(prepend: [TrustBffClientIp::class]);
-        $middleware->alias(['token.kind' => EnsureTokenKind::class, 'customer.optional' => OptionalCustomer::class]);
+        $middleware->alias([
+            'token.kind' => EnsureTokenKind::class,
+            'customer.optional' => OptionalCustomer::class,
+            'can.admin' => EnsureAdminPermission::class,
+        ]);
         // Check the token kind before route-model binding, so a customer token
         // gets 403 on /api/admin/v1/customers/{id} whether or not that id exists.
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: EnsureTokenKind::class);
+        // ...and the permission check too: no permission → 403, never a 404 that tells whether the id exists.
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: EnsureAdminPermission::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The API always answers in JSON (Laravel's 401/403/404/422/429 shapes).

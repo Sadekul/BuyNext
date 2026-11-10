@@ -12,7 +12,7 @@ import { CUSTOMER, notSignedIn } from './session.js'
  * customer session cookie is there (its token goes to Laravel), otherwise as
  * a guest, who can find the order later with its number and email.
  *
- *   POST /api/shop/cart/validate   { items: [{ productId, quantity }], couponCode, shippingMethod, email? } → priced cart
+ *   POST /api/shop/cart/validate   { items: [{ productId, quantity }], couponCode, shippingMethod, email?, country? } → priced cart
  *                                  (with the customer's token when signed in; a guest's email checks per-customer coupon limits)
  *   POST /api/shop/orders          { items, couponCode, shippingMethod, paymentMethod, email, phone,
  *                                    shippingAddress, billingAddress, expectedTotal } → 201 order

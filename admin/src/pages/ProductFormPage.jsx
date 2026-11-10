@@ -10,6 +10,7 @@ import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
+import { useAdminAuth } from '../auth/useAdminAuth'
 import { EMPTY_PRODUCT, productSchema } from '../utils/productSchema'
 import { formatMoney } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
@@ -52,6 +53,7 @@ const FIELDS_FROM_SERVER = Object.keys(EMPTY_PRODUCT)
 function ProductForm({ productId, initial, categories }) {
   const isNew = productId === undefined
   const navigate = useNavigate()
+  const { can } = useAdminAuth()
   const queryClient = useQueryClient()
   // A product just created (real data) opens here for editing, with this note.
   const justCreated = useLocation().state?.created === true
@@ -161,9 +163,13 @@ function ProductForm({ productId, initial, categories }) {
       </div>
 
       <div className="form__actions">
-        <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty)}>
-          {save.isPending ? 'Saving…' : isNew ? 'Add product' : 'Save changes'}
-        </button>
+        {can('products.edit') ? (
+          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty)}>
+            {save.isPending ? 'Saving…' : isNew ? 'Add product' : 'Save changes'}
+          </button>
+        ) : (
+          <span className="muted">Your role can view this product but not change it.</span>
+        )}
         <Link to="/products" className="btn btn--outline">
           Cancel
         </Link>

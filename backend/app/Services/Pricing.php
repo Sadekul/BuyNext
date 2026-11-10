@@ -17,6 +17,8 @@ use Illuminate\Support\Collection;
  */
 class Pricing
 {
+    public function __construct(private Settings $settings) {}
+
     /** "9.99" → 999. Decimal strings from the database have 2 places, so this is exact. */
     public static function toCents(string|int|float $amount): int
     {
@@ -71,8 +73,10 @@ class Pricing
      * $customerId / $email identify the shopper for per-customer coupon
      * limits (the customer's id when signed in, else the guest's email; both
      * null skips that check until checkout, where the email is required).
+     * $country: the shipping country, for tax (null: tax 0, not estimated).
      */
-    public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null, ?string $email = null): CartQuote
+    public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null,
+        ?string $email = null, ?string $country = null): CartQuote
     {
         // The same product twice counts as one line (stock is checked on the sum).
         $quantities = [];
@@ -101,12 +105,13 @@ class Pricing
 
         [$coupon, $discount, $couponError, $couponRecord] = $this->coupon($couponCode, $subtotal, $customerId, $email, $lock);
         $afterDiscount = $subtotal - $discount;
-        $freeStandard = $afterDiscount >= config('buynest.store.free_shipping_threshold_cents');
+        $freeStandard = $afterDiscount >= $this->settings->cents('free_shipping_threshold');
         // A free_shipping coupon makes every method free (not just standard).
         $freeEverything = $couponRecord?->type === 'free_shipping';
 
+        // Only the methods switched on in the settings (with their prices from there).
         $options = [];
-        foreach (config('buynest.store.shipping_methods') as $id => $method) {
+        foreach ($this->settings->shippingMethods() as $id => $method) {
             $options[$id] = [
                 'id' => $id,
                 'label' => $method['label'],
@@ -114,9 +119,9 @@ class Pricing
                 'price_cents' => $freeEverything || ($method['free_over_threshold'] && $freeStandard) ? 0 : $method['price_cents'],
             ];
         }
-        $method = $options[$shippingMethod] ?? $options['standard'];
+        $method = $options[$shippingMethod] ?? $options[$this->settings->defaultShippingMethod()] ?? reset($options);
         $shipping = $itemCount > 0 ? $method['price_cents'] : 0;
-        $tax = $itemCount > 0 ? config('buynest.store.tax_cents') : 0;
+        [$tax, $taxIncluded] = $itemCount > 0 ? $this->tax($afterDiscount + $shipping, $country) : [0, false];
 
         return new CartQuote(
             lines: $lines,
@@ -130,9 +135,31 @@ class Pricing
             discountCents: $discount,
             shippingCents: $shipping,
             taxCents: $tax,
-            totalCents: $afterDiscount + $shipping + $tax,
+            // Prices that already include tax: the tax is shown, but not added again.
+            totalCents: $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax),
             couponId: $couponRecord?->id,
+            taxEstimated: ! $this->settings->get('tax_enabled') || $country !== null,
         );
+    }
+
+    /**
+     * [tax cents, included?]. Tax = the shipping country's rate × (merchandise
+     * after the discount + shipping), rounded to the cent (halves up). With
+     * prices_include_tax the amount already contains the tax, so the tax is
+     * the part of it that is tax: amount × rate / (100 + rate).
+     * Rates are kept in hundredths of a percent (19.00% → 1900), so this is
+     * all integer math.
+     */
+    public function tax(int $amountCents, ?string $country): array
+    {
+        $rate = $this->settings->taxRateBasisPoints($country);
+        if (! $rate || $amountCents <= 0) {
+            return [0, false];
+        }
+        $included = (bool) $this->settings->get('prices_include_tax');
+        $divisor = $included ? 10000 + $rate : 10000;
+
+        return [intdiv($amountCents * $rate * 2 + $divisor, $divisor * 2), $included];
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\Pricing;
+use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -17,7 +18,7 @@ class OverviewController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        $threshold = config('buynest.store.low_stock_threshold');
+        $threshold = app(Settings::class)->get('low_stock_threshold');
 
         // Cancelled orders aren't revenue, and refunds (credit memos) are taken off it.
         $counted = Order::where('status', '!=', 'cancelled');

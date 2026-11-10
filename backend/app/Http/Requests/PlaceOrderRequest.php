@@ -4,7 +4,10 @@ namespace App\Http\Requests;
 
 use App\Http\Controllers\Api\V1\CartController;
 use App\Models\Customer;
+use App\Services\Settings;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 /**
  * POST /api/v1/orders. Prices are never accepted: only product ids and
@@ -12,9 +15,18 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class PlaceOrderRequest extends FormRequest
 {
+    /** Guests may check out only while guest checkout is on (Settings → Checkout). */
     public function authorize(): bool
     {
-        return true;
+        return $this->customer() !== null || (bool) app(Settings::class)->get('guest_checkout');
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => 'Please sign in to check out.',
+            'code' => 'guest_checkout_disabled',
+        ], 403));
     }
 
     public function customer(): ?Customer
@@ -38,6 +50,7 @@ class PlaceOrderRequest extends FormRequest
 
     public function rules(): array
     {
+        $settings = app(Settings::class);
         $address = fn (string $prefix, string $required) => [
             "{$prefix}.first_name" => [$required, 'string', 'max:60'],
             "{$prefix}.last_name" => [$required, 'string', 'max:60'],
@@ -46,14 +59,15 @@ class PlaceOrderRequest extends FormRequest
             "{$prefix}.city" => [$required, 'string', 'max:80'],
             "{$prefix}.state" => ['nullable', 'string', 'max:80'],
             "{$prefix}.postal_code" => [$required, 'string', 'regex:/^[A-Za-z0-9][A-Za-z0-9 -]{1,9}$/'],
-            "{$prefix}.country" => [$required, 'string', 'in:'.implode(',', config('buynest.store.countries'))],
+            "{$prefix}.country" => [$required, 'string', Rule::in($settings->get('allowed_countries'))],
         ];
 
         return [
             ...CartController::rules(),
             'items' => ['required', 'array', 'min:1', 'max:50'],
-            'shipping_method' => ['required', 'string', 'in:'.implode(',', array_keys(config('buynest.store.shipping_methods')))],
-            'payment_method' => ['required', 'string', 'in:'.implode(',', array_keys(config('buynest.store.payment_methods')))],
+            // Only what the settings switch on: a method that is off → 422.
+            'shipping_method' => ['required', 'string', Rule::in(array_keys($settings->shippingMethods()))],
+            'payment_method' => ['required', 'string', Rule::in($settings->paymentMethods())],
             'email' => ['required', 'string', 'email', 'max:190'],
             'phone' => ['required', 'string', PhoneNumber::RULE],
             'shipping_address' => ['required', 'array'],

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Admin;
+use App\Models\AdminRole;
 use App\Models\Customer;
 use App\Models\Product;
 use Illuminate\Database\Seeder;
@@ -21,7 +22,8 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        Admin::updateOrCreate(['email' => 'admin@buynest.test'], ['name' => 'Store Admin', 'password' => 'AdminPass2026']);
+        // Roles, content pages, home content, and settings are seeded by the migrations (data every install needs).
+        Admin::updateOrCreate(['email' => 'admin@buynest.test'], ['name' => 'Store Admin', 'password' => 'AdminPass2026', 'role_id' => AdminRole::owner()->id]);
 
         // Two shoppers, so "my data stays mine" can be tried on one browser.
         $shoppers = [

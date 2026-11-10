@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkoutSchema } from './checkoutSchema'
+import { checkoutSchema, createCheckoutSchema } from './checkoutSchema'
 
 const address = {
   firstName: 'Emily',
@@ -46,5 +46,15 @@ describe('checkoutSchema', () => {
       shippingMethod: 'Choose a delivery option.',
       paymentMethod: 'Choose a payment method.',
     })
+  })
+})
+
+describe('createCheckoutSchema (the store\'s settings)', () => {
+  const storeSchema = createCheckoutSchema({ countries: ['Canada'], shippingMethodIds: ['express'], paymentMethodIds: ['cod'] })
+
+  it('accepts only the store\'s countries, delivery options, and payment methods', () => {
+    expect(storeSchema.safeParse({ ...valid, shipping: { ...address, country: 'Canada' }, shippingMethod: 'express', paymentMethod: 'cod' }).success).toBe(true)
+    const issues = storeSchema.safeParse(valid).error.issues.map((issue) => issue.path.join('.'))
+    expect(issues).toEqual(['shipping.country', 'shippingMethod', 'paymentMethod'])
   })
 })

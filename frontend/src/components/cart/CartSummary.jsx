@@ -7,14 +7,14 @@ import './CartSummary.css'
  * Order summary. Every number comes from calculateCartTotals();
  * this component only displays them. `children` holds the action buttons.
  */
-function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isCheckingCoupon = false, children }) {
+function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isCheckingCoupon = false, showTax = true, children }) {
   return (
     <section className="cart-summary" aria-labelledby="cart-summary-title">
       <h2 id="cart-summary-title" className="cart-summary__title">
         Order summary
       </h2>
 
-      <FreeShippingProgress amountRemaining={totals.amountToFreeShipping} />
+      <FreeShippingProgress amountRemaining={totals.amountToFreeShipping} threshold={totals.freeShippingThreshold} />
 
       <dl className="cart-summary__rows">
         <div>
@@ -37,10 +37,13 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
           <dt>Estimated shipping</dt>
           <dd>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>
         </div>
-        <div>
-          <dt>Taxes</dt>
-          <dd>Calculated at checkout</dd>
-        </div>
+        {/* A store that charges no tax (REAL_SHOP settings) shows no tax line. */}
+        {showTax && (
+          <div>
+            <dt>Taxes</dt>
+            <dd>Calculated at checkout</dd>
+          </div>
+        )}
         <div className="cart-summary__total">
           <dt>Estimated total</dt>
           <dd>{formatPrice(totals.total)}</dd>

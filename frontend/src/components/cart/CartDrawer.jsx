@@ -54,7 +54,7 @@ function CartDrawer() {
         </EmptyState>
       ) : (
         <div className="cart-drawer">
-          <FreeShippingProgress amountRemaining={totals.amountToFreeShipping} />
+          <FreeShippingProgress amountRemaining={totals.amountToFreeShipping} threshold={totals.freeShippingThreshold} />
           <ul className="cart-drawer__list">
             {items.map((item) => (
               <li key={item.productId}>

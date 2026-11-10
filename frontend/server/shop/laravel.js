@@ -94,7 +94,9 @@ export function fromCart(raw = {}) {
     coupon: raw.coupon ? pick(raw.coupon, ['code', 'description']) : null,
     couponError: raw.coupon_error ?? null,
     shippingOptions: (raw.shipping_options ?? []).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price) })),
+    // Phase 4 tax: false when no country was given, so the tax shown is not final (0).
     totals: fromTotals(raw.totals),
+    taxEstimated: (raw.tax_estimated ?? raw.totals?.tax_estimated) === true,
   }
 }
 
@@ -168,6 +170,8 @@ export function failed({ status, data }) {
     body.errors = Object.fromEntries(Object.entries(data.errors).map(([field, messages]) => [camelPath(field), messages]))
   }
   if (Array.isArray(data?.problems)) body.problems = data.problems.map(fromProblem)
+  // A reason the store explains its own way (e.g. 403 guest_checkout_disabled).
+  if (typeof data?.code === 'string' && /^[a-z_]{1,60}$/.test(data.code)) body.code = data.code
   if (status === 409 && data?.data) {
     body.code = 'prices_changed'
     body.cart = fromCart(data.data)
@@ -179,17 +183,20 @@ const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) 
 
 export const laravelShop = {
   /**
-   * { items: [{ productId, quantity }], couponCode, shippingMethod, email? } → priced cart.
+   * { items: [{ productId, quantity }], couponCode, shippingMethod, email?, country? } → priced cart (with taxEstimated).
    * The customer's token (when signed in) or a guest's email lets the API
    * check per-customer coupon limits before checkout.
    */
   async validateCart(body, token, request) {
     const email = str(body.email)?.trim().slice(0, 254)
+    // The shipping country prices tax (phase 4); without it the API leaves tax at 0.
+    const country = str(body.country)?.trim().slice(0, 60)
     const payload = {
       items: toItems(body.items),
       coupon_code: str(body.couponCode) || null,
       shipping_method: str(body.shippingMethod) ?? 'standard',
       ...(email && { email }),
+      ...(country && { country }),
     }
     let result = await laravel('/api/v1/cart/validate', { method: 'POST', token, request, body: payload })
     // An expired session shouldn't stop the cart from being priced: ask again as a guest.

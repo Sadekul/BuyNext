@@ -12,6 +12,7 @@ import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatMoney, formatSlug } from '../utils/format'
 import { PRODUCT_STATUSES, productStatus } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
+import { useAdminAuth } from '../auth/useAdminAuth'
 
 const LIMIT = 20
 
@@ -22,6 +23,7 @@ const LIMIT = 20
 function ProductsPage() {
   const [params, setParams] = useSearchParams()
   const queryClient = useQueryClient()
+  const { can } = useAdminAuth()
   const q = params.get('q') ?? ''
   const category = params.get('category') ?? ''
   const status = LIVE_DATA ? (params.get('status') ?? '') : ''
@@ -81,9 +83,11 @@ function ProductsPage() {
         title="Products"
         description={products.data ? `${formatCount(products.data.total)} products` : undefined}
         actions={
-          <Link to="/products/new" className="btn btn--primary">
-            <LuPlus aria-hidden="true" /> Add product
-          </Link>
+          can('products.edit') && (
+            <Link to="/products/new" className="btn btn--primary">
+              <LuPlus aria-hidden="true" /> Add product
+            </Link>
+          )
         }
       />
       {!LIVE_DATA && <DemoNotice />}
@@ -197,12 +201,16 @@ function ProductsPage() {
                     </td>
                   )}
                   <td className="table__actions">
-                    <Link to={`/products/${product.id}`} className="icon-button" aria-label={`Edit ${product.title}`}>
-                      <LuPencil aria-hidden="true" />
-                    </Link>
-                    <button type="button" className="icon-button icon-button--danger" aria-label={`Delete ${product.title}`} onClick={() => setToDelete(product)}>
-                      <LuTrash2 aria-hidden="true" />
-                    </button>
+                    {can('products.edit') && (
+                      <Link to={`/products/${product.id}`} className="icon-button" aria-label={`Edit ${product.title}`}>
+                        <LuPencil aria-hidden="true" />
+                      </Link>
+                    )}
+                    {can('products.delete') && (
+                      <button type="button" className="icon-button icon-button--danger" aria-label={`Delete ${product.title}`} onClick={() => setToDelete(product)}>
+                        <LuTrash2 aria-hidden="true" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

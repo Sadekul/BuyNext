@@ -26,6 +26,7 @@ function failed({ status, data }) {
   const body = { message: data?.message ?? 'The request failed.' }
   if (data?.errors) body.errors = camelErrors(data.errors)
   if (data?.code) body.code = data.code
+  if (typeof data?.permission === 'string') body.permission = data.permission // 403 permission_denied (admin roles)
   if (data?.data) body.data = codeInfo(data.data)
   return { ok: false, status, body }
 }
@@ -39,7 +40,21 @@ export const customerProfile = (customer) => ({
   emailVerified: customer.email_verified === true,
   role: 'customer',
 })
-const adminProfile = (admin) => ({ id: admin.id, name: admin.name, firstName: admin.name, lastName: '', email: admin.email, role: 'admin' })
+/*
+ * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin
+ * app can hide what the role can't do (the API still refuses it). Without
+ * them (an older API, or a sign-in answer) `permissions` is left out and the
+ * app shows everything.
+ */
+const adminProfile = (admin) => ({
+  id: admin.id,
+  name: admin.name,
+  firstName: admin.name,
+  lastName: '',
+  email: admin.email,
+  role: admin.role && typeof admin.role === 'object' ? { id: admin.role.id, name: admin.role.name } : 'admin',
+  ...(Array.isArray(admin.permissions) && { permissions: admin.permissions.filter((key) => typeof key === 'string') }),
+})
 const tokensOf = (tokens) => ({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token })
 const str = (value) => (typeof value === 'string' ? value : undefined)
 

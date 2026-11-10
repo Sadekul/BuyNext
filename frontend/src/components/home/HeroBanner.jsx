@@ -2,7 +2,11 @@ import { LuCircleCheck } from 'react-icons/lu'
 import Button from '../ui/Button'
 import './HeroBanner.css'
 
-/** Homepage hero. All content comes in through the `content` prop (CMS-ready). */
+/**
+ * Homepage hero. All content comes in through the `content` prop: the demo's
+ * data/homeContent.js or the admin's CMS (REAL_SHOP), where a button or the
+ * image may be left out.
+ */
 function HeroBanner({ content }) {
   const { eyebrow, title, description, primaryCta, secondaryCta, image, imageAlt, highlights } = content
 
@@ -15,28 +19,38 @@ function HeroBanner({ content }) {
             {title}
           </h1>
           <p className="hero__description">{description}</p>
-          <div className="hero__actions">
-            <Button to={primaryCta.to} size="lg">
-              {primaryCta.label}
-            </Button>
-            <Button to={secondaryCta.to} size="lg" variant="outline">
-              {secondaryCta.label}
-            </Button>
-          </div>
-          <ul className="hero__highlights">
-            {highlights.map((highlight) => (
-              <li key={highlight}>
-                <LuCircleCheck aria-hidden="true" />
-                {highlight}
-              </li>
-            ))}
-          </ul>
+          {(primaryCta || secondaryCta) && (
+            <div className="hero__actions">
+              {primaryCta && (
+                <Button to={primaryCta.to} size="lg">
+                  {primaryCta.label}
+                </Button>
+              )}
+              {secondaryCta && (
+                <Button to={secondaryCta.to} size="lg" variant="outline">
+                  {secondaryCta.label}
+                </Button>
+              )}
+            </div>
+          )}
+          {highlights.length > 0 && (
+            <ul className="hero__highlights">
+              {highlights.map((highlight) => (
+                <li key={highlight}>
+                  <LuCircleCheck aria-hidden="true" />
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        <div className="hero__visual">
-          <div className="hero__blob" aria-hidden="true" />
-          <img src={image} alt={imageAlt} className="hero__image" width="560" height="560" fetchPriority="high" />
-        </div>
+        {image && (
+          <div className="hero__visual">
+            <div className="hero__blob" aria-hidden="true" />
+            <img src={image} alt={imageAlt} className="hero__image" width="560" height="560" fetchPriority="high" />
+          </div>
+        )}
       </div>
     </section>
   )

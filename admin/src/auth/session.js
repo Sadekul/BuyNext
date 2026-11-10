@@ -1,4 +1,5 @@
 import { api } from '../api/client'
+import { REAL_ACCOUNTS } from './accounts'
 
 /*
  * The admin session lives in its own HttpOnly cookies, set by the admin
@@ -41,6 +42,8 @@ export async function checkAdminSession({ signal } = {}) {
 export async function startSession(credentials) {
   const user = await api.post('/api/admin/auth/login', credentials)
   notifyOtherTabs()
+  // The sign-in answer has no role or permissions; /me has them (BuyNest accounts).
+  if (REAL_ACCOUNTS && !user?.permissions) return api.get('/api/admin/me').catch(() => user)
   return user
 }
 

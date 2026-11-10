@@ -8,6 +8,7 @@ use App\Mail\OrderStatusMail;
 use App\Models\Coupon;
 use App\Models\Order;
 use App\Models\Product;
+use App\Services\Audit;
 use App\Services\OrderDocuments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,7 +66,7 @@ class OrderController extends Controller
      * clients work: payment_status "paid" creates the full invoice, and
      * status "shipped" creates a shipment without tracking (OrderDocuments).
      */
-    public function update(Request $request, string $number, OrderDocuments $documents): AdminOrderResource|JsonResponse
+    public function update(Request $request, string $number, OrderDocuments $documents, Audit $audit): AdminOrderResource|JsonResponse
     {
         $data = $request->validate([
             'status' => ['nullable', Rule::in(Order::STATUSES)],
@@ -83,7 +84,7 @@ class OrderController extends Controller
         $notify = $data['notify_customer'] ?? true;
         $note = $data['note'] ?? null;
 
-        [$order, $statusChanged] = DB::transaction(function () use ($number, $data, $note, $notify, $request, $documents) {
+        [$order, $statusChanged] = DB::transaction(function () use ($number, $data, $note, $notify, $request, $documents, $audit) {
             // Lock the order: two staff members clicking at once can't both cancel (and restock twice).
             $order = Order::where('number', strtoupper($number))->lockForUpdate()->firstOrFail();
             $admin = $request->user();
@@ -141,6 +142,9 @@ class OrderController extends Controller
                 'admin_id' => $admin->id,
                 'customer_notified' => $emailed,
             ]);
+            $audit->record($to !== $from ? 'order.status_changed' : 'order.note_added',
+                $to !== $from ? "Order {$order->number}: {$from} → {$to}." : "Note added to order {$order->number}.",
+                'order', $order->id, Audit::diff(['status' => $from, 'note' => null], ['status' => $to, 'note' => $note]));
 
             return [$order, $emailed];
         });

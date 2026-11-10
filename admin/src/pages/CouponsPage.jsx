@@ -11,6 +11,7 @@ import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatMoney } from '../utils/format'
 import { COUPON_FILTERS, couponStatus } from '../utils/orders'
 import { describeCouponValue } from '../utils/couponSchema'
+import { useAdminAuth } from '../auth/useAdminAuth'
 
 const LIMIT = 20
 
@@ -39,6 +40,7 @@ function CouponsPage() {
   const [notice, setNotice] = useState(null)
   const noticeRef = useRef(null)
   const queryClient = useQueryClient()
+  const { can } = useAdminAuth()
   const query = { q, status, skip, limit: LIMIT }
   const coupons = useQuery({ queryKey: adminKeys.coupons(query), queryFn: ({ signal }) => getCoupons(query, { signal }), placeholderData: keepPreviousData })
 
@@ -79,9 +81,11 @@ function CouponsPage() {
         title="Coupons"
         description={coupons.data ? `${formatCount(coupons.data.total)} ${filtered ? 'matching codes' : 'codes'}` : 'Discount codes for the cart'}
         actions={
-          <Link to="/coupons/new" className="btn btn--primary">
-            <LuPlus aria-hidden="true" /> Add coupon
-          </Link>
+          can('coupons.edit') && (
+            <Link to="/coupons/new" className="btn btn--primary">
+              <LuPlus aria-hidden="true" /> Add coupon
+            </Link>
+          )
         }
       />
       <div role={notice?.tone === 'error' ? 'alert' : 'status'}>
@@ -162,6 +166,8 @@ function CouponsPage() {
                     <StatusBadge {...couponStatus(coupon.status)} />
                   </td>
                   <td className="table__actions">
+                    {can('coupons.edit') && (
+                      <>
                       <Link to={`/coupons/${coupon.id}`} className="icon-button" aria-label={`Edit ${coupon.code}`}>
                         <LuPencil aria-hidden="true" />
                       </Link>
@@ -173,6 +179,8 @@ function CouponsPage() {
                       <button type="button" className="icon-button icon-button--danger" onClick={() => setPending({ coupon, action: 'delete' })} aria-label={`Delete ${coupon.code}`}>
                         <LuTrash2 aria-hidden="true" />
                       </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Pricing;
+use App\Services\Settings;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -80,7 +81,7 @@ class Product extends Model
     {
         return match (true) {
             $this->stock_quantity <= 0 => 'out_of_stock',
-            $this->stock_quantity < config('buynest.store.low_stock_threshold') => 'low_stock',
+            $this->stock_quantity < app(Settings::class)->get('low_stock_threshold') => 'low_stock',
             default => 'in_stock',
         };
     }

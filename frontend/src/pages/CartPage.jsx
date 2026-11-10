@@ -10,6 +10,7 @@ import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { REAL_SHOP } from '../constants/shop'
 import { cartPricingQuery } from '../queries/orderQueries'
+import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSettings'
 import { withServerPricing } from '../utils/cartTotals'
 import './CartPage.css'
 
@@ -19,8 +20,9 @@ function CartPage() {
   const refresh = useProductRefresh({ hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
   // REAL_SHOP: the server prices the cart and decides whether the coupon applies
   // (same request and cache entry as the checkout's standard delivery).
+  const { settings } = useStoreSettings()
   const pricing = useQuery({
-    ...cartPricingQuery({ items: cart.items, couponCode: cart.couponCode, shippingMethod: 'standard' }),
+    ...cartPricingQuery({ items: cart.items, couponCode: cart.couponCode, shippingMethod: defaultShippingMethodId(settings) }),
     enabled: REAL_SHOP && cart.items.length > 0,
   })
   const totals = REAL_SHOP ? withServerPricing(cart.totals, pricing.data) : cart.totals
@@ -88,6 +90,7 @@ function CartPage() {
           onApplyCoupon={cart.applyCoupon}
           onRemoveCoupon={cart.removeCoupon}
           isCheckingCoupon={REAL_SHOP && pricing.isFetching}
+          showTax={!REAL_SHOP || settings.taxEnabled}
         >
           {problems.length > 0 && (
             <p className="cart-page__blocker" role="alert">

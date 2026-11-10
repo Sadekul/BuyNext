@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\DevMail;
+use App\Services\HtmlSanitizer;
+use App\Services\Settings;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSent;
@@ -14,7 +16,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // One Settings per request: it remembers the values it read, so the
+        // cache is read once however many prices a page needs.
+        $this->app->singleton(Settings::class);
+        // The sanitizer's allow-list is built once.
+        $this->app->singleton(HtmlSanitizer::class);
     }
 
     public function boot(): void

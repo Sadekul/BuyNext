@@ -6,6 +6,7 @@ import { ADMIN_SIGNAL, checkAdminSession, endSession, startSession } from './ses
 /*
  * Admin sign-in state for the whole dashboard.
  *   status: 'checking' | 'signedOut' | 'forbidden' (the server refused this session) | 'admin' | 'error'
+ *   can(key): whether the admin's role has a permission ("orders.edit"), for hiding screens and buttons
  *
  * Hiding screens here is only for convenience: the admin service checks the
  * admin session on every request, so anyone else gets 401/403 from the API
@@ -50,7 +51,12 @@ function AdminAuthProvider({ children }) {
     setSession({ status: 'signedOut', user: null })
   }, [queryClient])
 
-  const value = useMemo(() => ({ ...session, signIn, signOut }), [session, signIn, signOut])
+  // What the role allows (phase 4). Without a permission list (demo accounts,
+  // an older API) everything shows; the server refuses what isn't allowed either way.
+  const permissions = session.user?.permissions
+  const can = useCallback((key) => !Array.isArray(permissions) || permissions.includes(key), [permissions])
+
+  const value = useMemo(() => ({ ...session, signIn, signOut, can }), [session, signIn, signOut, can])
   return <AdminAuthContext value={value}>{children}</AdminAuthContext>
 }
 

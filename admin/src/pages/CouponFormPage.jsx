@@ -9,6 +9,7 @@ import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
+import { useAdminAuth } from '../auth/useAdminAuth'
 import { EMPTY_COUPON, couponSchema, couponToForm, toCouponPayload } from '../utils/couponSchema'
 import { formatCount } from '../utils/format'
 import { COUPON_TYPES, couponStatus } from '../utils/orders'
@@ -45,6 +46,7 @@ const FIELDS = Object.keys(EMPTY_COUPON)
 function CouponForm({ couponId, initial }) {
   const isNew = couponId === undefined
   const navigate = useNavigate()
+  const { can } = useAdminAuth()
   const queryClient = useQueryClient()
   const justCreated = useLocation().state?.created === true
   const [saved, setSaved] = useState(false)
@@ -135,9 +137,13 @@ function CouponForm({ couponId, initial }) {
       </label>
 
       <div className="form__actions">
-        <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty)}>
-          {save.isPending ? 'Saving…' : isNew ? 'Add coupon' : 'Save changes'}
-        </button>
+        {can('coupons.edit') ? (
+          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty)}>
+            {save.isPending ? 'Saving…' : isNew ? 'Add coupon' : 'Save changes'}
+          </button>
+        ) : (
+          <span className="muted">Your role can view this coupon but not change it.</span>
+        )}
         <Link to="/coupons" className="btn btn--outline">
           Cancel
         </Link>

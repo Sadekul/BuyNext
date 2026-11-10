@@ -3,6 +3,7 @@ import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from 'react-icons/fa6
 import { LuMail, LuPhone } from 'react-icons/lu'
 import Logo from '../common/Logo'
 import { FOOTER_LINK_GROUPS, SITE, SOCIAL_LINKS } from '../../constants/site'
+import { useStoreSettings } from '../../hooks/useStoreSettings'
 import './Footer.css'
 
 // Maps the data-friendly icon keys in SOCIAL_LINKS to icon components.
@@ -15,6 +16,11 @@ const SOCIAL_ICONS = {
 
 function Footer() {
   const currentYear = new Date().getFullYear()
+  // REAL_SHOP: the support details the admin set (store settings); the demo's otherwise.
+  const { settings } = useStoreSettings()
+  const supportEmail = settings.supportEmail ?? SITE.supportEmail
+  const supportPhone = settings.supportPhone ?? SITE.supportPhone
+  const storeName = settings.storeName ?? SITE.name
 
   return (
     <footer className="site-footer">
@@ -27,11 +33,11 @@ function Footer() {
           <ul className="site-footer__contact">
             <li>
               <LuMail aria-hidden="true" />
-              <a href={`mailto:${SITE.supportEmail}`}>{SITE.supportEmail}</a>
+              <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
             </li>
             <li>
               <LuPhone aria-hidden="true" />
-              <a href={`tel:${SITE.supportPhone.replace(/[^\d+]/g, '')}`}>{SITE.supportPhone}</a>
+              <a href={`tel:${supportPhone.replace(/[^\d+]/g, '')}`}>{supportPhone}</a>
             </li>
           </ul>
         </div>
@@ -53,7 +59,7 @@ function Footer() {
       <div className="site-footer__bottom">
         <div className="site-footer__bottom-inner container">
           <p>
-            © {currentYear} {SITE.name}. All rights reserved.
+            © {currentYear} {storeName}. All rights reserved.
           </p>
           <ul className="site-footer__social" aria-label="Social media">
             {SOCIAL_LINKS.map((social) => {

@@ -23,10 +23,11 @@ const cartLines = (items) => items.filter((item) => !item.isUnavailable).map((it
  * `problems`: [{ productId, code: unavailable | insufficient_stock | below_minimum, message }].
  * The server decides whether the coupon applies (`coupon` or `couponError`). A
  * guest's `email` lets it check "one use per customer" before checkout; a
- * signed-in customer is recognised by the session cookie.
+ * signed-in customer is recognised by the session cookie. The shipping
+ * `country` (sent only when the store charges tax) lets the server work out the tax.
  */
-export function validateCart({ items, couponCode, shippingMethod, email }, { signal } = {}) {
-  const body = { items: cartLines(items), couponCode: couponCode || null, shippingMethod, ...(email && { email }) }
+export function validateCart({ items, couponCode, shippingMethod, email, country }, { signal } = {}) {
+  const body = { items: cartLines(items), couponCode: couponCode || null, shippingMethod, ...(email && { email }), ...(country && { country }) }
   return apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
 }
 

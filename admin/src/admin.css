@@ -223,6 +223,12 @@
     align-items: stretch;
     height: 100vh;
     padding: var(--space-6) var(--space-4);
+    /* The menu grew with roles, content, reports, and settings: on short screens
+       it scrolls inside the sidebar, so the account links stay reachable and on
+       the dark background. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--color-secondary);
   }
 
   .admin__sidebar > nav {
@@ -1005,4 +1011,354 @@
     text-transform: uppercase;
     color: #94a3b8;
   }
+}
+
+/* ---------- Phase 4: permissions ---------- */
+.admin__role {
+  color: #94a3b8; /* 6.9:1 on the dark sidebar (the muted grey was 3.75:1) */
+}
+
+/* "You don't have access": calm, not an error-red panel. */
+.no-access {
+  max-width: 36rem;
+  margin: var(--space-8) auto;
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.no-access__icon {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-text-muted);
+}
+
+.no-access h1 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--text-xl);
+}
+
+.no-access p {
+  margin: 0 0 var(--space-3);
+}
+
+/* A fieldset that only groups (and can disable) its fields, without a box. */
+.form__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form__fieldset legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+/* ---------- Roles ---------- */
+.permission-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-4);
+}
+
+.permission-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.permission-group legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+}
+
+/* ---------- Audit log ---------- */
+.audit-table td {
+  vertical-align: top;
+}
+
+.audit-changes {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.audit-changes summary {
+  cursor: pointer;
+  color: var(--color-primary);
+}
+
+.audit-changes .table td {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Content pages ---------- */
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 64rem) {
+  .editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.editor .form {
+  padding: var(--space-5);
+}
+
+.editor__body {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+}
+
+.editor__preview {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+/* The saved page, styled roughly like the store's content pages. */
+.cms-preview {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.cms-preview h2,
+.cms-preview h3,
+.cms-preview h4 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.cms-preview table {
+  border-collapse: collapse;
+}
+
+.cms-preview th,
+.cms-preview td {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+}
+
+/* ---------- Home page editor ---------- */
+.form > .form__fieldset > .panel {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.banner-list,
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.banner-item {
+  position: relative;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.banner-item__tools,
+.picker-list__tools {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.banner-item__tools {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.picker-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* ---------- Reports ---------- */
+.report__header {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.stats--compact {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+/*
+ * Net revenue columns: one series, one hue (the brand primary), thin bars
+ * (max 24px) with a 4px rounded data end and a square end on the zero line.
+ * The text alternative and the table carry every value.
+ */
+.chart {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.chart__summary {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.chart__figure {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 12rem auto;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+
+.chart__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.chart__plot {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  border-left: 1px solid var(--color-border);
+}
+
+.chart__zero {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--color-border-strong);
+}
+
+.chart__slot {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.chart__bar {
+  position: absolute;
+  left: 50%;
+  width: min(24px, 70%);
+  min-height: 1px;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  border-radius: 4px 4px 0 0;
+}
+
+.chart__bar--negative {
+  border-radius: 0 0 4px 4px;
+}
+
+/* Hover readout (pointer only; the table has the same values for everyone). */
+.chart__tip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  z-index: 1;
+  display: none;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.chart__slot:hover .chart__tip {
+  display: block;
+}
+
+.chart__slot:hover .chart__bar {
+  opacity: 0.8;
+}
+
+.chart__labels {
+  grid-column: 2;
+  display: flex;
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.chart__labels span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.chart__labels span:first-child {
+  text-align: left;
+}
+
+.chart__labels span:last-child {
+  text-align: right;
+}
+
+.chart__table {
+  margin-top: var(--space-4);
+}
+
+.chart__table summary {
+  cursor: pointer;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+}
+
+@media (forced-colors: active) {
+  .chart__bar {
+    background: CanvasText;
+  }
+}
+
+/* ---------- Settings ---------- */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.settings__group {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.tax-table caption {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  text-align: left;
+}
+
+.tax-table input {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
 }

@@ -37,9 +37,23 @@ trait PlacesOrders
 
     protected function adminHeaders(): array
     {
-        $admin = Admin::factory()->create(['name' => 'Store Admin']);
+        return $this->signInAdmin(Admin::factory()->create(['name' => 'Store Admin']));
+    }
+
+    /** Signs $admin in (factory password) and returns the Authorization header. */
+    protected function signInAdmin(Admin $admin): array
+    {
+        $this->app['auth']->forgetGuards();
 
         return ['Authorization' => 'Bearer '.$this->postJson('/api/admin/v1/auth/login', ['email' => $admin->email, 'password' => 'AdminPass123'])
             ->assertOk()->json('data.tokens.access_token')];
+    }
+
+    /** An admin request; forgets the previous request's signed-in account first (several tokens in one test). */
+    protected function asAdmin(array $headers, string $method, string $uri, array $body = []): TestResponse
+    {
+        $this->app['auth']->forgetGuards();
+
+        return $this->json($method, $uri, $body, $headers);
     }
 }

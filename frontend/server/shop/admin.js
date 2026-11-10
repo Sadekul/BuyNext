@@ -34,6 +34,9 @@ function failed({ status, data }, fieldNames = {}) {
   if (data?.errors && typeof data.errors === 'object') {
     body.errors = Object.fromEntries(Object.entries(data.errors).map(([field, messages]) => [fieldNames[field] ?? camelPath(field), messages]))
   }
+  // 403 permission_denied (phase 4): the admin app names the permission the role lacks.
+  if (typeof data?.code === 'string') body.code = data.code
+  if (typeof data?.permission === 'string') body.permission = data.permission
   return { ok: false, status, body }
 }
 const answer = (result, okStatuses, map, fieldNames) =>

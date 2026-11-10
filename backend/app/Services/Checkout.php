@@ -32,7 +32,7 @@ class Checkout
     {
         $order = DB::transaction(function () use ($data, $customer) {
             $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
-                lock: true, customerId: $customer?->id, email: $data['email']);
+                lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null);
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([

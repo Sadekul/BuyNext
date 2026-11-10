@@ -1,0 +1,121 @@
+/* Readable long-form text for the admin's CMS pages. */
+.cms-page {
+  max-width: 46rem;
+  margin-top: var(--space-6);
+}
+
+.cms-page__title {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.cms-page__body {
+  margin-top: var(--space-6);
+  font-size: var(--text-lg);
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.cms-page__body > * + * {
+  margin-top: var(--space-4);
+}
+
+.cms-page__body h2 {
+  margin-top: var(--space-10);
+  font-size: var(--text-2xl);
+}
+
+.cms-page__body h3 {
+  margin-top: var(--space-8);
+  font-size: var(--text-xl);
+}
+
+.cms-page__body h4 {
+  margin-top: var(--space-6);
+  font-size: var(--text-lg);
+}
+
+.cms-page__body ul,
+.cms-page__body ol {
+  padding-left: var(--space-6);
+}
+
+.cms-page__body ul {
+  list-style: disc;
+}
+
+.cms-page__body ol {
+  list-style: decimal;
+}
+
+.cms-page__body li + li {
+  margin-top: var(--space-2);
+}
+
+.cms-page__body a,
+.cms-page__support a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.cms-page__body a:hover,
+.cms-page__support a:hover {
+  color: var(--color-primary-hover);
+}
+
+.cms-page__body blockquote {
+  padding-left: var(--space-4);
+  color: var(--color-text-muted);
+  border-left: 4px solid var(--color-primary-soft);
+}
+
+.cms-page__body hr {
+  margin-block: var(--space-8);
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Wide tables scroll inside the article instead of widening the page. */
+.cms-page__body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: var(--text-base);
+  border-collapse: collapse;
+}
+
+.cms-page__body th,
+.cms-page__body td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border: 1px solid var(--color-border);
+}
+
+.cms-page__body th {
+  background: var(--color-bg-muted);
+}
+
+.cms-page__support {
+  margin-top: var(--space-10);
+  padding: var(--space-6);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-lg);
+}
+
+.cms-page__support h2 {
+  font-size: var(--text-xl);
+}
+
+.cms-page__support ul {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.cms-page__support li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}

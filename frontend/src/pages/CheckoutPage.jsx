@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { LuLock, LuShoppingBag, LuTriangleAlert } from 'react-icons/lu'
+import { LuLock, LuShoppingBag, LuTriangleAlert, LuUserRound } from 'react-icons/lu'
 import AddressFields from '../components/checkout/AddressFields'
 import CouponForm from '../components/cart/CouponForm'
 import ChoiceCards from '../components/forms/ChoiceCards'
@@ -15,6 +16,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useCart } from '../hooks/useCart'
 import { useProductRefresh } from '../hooks/useProductRefresh'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSettings'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
 import { productKeys } from '../queries/productQueries'
@@ -22,8 +24,7 @@ import { cartPricingKey, cartPricingQuery, orderKeys } from '../queries/orderQue
 import { useOrders } from '../hooks/useOrders'
 import { createOrder, verifyCartWithServer } from '../services/orderService'
 import { placeOrder as placeServerOrder } from '../services/shopService'
-import { EMPTY_ADDRESS, checkoutSchema } from '../schemas/checkoutSchema'
-import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS } from '../constants/store'
+import { EMPTY_ADDRESS, checkoutSchema, createCheckoutSchema } from '../schemas/checkoutSchema'
 import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
@@ -46,6 +47,8 @@ const SERVER_FIELD_MAP = {
 
 // Good enough to send to cart/validate; the order itself is validated properly.
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
+
+const GUEST_CHECKOUT_OFF = "Please sign in to place your order: guest checkout isn't available right now."
 
 const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
 
@@ -71,6 +74,10 @@ function CheckoutPage() {
   // snapshots taken when each product was added. Items that sold out make
   // canCheckout false (the "needs your attention" screen below).
   const refresh = useProductRefresh({ hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
+  // REAL_SHOP: the server's countries, delivery and payment options, and guest checkout rule.
+  const store = useStoreSettings()
+  const { settings } = store
+  const location = useLocation()
 
   if (cart.items.length === 0) {
     return (
@@ -93,7 +100,7 @@ function CheckoutPage() {
   }
 
   // Guests can check out (REAL_SHOP), but a session being checked may still turn out to be a customer.
-  if (status === 'checking' || (user && profileRequest.isPending)) {
+  if (status === 'checking' || (user && profileRequest.isPending) || store.isPending) {
     return (
       <div className="section container">
         <Loader label="Preparing checkout…" />
@@ -101,11 +108,45 @@ function CheckoutPage() {
     )
   }
 
+  // The store can turn guest checkout off (the server refuses guest orders then): ask for a sign-in up front.
+  if (REAL_SHOP && !user && !settings.guestCheckout) {
+    return (
+      <div className="section container">
+        <title>{`Checkout | ${SITE.name}`}</title>
+        <EmptyState
+          icon={LuUserRound}
+          title="Sign in to check out"
+          message="Guest checkout isn't available right now. Sign in or create an account to place your order; your cart will be waiting."
+        >
+          <Button to={ROUTES.login} state={{ from: location }}>
+            Sign in
+          </Button>
+          <Button to={ROUTES.register} state={{ from: location }} variant="outline">
+            Create an account
+          </Button>
+        </EmptyState>
+      </div>
+    )
+  }
+
+  // Nothing the shopper could choose (a misconfigured store): say so instead of a form that can't be sent.
+  if (settings.shippingMethods.length === 0 || settings.paymentMethods.length === 0 || settings.countries.length === 0) {
+    return (
+      <div className="section container">
+        <EmptyState icon={LuTriangleAlert} title="Checkout is unavailable right now" message={`Please try again later, or contact us at ${settings.supportEmail ?? SITE.supportEmail}.`}>
+          <Button to={ROUTES.cart}>Back to cart</Button>
+        </EmptyState>
+      </div>
+    )
+  }
+
   // If the profile can't be loaded, fall back to what we know from sign-in.
   const profile = profileRequest.data ?? user
   const address = profile?.address
+  const { countries, paymentMethods } = settings
+  const emptyAddress = { ...EMPTY_ADDRESS, country: countries.includes(EMPTY_ADDRESS.country) ? EMPTY_ADDRESS.country : countries[0] }
   const shippingDefaults = {
-    ...EMPTY_ADDRESS,
+    ...emptyAddress,
     firstName: profile?.firstName ?? '',
     lastName: profile?.lastName ?? '',
     ...(address && {
@@ -113,7 +154,7 @@ function CheckoutPage() {
       city: address.city,
       state: address.state,
       postalCode: address.postalCode,
-      country: COUNTRIES.includes(address.country) ? address.country : EMPTY_ADDRESS.country,
+      country: countries.includes(address.country) ? address.country : emptyAddress.country,
     }),
   }
 
@@ -121,27 +162,38 @@ function CheckoutPage() {
     <CheckoutForm
       isCheckingPrices={refresh.isFetching}
       refreshProducts={refresh.refetch}
+      settings={settings}
       defaultValues={{
         email: profile?.email ?? '',
         phone: profile?.phone ?? '',
         shipping: shippingDefaults,
         billingSameAsShipping: true,
-        billing: EMPTY_ADDRESS,
-        shippingMethod: 'standard',
-        // Cash on delivery is the one real order that needs no payment provider.
-        paymentMethod: REAL_SHOP ? 'cod' : 'card',
+        billing: emptyAddress,
+        shippingMethod: defaultShippingMethodId(settings),
+        // Cash on delivery is the one real order that needs no payment provider (when the store offers it).
+        paymentMethod: REAL_SHOP ? (paymentMethods.find((method) => method.id === 'cod') ?? paymentMethods[0]).id : 'card',
       }}
     />
   )
 }
 
-function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
+function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings }) {
   const cart = useCart()
   const { user, isAuthenticated, authorizedRequest } = useAuth()
   const { placeOrder } = useOrders()
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  // REAL_SHOP: only what the store offers is accepted (the demo keeps its fixed rules).
+  const [schema] = useState(() =>
+    REAL_SHOP
+      ? createCheckoutSchema({
+          countries: settings.countries,
+          shippingMethodIds: settings.shippingMethods.map((method) => method.id),
+          paymentMethodIds: settings.paymentMethods.map((method) => method.id),
+        })
+      : checkoutSchema,
+  )
 
   // A MUTATION: a request that changes something on the server (here: the
   // server prices the cart). Unlike queries, mutations run only when called.
@@ -164,7 +216,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm({
-    resolver: zodResolver(checkoutSchema),
+    resolver: zodResolver(schema),
     defaultValues,
     // Errors appear after the first submit, then update live as you type.
     // (Validating on blur made error messages push the layout down while the
@@ -174,9 +226,9 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
   })
 
   // useWatch subscribes to just these fields, for the live summary and cards.
-  const [shippingMethod, billingSameAsShipping, paymentMethod, email] = useWatch({
+  const [shippingMethod, billingSameAsShipping, paymentMethod, email, shippingCountry] = useWatch({
     control,
-    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email'],
+    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email', 'shipping.country'],
   })
 
   // A guest's email goes with the pricing request, so "one use per customer"
@@ -187,21 +239,28 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
   // REAL_SHOP: the server's prices are the ones shown and charged. The local
   // calculation (same rules, but no coupon: the server decides about those)
   // fills in until the first answer arrives.
-  const pricingInput = { items: cart.items, couponCode: cart.couponCode, shippingMethod, email: looksLikeEmail(guestEmail) ? guestEmail : undefined }
+  // With tax on, the shipping country goes along too: the server's tax depends on it.
+  const pricingInput = {
+    items: cart.items,
+    couponCode: cart.couponCode,
+    shippingMethod,
+    email: looksLikeEmail(guestEmail) ? guestEmail : undefined,
+    country: REAL_SHOP && settings.taxEnabled ? shippingCountry : undefined,
+  }
   const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
   const serverCart = REAL_SHOP ? pricing.data : null
 
   const localCoupon = REAL_SHOP ? null : cart.couponCode
-  const localTotals = calculateCartTotals(cart.items, localCoupon, shippingMethod)
+  const localTotals = calculateCartTotals(cart.items, localCoupon, shippingMethod, settings)
   const totals = serverCart ? serverCart.totals : localTotals
   const coupon = serverCart ? serverCart.coupon : localTotals.coupon
   const couponError = serverCart ? serverCart.couponError : localTotals.couponError
   const problems = serverCart?.problems ?? []
-  const shippingLabel = SHIPPING_METHODS.find((method) => method.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
+  const shippingLabel = settings.shippingMethods.find((method) => method.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
   const changedCount = cart.items.filter((item) => item.notice).length
-  const shippingOptions = SHIPPING_METHODS.map((method) => {
+  const shippingOptions = settings.shippingMethods.map((method) => {
     const serverPrice = serverCart?.shippingOptions.find((option) => option.id === method.id)?.price
-    const price = serverPrice ?? calculateCartTotals(cart.items, localCoupon, method.id).shipping
+    const price = serverPrice ?? calculateCartTotals(cart.items, localCoupon, method.id, settings).shipping
     return { ...method, description: method.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
   })
   const isPricing = REAL_SHOP && (pricing.isPending || pricing.isFetching)
@@ -254,6 +313,11 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
         return
       }
       // Invalid fields (422) come back with per-field messages: show them on the fields.
+      // Guest checkout was turned off after the page loaded.
+      if (error.status === 403 && !isAuthenticated) {
+        setError('root.server', { message: error.data?.code === 'guest_checkout_disabled' ? GUEST_CHECKOUT_OFF : error.message })
+        return
+      }
       if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
       // Stock problems (422 on the items) explain themselves; so does a coupon
       // the server refused (couponCode), which has no field in this form.
@@ -276,7 +340,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
           <LuLock aria-hidden="true" />{' '}
           {REAL_SHOP ? 'Secure checkout — our server confirms every price before your order is placed.' : 'Demo checkout — no payment is taken and nothing ships.'}
         </p>
-        {REAL_SHOP && !isAuthenticated && (
+        {REAL_SHOP && !isAuthenticated && settings.guestCheckout && (
           <p className="checkout__note">
             Have an account?{' '}
             <Link to={ROUTES.login} state={{ from: location }}>
@@ -309,14 +373,14 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
 
           <section className="checkout__section" aria-labelledby="shipping-title">
             <h2 id="shipping-title">Shipping address</h2>
-            <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" />
+            <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} />
           </section>
 
           <section className="checkout__section" aria-labelledby="billing-title">
             <h2 id="billing-title">Billing address</h2>
             <CheckboxField label="Same as shipping address" {...register('billingSameAsShipping')} />
             {!billingSameAsShipping && (
-              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" />
+              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
             )}
           </section>
 
@@ -333,7 +397,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
           <section className="checkout__section">
             <ChoiceCards
               legend="Payment"
-              options={PAYMENT_METHODS}
+              options={settings.paymentMethods}
               registration={register('paymentMethod')}
               selectedId={paymentMethod}
               error={errors.paymentMethod?.message}
@@ -356,7 +420,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts }) {
             Order summary
           </h2>
           <OrderItems items={serverCart ? serverCart.lines.filter((line) => line.available) : cart.items} />
-          <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} />
+          <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
           <CouponForm
             appliedCode={cart.couponCode}
             coupon={coupon}

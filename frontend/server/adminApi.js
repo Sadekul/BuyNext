@@ -1,6 +1,7 @@
 import { json, pick, readBody, upstream } from './http.js'
 import { accounts } from './accounts/index.js'
 import { laravelAdminData } from './shop/admin.js'
+import { SYSTEM_ROUTES, isReportName } from './adminSystemApi.js'
 import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 
 /*
@@ -57,6 +58,12 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  *   DELETE /api/admin/coupons/:id                  → { deleted: true } or, once used, { disabled: true, coupon }
  *   GET    /api/admin/customers?q&status&limit&skip
  *   PATCH  /api/admin/customers/:id      { isActive } → block or unblock (Laravel accounts only)
+ *
+ * Phase 4 (Laravel only; adminSystemApi.js): admin users, roles and
+ * permissions, the audit log, CMS pages, the home page, reports, settings.
+ * With roles, `GET me` also has `role: { id, name }` and `permissions`, and
+ * the API answers 403 { code: "permission_denied", permission } to anything
+ * the role can't do: passed on unchanged.
  */
 
 const PRODUCT_LIST_FIELDS = ['id', 'title', 'category', 'brand', 'price', 'discountPercentage', 'stock', 'rating', 'thumbnail', 'availabilityStatus']
@@ -88,7 +95,7 @@ const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
 const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
 const isCreditMemoNumber = (value) => /^CM-\d{1,12}$/.test(value ?? '')
 // How each resource's records are addressed in the URL; anything else is a 404 before any upstream call.
-const ID_FORMATS = { orders: (value) => isId(value) || isOrderNumber(value), invoices: isInvoiceNumber, 'credit-memos': isCreditMemoNumber }
+const ID_FORMATS = { orders: (value) => isId(value) || isOrderNumber(value), invoices: isInvoiceNumber, 'credit-memos': isCreditMemoNumber, reports: isReportName }
 const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable']
 const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
 const COUPON_TYPES = ['percent', 'fixed', 'free_shipping']
@@ -523,6 +530,7 @@ const ROUTES = {
     const result = await backend.admin.updateCustomer(ctx.token, ctx.id, { isActive: body.isActive }, ctx.request)
     return result.ok ? json(result.data) : json(result.body, result.status)
   },
+  ...SYSTEM_ROUTES,
 }
 
 /**
@@ -535,6 +543,7 @@ function matchRoute(method, segments) {
   if (rest.length > 0) return null
   if (id === undefined) return { route: ROUTES[`${method} ${resource}`] }
   if (!(ID_FORMATS[resource] ?? isId)(id)) return null
+  if (document === 'reset-password' && resource === 'admins') return { route: ROUTES[`${method} admins/:id/reset-password`], id }
   if (document === undefined) return { route: ROUTES[`${method} ${resource}/:id`], id }
   // Documents belong to an order, addressed by its number.
   if (resource !== 'orders' || !isOrderNumber(id) || !ORDER_DOCUMENTS.includes(document)) return null

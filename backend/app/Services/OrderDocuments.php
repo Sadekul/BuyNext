@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  */
 class OrderDocuments
 {
+    public function __construct(private Audit $audit) {}
+
     /** Records the payment of the full grand total: paid, and pending_payment → processing. */
     public function invoice(Order $order, Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): Invoice
     {
@@ -51,6 +53,8 @@ class OrderDocuments
             'admin_id' => $admin->id,
             'customer_notified' => $notify,
         ]);
+        $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} (\${$invoice->amount}).",
+            'invoice', $invoice->id, ['before' => ['payment_status' => 'unpaid'], 'after' => ['payment_status' => 'paid', 'amount' => $invoice->amount]], $admin);
 
         return $invoice;
     }
@@ -95,6 +99,9 @@ class OrderDocuments
             'admin_id' => $admin->id,
             'customer_notified' => $notify,
         ]);
+        $this->audit->record('shipment.created', "Shipment {$shipment->number} created for order {$order->number} ({$shipment->carrierLabel()}"
+            .($trackingNumber ? ", {$trackingNumber}" : '').').', 'shipment', $shipment->id,
+            ['before' => [], 'after' => ['order' => $order->number, 'carrier' => $carrier, 'tracking_number' => $trackingNumber]], $admin);
 
         return $shipment;
     }

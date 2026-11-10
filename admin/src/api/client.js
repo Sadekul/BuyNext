@@ -13,6 +13,9 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = status === 422 && data?.errors && typeof data.errors === 'object' ? data.errors : null
+    // 403 permission_denied (admin roles): which permission the role lacks.
+    this.code = typeof data?.code === 'string' ? data.code : null
+    this.permission = typeof data?.permission === 'string' ? data.permission : null
   }
 }
 

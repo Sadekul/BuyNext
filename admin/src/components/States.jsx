@@ -1,3 +1,4 @@
+import { NoPermission } from './NoPermission'
 import { LuInbox, LuTriangleAlert } from 'react-icons/lu'
 
 export function Loading({ label = 'Loading…' }) {
@@ -10,6 +11,8 @@ export function Loading({ label = 'Loading…' }) {
 }
 
 export function ErrorState({ error, onRetry }) {
+  // The role lacks a permission (403 permission_denied): say which, not "try again".
+  if (error?.code === 'permission_denied') return <NoPermission permission={error.permission} />
   return (
     <div className="state state--error" role="alert">
       <LuTriangleAlert aria-hidden="true" />

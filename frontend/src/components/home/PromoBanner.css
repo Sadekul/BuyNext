@@ -23,6 +23,15 @@
   background: linear-gradient(135deg, var(--color-primary), #059669);
 }
 
+/* Dark enough for white text (WCAG AA). */
+.promo-banner--amber {
+  background: linear-gradient(135deg, #92400e, #b45309);
+}
+
+.promo-banner--rose {
+  background: linear-gradient(135deg, #9f1239, #be123c);
+}
+
 .promo-banner__copy {
   position: relative;
   z-index: 1;

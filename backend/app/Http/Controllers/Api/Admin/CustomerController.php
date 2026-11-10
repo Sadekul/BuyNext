@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminCustomerResource;
 use App\Models\Customer;
+use App\Services\Audit;
 use App\Services\TokenPairs;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -47,12 +48,18 @@ class CustomerController extends Controller
     }
 
     /** PATCH /api/admin/v1/customers/{customer} { is_active } - block or unblock. Blocking signs them out everywhere. */
-    public function update(Request $request, Customer $customer, TokenPairs $tokens): AdminCustomerResource
+    public function update(Request $request, Customer $customer, TokenPairs $tokens, Audit $audit): AdminCustomerResource
     {
         $data = $request->validate(['is_active' => ['required', 'boolean']]);
+        $wasActive = $customer->is_active;
         $customer->forceFill(['is_active' => $data['is_active']])->save();
         if (! $customer->is_active) {
             $tokens->revokeAll($customer);
+        }
+        if ($wasActive !== $customer->is_active) {
+            $action = $customer->is_active ? 'customer.unblocked' : 'customer.blocked';
+            $audit->record($action, "Customer {$customer->email} ".($customer->is_active ? 'unblocked' : 'blocked').'.', 'customer', $customer->id,
+                Audit::diff(['is_active' => $wasActive], ['is_active' => $customer->is_active]));
         }
 
         return new AdminCustomerResource($customer);

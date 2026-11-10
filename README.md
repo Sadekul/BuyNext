@@ -45,6 +45,7 @@ cd frontend && npm install && cp .env.example .env.local && cd ..
 | Store | http://localhost:5173 |
 | Admin dashboard | http://localhost:5173/admin/ |
 | Track an order (guests) | http://localhost:5173/track-order |
+| Content pages | http://localhost:5173/pages/about (also shipping-and-returns, privacy, terms, contact) |
 | Test inbox (codes, order emails) | http://127.0.0.1:8000/dev/mailbox |
 
 Local demo accounts (created by `php artisan db:seed`):
@@ -82,6 +83,6 @@ Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/REA
 | B1 | Backend phase 1: accounts (Laravel + MySQL) | Done: sign-up with email code, sign-in, password reset, separate admin accounts, block customers; see [docs/backend/ACCOUNTS.md](docs/backend/ACCOUNTS.md) |
 | B2 | Backend phase 2: catalog, real orders, customers' order history | Done: products in MySQL, server pricing, guest checkout, order tracking, order emails, admin order handling; see [docs/backend/PHASE2_CONTRACT.md](docs/backend/PHASE2_CONTRACT.md) |
 | B3 | Backend phase 3: invoices, shipments, refunds, coupons | Done: invoices, shipments with carrier tracking links, partial and full refunds (credit memos) with restock, printable invoices, coupons managed in the admin; see [docs/backend/PHASE3_CONTRACT.md](docs/backend/PHASE3_CONTRACT.md) |
-| B4 | Backend phase 4: admin roles and permissions, content pages, reports, settings | Next; agreement in [docs/backend/PHASE4_CONTRACT.md](docs/backend/PHASE4_CONTRACT.md) |
+| B4 | Backend phase 4: admin roles and permissions, content pages, reports, settings | Done: roles (Owner, Sales staff, Catalog manager, Marketing, Viewer) enforced on every admin route, admin users, audit log, content pages and home page editor (HTML cleaned on the server), sales reports with CSV, store settings (shipping, tax, countries, payment methods, guest checkout); see [docs/backend/PHASE4_CONTRACT.md](docs/backend/PHASE4_CONTRACT.md) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).

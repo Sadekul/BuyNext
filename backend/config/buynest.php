@@ -41,36 +41,29 @@ return [
     'orders_per_minute' => (int) env('BUYNEST_ORDERS_PER_MINUTE', 10),
 
     /*
-     * Store rules. Every amount is in whole CENTS (499 = $4.99), because
-     * integers add up exactly and floats don't. App\Services\Pricing is the
-     * only code that reads these money rules. They move into the admin in
-     * phase 4.
+     * Store rules that are code, not settings: the ids and wording of the
+     * shipping and payment methods. Everything shop staff can change (prices,
+     * the free-shipping threshold, which methods are on, countries, tax, guest
+     * checkout, the low-stock threshold) lives in the database since phase 4:
+     * App\Services\Settings (admin: Stores → Settings), with the old values
+     * as defaults.
      */
     'store' => [
         'currency' => 'USD',
-        'tax_cents' => 0, // tax rules arrive in phase 4
 
-        // Free standard shipping once the merchandise (after the coupon) reaches this.
-        'free_shipping_threshold_cents' => 5000,
-
-        // Keys are the ids the storefront sends. Standard is the only one that can be free.
+        // Keys are the ids the storefront sends. Prices come from the settings
+        // (standard_price, express_price, next_day_price). Standard is the
+        // only one that becomes free over the threshold.
         'shipping_methods' => [
-            'standard' => ['label' => 'Standard', 'eta' => '3–5 business days', 'price_cents' => 499, 'free_over_threshold' => true],
-            'express' => ['label' => 'Express', 'eta' => '1–2 business days', 'price_cents' => 1299, 'free_over_threshold' => false],
-            'nextDay' => ['label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price_cents' => 2499, 'free_over_threshold' => false],
+            'standard' => ['label' => 'Standard', 'eta' => '3–5 business days', 'price_setting' => 'standard_price', 'free_over_threshold' => true],
+            'express' => ['label' => 'Express', 'eta' => '1–2 business days', 'price_setting' => 'express_price', 'free_over_threshold' => false],
+            'nextDay' => ['label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price_setting' => 'next_day_price', 'free_over_threshold' => false],
         ],
-
-        // Coupons live in the database since phase 3 (coupons table, admin: Marketing → Coupons).
 
         'payment_methods' => [
             'card' => 'Credit or debit card',
             'paypal' => 'PayPal',
             'cod' => 'Cash on delivery',
         ],
-
-        'countries' => ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India'],
-
-        // Fewer units than this shows as "low stock".
-        'low_stock_threshold' => 10,
     ],
 ];

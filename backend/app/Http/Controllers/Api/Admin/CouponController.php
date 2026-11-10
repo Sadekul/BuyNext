@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CouponResource;
 use App\Models\Coupon;
+use App\Services\Audit;
 use App\Services\Pricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,11 @@ use Illuminate\Validation\ValidationException;
 class CouponController extends Controller
 {
     private const MONEY = 'regex:/^\d{1,7}(\.\d{1,2})?$/';
+
+    private const AUDITED = ['code', 'description', 'type', 'value', 'min_subtotal', 'starts_at', 'ends_at',
+        'usage_limit', 'usage_limit_per_customer', 'is_active'];
+
+    public function __construct(private Audit $audit) {}
 
     /** GET /api/admin/v1/coupons?search&status&page&per_page - newest first. */
     public function index(Request $request): AnonymousResourceCollection
@@ -81,10 +87,15 @@ class CouponController extends Controller
             return $this->notFound();
         }
         if ($coupon->redemptions()->exists()) {
+            $wasActive = $coupon->is_active;
             $coupon->forceFill(['is_active' => false])->save();
+            $this->audit->record('coupon.disabled', "Coupon {$coupon->code} disabled (orders used it, so it is kept).", 'coupon', $coupon->id,
+                Audit::diff(['is_active' => $wasActive], ['is_active' => false]));
 
             return new CouponResource($coupon->fresh());
         }
+        $this->audit->record('coupon.deleted', "Coupon {$coupon->code} deleted.", 'coupon', $coupon->id,
+            Audit::deleted(Audit::fieldsOf($coupon, self::AUDITED)));
         $coupon->delete();
 
         return response()->json(null, 204);
@@ -154,6 +165,8 @@ class CouponController extends Controller
 
     private function save(Coupon $coupon, array $data): void
     {
+        $creating = ! $coupon->exists;
+        $before = $creating ? [] : Audit::fieldsOf($coupon, self::AUDITED);
         $coupon->fill($data);
         // No description given: write one from the rule ("10% off your order").
         if (blank($coupon->description)) {
@@ -164,6 +177,13 @@ class CouponController extends Controller
             );
         }
         $coupon->save();
+
+        if ($creating) {
+            $this->audit->record('coupon.created', "Coupon {$coupon->code} created.", 'coupon', $coupon->id,
+                Audit::created(Audit::fieldsOf($coupon, self::AUDITED)));
+        } elseif ($changes = Audit::diff($before, Audit::fieldsOf($coupon, self::AUDITED))) {
+            $this->audit->record('coupon.updated', "Coupon {$coupon->code} updated.", 'coupon', $coupon->id, $changes);
+        }
     }
 
     private function notFound(): JsonResponse

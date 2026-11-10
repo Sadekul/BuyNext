@@ -7,6 +7,7 @@ use App\Http\Resources\AdminProductResource;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,6 +18,12 @@ use Illuminate\Validation\Rule;
 /** Products, as shop staff manage them: every status, create, edit, (soft) delete. */
 class ProductController extends Controller
 {
+    // What the audit log records about a product (not counters like ratings).
+    private const AUDITED = ['name', 'sku', 'status', 'price', 'discount_percent', 'stock_quantity', 'min_order_quantity',
+        'category_id', 'brand_id', 'description', 'thumbnail_url'];
+
+    public function __construct(private Audit $audit) {}
+
     /** GET /api/admin/v1/products?search&category&status&sort=name|price|stock|rating|newest&direction&page&per_page */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -79,6 +86,8 @@ class ProductController extends Controller
                 $product->forceFill(['sku' => $this->generatedSku($product)])->save();
             }
             $this->syncImages($product, $data);
+            $this->audit->record('product.created', "Product {$product->sku} \"{$product->name}\" created.", 'product', $product->id,
+                Audit::created(Audit::fieldsOf($product, self::AUDITED)));
 
             return $product;
         });
@@ -97,6 +106,8 @@ class ProductController extends Controller
         $data = $request->validate($this->rules($product), $this->messages());
 
         DB::transaction(function () use ($product, $data) {
+            $before = Audit::fieldsOf($product, self::AUDITED);
+            $imagesBefore = $product->images()->pluck('url')->all();
             $product->fill(collect($data)->only(['name', 'status', 'discount_percent', 'min_order_quantity'])->filter(fn ($v) => $v !== null)->all());
             if (! empty($data['sku'])) {
                 $product->sku = $data['sku'];
@@ -104,6 +115,14 @@ class ProductController extends Controller
             $this->fill($product, $data);
             $product->save();
             $this->syncImages($product, $data);
+
+            $after = Audit::fieldsOf($product, self::AUDITED);
+            if (array_key_exists('images', $data) && $data['images'] !== null) {
+                [$before['images'], $after['images']] = [$imagesBefore, array_values($data['images'])];
+            }
+            if ($changes = Audit::diff($before, $after)) {
+                $this->audit->record('product.updated', "Product {$product->sku} \"{$product->name}\" updated.", 'product', $product->id, $changes);
+            }
         });
 
         return (new AdminProductResource($product->fresh(['category', 'brand', 'images'])))->withDetail();
@@ -116,7 +135,11 @@ class ProductController extends Controller
         if (! $product) {
             return $this->notFound();
         }
-        $product->delete();
+        DB::transaction(function () use ($product) {
+            $product->delete();
+            $this->audit->record('product.deleted', "Product {$product->sku} \"{$product->name}\" deleted.", 'product', $product->id,
+                Audit::deleted(Audit::fieldsOf($product, ['name', 'sku', 'status', 'price', 'stock_quantity'])));
+        });
 
         return response()->json(null, 204);
     }

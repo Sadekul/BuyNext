@@ -1,35 +1,10 @@
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
-import { LuBoxes, LuExternalLink, LuFileText, LuLayoutDashboard, LuLogOut, LuReceipt, LuTicketPercent, LuUndo2, LuUsers } from 'react-icons/lu'
-import { LIVE_DATA } from '../api/mode'
+import { LuExternalLink, LuLogOut } from 'react-icons/lu'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { Loading } from '../components/States'
 import AccessDenied from '../pages/AccessDenied'
 import { fullName } from '../utils/format'
-
-const DEMO_NAV = [
-  { to: '/', label: 'Overview', icon: LuLayoutDashboard, end: true },
-  { to: '/products', label: 'Products', icon: LuBoxes },
-  { to: '/orders', label: 'Orders', icon: LuReceipt },
-  { to: '/customers', label: 'Customers', icon: LuUsers },
-]
-
-// Real data (phase 3) adds the sales documents and coupons, grouped like Magento's admin.
-const LIVE_NAV = [
-  { to: '/', label: 'Overview', icon: LuLayoutDashboard, end: true },
-  { to: '/products', label: 'Products', icon: LuBoxes },
-  {
-    heading: 'Sales',
-    items: [
-      { to: '/orders', label: 'Orders', icon: LuReceipt },
-      { to: '/invoices', label: 'Invoices', icon: LuFileText },
-      { to: '/credit-memos', label: 'Credit memos', icon: LuUndo2 },
-    ],
-  },
-  { heading: 'Marketing', items: [{ to: '/coupons', label: 'Coupons', icon: LuTicketPercent }] },
-  { to: '/customers', label: 'Customers', icon: LuUsers },
-]
-
-const NAV = LIVE_DATA ? LIVE_NAV : DEMO_NAV
+import { allowedNav } from '../utils/permissions'
 
 function NavItem({ to, label, icon: Icon, end }) {
   return (
@@ -47,7 +22,7 @@ function NavItem({ to, label, icon: Icon, end }) {
  * "access denied" (the API enforces the same rule on every request).
  */
 function AdminLayout() {
-  const { status, user, signOut, message } = useAdminAuth()
+  const { status, user, signOut, message, can } = useAdminAuth()
   const location = useLocation()
 
   if (status === 'checking') {
@@ -81,7 +56,7 @@ function AdminLayout() {
         </p>
         <nav aria-label="Admin">
           <ul className="admin__nav">
-            {NAV.map((entry) =>
+            {allowedNav(can).map((entry) =>
               entry.heading ? (
                 <li key={entry.heading} className="admin__nav-group">
                   <span id={`nav-${entry.heading}`} className="admin__nav-heading">
@@ -102,6 +77,7 @@ function AdminLayout() {
         <div className="admin__account">
           <p>
             Signed in as <strong>{user?.name || fullName(user) || user?.username}</strong>
+            {typeof user?.role === 'object' && user.role?.name && <small className="admin__role"> · {user.role.name}</small>}
           </p>
           {/* The storefront is a different app: a normal link, not router navigation. */}
           <a href="/" className="admin__account-link">

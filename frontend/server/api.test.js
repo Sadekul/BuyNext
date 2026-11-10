@@ -505,6 +505,28 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
     expect(calls[1].init.headers.Authorization).toBe('Bearer 1|ACCESS')
   })
 
+  it('cart/validate forwards the shipping country for tax and says whether the tax is estimated', async () => {
+    const taxed = { ...CART, totals: { ...TOTALS, tax: '4.15' }, tax_estimated: true }
+    const calls = fakeUpstream({ 'POST /api/v1/cart/validate': { body: { data: taxed } } })
+    const cart = await (await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [{ productId: 1, quantity: 2 }], country: ' Germany ' } })).json()
+    expect(sentBody(calls[0]).country).toBe('Germany')
+    expect(cart).toMatchObject({ taxEstimated: true, totals: { tax: 4.15 } })
+
+    fakeUpstream({ 'POST /api/v1/cart/validate': { body: { data: { ...CART, tax_estimated: false } } } })
+    const noCountry = await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [], country: 42 } })
+    expect(await noCountry.json()).toMatchObject({ taxEstimated: false })
+    const long = fakeUpstream({ 'POST /api/v1/cart/validate': { body: { data: CART } } })
+    await call('cart/validate', { service: 'shop', method: 'POST', body: { items: [], country: 'x'.repeat(200) } })
+    expect(sentBody(long[0]).country).toHaveLength(60)
+  })
+
+  it('order errors keep their code, e.g. guest checkout turned off (403)', async () => {
+    fakeUpstream({ 'POST /api/v1/orders': { status: 403, body: { message: 'Please sign in to check out.', code: 'guest_checkout_disabled', secret: 'x' } } })
+    const response = await call('orders', { service: 'shop', method: 'POST', body: CHECKOUT })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ message: 'Please sign in to check out.', code: 'guest_checkout_disabled' })
+  })
+
   it('cart/validate is asked again as a guest when the session expired', async () => {
     const calls = fakeUpstream({})
     vi.stubGlobal('fetch', async (url, init = {}) => {
@@ -767,5 +789,212 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
         expect((await admin(path, { method, body: method === 'GET' ? undefined : {} })).status).toBe(404)
       }
     })
+  })
+})
+
+describe('phase 4: roles, content, reports, settings (Laravel)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_ACCOUNTS_BACKEND', 'laravel')
+    vi.stubEnv('VITE_API_PROVIDER', 'laravel')
+    vi.stubEnv('BUYNEST_LARAVEL_URL', 'http://laravel.test')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  const sentBody = (entry) => JSON.parse(entry.init.body)
+  const ME = { id: 1, name: 'Store Admin', email: 'admin@buynest.test', role: { id: 1, name: 'Owner', is_system: true }, permissions: ['orders.view', 'admins.manage'] }
+  const ADMIN_ME = { 'GET /api/admin/v1/me': { body: { data: ME } } }
+  const admin = (action, options = {}) => call(action, { service: 'admin', cookie: 'buynest_admin_at=9|ADMIN', ...options })
+  const DENIED = { status: 403, body: { message: "Your role doesn't allow this.", code: 'permission_denied', permission: 'orders.edit' } }
+
+  it('GET me passes the role and permission keys', async () => {
+    fakeUpstream(ADMIN_ME)
+    expect(await (await admin('me')).json()).toEqual({ id: 1, name: 'Store Admin', firstName: 'Store Admin', lastName: '', email: 'admin@buynest.test', role: { id: 1, name: 'Owner' }, permissions: ['orders.view', 'admins.manage'] })
+  })
+
+  it('passes 403 permission_denied on unchanged, on old and new routes', async () => {
+    fakeUpstream({ ...ADMIN_ME, 'PATCH /api/admin/v1/orders/BN-100001': DENIED, 'GET /api/admin/v1/settings': { ...DENIED, body: { ...DENIED.body, permission: 'settings.view' } }, 'GET /api/admin/v1/customers': DENIED })
+    const order = await admin('orders/BN-100001', { method: 'PATCH', body: { status: 'shipped' } })
+    expect(order.status).toBe(403)
+    expect(await order.json()).toEqual(DENIED.body)
+    expect(await (await admin('settings')).json()).toMatchObject({ code: 'permission_denied', permission: 'settings.view' })
+    expect(await (await admin('customers')).json()).toMatchObject({ code: 'permission_denied', permission: 'orders.edit' })
+    // The session stays: a missing permission is not a signed-out admin.
+    expect(order.headers.getSetCookie()).toEqual([])
+  })
+
+  it('admin users: list, create (validated, allow-listed), edit, reset password', async () => {
+    const raw = { id: 2, name: 'Sam Sales', email: 'sam@buynest.test', role: { id: 2, name: 'Sales staff' }, role_id: 2, is_active: true, last_login_at: null, created_at: 'T', password: 'never' }
+    const calls = fakeUpstream({
+      ...ADMIN_ME,
+      'GET /api/admin/v1/admins': { body: { data: [raw], meta: { total: 1, path: 'http://laravel.test/x' } } },
+      'POST /api/admin/v1/admins': { status: 201, body: { data: raw } },
+      'PATCH /api/admin/v1/admins/2': { status: 422, body: { message: 'Invalid', errors: { role_id: ['There must be an active Owner.'], is_active: ["You can't deactivate yourself."] } } },
+      'POST /api/admin/v1/admins/2/reset-password': { body: { message: 'Password changed.' } },
+    })
+    const list = await (await admin('admins?q=sam&limit=10&skip=10')).json()
+    expect(list).toEqual({ admins: [{ id: 2, name: 'Sam Sales', email: 'sam@buynest.test', role: { id: 2, name: 'Sales staff' }, roleId: 2, isActive: true, lastLoginAt: null, createdAt: 'T', updatedAt: null }], total: 1, limit: 10, skip: 10, live: true })
+    expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '2', per_page: '10', search: 'sam' })
+
+    expect((await admin('admins', { method: 'POST', body: { name: 'Sam', email: 'sam@buynest.test', roleId: 2, password: 'short1' } })).status).toBe(422)
+    const created = await admin('admins', { method: 'POST', body: { name: ' Sam Sales ', email: 'Sam@BuyNest.test', roleId: 2, password: 'LongEnough2026', isActive: true, permissions: ['x'] } })
+    expect(created.status).toBe(201)
+    expect(JSON.stringify(await created.json())).not.toContain('never')
+    expect(sentBody(calls.at(-1))).toEqual({ name: 'Sam Sales', email: 'sam@buynest.test', role_id: 2, is_active: true, password: 'LongEnough2026' })
+
+    const refused = await admin('admins/2', { method: 'PATCH', body: { roleId: 3, isActive: false } })
+    expect(await refused.json()).toMatchObject({ errors: { roleId: ['There must be an active Owner.'], isActive: ["You can't deactivate yourself."] } })
+    expect((await admin('admins/2', { method: 'PATCH', body: {} })).status).toBe(422)
+
+    expect((await admin('admins/2/reset-password', { method: 'POST', body: { password: 'password' } })).status).toBe(422)
+    expect(await (await admin('admins/2/reset-password', { method: 'POST', body: { password: 'NewPassword2026' } })).json()).toEqual({ ok: true, message: 'Password changed.' })
+    expect(sentBody(calls.at(-1)).password).toBe('NewPassword2026')
+    expect((await admin('admins/abc')).status).toBe(404)
+    expect((await admin('admins/2/delete', { method: 'POST', body: {} })).status).toBe(404)
+  })
+
+  it('roles and the grouped permission list', async () => {
+    const calls = fakeUpstream({
+      ...ADMIN_ME,
+      'GET /api/admin/v1/roles': { body: { data: [{ id: 1, name: 'Owner', description: 'Everything', permissions: ['orders.view'], is_system: true, admins_count: 1 }] } },
+      'POST /api/admin/v1/roles': { status: 201, body: { data: { id: 6, name: 'Support', permissions: ['orders.view'], is_system: false } } },
+      'DELETE /api/admin/v1/roles/6': { status: 422, body: { message: '2 admins use this role.' } },
+      'GET /api/admin/v1/permissions': { body: { data: [{ area: 'Sales', permissions: [{ key: 'orders.view', label: 'View orders' }, 'orders.edit'] }, { area: 'Empty', permissions: [] }] } },
+    })
+    expect((await (await admin('roles')).json()).roles[0]).toEqual({ id: 1, name: 'Owner', description: 'Everything', permissions: ['orders.view'], isSystem: true, adminCount: 1, createdAt: null, updatedAt: null })
+    expect((await admin('roles', { method: 'POST', body: { name: 'Support', permissions: ['orders.view', 'DROP TABLE'] } })).status).toBe(422)
+    const created = await admin('roles', { method: 'POST', body: { name: 'Support', description: '', permissions: ['orders.view', 'orders.view'], isSystem: true } })
+    expect(created.status).toBe(201)
+    expect(sentBody(calls.at(-1))).toEqual({ name: 'Support', description: null, permissions: ['orders.view'] })
+    const inUse = await admin('roles/6', { method: 'DELETE' })
+    expect([inUse.status, (await inUse.json()).message]).toEqual([422, '2 admins use this role.'])
+    expect(await (await admin('permissions')).json()).toEqual({ groups: [{ label: 'Sales', permissions: [{ key: 'orders.view', label: 'View orders' }, { key: 'orders.edit', label: 'orders.edit' }] }], live: true })
+  })
+
+  it('the audit log forwards well-formed filters only, with readable changes', async () => {
+    const calls = fakeUpstream({
+      ...ADMIN_ME,
+      'GET /api/admin/v1/audit': {
+        body: { data: [{ id: 9, admin_id: 1, admin: { id: 1, name: 'Store Admin' }, action: 'product.updated', subject_type: 'product', subject_id: 4, summary: 'Updated Mascara', changes: { before: { price: '9.99' }, after: { price: '12.50', stock: 3 } }, ip: '127.0.0.1', created_at: 'T' }], meta: { total: 1 } },
+      },
+    })
+    const log = await (await admin('audit?adminId=1&action=product.updated&subjectType=product&from=2026-11-01&to=nope&evil=1')).json()
+    expect(log.entries[0]).toMatchObject({ adminName: 'Store Admin', action: 'product.updated', changes: [{ field: 'price', before: '9.99', after: '12.50' }, { field: 'stock', before: null, after: 3 }] })
+    expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '1', per_page: '20', action: 'product.updated', from: '2026-11-01', admin_id: '1', subject_type: 'product' })
+    await admin('audit?adminId=x&action=<script>')
+    expect(Object.fromEntries(new URLSearchParams(calls.at(-1).search))).toEqual({ page: '1', per_page: '20' })
+  })
+
+  it('CMS pages: camelCase both ways; the saved body is what the API sanitized', async () => {
+    const raw = { id: 3, slug: 'about', title: 'About', body: '<p>Hi</p>', meta_title: null, meta_description: null, is_published: true }
+    const calls = fakeUpstream({ ...ADMIN_ME, 'PATCH /api/admin/v1/pages/3': { body: { data: raw } }, 'GET /api/admin/v1/pages': { body: { data: [raw], meta: { total: 1 } } } })
+    expect((await (await admin('pages')).json()).pages[0]).toMatchObject({ slug: 'about', metaTitle: '', isPublished: true })
+    const saved = await (await admin('pages/3', { method: 'PATCH', body: { body: '<p>Hi</p><script>x</script>', metaTitle: '', isPublished: true, id: 7 } })).json()
+    expect(saved.page.body).toBe('<p>Hi</p>')
+    expect(sentBody(calls.at(-1))).toEqual({ body: '<p>Hi</p><script>x</script>', meta_title: null, is_published: true })
+    expect((await admin('pages', { method: 'POST', body: { slug: 'About Us', title: 'About', body: '' } })).status).toBe(422)
+  })
+
+  it('home content: validated and sent in API names, banner order becomes position', async () => {
+    const home = {
+      hero: { eyebrow: 'New', title: 'Hello', description: '', primary_cta: { label: 'Shop', url: '/products' }, secondary_cta: null, image_url: '', image_alt: '', highlights: ['Free shipping'] },
+      banners: [{ id: 2, title: 'B', cta: { label: 'Go', url: '/deals' }, tone: 'rose', position: 2, is_active: false }, { id: 1, title: 'A', cta: { label: 'Go', url: '/' }, tone: 'navy', position: 1, is_active: true }],
+      featured_product_ids: [5, 7],
+    }
+    const calls = fakeUpstream({ ...ADMIN_ME, 'GET /api/admin/v1/home': { body: { data: home } }, 'PUT /api/admin/v1/home': { body: { data: home } } })
+    const got = await (await admin('home')).json()
+    expect(got.banners.map((banner) => banner.title)).toEqual(['A', 'B'])
+    expect(got).toMatchObject({ hero: { primaryCta: { label: 'Shop', url: '/products' }, highlights: ['Free shipping'] }, featuredProductIds: [5, 7] })
+
+    const bad = await admin('home', { method: 'PUT', body: { ...got, hero: { ...got.hero, primaryCta: { label: 'x', url: 'javascript:alert(1)' } }, banners: [{ ...got.banners[0], tone: 'pink' }] } })
+    expect((await bad.json()).errors).toMatchObject({ 'hero.primaryCta.url': [expect.any(String)], 'banners.0.tone': ['Choose a color.'] })
+    const ok = await admin('home', { method: 'PUT', body: { ...got, banners: [got.banners[1], got.banners[0]], featuredProductIds: [7, 7, 5] } })
+    expect(ok.status).toBe(200)
+    const sent = sentBody(calls.at(-1))
+    expect(sent.banners.map((banner) => [banner.id, banner.position, banner.is_active])).toEqual([[2, 0, false], [1, 1, true]])
+    expect(sent).toMatchObject({ hero: { primary_cta: { label: 'Shop', url: '/products' }, secondary_cta: null }, featured_product_ids: [7, 5] })
+  })
+
+  it('reports: strict query, money as numbers, and CSV passed through as a download', async () => {
+    const calls = fakeUpstream({
+      ...ADMIN_ME,
+      'GET /api/admin/v1/reports/sales': {
+        body: { data: { totals: { orders: 2, units: 3, gross: '50.00', discounts: '5.00', shipping: '4.99', refunds: '10.00', net: '40.00', average_order: '25.00' }, series: [{ period: '2026-11-10', orders: 2, gross: '50.00', refunds: '10.00', net: '40.00' }] } },
+      },
+    })
+    const sales = await (await admin('reports/sales?from=2026-11-01&to=2026-11-10&groupBy=week&evil=1')).json()
+    expect(sales).toMatchObject({ totals: { gross: 50, net: 40, averageOrder: 25 }, series: [{ period: '2026-11-10', net: 40 }] })
+    expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ from: '2026-11-01', to: '2026-11-10', group_by: 'week' })
+    expect((await admin('reports/secrets')).status).toBe(404)
+    expect((await admin('reports/customers.csv')).status).toBe(404)
+
+    vi.stubGlobal('fetch', async (url) => {
+      const { pathname } = new URL(url)
+      if (pathname === '/api/admin/v1/me') return new Response(JSON.stringify({ data: ME }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response("period,net\n'=SUM(A1),1\n", { status: 200, headers: { 'Content-Type': 'text/csv; charset=UTF-8', 'Content-Disposition': 'attachment; filename="sales-2026-11-01-2026-11-10.csv"' } })
+    })
+    const csv = await admin('reports/sales.csv?from=2026-11-01')
+    expect(csv.headers.get('content-type')).toBe('text/csv; charset=UTF-8')
+    expect(csv.headers.get('content-disposition')).toBe('attachment; filename="sales-2026-11-01-2026-11-10.csv"')
+    expect(await csv.text()).toContain("'=SUM(A1)")
+  })
+
+  it('settings: grouped camelCase, known keys only, money sent as 2-decimal strings', async () => {
+    const raw = {
+      general: { store_name: 'BuyNest', support_email: 'help@buynest.test', support_phone: '', address: '' },
+      shipping: { standard_price: '4.99', free_shipping_threshold: 50, express_price: '12.99', next_day_price: '24.99', enabled_methods: ['standard', 'express'] },
+      tax: { tax_enabled: false, tax_rates: [{ country: 'Germany', rate: '19.00' }], prices_include_tax: false, secret: 1 },
+      checkout: { allowed_countries: ['Germany'], guest_checkout: true, enabled_payment_methods: ['card'] },
+      inventory: { low_stock_threshold: 10 },
+    }
+    const calls = fakeUpstream({
+      ...ADMIN_ME,
+      'GET /api/admin/v1/settings': { body: { data: raw } },
+      'PATCH /api/admin/v1/settings': { body: { data: raw } },
+    })
+    const settings = await (await admin('settings')).json()
+    expect(settings.shipping).toEqual({ standardPrice: 4.99, freeShippingThreshold: 50, expressPrice: 12.99, nextDayPrice: 24.99, enabledMethods: ['standard', 'express'] })
+    expect(settings.tax).toEqual({ taxEnabled: false, taxRates: [{ country: 'Germany', rate: 19 }], pricesIncludeTax: false })
+
+    const bad = await admin('settings', { method: 'PATCH', body: { shipping: { standardPrice: 4.999, enabledMethods: [] }, tax: { taxRates: [{ country: 'X', rate: 101 }] } } })
+    expect(Object.keys((await bad.json()).errors).sort()).toEqual(['shipping.enabledMethods', 'shipping.standardPrice', 'tax.taxRates'])
+    expect((await admin('settings', { method: 'PATCH', body: { unknown: { x: 1 } } })).status).toBe(422)
+
+    await admin('settings', { method: 'PATCH', body: { shipping: { standardPrice: 5, evil: 1 }, tax: { taxEnabled: true, taxRates: [{ country: ' Germany ', rate: 19 }] } } })
+    expect(sentBody(calls.at(-1))).toEqual({ shipping: { standard_price: '5.00' }, tax: { tax_enabled: true, tax_rates: [{ country: 'Germany', rate: '19.00' }] } })
+
+    vi.stubGlobal('fetch', async (url) => {
+      const { pathname } = new URL(url)
+      const body = pathname === '/api/admin/v1/me' ? { data: ME } : { message: 'Invalid', errors: { 'shipping.free_shipping_threshold': ['Too high'] } }
+      return new Response(JSON.stringify(body), { status: pathname === '/api/admin/v1/me' ? 200 : 422, headers: { 'Content-Type': 'application/json' } })
+    })
+    const refused = await admin('settings', { method: 'PATCH', body: { shipping: { freeShippingThreshold: 1 } } })
+    expect((await refused.json()).errors).toEqual({ 'shipping.freeShippingThreshold': ['Too high'] })
+  })
+
+  it('demo mode answers 404 for the phase 4 admin routes', async () => {
+    vi.stubEnv('VITE_API_PROVIDER', 'dummyjson')
+    fakeUpstream(ADMIN_ME)
+    for (const [path, method] of [['admins', 'GET'], ['roles', 'POST'], ['permissions', 'GET'], ['audit', 'GET'], ['pages/1', 'PATCH'], ['home', 'PUT'], ['reports/sales', 'GET'], ['reports/sales.csv', 'GET'], ['settings', 'PATCH']]) {
+      expect((await admin(path, { method, body: method === 'GET' ? undefined : {} })).status).toBe(404)
+    }
+  })
+
+  it('the store: home, CMS pages, and store rules are public, cached, GET only, and slugs are strict', async () => {
+    const data = { hero: { title: 'Hello' }, banners: [], featured_products: [{ id: 1, name: 'Mascara' }] }
+    const calls = fakeUpstream({
+      'GET /api/v1/home': { body: { data, links: { self: 'http://laravel.test/x' } } },
+      'GET /api/v1/pages/shipping-and-returns': { body: { data: { slug: 'shipping-and-returns', title: 'Shipping', body: '<p>x</p>' } } },
+      'GET /api/v1/pages/draft': { status: 404, body: { message: 'Page not found.' } },
+      'GET /api/v1/store': { body: { data: { store_name: 'BuyNest', guest_checkout: true } } },
+    })
+    const home = await call('home', { service: 'catalog' })
+    expect(home.headers.get('cache-control')).toBe('public, max-age=60')
+    expect(await home.json()).toEqual({ data })
+    expect(await (await call('pages/shipping-and-returns', { service: 'catalog' })).json()).toMatchObject({ data: { title: 'Shipping' } })
+    expect(await (await call('store', { service: 'catalog' })).json()).toEqual({ data: { store_name: 'BuyNest', guest_checkout: true } })
+    expect((await call('pages/draft', { service: 'catalog' })).status).toBe(404)
+    for (const path of ['pages/About', 'pages/a.b', 'pages/' + 'a'.repeat(81), 'pages', 'home/1', 'pages/about/x']) expect((await call(path, { service: 'catalog' })).status).toBe(404)
+    expect((await call('home', { service: 'catalog', method: 'POST', body: {} })).status).toBe(405)
+    expect(calls.map((entry) => entry.path)).toEqual(['/api/v1/home', '/api/v1/pages/shipping-and-returns', '/api/v1/store', '/api/v1/pages/draft'])
   })
 })

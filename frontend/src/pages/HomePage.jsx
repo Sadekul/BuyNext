@@ -6,15 +6,43 @@ import PromoBanner from '../components/home/PromoBanner'
 import BenefitsSection from '../components/home/BenefitsSection'
 import Newsletter from '../components/forms/Newsletter'
 import ErrorMessage from '../components/ui/ErrorMessage'
+import Loader from '../components/ui/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { useCategories } from '../hooks/useCategories'
 import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
+import { REAL_SHOP } from '../constants/shop'
+import { SITE } from '../constants/site'
 import { customerBenefits, featuredCategories, heroContent, homeCollectionIds, promoBanners } from '../data/homeContent'
 import { allProductsQuery } from '../queries/productQueries'
+import { homeContentQuery } from '../queries/contentQueries'
 import { buildHomeCollections } from '../utils/productCollections'
 
 const EMPTY_COLLECTIONS = { featured: [], newArrivals: [], bestSellers: [], specialOffers: [] }
+
+/**
+ * REAL_SHOP: the hero from the admin's CMS. While it loads (or if it can't
+ * be loaded) the page keeps its h1 and the sections below still render.
+ */
+function CmsHero({ request }) {
+  if (request.data) return <HeroBanner content={request.data.hero} />
+  return (
+    <section className="hero section" aria-labelledby="hero-title">
+      <div className="container">
+        {request.error ? (
+          <ErrorMessage titleAs="h1" title="We couldn't load this page's highlights" message={request.error.message} onRetry={request.refetch} />
+        ) : (
+          <>
+            <h1 id="hero-title" className="visually-hidden">
+              {SITE.name}
+            </h1>
+            <Loader label="Loading…" />
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
 
 /**
  * One request for every product (card fields only, ~53 KB), then the
@@ -31,6 +59,10 @@ const selectHomeCollections = (items) => buildHomeCollections(items, homeCollect
  */
 function HomePage() {
   const collectionsRequest = useQuery({ ...allProductsQuery(), select: selectHomeCollections })
+  // REAL_SHOP: hero, promo banners, and featured products come from the admin's CMS.
+  const homeRequest = useQuery({ ...homeContentQuery(), enabled: REAL_SHOP })
+  const cmsFeatured = homeRequest.data?.featuredProducts ?? []
+  const banners = REAL_SHOP ? (homeRequest.data?.banners ?? []) : promoBanners
   const categoriesRequest = useCategories()
   const { addItem } = useCart()
 
@@ -64,7 +96,7 @@ function HomePage() {
 
   return (
     <>
-      <HeroBanner content={heroContent} />
+      {REAL_SHOP ? <CmsHero request={homeRequest} /> : <HeroBanner content={heroContent} />}
       <BenefitsSection benefits={customerBenefits} />
       <FeaturedCategories
         categories={categories}
@@ -73,7 +105,19 @@ function HomePage() {
         onRetry={categoriesRequest.refetch}
       />
 
-      {productsUnavailable || (
+      {REAL_SHOP && (homeRequest.isPending || cmsFeatured.length > 0) && (
+        <ProductSection
+          eyebrow="Handpicked"
+          title="Featured products"
+          products={cmsFeatured}
+          isLoading={homeRequest.isPending}
+          viewAllTo={ROUTES.products}
+          onAddToCart={handleAddToCart}
+          muted
+        />
+      )}
+
+      {productsUnavailable || (!REAL_SHOP && (
         <ProductSection
           eyebrow="Handpicked"
           title="Featured products"
@@ -83,15 +127,17 @@ function HomePage() {
           onAddToCart={handleAddToCart}
           muted
         />
-      )}
+      ))}
 
-      <section className="section" aria-label="Promotions">
-        <div className="container promo-section">
-          {promoBanners.map((banner) => (
-            <PromoBanner key={banner.id} banner={banner} />
-          ))}
-        </div>
-      </section>
+      {banners.length > 0 && (
+        <section className="section" aria-label="Promotions">
+          <div className="container promo-section">
+            {banners.map((banner) => (
+              <PromoBanner key={banner.id} banner={banner} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* If products failed, the single error panel above covers every product section. */}
       {!collectionsRequest.error && (

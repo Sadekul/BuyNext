@@ -21,9 +21,16 @@ use Illuminate\Validation\ValidationException;
  *      floor(line paid / quantity); the LAST refundable unit of the line also
  *      takes the remainder. So refunding everything gives back exactly what
  *      was paid, whichever order the units are refunded in.
+ *   3. Tax (phase 4): when tax was added on top of the prices, it is shared
+ *      out the same way over the lines and the shipping, so a unit's refund
+ *      includes its tax and "shipping refundable" includes the shipping's tax.
+ *      A full refund still gives back exactly the grand total. When prices
+ *      include tax (or tax is off) there is nothing extra to share.
  */
 class Refunds
 {
+    public function __construct(private Audit $audit) {}
+
     /**
      * The limits for the admin's refund form (GET .../refundable), in cents:
      * [items => [order_item_id => [item, ordered, refunded, refundable, unit_cents, paid_cents]],
@@ -31,7 +38,7 @@ class Refunds
      */
     public function limits(Order $order): array
     {
-        $paid = $this->linePaidCents($order);
+        [$paid, $shippingPaid] = $this->paidShares($order);
         $refunded = [];
         $shippingRefunded = 0;
         foreach ($order->creditMemos as $memo) {
@@ -59,7 +66,7 @@ class Refunds
 
         return [
             'items' => $items,
-            'shipping_cents' => $isPaid ? max(0, Pricing::toCents($order->shipping_total) - $shippingRefunded) : 0,
+            'shipping_cents' => $isPaid ? max(0, $shippingPaid - $shippingRefunded) : 0,
             'max_cents' => $isPaid ? max(0, $order->paidCents() - $order->refundedCents()) : 0,
         ];
     }
@@ -185,34 +192,68 @@ class Refunds
             'customer_notified' => $notify,
         ]);
 
+        $this->audit->record('credit_memo.created', "Credit memo {$memo->number} created for order {$order->number}: \${$memo->total} refunded.",
+            'credit_memo', $memo->id, ['before' => [], 'after' => [
+                'order' => $order->number, 'subtotal' => $memo->subtotal, 'shipping_refund' => $memo->shipping_refund,
+                'adjustment' => $memo->adjustment, 'total' => $memo->total, 'restocked' => $restock, 'payment_status' => $order->payment_status,
+            ]], $admin);
+
         return $memo;
     }
 
-    /** order_item_id => what the customer paid for the whole line, in cents (step 1 of the class comment). */
-    private function linePaidCents(Order $order): array
+    /**
+     * [order_item_id => what the customer paid for the whole line, shipping paid], in cents.
+     * Step 1 of the class comment, then step 3: tax that was added on top of
+     * the prices (tax enabled, prices without tax) is shared out the same way
+     * over the lines (after their discount) and the shipping.
+     */
+    private function paidShares(Order $order): array
     {
-        $discount = Pricing::toCents($order->discount_total);
         $lineCents = $order->items->mapWithKeys(fn (OrderItem $item) => [$item->id => Pricing::toCents($item->line_total)])->all();
-        $subtotal = array_sum($lineCents);
+        $discountShares = $this->share(Pricing::toCents($order->discount_total), $lineCents);
+        $paid = array_map(fn ($id) => $lineCents[$id] - $discountShares[$id], array_combine(array_keys($lineCents), array_keys($lineCents)));
+        $shipping = Pricing::toCents($order->shipping_total);
 
+        // The tax on top = what the order costs beyond merchandise and shipping (0 when tax was off or included in the prices).
+        $taxOnTop = Pricing::toCents($order->grand_total) - (array_sum($paid) + $shipping);
+        if ($taxOnTop > 0) {
+            $taxShares = $this->share($taxOnTop, $paid + ['shipping' => $shipping]); // + keeps the item ids as keys
+            $shipping += $taxShares['shipping'];
+            unset($taxShares['shipping']);
+            foreach ($taxShares as $id => $cents) {
+                $paid[$id] += $cents;
+            }
+        }
+
+        return [$paid, $shipping];
+    }
+
+    /**
+     * Splits $total over $weights (key => cents) in proportion, in whole cents
+     * that add up exactly: each share is floored, and the leftover cents go
+     * to the biggest dropped fractions first (then the earlier key).
+     */
+    private function share(int $total, array $weights): array
+    {
+        $sum = array_sum($weights);
         $shares = [];
         $dropped = [];
-        foreach ($lineCents as $id => $cents) {
-            $exact = $subtotal > 0 ? $discount * $cents : 0; // share × subtotal, kept in integers
-            $shares[$id] = $subtotal > 0 ? intdiv($exact, $subtotal) : 0;
-            $dropped[$id] = $subtotal > 0 ? $exact % $subtotal : 0;
+        foreach ($weights as $key => $weight) {
+            $exact = $sum > 0 ? $total * $weight : 0; // share × sum, kept in integers
+            $shares[$key] = $sum > 0 ? intdiv($exact, $sum) : 0;
+            $dropped[$key] = $sum > 0 ? $exact % $sum : 0;
         }
-        // Hand out the leftover cents: biggest dropped fraction first, then the earlier line.
-        $leftover = $discount - array_sum($shares);
-        uksort($dropped, fn ($a, $b) => [$dropped[$b], $a] <=> [$dropped[$a], $b]);
-        foreach (array_keys($dropped) as $id) {
+        $order = array_flip(array_keys($weights)); // the earlier key wins a tie
+        $leftover = $total - array_sum($shares);
+        uksort($dropped, fn ($a, $b) => [$dropped[$b], $order[$a]] <=> [$dropped[$a], $order[$b]]);
+        foreach (array_keys($dropped) as $key) {
             if ($leftover-- <= 0) {
                 break;
             }
-            $shares[$id]++;
+            $shares[$key]++;
         }
 
-        return array_map(fn ($id) => $lineCents[$id] - $shares[$id], array_combine(array_keys($lineCents), array_keys($lineCents)));
+        return $shares;
     }
 
     /** Puts refunded units back in stock: only products that still exist (not deleted). */

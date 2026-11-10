@@ -23,6 +23,8 @@ final readonly class CartQuote
         public int $taxCents,
         public int $totalCents,
         public ?int $couponId = null, // the coupons row applied (checkout counts the use)
+        // false: tax is on but no country was given, so the tax (0.00) isn't the real one yet.
+        public bool $taxEstimated = true,
     ) {}
 
     public function hasProblems(): bool
@@ -59,6 +61,7 @@ final readonly class CartQuote
                 'price' => $money($option['price_cents']),
             ], $this->shippingOptions),
             'totals' => $this->totals(),
+            'tax_estimated' => $this->taxEstimated,
         ];
     }
 

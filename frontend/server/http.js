@@ -69,14 +69,34 @@ export function clientIp(request) {
  * passes on the visitor's IP, so the API's rate limits count each visitor
  * separately instead of everyone together.
  */
-export function laravel(path, { request, ...options } = {}) {
-  const base = (process.env.BUYNEST_LARAVEL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+const laravelBase = () => (process.env.BUYNEST_LARAVEL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+function bffHeaders(request) {
   const key = process.env.BUYNEST_BFF_KEY
   const ip = clientIp(request)
-  return callJson(`${base}${path}`, {
-    ...options,
-    headers: key && ip ? { 'X-BuyNest-Bff': key, 'X-Client-IP': ip } : {},
-  })
+  return key && ip ? { 'X-BuyNest-Bff': key, 'X-Client-IP': ip } : {}
+}
+
+export function laravel(path, { request, ...options } = {}) {
+  return callJson(`${laravelBase()}${path}`, { ...options, headers: bffHeaders(request) })
+}
+
+/**
+ * A GET to the Laravel API whose answer isn't JSON (the report CSV files).
+ * Resolves to { status, contentType, disposition, text } on success, or
+ * { status, data } (parsed JSON error) like laravel().
+ */
+export async function laravelFile(path, { token, request } = {}) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      headers: { Accept: 'text/csv, application/json', ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      signal: AbortSignal.timeout(30_000),
+    })
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!response.ok || contentType.includes('application/json')) return { status: response.ok ? 502 : response.status, data: await response.json().catch(() => ({})) }
+    return { status: response.status, contentType, disposition: response.headers.get('content-disposition'), text: await response.text() }
+  } catch {
+    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+  }
 }
 
 /** Copies only the listed keys that exist: the allow-list pattern for anything sent to the browser. */

@@ -18,5 +18,6 @@ export const ROUTES = {
   register: '/register',
   forgotPassword: '/forgot-password',
   verifyEmail: '/verify-email',
+  page: (slug) => `/pages/${slug}`, // CMS pages (REAL_SHOP)
   componentLab: '/learn',
 }

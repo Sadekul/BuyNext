@@ -42,6 +42,7 @@ const sent = (fetchMock, path) => JSON.parse(fetchMock.mock.calls.find(([url]) =
 const checkoutRoutes = <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
 
 async function fillGuestCheckout(user) {
+  await screen.findByLabelText('Email') // the form appears once the store settings are in
   const fields = { Email: 'ava@example.com', Phone: '+1 555 010 0100', 'First name': 'Ava', 'Last name': 'Guest', 'Street address': '12 Market Street', City: 'Springfield', 'State / region': 'Oregon', 'Postal code': '29112' }
   for (const [label, value] of Object.entries(fields)) await user.type(screen.getByLabelText(label), value)
 }

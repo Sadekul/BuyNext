@@ -51,6 +51,21 @@ export const FOOTER_LINK_GROUPS = [
       ...(REAL_SHOP ? [{ label: 'Track your order', to: ROUTES.trackOrder }] : []),
     ],
   },
+  // The admin's CMS pages (REAL_SHOP; seeded by the API, editable in the admin).
+  ...(REAL_SHOP
+    ? [
+        {
+          title: 'Help & info',
+          links: [
+            { label: 'About us', to: ROUTES.page('about') },
+            { label: 'Shipping & returns', to: ROUTES.page('shipping-and-returns') },
+            { label: 'Privacy policy', to: ROUTES.page('privacy') },
+            { label: 'Terms of service', to: ROUTES.page('terms') },
+            { label: 'Contact us', to: ROUTES.page('contact') },
+          ],
+        },
+      ]
+    : []),
   ...(SHOW_LEARNING_LAB ? [{ title: 'Learning', links: [{ label: 'Component lab', to: ROUTES.componentLab }] }] : []),
 ]
 

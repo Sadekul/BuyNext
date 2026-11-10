@@ -52,3 +52,23 @@ describe('evaluateCoupon', () => {
     expect(evaluateCoupon('save20', 15000).discountCents).toBe(2000)
   })
 })
+
+describe('calculateCartTotals with the store\'s rules', () => {
+  const rules = {
+    shippingMethods: [{ id: 'standard', label: 'Standard', eta: '', price: null }, { id: 'express', label: 'Express', eta: '', price: 14.99 }],
+    standardShippingCost: 5.99,
+    freeShippingThreshold: 100,
+  }
+
+  it('uses the store\'s prices and free-shipping threshold', () => {
+    const totals = calculateCartTotals([line(30, 1)], null, 'standard', rules)
+    expect(totals).toMatchObject({ shipping: 5.99, freeShippingThreshold: 100, amountToFreeShipping: 70 })
+    expect(calculateCartTotals([line(30, 1)], null, 'express', rules).shipping).toBe(14.99)
+    expect(calculateCartTotals([line(60, 2)], null, 'standard', rules).shipping).toBe(0)
+  })
+
+  it('has no free-shipping goal when the store offers no standard delivery', () => {
+    const totals = calculateCartTotals([line(30, 1)], null, 'express', { ...rules, shippingMethods: [rules.shippingMethods[1]] })
+    expect(totals).toMatchObject({ shipping: 14.99, freeShippingThreshold: null, amountToFreeShipping: null })
+  })
+})

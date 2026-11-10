@@ -28,6 +28,7 @@ const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
 const TrackOrderPage = lazy(() => import('../pages/TrackOrderPage'))
 const InvoicePage = lazy(() => import('../pages/InvoicePage'))
+const CmsPage = lazy(() => import('../pages/CmsPage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -68,6 +69,8 @@ function AppRoutes() {
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         {REAL_SHOP && checkoutRoutes}
         {REAL_SHOP && <Route path="track-order" element={<TrackOrderPage />} />}
+        {/* Pages written in the admin's CMS (about, policies, contact). */}
+        {REAL_SHOP && <Route path="pages/:slug" element={<CmsPage />} />}
 
         {/* Signed-in customers only (UX guard; the API enforces real access). */}
         <Route element={<ProtectedRoute />}>

@@ -23,6 +23,15 @@ export const adminKeys = {
   creditMemo: (number) => ['credit-memo', String(number)],
   coupons: (params) => ['coupons', params],
   coupon: (id) => ['coupon', String(id)],
+  admins: (params) => ['admins', params],
+  roles: ['roles'],
+  permissions: ['permissions'],
+  audit: (params) => ['audit', params],
+  pages: (params) => ['pages', params],
+  page: (id) => ['page', String(id)],
+  home: ['home'],
+  report: (name, params) => ['report', name, params],
+  settings: ['settings'],
 }
 
 export const getOverview = ({ signal } = {}) => api.get('/api/admin/overview', { signal })
@@ -62,3 +71,45 @@ export const createCoupon = (values) => api.post('/api/admin/coupons', values)
 export const updateCoupon = (id, values) => api.patch(`/api/admin/coupons/${id}`, values)
 /** Deletes an unused coupon ({ deleted: true }); one already used is only disabled ({ disabled: true, coupon }). */
 export const deleteCoupon = (id) => api.delete(`/api/admin/coupons/${id}`)
+
+/*
+ * Phase 4 (docs/backend/PHASE4_CONTRACT.md), BuyNest's backend only. Each
+ * needs a permission of the admin's role; without it the server answers 403
+ * with `code: 'permission_denied'` and the permission (ApiError.code/.permission).
+ */
+/** admins.manage: { admins: [{ id, name, email, role: { id, name }, roleId, isActive, lastLoginAt }], total }. */
+export const getAdmins = (params, { signal } = {}) => api.get('/api/admin/admins', { params, signal })
+/** { name, email, roleId, isActive, password } → { admin }. */
+export const createAdmin = (values) => api.post('/api/admin/admins', values)
+/** { name?, email?, roleId?, isActive? } → { admin }. Deactivating signs them out everywhere. */
+export const updateAdmin = (id, values) => api.patch(`/api/admin/admins/${id}`, values)
+/** Sets a new password and signs that admin out everywhere. */
+export const resetAdminPassword = (id, password) => api.post(`/api/admin/admins/${id}/reset-password`, { password })
+/** { roles: [{ id, name, description, permissions, isSystem, adminCount }] }. */
+export const getRoles = ({ signal } = {}) => api.get('/api/admin/roles', { signal })
+export const createRole = (values) => api.post('/api/admin/roles', values)
+export const updateRole = (id, values) => api.patch(`/api/admin/roles/${id}`, values)
+export const deleteRole = (id) => api.delete(`/api/admin/roles/${id}`)
+/** { groups: [{ label, permissions: [{ key, label }] }] } for the role form. */
+export const getPermissions = ({ signal } = {}) => api.get('/api/admin/permissions', { signal })
+/** audit.view: ?adminId&action&from&to&limit&skip → { entries: [{ adminName, action, summary, changes: [{ field, before, after }], ip, createdAt }], total }. */
+export const getAudit = (params, { signal } = {}) => api.get('/api/admin/audit', { params, signal })
+/** content.view / content.edit. A saved page's `body` is the server's sanitized HTML. */
+export const getPages = (params, { signal } = {}) => api.get('/api/admin/pages', { params, signal })
+export const getPage = (id, { signal } = {}) => api.get(`/api/admin/pages/${id}`, { signal })
+export const createPage = (values) => api.post('/api/admin/pages', values)
+export const updatePage = (id, values) => api.patch(`/api/admin/pages/${id}`, values)
+export const deletePage = (id) => api.delete(`/api/admin/pages/${id}`)
+/** { hero, banners, featuredProductIds, featuredProducts }. */
+export const getHome = ({ signal } = {}) => api.get('/api/admin/home', { signal })
+export const updateHome = (values) => api.put('/api/admin/home', values)
+/** reports.view: name = sales | products | customers | coupons | low-stock; params { from, to, groupBy, limit }. */
+export const getReport = (name, params, { signal } = {}) => api.get(`/api/admin/reports/${name}`, { params, signal })
+/** The CSV download's address (sales, products); the browser sends the session cookie. */
+export function reportCsvUrl(name, params) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value))
+  return `/api/admin/reports/${name}.csv${query.size > 0 ? `?${query}` : ''}`
+}
+/** settings.view / settings.edit: { general, shipping, tax, checkout, inventory }; PATCH one or more groups. */
+export const getSettings = ({ signal } = {}) => api.get('/api/admin/settings', { signal })
+export const updateSettings = (changes) => api.patch('/api/admin/settings', changes)

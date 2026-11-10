@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, fullName } from '../utils/format'
+import { useAdminAuth } from '../auth/useAdminAuth'
 
 const LIMIT = 20
 const ROLE_LABELS = { admin: 'Admin', moderator: 'Moderator', user: 'Customer' }
@@ -43,6 +44,7 @@ function CustomersPage() {
   const [confirming, setConfirming] = useState(null) // the customer about to be blocked
   const [notice, setNotice] = useState(null)
   const queryClient = useQueryClient()
+  const { can } = useAdminAuth()
 
   const customers = useQuery({
     queryKey: adminKeys.customers({ q, status, skip }),
@@ -164,7 +166,7 @@ function CustomersPage() {
                     <td>{formatDate(customer.createdAt)}</td>
                     <td>{formatDate(customer.lastLoginAt, 'Never')}</td>
                     <td>
-                      {customer.isActive ? (
+                      {!can('customers.edit') ? null : customer.isActive ? (
                         <button
                           type="button"
                           className="btn btn--outline btn--sm"

@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
 import { PAYMENT_METHODS, orderActions, orderStatus, paymentStatus } from '../utils/orders'
+import { useAdminAuth } from '../auth/useAdminAuth'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -210,6 +211,7 @@ const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog
  */
 function LiveOrderDetailPage() {
   const { orderId } = useParams()
+  const { can } = useAdminAuth()
   const queryClient = useQueryClient()
   const order = useQuery({ queryKey: adminKeys.order(orderId), queryFn: ({ signal }) => getOrder(orderId, { signal }) })
   const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'delivered' | 'cancelled'
@@ -226,8 +228,17 @@ function LiveOrderDetailPage() {
   if (order.error) return <ErrorState error={order.error} onRetry={order.refetch} />
 
   const data = order.data
-  const actions = orderActions(data)
-  const nothingToDo = !Object.values(actions).some(Boolean)
+  // What the order allows, then what the role allows (each action has its own permission).
+  const possible = orderActions(data)
+  const actions = {
+    invoice: possible.invoice && can('invoices.create'),
+    ship: possible.ship && can('shipments.create'),
+    deliver: possible.deliver && can('orders.edit'),
+    refund: possible.refund && can('credit_memos.create'),
+    cancel: possible.cancel && can('orders.edit'),
+  }
+  const nothingToDo = !Object.values(possible).some(Boolean)
+  const nothingAllowed = !nothingToDo && !Object.values(actions).some(Boolean)
 
   function open(name, event) {
     openerRef.current = event.currentTarget
@@ -383,6 +394,8 @@ function LiveOrderDetailPage() {
           <div className="order-actions">
             {nothingToDo ? (
               <p className="muted">Nothing left to do: this order is {orderStatus(data.status).label.toLowerCase()}.</p>
+            ) : nothingAllowed ? (
+              <p className="muted">Your role can view this order but not change it.</p>
             ) : (
               <>
                 <div className="order-actions__buttons">

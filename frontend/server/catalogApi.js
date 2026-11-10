@@ -8,6 +8,10 @@ import { json, laravel, pick } from './http.js'
  *   GET /api/catalog/products?…     → GET /api/v1/products?…   ({ data, meta })
  *   GET /api/catalog/products/:id   → GET /api/v1/products/:id ({ data })
  *   GET /api/catalog/categories     → GET /api/v1/categories   ({ data })
+ *   GET /api/catalog/home           → GET /api/v1/home         ({ data: { hero, banners, featured_products } })
+ *   GET /api/catalog/pages/:slug    → GET /api/v1/pages/:slug  ({ data }, published pages only)
+ *   GET /api/catalog/store          → GET /api/v1/store        ({ data }: shipping, countries, payment, tax rules)
+ * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
  *
  * Only these paths and the query keys below are forwarded (an allow-list), so
  * the service can't be used to reach anything else on the API. Answers are
@@ -19,6 +23,7 @@ const MAX_VALUE_LENGTH = 100
 const CACHE = 'public, max-age=60'
 
 const isId = (value) => /^\d{1,9}$/.test(value ?? '')
+const isSlug = (value) => /^[a-z0-9-]{1,80}$/.test(value ?? '')
 
 function forwardedQuery(url) {
   const params = new URLSearchParams()
@@ -36,6 +41,8 @@ function upstreamPath(segments, url) {
   if (resource === 'products' && id === undefined) return `/api/v1/products${forwardedQuery(url)}`
   if (resource === 'products' && isId(id)) return `/api/v1/products/${id}`
   if (resource === 'categories' && id === undefined) return '/api/v1/categories'
+  if ((resource === 'home' || resource === 'store') && id === undefined) return `/api/v1/${resource}`
+  if (resource === 'pages' && isSlug(id)) return `/api/v1/pages/${id}`
   return null
 }
 

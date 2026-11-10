@@ -4,6 +4,7 @@ import { CART_ACTIONS, EMPTY_CART, cartReducer, mergeCarts, sanitizeCart } from 
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
 import { STORAGE_KEYS } from '../constants/storageKeys'
 import { useAuth } from '../hooks/useAuth'
+import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSettings'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
 import { REAL_SHOP } from '../constants/shop'
@@ -33,6 +34,9 @@ function CartProvider({ children }) {
   const { user } = useAuth()
   const [cart, dispatch] = usePersistentReducer(cartReducer, STORAGE_OPTIONS, user?.id)
   const [isCartOpen, setIsCartOpen] = useState(false)
+  // Shipping prices and the free-shipping threshold: the server's settings in REAL_SHOP, the demo's otherwise.
+  // An empty cart needs no prices, so it doesn't ask for them.
+  const { settings } = useStoreSettings({ enabled: cart.items.length > 0 })
 
   // Stable action functions (useCallback) so consumers don't re-render needlessly.
   // `dispatch` never changes, but the linter can't know that when it comes from a custom hook.
@@ -66,7 +70,7 @@ function CartProvider({ children }) {
       couponCode: cart.couponCode,
       // With BuyNest's API the server decides about coupons (cart page and
       // checkout ask it); the local table in constants/store.js is demo-only.
-      totals: calculateCartTotals(cart.items, REAL_SHOP ? null : cart.couponCode),
+      totals: calculateCartTotals(cart.items, REAL_SHOP ? null : cart.couponCode, defaultShippingMethodId(settings), settings),
       isCartOpen,
       addItem,
       updateQuantity,
@@ -79,7 +83,7 @@ function CartProvider({ children }) {
       openCart,
       closeCart,
     }),
-    [cart, isCartOpen, addItem, updateQuantity, removeItem, clearCart, removeOrderedItems, applyCoupon, removeCoupon, refreshProducts, openCart, closeCart],
+    [cart, settings, isCartOpen, addItem, updateQuantity, removeItem, clearCart, removeOrderedItems, applyCoupon, removeCoupon, refreshProducts, openCart, closeCart],
   )
 
   return <CartContext value={value}>{children}</CartContext>
