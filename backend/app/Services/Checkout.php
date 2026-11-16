@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\OrderPlacedMail;
+use App\Models\Admin;
 use App\Models\Coupon;
 use App\Models\CouponRedemption;
 use App\Models\Customer;
@@ -22,17 +23,34 @@ use Throwable;
  */
 class Checkout
 {
-    public function __construct(private Pricing $pricing) {}
+    public function __construct(private Pricing $pricing, private AddressBook $addressBook, private Audit $audit) {}
+
+    /**
+     * Prices an order without placing it (no locks, no stock change): the
+     * admin's "Create order" page shows these totals before placing it.
+     */
+    public function quote(array $data, ?Customer $customer): CartQuote
+    {
+        return $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
+            customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null),
+            country: $data['shipping_address']['country'] ?? null, group: $customer?->priceGroup());
+    }
 
     /**
      * $data: the validated PlaceOrderRequest fields (addresses already cleaned).
      * Throws a 422 (problems / coupon) or 409 (prices changed) response.
+     *
+     * Phase 6: $admin places the order for a customer or guest (source
+     * "admin"; $data['note'] becomes a staff-only history note); $notify
+     * false skips the confirmation email. $data['save_address'] adds the
+     * shipping address to a signed-in customer's address book.
      */
-    public function place(array $data, ?Customer $customer): Order
+    public function place(array $data, ?Customer $customer, ?Admin $admin = null, bool $notify = true): Order
     {
-        $order = DB::transaction(function () use ($data, $customer) {
+        $order = DB::transaction(function () use ($data, $customer, $admin) {
             $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
-                lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null);
+                lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null,
+                group: $customer?->priceGroup());
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
@@ -52,26 +70,40 @@ class Checkout
                 ], 409));
             }
 
-            return $this->create($data, $customer, $quote);
+            return $this->create($data, $customer, $quote, $admin);
         });
 
+        // The address book is a convenience: it never stops an order (full book, or already saved: skipped).
+        if ($customer && ! empty($data['save_address'])) {
+            try {
+                $this->addressBook->remember($customer, $order->shipping_address, $order->phone);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
         // After the commit: a failed email must not undo a placed order.
-        try {
-            Mail::to($order->email)->send(new OrderPlacedMail($order));
-        } catch (Throwable $e) {
-            report($e);
+        if ($notify) {
+            try {
+                Mail::to($order->email)->send(new OrderPlacedMail($order));
+            } catch (Throwable $e) {
+                report($e);
+            }
         }
 
         return $order;
     }
 
-    private function create(array $data, ?Customer $customer, CartQuote $quote): Order
+    private function create(array $data, ?Customer $customer, CartQuote $quote, ?Admin $admin): Order
     {
-        // Cash on delivery can be prepared now; card/PayPal wait for the payment.
-        $status = $data['payment_method'] === 'cod' ? 'processing' : 'pending_payment';
+        // Cash on delivery (and cash) can be prepared now; card/PayPal/bank transfer wait for the payment.
+        $status = in_array($data['payment_method'], Order::PAY_LATER_METHODS, true) ? 'processing' : 'pending_payment';
 
         $order = Order::create([
             'customer_id' => $customer?->id,
+            'customer_group' => $quote->group?->name,
+            'source' => $admin ? 'admin' : 'storefront',
+            'created_by_admin_id' => $admin?->id,
             'email' => $data['email'],
             'phone' => $data['phone'],
             'status' => $status,
@@ -114,6 +146,7 @@ class Checkout
                 'thumbnail_url' => $product->thumbnail_url,
                 'unit_price' => Pricing::format($line['price_cents']),
                 'discount_percent' => $product->discount_percent,
+                'group_discount_percent' => $line['group_discount_percent'],
                 'sale_price' => Pricing::format($line['sale_cents']),
                 'quantity' => $line['quantity'],
                 'line_total' => Pricing::format($line['line_cents']),
@@ -137,8 +170,26 @@ class Checkout
             'status' => $status,
             'payment_status' => 'unpaid',
             'note' => 'Order placed.',
+            'admin_id' => $admin?->id,
             'customer_notified' => true,
         ]);
+        if ($admin) {
+            if (filled($data['note'] ?? null)) {
+                // A staff note about the phone order: internal, never shown to the customer.
+                $order->history()->create([
+                    'status' => $status,
+                    'payment_status' => 'unpaid',
+                    'note' => trim($data['note']),
+                    'admin_id' => $admin->id,
+                    'customer_notified' => false,
+                ]);
+            }
+            $this->audit->record('order.created', "Order {$order->number} created in the admin for {$order->email} (\${$order->grand_total}).",
+                'order', $order->id, ['before' => [], 'after' => [
+                    'number' => $order->number, 'email' => $order->email, 'customer_id' => $order->customer_id,
+                    'payment_method' => $order->payment_method, 'grand_total' => $order->grand_total, 'source' => 'admin',
+                ]], $admin);
+        }
 
         return $order->load(['items', 'history']);
     }

@@ -1,5 +1,6 @@
 import { json, readBody } from './http.js'
 import { laravelShop } from './shop/laravel.js'
+import { laravelCustomer } from './shop/customer.js'
 import { CUSTOMER, notSignedIn } from './session.js'
 
 /*
@@ -24,13 +25,28 @@ import { CUSTOMER, notSignedIn } from './session.js'
  *   POST /api/shop/products/:id/reviews { rating, title?, comment } → 201 review (customer session; phase 5)
  *                                  422 { code: 'already_reviewed' } for a second review of the same product
  *
+ * Phase 6, customer session only (shop/customer.js):
+ *   GET    /api/shop/me/addresses              → { addresses } (the address book)
+ *   POST   /api/shop/me/addresses              { firstName, lastName, phone?, company?, line1, line2?, city, state,
+ *                                                postalCode, country, isDefaultShipping?, isDefaultBilling? } → 201 address
+ *   PATCH  /api/shop/me/addresses/:id          (any of those fields) → address
+ *   DELETE /api/shop/me/addresses/:id          → { ok: true }
+ *   POST   /api/shop/orders/:number/returns    { items: [{ orderItemId, quantity }], reason, comment? } → 201 return
+ *   GET    /api/shop/returns?page              → { returns, total, page, perPage, lastPage }
+ *   GET    /api/shop/returns/:number           → return (someone else's → 404)
+ * POST /api/shop/orders also takes `saveAddress: true` (signed in: the
+ * shipping address goes into the address book after the order is placed).
+ *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */
 
 const isProductId = (value) => /^\d{1,9}$/.test(value ?? '')
+const isAddressId = isProductId // the same: a positive whole number
 const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
 const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
+const isReturnNumber = (value) => /^RMA-\d{1,12}$/.test(value ?? '')
+const pageOf = (url) => Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
 const reply = (result, status) => (result.ok ? json(result.data, status ?? result.status) : json(result.body, result.status))
 
 const ROUTES = {
@@ -45,8 +61,7 @@ const ROUTES = {
 
   async 'GET orders'({ request, cookies, url }) {
     if (!cookies[CUSTOMER.access]) return notSignedIn()
-    const page = Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
-    return reply(await laravelShop.listOrders(cookies[CUSTOMER.access], page, request))
+    return reply(await laravelShop.listOrders(cookies[CUSTOMER.access], pageOf(url), request))
   },
 
   async 'GET orders/:number'({ request, cookies, param }) {
@@ -67,6 +82,43 @@ const ROUTES = {
   async 'POST orders/lookup'({ request }) {
     return reply(await laravelShop.lookupOrder(await readBody(request), request))
   },
+
+  // ---- phase 6: address book and returns (the account comes from the session) ----
+
+  async 'GET me/addresses'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.listAddresses(cookies[CUSTOMER.access], request))
+  },
+
+  async 'POST me/addresses'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.createAddress(cookies[CUSTOMER.access], await readBody(request), request), 201)
+  },
+
+  async 'PATCH me/addresses/:id'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.updateAddress(cookies[CUSTOMER.access], param, await readBody(request), request))
+  },
+
+  async 'DELETE me/addresses/:id'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.deleteAddress(cookies[CUSTOMER.access], param, request), 200)
+  },
+
+  async 'POST orders/:number/returns'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.requestReturn(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
+  },
+
+  async 'GET returns'({ request, cookies, url }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.listReturns(cookies[CUSTOMER.access], pageOf(url), request))
+  },
+
+  async 'GET returns/:number'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCustomer.getReturn(cookies[CUSTOMER.access], param, request))
+  },
 }
 
 /** /api/shop/<segments> → a route, or null. */
@@ -75,6 +127,15 @@ function matchRoute(method, segments) {
   if (ROUTES[`${method} ${path}`]) return { route: ROUTES[`${method} ${path}`] }
   if (segments.length === 2 && segments[0] === 'orders' && isOrderNumber(segments[1])) {
     return { route: ROUTES[`${method} orders/:number`], param: segments[1] }
+  }
+  if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'addresses' && isAddressId(segments[2])) {
+    return { route: ROUTES[`${method} me/addresses/:id`], param: segments[2] }
+  }
+  if (segments.length === 3 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'returns') {
+    return { route: ROUTES[`${method} orders/:number/returns`], param: segments[1] }
+  }
+  if (segments.length === 2 && segments[0] === 'returns' && isReturnNumber(segments[1])) {
+    return { route: ROUTES[`${method} returns/:number`], param: segments[1] }
   }
   if (segments.length === 3 && segments[0] === 'products' && isProductId(segments[1]) && segments[2] === 'reviews') {
     return { route: ROUTES[`${method} products/:id/reviews`], param: segments[1] }

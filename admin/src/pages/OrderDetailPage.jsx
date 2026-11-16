@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuArrowLeft, LuExternalLink } from 'react-icons/lu'
+import { LuArrowLeft, LuExternalLink, LuPrinter } from 'react-icons/lu'
 import { adminKeys, getOrder } from '../api/admin'
 import { LIVE_DATA } from '../api/mode'
-import { InvoiceDialog, RefundDialog, ShipDialog, StatusDialog } from '../components/OrderActionDialogs'
+import { CreateReturnDialog, InvoiceDialog, RefundDialog, ShipDialog, StatusDialog } from '../components/OrderActionDialogs'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
-import { PAYMENT_METHODS, orderActions, orderStatus, paymentStatus } from '../utils/orders'
+import { PAYMENT_METHODS, orderActions, orderSource, orderStatus, paymentStatus, returnStatus } from '../utils/orders'
 import { useAdminAuth } from '../auth/useAdminAuth'
 
 /** Demo: a DummyJSON cart shown as an order. */
@@ -141,8 +141,8 @@ function Address({ address }) {
 
 /** The order's invoices, shipments, and credit memos. */
 function Documents({ order }) {
-  const { invoices = [], shipments = [], creditMemos = [] } = order
-  if (invoices.length + shipments.length + creditMemos.length === 0) return <p className="muted documents">No invoices, shipments, or refunds yet.</p>
+  const { invoices = [], shipments = [], creditMemos = [], returns = [] } = order
+  if (invoices.length + shipments.length + creditMemos.length + returns.length === 0) return <p className="muted documents">No invoices, shipments, returns, or refunds yet.</p>
   return (
     <div className="documents">
       {invoices.length > 0 && (
@@ -164,7 +164,7 @@ function Documents({ order }) {
           <ul>
             {shipments.map((shipment) => (
               <li key={shipment.number}>
-                {shipment.number} · {shipment.carrierLabel} · {formatDate(shipment.createdAt)}
+                <Link to={`/shipments/${shipment.number}`}>{shipment.number}</Link> · {shipment.carrierLabel} · {formatDate(shipment.createdAt)}
                 {shipment.trackingNumber && (
                   <>
                     {' · '}
@@ -179,6 +179,18 @@ function Documents({ order }) {
                   </>
                 )}
                 {shipment.note && <p className="muted">{shipment.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {returns.length > 0 && (
+        <section aria-labelledby="doc-returns">
+          <h3 id="doc-returns">Returns</h3>
+          <ul>
+            {returns.map((item) => (
+              <li key={item.number}>
+                <Link to={`/returns/${item.number}`}>{item.number}</Link> · {returnStatus(item.status).label} · {formatDate(item.createdAt)}
               </li>
             ))}
           </ul>
@@ -200,7 +212,7 @@ function Documents({ order }) {
   )
 }
 
-const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog }
+const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog, return: CreateReturnDialog }
 
 /**
  * A real order (BuyNest's API): items, customer, delivery, payment, its
@@ -213,9 +225,11 @@ function LiveOrderDetailPage() {
   const { orderId } = useParams()
   const { can } = useAdminAuth()
   const queryClient = useQueryClient()
+  const location = useLocation()
   const order = useQuery({ queryKey: adminKeys.order(orderId), queryFn: ({ signal }) => getOrder(orderId, { signal }) })
-  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'delivered' | 'cancelled'
-  const [notice, setNotice] = useState(null)
+  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'return' | 'delivered' | 'cancelled'
+  // An order just created (Create order) arrives with what happened.
+  const [notice, setNotice] = useState(location.state?.notice ?? null)
   const noticeRef = useRef(null)
   const openerRef = useRef(null)
 
@@ -236,6 +250,8 @@ function LiveOrderDetailPage() {
     deliver: possible.deliver && can('orders.edit'),
     refund: possible.refund && can('credit_memos.create'),
     cancel: possible.cancel && can('orders.edit'),
+    // Phase 6: a return for the customer, once something was shipped.
+    return: possible.return && can('returns.manage'),
   }
   const nothingToDo = !Object.values(possible).some(Boolean)
   const nothingAllowed = !nothingToDo && !Object.values(actions).some(Boolean)
@@ -252,7 +268,7 @@ function LiveOrderDetailPage() {
   function done(message) {
     setDialog(null)
     // Everything that shows this order, its documents, stock, or totals.
-    for (const key of [adminKeys.order(orderId), ['orders'], adminKeys.overview, ['invoices'], ['credit-memos'], adminKeys.refundable(orderId), ['products'], ['product']]) {
+    for (const key of [adminKeys.order(orderId), ['orders'], adminKeys.overview, ['invoices'], ['credit-memos'], ['shipments'], ['returns'], adminKeys.refundable(orderId), ['products'], ['product']]) {
       queryClient.invalidateQueries({ queryKey: key })
     }
     setNotice(message)
@@ -270,6 +286,7 @@ function LiveOrderDetailPage() {
         description={`Placed ${formatDate(data.placedAt)} · ${formatCount(data.items)} items`}
         actions={
           <>
+            <StatusBadge {...orderSource(data.source)} />
             <StatusBadge {...orderStatus(data.status)} />
             <StatusBadge {...paymentStatus(data.paymentStatus)} />
           </>
@@ -420,6 +437,11 @@ function LiveOrderDetailPage() {
                       Refund
                     </button>
                   )}
+                  {actions.return && (
+                    <button type="button" className="btn btn--outline" onClick={(event) => open('return', event)}>
+                      Create return
+                    </button>
+                  )}
                   {actions.cancel && (
                     <button type="button" className="btn btn--danger" onClick={(event) => open('cancelled', event)}>
                       Cancel order
@@ -442,6 +464,16 @@ function LiveOrderDetailPage() {
             Documents
           </h2>
           <Documents order={data} />
+          <p className="documents print-links">
+            <Link to={`/print/packing-slips?orders=${data.number}`} className="btn btn--outline btn--sm">
+              <LuPrinter aria-hidden="true" /> Packing slip
+            </Link>
+            {data.invoices?.length > 0 && (
+              <Link to={`/print/invoices?orders=${data.number}`} className="btn btn--outline btn--sm">
+                <LuPrinter aria-hidden="true" /> Print invoice
+              </Link>
+            )}
+          </p>
         </section>
 
         <section className="panel" aria-labelledby="customer-title">
@@ -451,8 +483,21 @@ function LiveOrderDetailPage() {
           <dl className="details">
             <dt>Name</dt>
             <dd>
-              {fullName(data.customer) || '—'} <span className="muted">· {data.customer.guest ? 'Guest' : 'Account'}</span>
+              {data.customer.id && can('customers.view') ? <Link to={`/customers/${data.customer.id}`}>{fullName(data.customer) || '—'}</Link> : fullName(data.customer) || '—'}{' '}
+              <span className="muted">· {data.customer.guest ? 'Guest' : 'Account'}</span>
             </dd>
+            {data.customerGroup && (
+              <>
+                <dt>Group</dt>
+                <dd>{data.customerGroup}</dd>
+              </>
+            )}
+            {data.source === 'admin' && (
+              <>
+                <dt>Created by</dt>
+                <dd>{data.createdByAdmin ? `${data.createdByAdmin} (admin)` : 'An admin'}</dd>
+              </>
+            )}
             <dt>Email</dt>
             <dd>
               <a href={`mailto:${data.email}`}>{data.email}</a>

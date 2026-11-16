@@ -157,6 +157,7 @@ class Refunds
 
         $restock = (bool) ($data['restock'] ?? false) && $lines !== [];
         $memo = $order->creditMemos()->create([
+            'return_id' => $data['return_id'] ?? null, // phase 6: the return this refund settles
             'subtotal' => Pricing::format($subtotal),
             'shipping_refund' => Pricing::format($shipping),
             'adjustment' => Pricing::format($adjustment),

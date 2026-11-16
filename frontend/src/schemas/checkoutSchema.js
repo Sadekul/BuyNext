@@ -15,7 +15,7 @@ z.config({ jitless: true })
 const requiredText = (message) => z.string({ error: message }).trim().min(1, message)
 
 /** One address; `countries` are the ones the store ships to (the demo list, or the server's settings). */
-const createAddressSchema = (countries) => z.object({
+export const createAddressSchema = (countries) => z.object({
   firstName: requiredText('Enter a first name.'),
   lastName: requiredText('Enter a last name.'),
   line1: requiredText('Enter a street address.'),
@@ -54,6 +54,8 @@ export function createCheckoutSchema({
       billing: z.any(), // validated below, only when it's a separate address
       shippingMethod: z.enum(shippingMethodIds, { error: 'Choose a delivery option.' }),
       paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
+      // Signed-in customers (REAL_SHOP): keep the shipping address in the address book.
+      saveAddress: z.boolean().optional(),
     })
     // Conditional rule: the billing address is required only when it differs.
     .superRefine((data, ctx) => {
@@ -77,4 +79,20 @@ export const EMPTY_ADDRESS = {
   state: '',
   postalCode: '',
   country: COUNTRIES[0],
+}
+
+/**
+ * An address-book entry (REAL_SHOP): an order address plus a phone number
+ * (for the courier) and an optional company, and whether it is the default for shipping and for billing.
+ */
+export function createSavedAddressSchema(countries = COUNTRIES) {
+  return createAddressSchema(countries).extend({
+    phone: z
+      .string({ error: 'Enter a phone number.' })
+      .trim()
+      .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a valid phone number.'),
+    company: z.string().trim().max(100, 'Keep the company name to 100 characters or fewer.'),
+    isDefaultShipping: z.boolean(),
+    isDefaultBilling: z.boolean(),
+  })
 }

@@ -26,7 +26,7 @@ describe('permissions in the admin app', () => {
     renderApp('/')
     expect(await screen.findByRole('heading', { name: 'Orders' })).toBeInTheDocument()
     const links = nav().getAllByRole('link').map((link) => link.textContent)
-    expect(links).toEqual(['Orders', 'Invoices', 'Credit memos', 'Customers'])
+    expect(links).toEqual(['Orders', 'Shipments', 'Invoices', 'Credit memos', 'All customers', 'Customer groups'])
     expect(screen.getByText(/Sales staff/)).toBeInTheDocument()
   })
 

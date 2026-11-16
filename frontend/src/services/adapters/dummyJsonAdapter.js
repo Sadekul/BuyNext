@@ -89,5 +89,7 @@ export function normalizeUser(raw) {
     phone: raw.phone ?? null, // only in /auth/me
     emailVerified: raw.emailVerified ?? null, // BuyNest accounts only
     address, // only in /auth/me
+    // BuyNest accounts (phase 6): the customer group and its discount, e.g. { name: 'Wholesale', discountPercent: 10 }.
+    group: raw.group && typeof raw.group.name === 'string' ? { name: raw.group.name, discountPercent: Number(raw.group.discountPercent) || 0 } : null,
   }
 }

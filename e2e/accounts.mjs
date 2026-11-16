@@ -1,6 +1,8 @@
 // Account separation: what one customer's session leaves behind for the next person on the device.
 import {
   BASE,
+  LARAVEL,
+  LARAVEL_URL,
   SHOPPER,
   SHOPPER_2,
   headerCounts,
@@ -68,7 +70,23 @@ log(counts.wishlist === 0 && counts.cart === 0, `another account sees none of th
 await page.goto(`${BASE}/account`, { waitUntil: 'networkidle' })
 log(await page.getByRole('heading', { name: new RegExp(`Hi, ${SHOPPER_2.firstName}`) }).isVisible(), 'profile shows the new account, not a cached one')
 await page.goto(`${BASE}/account/orders`, { waitUntil: 'networkidle' })
-log((await page.locator('.orders__item').count()) === 0, "another account sees none of the first account's orders")
+if (LARAVEL) {
+  // The second shopper may have orders of their own (other suites place some): check that none of the first shopper's appear.
+  const call = async (path, init = {}) =>
+    (await fetch(`${LARAVEL_URL}${path}`, { ...init, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers } })).json()
+  const login = await call('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: SHOPPER.email, password: SHOPPER.password }) })
+  const firstOrders = []
+  for (let pageNumber = 1; ; pageNumber++) {
+    const { data, meta } = await call(`/api/v1/orders?per_page=50&page=${pageNumber}`, { headers: { Authorization: `Bearer ${login.data.tokens.access_token}` } })
+    firstOrders.push(...data.map((order) => order.number))
+    if (pageNumber >= meta.last_page) break
+  }
+  const shown = await page.locator('.orders__item').allInnerTexts()
+  const leaked = firstOrders.filter((number) => shown.some((text) => text.includes(number)))
+  log(firstOrders.length > 0 && leaked.length === 0, `another account sees none of the first account's orders (${firstOrders.length} checked, leaked: ${leaked.join(', ') || 'none'})`)
+} else {
+  log((await page.locator('.orders__item').count()) === 0, "another account sees none of the first account's orders")
+}
 await storefrontSignOut(page)
 
 // 5. The first shopper signs back in ("Keep me signed in" was on): her wishlist and cart are back

@@ -124,3 +124,9 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+.cart-line__group {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+}

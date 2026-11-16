@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * adjustment. "CM-100001". No payment provider is connected yet: the memo
  * records that staff returned the money by the original method.
  */
-#[Fillable(['order_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'restocked', 'admin_id', 'note', 'customer_notified'])]
+#[Fillable(['order_id', 'return_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'restocked', 'admin_id', 'note', 'customer_notified'])]
 class CreditMemo extends Model
 {
     public const UPDATED_AT = null;
@@ -43,6 +43,12 @@ class CreditMemo extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
+    }
+
+    /** Phase 6: the return this refund settled, if any. */
+    public function orderReturn(): BelongsTo
+    {
+        return $this->belongsTo(OrderReturn::class, 'return_id');
     }
 
     public function items(): HasMany

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CustomerGroup;
+
 /**
  * The result of Pricing::quote(): lines, problems, coupon, shipping, and
  * totals, all in cents. toArray() is the `data` of POST /api/v1/cart/validate
@@ -25,6 +27,9 @@ final readonly class CartQuote
         public ?int $couponId = null, // the coupons row applied (checkout counts the use)
         // false: tax is on but no country was given, so the tax (0.00) isn't the real one yet.
         public bool $taxEstimated = true,
+        // Phase 6: the shopper's customer group (null only when no group exists) and what its discount took off the subtotal.
+        public ?CustomerGroup $group = null,
+        public int $groupDiscountCents = 0,
     ) {}
 
     public function hasProblems(): bool
@@ -46,6 +51,10 @@ final readonly class CartQuote
                 'thumbnail_url' => $line['thumbnail_url'],
                 'price' => $money($line['price_cents']),
                 'discount_percent' => $line['discount_percent'],
+                // Phase 6: sale_price is what one unit costs this shopper (after the group discount);
+                // base_sale_price is the product's sale price before it.
+                'group_discount_percent' => $line['group_discount_percent'],
+                'base_sale_price' => $money($line['base_sale_cents']),
                 'sale_price' => $money($line['sale_cents']),
                 'quantity' => $line['quantity'],
                 'line_total' => $money($line['line_cents']),
@@ -64,6 +73,7 @@ final readonly class CartQuote
             ], $this->shippingOptions),
             'totals' => $this->totals(),
             'tax_estimated' => $this->taxEstimated,
+            'customer_group' => $this->group?->summary(),
         ];
     }
 
@@ -73,6 +83,8 @@ final readonly class CartQuote
             'item_count' => $this->itemCount,
             'subtotal' => Pricing::format($this->subtotalCents),
             'discount' => Pricing::format($this->discountCents),
+            // Already inside the subtotal (the lines are priced after it); shown so the cart can say what the group saved.
+            'group_discount' => Pricing::format($this->groupDiscountCents),
             'shipping' => Pricing::format($this->shippingCents),
             'tax' => Pricing::format($this->taxCents),
             'total' => Pricing::format($this->totalCents),

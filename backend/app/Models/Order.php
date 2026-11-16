@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * until the courier collects the money.
  */
 #[Fillable([
-    'customer_id', 'email', 'phone', 'status', 'payment_status', 'payment_method', 'shipping_method',
+    'customer_id', 'customer_group', 'source', 'created_by_admin_id', 'email', 'phone', 'status', 'payment_status', 'payment_method', 'shipping_method',
     'shipping_label', 'shipping_eta', 'coupon_code', 'subtotal', 'discount_total', 'shipping_total',
     'tax_total', 'grand_total', 'shipping_address', 'billing_address', 'placed_at',
 ])]
@@ -29,6 +29,15 @@ class Order extends Model
     public const STATUSES = ['pending_payment', 'processing', 'shipped', 'delivered', 'cancelled', 'closed'];
 
     public const PAYMENT_STATUSES = ['unpaid', 'paid', 'partially_refunded', 'refunded'];
+
+    /** Phase 6: storefront checkout, or staff creating the order in the admin. */
+    public const SOURCES = ['storefront', 'admin'];
+
+    /** Orders that are still being handled (a customer with one can't be deleted). */
+    public const OPEN_STATUSES = ['pending_payment', 'processing', 'shipped'];
+
+    /** Payment methods that may ship before an invoice (the money is collected on delivery / in person). */
+    public const PAY_LATER_METHODS = ['cod', 'cash'];
 
     /**
      * Where an admin may move an order from each status with PATCH. Anything
@@ -86,6 +95,17 @@ class Order extends Model
     public function creditMemos(): HasMany
     {
         return $this->hasMany(CreditMemo::class)->orderBy('id');
+    }
+
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderReturn::class)->orderBy('id');
+    }
+
+    /** The admin who placed the order (source "admin"). */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'created_by_admin_id');
     }
 
     /** What resources need to show an order with its documents (eager load, no N+1). */

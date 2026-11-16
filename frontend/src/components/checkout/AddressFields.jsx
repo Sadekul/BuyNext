@@ -6,12 +6,13 @@ import './AddressFields.css'
  * Address inputs for one prefix ("shipping" or "billing"). Uses React Hook
  * Form's `register` (uncontrolled inputs: the DOM holds the values, RHF
  * reads them) and shows nested errors like errors.shipping.city.
-`countries`: where the store ships (REAL_SHOP: the server's settings).
+ * `countries`: where the store ships (REAL_SHOP: the server's settings).
+ * An empty `prefix` registers the fields at the top level (the address book form).
  */
 function AddressFields({ prefix, register, errors = {}, autoCompleteSection, countries = COUNTRIES }) {
   // Browsers autofill separate address books with "section-… shipping/billing …".
   const ac = (token) => `section-${autoCompleteSection} ${autoCompleteSection} ${token}`
-  const field = (name) => ({ ...register(`${prefix}.${name}`), error: errors[name]?.message })
+  const field = (name) => ({ ...register(prefix ? `${prefix}.${name}` : name), error: errors[name]?.message })
 
   return (
     <div className="address-fields">

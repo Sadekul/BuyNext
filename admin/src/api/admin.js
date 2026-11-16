@@ -33,6 +33,14 @@ export const adminKeys = {
   report: (name, params) => ['report', name, params],
   settings: ['settings'],
   reviews: (params) => ['reviews', params],
+  customer: (id) => ['customer', String(id)],
+  customerGroups: ['customer-groups'],
+  shipments: (params) => ['shipments', params],
+  shipment: (number) => ['shipment', String(number)],
+  returns: (params) => ['returns', params],
+  return: (number) => ['return', String(number)],
+  packingSlip: (number) => ['packing-slip', String(number)],
+  quote: (body) => ['quote', body],
 }
 
 export const getOverview = ({ signal } = {}) => api.get('/api/admin/overview', { signal })
@@ -172,3 +180,68 @@ export const getReviews = (params, { signal } = {}) => api.get('/api/admin/revie
 export const updateReview = (id, status) => api.patch(`/api/admin/reviews/${id}`, { status })
 export const bulkReviews = (ids, status) => api.post('/api/admin/reviews/bulk', { ids, status })
 export const deleteReview = (id) => api.delete(`/api/admin/reviews/${id}`)
+
+/*
+ * Phase 6 (docs/backend/PHASE6_CONTRACT.md), BuyNest's backend only:
+ * Magento-style customers and sales. Permissions: customers.view/edit/create/
+ * delete, customer_groups.manage, orders.create, returns.view/manage (and the
+ * phase 3 ones for the order grid's mass actions).
+ */
+/** customers.view: { groups: [{ id, name, code, discountPercent, isSystem, customerCount }] }. */
+export const getCustomerGroups = ({ signal } = {}) => api.get('/api/admin/customer-groups', { signal })
+/** customer_groups.manage: { name, code, discountPercent } → { group }. */
+export const createCustomerGroup = (values) => api.post('/api/admin/customer-groups', values)
+export const updateCustomerGroup = (id, values) => api.patch(`/api/admin/customer-groups/${id}`, values)
+/** 422 with the server's message while customers are in the group (or for the system group). */
+export const deleteCustomerGroup = (id) => api.delete(`/api/admin/customer-groups/${id}`)
+
+/** The customer's full profile: account, group, addresses, ordersCount, lifetimeSpent, recentOrders, reviewsCount, notes. */
+export const getCustomer = (id, { signal } = {}) => api.get(`/api/admin/customers/${id}`, { signal })
+/** customers.create: { firstName, lastName, email, phone?, groupId? } → { customer }. The customer is emailed a "set your password" code. */
+export const createCustomer = (values) => api.post('/api/admin/customers', values)
+/** customers.delete: refused (422) while the customer has an open order. Orders and reviews are kept. */
+export const deleteCustomer = (id) => api.delete(`/api/admin/customers/${id}`)
+/** customers.edit: emails the customer a password reset code. Admins never see or set passwords. */
+export const sendCustomerPasswordReset = (id) => api.post(`/api/admin/customers/${id}/password-reset`, {})
+export const getCustomerAddresses = (id, { signal } = {}) => api.get(`/api/admin/customers/${id}/addresses`, { signal })
+export const createCustomerAddress = (id, values) => api.post(`/api/admin/customers/${id}/addresses`, values)
+export const updateCustomerAddress = (id, addressId, values) => api.patch(`/api/admin/customers/${id}/addresses/${addressId}`, values)
+export const deleteCustomerAddress = (id, addressId) => api.delete(`/api/admin/customers/${id}/addresses/${addressId}`)
+export const getCustomerNotes = (id, { signal } = {}) => api.get(`/api/admin/customers/${id}/notes`, { signal })
+/** Internal: never shown to the customer. */
+export const addCustomerNote = (id, body) => api.post(`/api/admin/customers/${id}/notes`, { body })
+/** customers.view: the CSV download's address, with the list's filters. */
+export function customersCsvUrl(filters = {}) {
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value))
+  return `/api/admin/customers/export.csv${query.size > 0 ? `?${query}` : ''}`
+}
+
+/**
+ * orders.create: the order an admin places for a customer (or a guest):
+ * { customerId | guest, items: [{ productId, variantId?, quantity }], shippingAddress,
+ *   billingAddress | sameAsShipping, shippingMethod, paymentMethod, couponCode?, note?, notifyCustomer }.
+ * quoteOrder prices it without placing it (lines, problems, totals, shippingOptions, coupon, couponError).
+ */
+export const quoteOrder = (body, { signal } = {}) => api.post('/api/admin/orders/quote', body, { signal })
+export const createOrder = (body) => api.post('/api/admin/orders', body)
+/** { numbers, action: invoice | ship | cancel, carrier?, notifyCustomer } → { done: [numbers], skipped: [{ number, reason }] }. */
+export const bulkOrders = (numbers, action, extra = {}) => api.post('/api/admin/orders/bulk', { numbers, action, ...extra })
+/** orders.view: the CSV download's address, with the grid's filters. */
+export function ordersCsvUrl(filters = {}) {
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value))
+  return `/api/admin/orders/export.csv${query.size > 0 ? `?${query}` : ''}`
+}
+/** { orderNumber, placedAt, customerName, shippingAddress, shippingMethod, items: [{ name, sku, variantLabel, quantity }] }: no prices. */
+export const getPackingSlip = (number, { signal } = {}) => api.get(`/api/admin/orders/${number}/packing-slip`, { signal })
+/** returns.manage: { items: [{ orderItemId, quantity }], reason, comment?, overrideWindow?, notifyCustomer } → { return }. */
+export const createReturn = (number, values) => api.post(`/api/admin/orders/${number}/returns`, values)
+
+/** orders.view: ?q&carrier&from&to&limit&skip → { shipments, total }. */
+export const getShipments = (params, { signal } = {}) => api.get('/api/admin/shipments', { params, signal })
+export const getShipment = (number, { signal } = {}) => api.get(`/api/admin/shipments/${number}`, { signal })
+
+/** returns.view: ?status&q&limit&skip → { returns, total }. */
+export const getReturns = (params, { signal } = {}) => api.get('/api/admin/returns', { params, signal })
+export const getReturn = (number, { signal } = {}) => api.get(`/api/admin/returns/${number}`, { signal })
+/** returns.manage: { status, adminNote?, notifyCustomer, items?: [{ returnItemId, condition }], restock? } → { return }. */
+export const updateReturn = (number, values) => api.patch(`/api/admin/returns/${number}`, values)

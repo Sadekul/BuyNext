@@ -24,6 +24,12 @@ import SettingsPage from './pages/SettingsPage'
 import CategoriesPage from './pages/CategoriesPage'
 import ImportExportPage from './pages/ImportExportPage'
 import ReviewsPage from './pages/ReviewsPage'
+import CustomerDetailPage from './pages/CustomerDetailPage'
+import CustomerGroupsPage from './pages/CustomerGroupsPage'
+import CreateOrderPage from './pages/CreateOrderPage'
+import { ShipmentDetailPage, ShipmentsPage } from './pages/ShipmentsPages'
+import { ReturnDetailPage, ReturnsPage } from './pages/ReturnsPages'
+import { InvoicesPrintPage, PackingSlipsPrintPage } from './pages/PrintPages'
 import { firstAllowedPath } from './utils/permissions'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
@@ -54,6 +60,16 @@ export function AdminRoutes() {
         {/* Sales documents, coupons, and everything of phases 4 and 5 exist only with BuyNest's backend. */}
         {LIVE_DATA && (
           <>
+            {/* Phase 6: customers and sales. */}
+            <Route path="orders/new" element={guarded('orders.create', <CreateOrderPage />)} />
+            <Route path="customers/:customerId" element={guarded('customers.view', <CustomerDetailPage />)} />
+            <Route path="customer-groups" element={guarded('customers.view', <CustomerGroupsPage />)} />
+            <Route path="shipments" element={guarded('orders.view', <ShipmentsPage />)} />
+            <Route path="shipments/:number" element={guarded('orders.view', <ShipmentDetailPage />)} />
+            <Route path="returns" element={guarded('returns.view', <ReturnsPage />)} />
+            <Route path="returns/:number" element={guarded('returns.view', <ReturnDetailPage />)} />
+            <Route path="print/packing-slips" element={guarded('orders.view', <PackingSlipsPrintPage />)} />
+            <Route path="print/invoices" element={guarded('orders.view', <InvoicesPrintPage />)} />
             <Route path="categories" element={guarded('products.view', <CategoriesPage />)} />
             <Route path="import-export" element={guarded('products.import', <ImportExportPage />)} />
             <Route path="reviews" element={guarded('reviews.view', <ReviewsPage />)} />

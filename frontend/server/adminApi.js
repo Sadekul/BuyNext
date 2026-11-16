@@ -4,6 +4,16 @@ import { laravelAdminData } from './shop/admin.js'
 import { SYSTEM_ROUTES, isReportName } from './adminSystemApi.js'
 import { CATALOG_ROUTES, NAMED_ACTIONS, PRODUCT_PARTS } from './adminCatalogApi.js'
 import { laravelCatalogData } from './shop/adminCatalog.js'
+import {
+  CUSTOMER_PARTS,
+  SALES_NAMED_ACTIONS,
+  SALES_ROUTES,
+  isReturnNumber,
+  isShipmentNumber,
+  laravelAccounts,
+  listCustomersFromLaravel,
+  updateCustomerInLaravel,
+} from './adminSalesApi.js'
 import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 
 /*
@@ -38,7 +48,7 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  *   PUT    /api/admin/products/:id       → update (validated, partial)
  *   DELETE /api/admin/products/:id
  *   GET    /api/admin/categories
- *   GET    /api/admin/orders?q&status&paymentStatus&limit&skip   (filters: Laravel only)
+ *   GET    /api/admin/orders?q&status&paymentStatus&source&limit&skip   (filters: Laravel only)
  *   GET    /api/admin/orders/:id          (Laravel: the order number, e.g. BN-100001)
  *   PATCH  /api/admin/orders/:number      { status?, paymentStatus?, note?, notifyCustomer? } (Laravel only)
  *
@@ -71,6 +81,13 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  * images (multipart upload), options and variants, mass actions, CSV export
  * and import, and review moderation. With real data, GET categories is the
  * tree as a flat list in tree order (parentId, depth, isActive, …).
+ *
+ * Phase 6 (Laravel only; adminSalesApi.js): customer groups, the customer
+ * profile (edit, address book, notes, password reset, delete, CSV), orders
+ * created by admins (quote, place), mass actions and CSV on the order grid,
+ * packing slips, the shipments list, and returns (RMA). With Laravel
+ * accounts, GET customers takes the new filters and rows carry the group, and
+ * PATCH customers/:id edits the whole account (not only isActive).
  */
 
 const PRODUCT_LIST_FIELDS = ['id', 'title', 'category', 'brand', 'price', 'discountPercentage', 'stock', 'rating', 'thumbnail', 'availabilityStatus']
@@ -102,8 +119,15 @@ const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
 const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
 const isCreditMemoNumber = (value) => /^CM-\d{1,12}$/.test(value ?? '')
 // How each resource's records are addressed in the URL; anything else is a 404 before any upstream call.
-const ID_FORMATS = { orders: (value) => isId(value) || isOrderNumber(value), invoices: isInvoiceNumber, 'credit-memos': isCreditMemoNumber, reports: isReportName }
-const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable']
+const ID_FORMATS = {
+  orders: (value) => isId(value) || isOrderNumber(value),
+  invoices: isInvoiceNumber,
+  'credit-memos': isCreditMemoNumber,
+  reports: isReportName,
+  shipments: isShipmentNumber,
+  returns: isReturnNumber,
+}
+const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable', 'packing-slip', 'returns']
 const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
 const COUPON_TYPES = ['percent', 'fixed', 'free_shipping']
 const COUPON_FILTERS = ['active', 'inactive', 'scheduled', 'expired', 'used_up']
@@ -198,10 +222,14 @@ export function validateCreditMemo(body) {
   if (!isMoney(shippingRefund)) errors.shippingRefund = ['Enter a shipping refund of 0 or more, with at most 2 decimals.']
   if (!isMoney(adjustment, { min: -1_000_000 })) errors.adjustment = ['Enter an adjustment with at most 2 decimals (negative to keep a fee).']
   if (body.restock !== undefined && typeof body.restock !== 'boolean') errors.restock = ['Choose whether to return the items to stock.']
+  // Phase 6: refunding a return (RMA-100001) marks it refunded.
+  if (body.returnNumber !== undefined && body.returnNumber !== null && !/^RMA-\d{1,12}$/.test(body.returnNumber)) errors.returnNumber = ['Choose a return of this order.']
   const note = optionalNote(body, errors)
   if (Object.keys(errors).length > 0) return { errors }
   if (items.length === 0 && shippingRefund === 0 && adjustment <= 0) return { errors: { items: ['Choose at least one item, or refund shipping or an amount.'] } }
-  return { values: { items, shippingRefund, adjustment, restock: body.restock === true, note, notifyCustomer: body.notifyCustomer !== false } }
+  return {
+    values: { items, shippingRefund, adjustment, restock: body.restock === true, note, notifyCustomer: body.notifyCustomer !== false, ...(body.returnNumber && { returnNumber: body.returnNumber }) },
+  }
 }
 
 const nullable = (rule) => (value) => (value === null ? null : rule(value))
@@ -371,6 +399,7 @@ const ROUTES = {
         q: searchParams.get('q')?.trim().slice(0, 100),
         status: oneOf(searchParams.get('status'), ORDER_STATUSES),
         paymentStatus: oneOf(searchParams.get('paymentStatus'), ['paid', 'unpaid']),
+        source: oneOf(searchParams.get('source'), ['storefront', 'admin']),
         limit,
         skip,
       }
@@ -512,6 +541,8 @@ const ROUTES = {
     const { url } = ctx
     const { limit, skip } = pageParams(url)
     const q = url.searchParams.get('q')?.trim()
+    // Phase 6: straight from the API, with the group and the new filters.
+    if (laravelAccounts()) return listCustomersFromLaravel(ctx)
     const backend = accounts()
     if (backend.admin.listCustomers) {
       const status = ['verified', 'unverified', 'blocked'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : undefined
@@ -530,6 +561,7 @@ const ROUTES = {
   },
 
   async 'PATCH customers/:id'(ctx) {
+    if (laravelAccounts()) return updateCustomerInLaravel(ctx)
     const backend = accounts()
     if (!backend.admin.updateCustomer) return json({ message: 'Blocking customers needs the BuyNest backend; the demo accounts cannot do it.' }, 404)
     const body = await readBody(ctx.request)
@@ -539,6 +571,7 @@ const ROUTES = {
   },
   ...SYSTEM_ROUTES,
   ...CATALOG_ROUTES,
+  ...SALES_ROUTES,
 }
 
 /**
@@ -549,8 +582,10 @@ const ROUTES = {
 function matchRoute(method, segments) {
   const [resource, id, document, ...rest] = segments
   // Phase 5: actions on a list (products/bulk) and a product's parts (products/1/images/2).
-  if (document === undefined && NAMED_ACTIONS.includes(`${resource}/${id}`)) return { route: ROUTES[`${method} ${resource}/${id}`] }
+  if (document === undefined && [...NAMED_ACTIONS, ...SALES_NAMED_ACTIONS].includes(`${resource}/${id}`)) return { route: ROUTES[`${method} ${resource}/${id}`] }
   if (resource === 'products' && document !== undefined) return matchProductPart(method, id, document, rest)
+  // Phase 6: a customer's addresses[/:addressId], notes, password-reset.
+  if (resource === 'customers' && document !== undefined) return matchCustomerPart(method, id, document, rest)
   if (rest.length > 0) return null
   if (id === undefined) return { route: ROUTES[`${method} ${resource}`] }
   if (!(ID_FORMATS[resource] ?? isId)(id)) return null
@@ -568,6 +603,13 @@ function matchProductPart(method, id, part, rest) {
   const [sub] = rest
   if (PRODUCT_PARTS[part].includes(sub)) return { route: ROUTES[`${method} products/:id/${part}/${sub}`], id }
   return isId(sub) ? { route: ROUTES[`${method} products/:id/${part}/:sub`], id, sub } : null
+}
+
+/** customers/:id/addresses[/:addressId], customers/:id/notes, customers/:id/password-reset. */
+function matchCustomerPart(method, id, part, rest) {
+  if (!isId(id) || !Object.hasOwn(CUSTOMER_PARTS, part) || rest.length > 1) return null
+  if (rest.length === 0) return { route: ROUTES[`${method} customers/:id/${part}`], id }
+  return CUSTOMER_PARTS[part] && isId(rest[0]) ? { route: ROUTES[`${method} customers/:id/${part}/:sub`], id, sub: rest[0] } : null
 }
 
 /** The admin session routes: no permission check (they create or end the session). */

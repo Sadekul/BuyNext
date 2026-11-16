@@ -9,7 +9,11 @@ separate from customers.
 | Overview | Revenue, average order, units sold, products, low stock, customers, inventory value; products that need restocking; latest orders |
 | Products | Search, category filter, sorting, pages; add, edit, and delete products (with server-side validation) |
 | Orders | All orders with pages; order details with items, totals, and the customer |
-| Customers | The real sign-ups (BuyNest accounts): search by name, email, or phone; filter by status (Active, Email not confirmed, Blocked); block and unblock. With DummyJSON demo users: a read-only list. |
+| Customers | The real sign-ups (BuyNest accounts): search by name, email, or phone; filter by status (Active, Email not confirmed, Blocked); block and unblock. With DummyJSON demo users: a read-only list. With BuyNest's backend (phase 6): filters by email confirmation, group, and join dates; CSV export; "Add customer"; and a customer page with tabs (Account and group, Addresses, Orders, Notes) and actions (password reset email, block/unblock, delete). |
+| Customer groups | Phase 6: groups with a discount on every product price (General, Wholesale, VIP…); add, edit, delete when empty. |
+| Create order | Phase 6 (Orders → Create order): a customer (search) or a guest, products with options and quantities, saved addresses, shipping, payment (bank transfer and cash are staff-only), coupon, note; live totals from the server. |
+| Shipments, Returns | Phase 6: every shipment (search, carrier and date filters) with its packing slip; returns (RMA) with approve/reject, receive (condition, restock), close, and "Refund this return" through the credit memo dialog. |
+| Order grid extras | Phase 6: a Source column (storefront or admin), CSV export, and mass actions on ticked orders: invoice, ship, cancel, print invoices, print packing slips. |
 
 ## Who can use it
 

@@ -183,3 +183,25 @@
 - Reports with date ranges and grouping; CSV download with a guard against spreadsheet formula injection
 - A cached settings service: shipping, tax, countries, payment methods, guest checkout, applied by the store immediately
 - React side: hiding navigation and buttons the role can't use (`can()` in `AdminAuthProvider`) while the server still refuses, a "You don't have access" screen for 403, accessible charts as tables, a home page editor with banner reordering
+
+## Backend phase 5: Magento-style catalog
+
+- Trees in a relational database: `parent_id`, depth limits, refusing cycles, "visible only when every ancestor is active", and including descendants in a category listing
+- File uploads safely: trusting the file's contents (finfo + getimagesize), never its name or the browser's type; random file names; serving files through an allow-listed route on the store's own origin
+- Multipart requests through a backend-for-frontend: passing the body through with its boundary, and size caps that stop reading early
+- Modeling configurable products: options, values, and variants with their own SKU, price, and stock; keeping old orders linked by deactivating instead of deleting
+- All-or-nothing bulk changes and CSV imports in one transaction, with a dry run that reports errors per row
+- Moderation workflows: pending → approved/rejected, recomputing averages from approved rows only
+- React side: accessible option pickers (radio groups in fieldsets), cart lines keyed by product + variant with a backward-compatible saved shape, `FormData` uploads, keyboard-friendly reordering (move up/down buttons instead of drag only), a bulk-selection bar
+- Testing lesson: browser suites that share one database must never run at the same time, and must clean up in a `finally` block
+
+## Backend phase 6: Magento-style customers and sales
+
+- Ownership checks: a customer can only see and change their own addresses and returns (another customer's id answers 404, not 403, so ids don't leak)
+- Pricing layers in a fixed order: product discount → customer group discount → coupon; storing the amounts on the order so later refunds use what was actually charged
+- Reusing one checkout service for the storefront and for staff-created (phone) orders, with a "quote" that prices without saving
+- State machines: return statuses with allowed moves, refused moves answered with 422, and side effects (emails, history notes) on each move
+- Preventing double effects: restocking once whether it happens on receipt or on refund
+- Partial success in bulk actions: each order in its own transaction, answered with done and skipped lists
+- Account lifecycle: staff-created accounts get a "set your password" code instead of a password; changing an email unverifies it and signs the customer out
+- React side: tabs with arrow-key navigation (ARIA tabs pattern), print pages with print-only CSS, pre-filling forms from saved data, showing server-calculated totals instead of recalculating in the browser

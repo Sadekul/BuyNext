@@ -14,6 +14,9 @@ export const ROUTES = {
   orders: '/account/orders',
   orderDetails: (orderId) => `/account/orders/${orderId}`,
   invoice: (orderId, invoiceNumber) => `/account/orders/${orderId}/invoices/${invoiceNumber}`,
+  addresses: '/account/addresses', // address book (REAL_SHOP)
+  returns: '/account/returns', // returns (REAL_SHOP)
+  returnDetails: (returnNumber) => `/account/returns/${returnNumber}`,
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',

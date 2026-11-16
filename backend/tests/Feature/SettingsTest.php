@@ -73,6 +73,9 @@ class SettingsTest extends TestCase
             'payment_methods' => ['card', 'paypal', 'cod'],
             'guest_checkout' => true,
             'tax_enabled' => false,
+            'returns_enabled' => true,
+            'return_window_days' => 30,
+            'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
         ]]);
     }
 

@@ -56,6 +56,8 @@ class SettingsController extends Controller
             'shipping.enabled_methods.min' => 'Keep at least one shipping method on.',
             'checkout.enabled_payment_methods.min' => 'Keep at least one payment method on.',
             'checkout.allowed_countries.min' => 'Keep at least one country.',
+            'returns.return_reasons.min' => 'Keep at least one return reason.',
+            'returns.return_window_days.min' => 'The return window must be at least 1 day.',
             '*.*.*.distinct' => 'This is listed twice.',
             'tax.tax_rates.*.country.distinct' => 'This country already has a rate.',
         ])->validate();
@@ -101,6 +103,9 @@ class SettingsController extends Controller
                 'shipping_methods' => collect(config('buynest.store.shipping_methods'))
                     ->map(fn ($method, $id) => ['id' => $id, 'label' => $method['label'], 'eta' => $method['eta']])->values(),
                 'payment_methods' => collect(config('buynest.store.payment_methods'))
+                    ->map(fn ($label, $id) => ['id' => $id, 'label' => $label])->values(),
+                // Phase 6: always available to staff creating an order, never to shoppers.
+                'admin_payment_methods' => collect(config('buynest.store.admin_payment_methods'))
                     ->map(fn ($label, $id) => ['id' => $id, 'label' => $label])->values(),
                 'currency' => config('buynest.store.currency'),
             ],

@@ -26,7 +26,7 @@ const isMoneyText = (text) => text.trim() !== '' && Number.isFinite(Number(text)
 
 /**
  * Store settings, one form per group (General, Shipping, Tax, Checkout,
- * Inventory, Catalog), each saved on its own. The server applies these rules to
+ * Inventory, Catalog, Returns), each saved on its own. The server applies these rules to
  * every cart and order. Needs settings.view; saving settings.edit.
  */
 function SettingsPage() {
@@ -45,6 +45,7 @@ function SettingsPage() {
           <CheckoutForm saved={settings.data.checkout} />
           <InventoryForm saved={settings.data.inventory} />
           <CatalogForm saved={settings.data.catalog ?? {}} />
+          {settings.data.returns && <ReturnsForm saved={settings.data.returns} />}
         </div>
       )}
     </>
@@ -430,6 +431,75 @@ function CatalogForm({ saved }) {
       <p id="catalog-approval-hint" className="field__hint">
         When on, a shopper's review appears in the store only after someone approves it under Catalog → Reviews. When off, new reviews are shown right away.
       </p>
+    </SettingsGroup>
+  )
+}
+
+const DEFAULT_REASONS = ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other']
+
+/** Returns (phase 6): whether customers can ask for one, for how long after delivery, and the reasons they choose from. */
+function ReturnsForm({ saved }) {
+  const [enabled, setEnabled] = useState(saved.returnsEnabled !== false)
+  const [days, setDays] = useState(toText(saved.returnWindowDays ?? 30))
+  const [reasons, setReasons] = useState(() => (saved.returnReasons?.length ? saved.returnReasons : DEFAULT_REASONS))
+  const [newReason, setNewReason] = useState('')
+  const [errors, setErrors] = useState({})
+
+  function addReason() {
+    const reason = newReason.trim()
+    if (!reason) return
+    if (!reasons.some((item) => item.toLowerCase() === reason.toLowerCase())) setReasons([...reasons, reason])
+    setNewReason('')
+  }
+  function toValues() {
+    const found = {}
+    const value = Number(days)
+    if (days.trim() === '' || !Number.isInteger(value) || value < 1 || value > 365) found.returnWindowDays = ['Enter a whole number of days from 1 to 365.']
+    if (reasons.length === 0) found.returnReasons = ['Keep at least one reason.']
+    else if (reasons.length > 20) found.returnReasons = ['Keep up to 20 reasons.']
+    return Object.keys(found).length > 0 ? { errors: found } : { values: { returnsEnabled: enabled, returnWindowDays: value, returnReasons: reasons } }
+  }
+  return (
+    <SettingsGroup group="returns" title="Returns" toValues={toValues} errors={errors} setErrors={setErrors}>
+      <label className="checkbox">
+        <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+        Customers can request returns from their orders
+      </label>
+      <Field label="Return window (days)" error={err(errors, 'returnWindowDays')} hint="Counted from delivery, or from the last shipment when there's no delivery date. Staff can create returns after it.">
+        {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="1" max="365" step="1" value={days} onChange={(event) => setDays(event.target.value)} />}
+      </Field>
+      <fieldset className="form__fieldset">
+        <legend>Reasons customers choose from</legend>
+        <ul className="picker-list">
+          {reasons.map((reason, index) => (
+            <li key={reason}>
+              <span>{reason}</span>
+              <button type="button" className="icon-button icon-button--danger" aria-label={`Remove the reason ${reason}`} onClick={() => setReasons(reasons.filter((_, at) => at !== index))}>
+                <LuTrash2 aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        {err(errors, 'returnReasons') && <span className="field__error">{err(errors, 'returnReasons')}</span>}
+      </fieldset>
+      <div className="toolbar">
+        <label className="toolbar__select">
+          <span>Add a reason</span>
+          <input
+            value={newReason}
+            maxLength={60}
+            onChange={(event) => setNewReason(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault() // add, don't save the form
+              addReason()
+            }}
+          />
+        </label>
+        <button type="button" className="btn btn--outline btn--sm" onClick={addReason}>
+          <LuPlus aria-hidden="true" /> Add
+        </button>
+      </div>
     </SettingsGroup>
   )
 }

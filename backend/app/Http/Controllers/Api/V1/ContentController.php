@@ -53,6 +53,10 @@ class ContentController extends Controller
             'payment_methods' => $settings->paymentMethods(),
             'guest_checkout' => (bool) $settings->get('guest_checkout'),
             'tax_enabled' => (bool) $settings->get('tax_enabled'),
+            // Phase 6: Settings → Returns, so the storefront can show the policy and the reasons.
+            'returns_enabled' => (bool) $settings->get('returns_enabled'),
+            'return_window_days' => (int) $settings->get('return_window_days'),
+            'return_reasons' => array_values($settings->get('return_reasons', [])),
         ]]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Coupon;
+use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CategoryTree;
@@ -76,10 +77,15 @@ class Pricing
      * limits (the customer's id when signed in, else the guest's email; both
      * null skips that check until checkout, where the email is required).
      * $country: the shipping country, for tax (null: tax 0, not estimated).
+     * $group (phase 6): the shopper's customer group; null = General (guests).
+     * Its discount comes off every line's sale price, after the product's own
+     * discount and before coupons.
      */
     public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null,
-        ?string $email = null, ?string $country = null): CartQuote
+        ?string $email = null, ?string $country = null, ?CustomerGroup $group = null): CartQuote
     {
+        $group ??= CustomerGroup::general();
+        $groupBasisPoints = $group?->discountBasisPoints() ?? 0;
         // The same product (and variant) twice counts as one line (stock is checked on the sum).
         // The same product with two different variants is two lines.
         $quantities = [];
@@ -102,7 +108,7 @@ class Pricing
             $product = $products->get($productId);
             $variant = $variantId ? $variants->get($variantId) : null;
             $problem = $this->problemWith($product, $variantId ?: null, $variant, $quantity, $tree);
-            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null);
+            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null, $groupBasisPoints);
             if ($problem) {
                 $problems[] = ['product_id' => $productId, 'variant_id' => $variantId ?: null, ...$problem];
             }
@@ -112,6 +118,7 @@ class Pricing
         $charged = array_filter($lines, fn ($line) => $line['available']);
         $itemCount = array_sum(array_column($charged, 'quantity'));
         $subtotal = array_sum(array_column($charged, 'line_cents'));
+        $groupDiscount = array_sum(array_map(fn ($line) => ($line['base_sale_cents'] - $line['sale_cents']) * $line['quantity'], $charged));
 
         [$coupon, $discount, $couponError, $couponRecord] = $this->coupon($couponCode, $subtotal, $customerId, $email, $lock);
         $afterDiscount = $subtotal - $discount;
@@ -149,6 +156,8 @@ class Pricing
             totalCents: $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax),
             couponId: $couponRecord?->id,
             taxEstimated: ! $this->settings->get('tax_enabled') || $country !== null,
+            group: $group,
+            groupDiscountCents: $groupDiscount,
         );
     }
 
@@ -222,12 +231,27 @@ class Pricing
     /** Problems that make a line unavailable (not charged); stock and minimum problems still price the line. */
     private const UNAVAILABLE = ['unavailable', 'variant_required', 'variant_unavailable'];
 
-    private function line(int $productId, ?int $variantId, ?Product $product, ?ProductVariant $variant, int $quantity, ?string $problem): array
+    /**
+     * A group discount on a sale price, in cents: round(cents × (1 − percent / 100)),
+     * halves up. $basisPoints: hundredths of a percent (10.00% → 1000).
+     */
+    public static function groupPriceCents(int $saleCents, int $basisPoints): int
+    {
+        if ($basisPoints <= 0) {
+            return $saleCents;
+        }
+
+        return intdiv($saleCents * (10000 - $basisPoints) * 2 + 10000, 20000);
+    }
+
+    private function line(int $productId, ?int $variantId, ?Product $product, ?ProductVariant $variant, int $quantity, ?string $problem,
+        int $groupBasisPoints = 0): array
     {
         $available = $product !== null && ! in_array($problem, self::UNAVAILABLE, true);
         $sellsVariant = $available && $variant !== null;
         $priceCents = $available ? ($sellsVariant ? $variant->priceCents($product) : $product->priceCents()) : null;
-        $saleCents = $available ? ($sellsVariant ? $variant->salePriceCents($product) : $product->salePriceCents()) : null;
+        $baseSaleCents = $available ? ($sellsVariant ? $variant->salePriceCents($product) : $product->salePriceCents()) : null;
+        $saleCents = $available ? self::groupPriceCents($baseSaleCents, $groupBasisPoints) : null;
 
         return [
             'product_id' => $productId,
@@ -240,6 +264,8 @@ class Pricing
             'thumbnail_url' => $product?->thumbnail_url,
             'price_cents' => $priceCents,
             'discount_percent' => $available ? (float) $product->discount_percent : null,
+            'group_discount_percent' => $available ? $groupBasisPoints / 100 : null,
+            'base_sale_cents' => $baseSaleCents,
             'sale_cents' => $saleCents,
             'quantity' => $quantity,
             'line_cents' => $available ? $saleCents * $quantity : 0,

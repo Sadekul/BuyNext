@@ -8,6 +8,7 @@ use App\Mail\RefundMail;
 use App\Models\CreditMemo;
 use App\Models\Order;
 use App\Services\Refunds;
+use App\Services\Returns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -39,7 +40,7 @@ class CreditMemoController extends Controller
      * POST /api/admin/v1/orders/{number}/credit-memos
      * { items: [{ order_item_id, quantity }], shipping_refund, adjustment, restock, note?, notify_customer? } → 201
      */
-    public function store(Request $request, string $number, Refunds $refunds): JsonResponse
+    public function store(Request $request, string $number, Refunds $refunds, Returns $returns): JsonResponse
     {
         $data = $request->validate([
             'items' => ['nullable', 'array', 'max:50'],
@@ -50,6 +51,8 @@ class CreditMemoController extends Controller
             'restock' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:1000'],
             'notify_customer' => ['nullable', 'boolean'],
+            // Phase 6: "Refund this return": the return (received) becomes refunded.
+            'return_number' => ['nullable', 'string', 'max:20'],
         ], [
             'items.*.quantity.min' => 'The quantity can\'t be negative.',
             'shipping_refund.regex' => 'Enter the shipping refund as an amount, for example 4.99.',
@@ -60,11 +63,27 @@ class CreditMemoController extends Controller
         }
         $notify = $data['notify_customer'] ?? true;
 
-        $memo = DB::transaction(function () use ($number, $data, $notify, $request, $refunds) {
+        [$memo, $return] = DB::transaction(function () use ($number, $data, $notify, $request, $refunds, $returns) {
             $order = Order::where('number', strtoupper($number))->lockForUpdate()->firstOrFail();
+            $return = null;
+            if (filled($data['return_number'] ?? null)) {
+                $return = $returns->forRefund($order, $data['return_number']);
+                $data['return_id'] = $return->id;
+                // Units already put back in stock when the parcel was received aren't restocked twice.
+                if ($return->restocked) {
+                    $data['restock'] = false;
+                }
+            }
+            $memo = $refunds->refund($order, $request->user(), $data, $notify);
+            if ($return) {
+                $returns->refunded($return, $request->user(), $memo->number, $notify);
+            }
 
-            return $refunds->refund($order, $request->user(), $data, $notify);
+            return [$memo, $return];
         });
+        if ($return && $notify) {
+            $returns->email($return);
+        }
 
         $memo->load(self::WITH);
         if ($notify) {

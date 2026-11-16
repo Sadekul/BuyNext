@@ -44,7 +44,7 @@ class CartPricingTest extends TestCase
     private function assertTotals(TestResponse $response, int $count, string $subtotal, string $discount, string $shipping, string $total): void
     {
         $this->assertSame(
-            ['item_count' => $count, 'subtotal' => $subtotal, 'discount' => $discount, 'shipping' => $shipping, 'tax' => '0.00', 'total' => $total],
+            ['item_count' => $count, 'subtotal' => $subtotal, 'discount' => $discount, 'group_discount' => '0.00', 'shipping' => $shipping, 'tax' => '0.00', 'total' => $total],
             $response->json('data.totals'),
         );
     }

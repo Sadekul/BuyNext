@@ -19,6 +19,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSettings'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
+import { addressesQuery, customerKeys } from '../queries/customerQueries'
 import { productKeys } from '../queries/productQueries'
 import { cartPricingKey, cartPricingQuery, orderKeys } from '../queries/orderQueries'
 import { useOrders } from '../hooks/useOrders'
@@ -32,6 +33,9 @@ import { calculateCartTotals } from '../utils/cartTotals'
 import { formatPrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
 import { cartLineKey } from '../reducers/cartReducer'
+import { MAX_SAVED_ADDRESSES, defaultAddress, isSameAddress, toOrderAddress } from '../utils/addresses'
+import SavedAddressPicker from '../components/checkout/SavedAddressPicker'
+import GroupDiscountNote from '../components/cart/GroupDiscountNote'
 import './CheckoutPage.css'
 
 // API field names → checkout form fields. The shop service (server/shop/laravel.js)
@@ -71,6 +75,8 @@ function CheckoutPage() {
   const { user, status, authorizedRequest } = useAuth()
   // Same cache entry as the profile page: visiting /account first makes this instant.
   const profileRequest = useQuery({ ...profileQuery(user?.id, authorizedRequest), enabled: Boolean(user) })
+  // REAL_SHOP: the address book fills in the defaults and offers the saved addresses.
+  const addressRequest = useQuery({ ...addressesQuery(user?.id, authorizedRequest), enabled: REAL_SHOP && Boolean(user) })
   // Re-check prices and stock on arrival, like the cart page: the cart holds
   // snapshots taken when each product was added. Items that sold out make
   // canCheckout false (the "needs your attention" screen below).
@@ -101,7 +107,7 @@ function CheckoutPage() {
   }
 
   // Guests can check out (REAL_SHOP), but a session being checked may still turn out to be a customer.
-  if (status === 'checking' || (user && profileRequest.isPending) || store.isPending) {
+  if (status === 'checking' || (user && profileRequest.isPending) || (REAL_SHOP && user && addressRequest.isPending) || store.isPending) {
     return (
       <div className="section container">
         <Loader label="Preparing checkout…" />
@@ -146,30 +152,42 @@ function CheckoutPage() {
   const address = profile?.address
   const { countries, paymentMethods } = settings
   const emptyAddress = { ...EMPTY_ADDRESS, country: countries.includes(EMPTY_ADDRESS.country) ? EMPTY_ADDRESS.country : countries[0] }
-  const shippingDefaults = {
-    ...emptyAddress,
-    firstName: profile?.firstName ?? '',
-    lastName: profile?.lastName ?? '',
-    ...(address && {
-      line1: address.line1,
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: countries.includes(address.country) ? address.country : emptyAddress.country,
-    }),
-  }
+  // Saved addresses whose country the store no longer ships to can't be used.
+  const savedAddresses = REAL_SHOP && user ? (addressRequest.data ?? []).filter((saved) => countries.includes(saved.country)) : []
+  const savedShipping = defaultAddress(savedAddresses, 'shipping')
+  const savedBilling = defaultAddress(savedAddresses, 'billing')
+  const shippingDefaults = savedShipping
+    ? toOrderAddress(savedShipping)
+    : {
+        ...emptyAddress,
+        firstName: profile?.firstName ?? '',
+        lastName: profile?.lastName ?? '',
+        ...(address && {
+          line1: address.line1,
+          city: address.city,
+          state: address.state,
+          postalCode: address.postalCode,
+          country: countries.includes(address.country) ? address.country : emptyAddress.country,
+        }),
+      }
+  // A default billing address that differs from the shipping one is filled in separately.
+  const separateBilling = savedBilling && !isSameAddress(savedBilling, shippingDefaults) ? toOrderAddress(savedBilling) : null
 
   return (
     <CheckoutForm
       isCheckingPrices={refresh.isFetching}
       refreshProducts={refresh.refetch}
       settings={settings}
+      savedAddresses={savedAddresses}
+      addressBookFull={(addressRequest.data?.length ?? 0) >= MAX_SAVED_ADDRESSES}
+      group={profile?.group ?? null}
       defaultValues={{
         email: profile?.email ?? '',
-        phone: profile?.phone ?? '',
+        phone: profile?.phone || savedShipping?.phone || '',
         shipping: shippingDefaults,
-        billingSameAsShipping: true,
-        billing: emptyAddress,
+        billingSameAsShipping: !separateBilling,
+        billing: separateBilling ?? emptyAddress,
+        saveAddress: false,
         shippingMethod: defaultShippingMethodId(settings),
         // Cash on delivery is the one real order that needs no payment provider (when the store offers it).
         paymentMethod: REAL_SHOP ? (paymentMethods.find((method) => method.id === 'cod') ?? paymentMethods[0]).id : 'card',
@@ -187,7 +205,7 @@ function withVariantLabels(lines, items) {
   })
 }
 
-function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings }) {
+function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings, savedAddresses = [], addressBookFull = false, group = null }) {
   const cart = useCart()
   const { user, isAuthenticated, authorizedRequest } = useAuth()
   const { placeOrder } = useOrders()
@@ -224,7 +242,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     control,
     setError,
     clearErrors,
-    formState: { errors, isSubmitting },
+    setValue,
+    formState: { errors, isSubmitting, isSubmitted },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues,
@@ -236,10 +255,20 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   })
 
   // useWatch subscribes to just these fields, for the live summary and cards.
-  const [shippingMethod, billingSameAsShipping, paymentMethod, email, shippingCountry] = useWatch({
+  const [shippingMethod, billingSameAsShipping, paymentMethod, email, shippingCountry, shippingAddress, billingAddress] = useWatch({
     control,
-    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email', 'shipping.country'],
+    name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email', 'shipping.country', 'shipping', 'billing'],
   })
+
+  // Signed-in customers (REAL_SHOP): which saved address the fields match (if any), and the address-book option.
+  const canUseAddressBook = REAL_SHOP && isAuthenticated
+  const shippingIsSaved = savedAddresses.some((saved) => isSameAddress(saved, shippingAddress))
+  const offerToSave = canUseAddressBook && !addressBookFull && !shippingIsSaved
+  /** Copies a saved address into the shipping or billing fields. */
+  function fillFromSaved(prefix, saved) {
+    const options = { shouldDirty: true, shouldValidate: isSubmitted }
+    for (const [field, value] of Object.entries(toOrderAddress(saved))) setValue(`${prefix}.${field}`, value, options)
+  }
 
   // A guest's email goes with the pricing request, so "one use per customer"
   // codes are checked before the order (signed-in customers: the session).
@@ -300,9 +329,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   async function placeRealOrder(values) {
     // Only ids, quantities, and choices are sent; `expectedTotal` is the total
     // the shopper saw, so the server refuses (409) if its own total differs.
-    const order = await orderMutation.mutateAsync({ items: cart.items, couponCode: cart.couponCode, values, expectedTotal: totals.total })
+    // "Save this address" only when it is offered (an address already in the book isn't saved twice).
+    const saveAddress = offerToSave && values.saveAddress === true
+    const order = await orderMutation.mutateAsync({ items: cart.items, couponCode: cart.couponCode, values: { ...values, saveAddress }, expectedTotal: totals.total })
     queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
     queryClient.invalidateQueries({ queryKey: orderKeys.all })
+    if (saveAddress) queryClient.invalidateQueries({ queryKey: customerKeys.addresses(user.id) })
     // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
     navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order } })
     cart.removeOrderedItems(cart.items.filter((item) => !item.isUnavailable).map(cartLineKey))
@@ -383,12 +415,19 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
           <section className="checkout__section" aria-labelledby="shipping-title">
             <h2 id="shipping-title">Shipping address</h2>
+            {canUseAddressBook && savedAddresses.length > 0 && (
+              <SavedAddressPicker label="Saved shipping addresses" addresses={savedAddresses} current={shippingAddress} onChoose={(saved) => fillFromSaved('shipping', saved)} />
+            )}
             <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} />
+            {offerToSave && <CheckboxField label="Save this address to my address book" {...register('saveAddress')} />}
           </section>
 
           <section className="checkout__section" aria-labelledby="billing-title">
             <h2 id="billing-title">Billing address</h2>
             <CheckboxField label="Same as shipping address" {...register('billingSameAsShipping')} />
+            {!billingSameAsShipping && canUseAddressBook && savedAddresses.length > 0 && (
+              <SavedAddressPicker label="Saved billing addresses" addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
+            )}
             {!billingSameAsShipping && (
               <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
             )}
@@ -430,6 +469,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             Order summary
           </h2>
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
+          {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} />}
           <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
           <CouponForm
             appliedCode={cart.couponCode}

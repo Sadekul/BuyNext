@@ -29,10 +29,16 @@ final class Permissions
             'invoices.create' => 'Create invoices (record payments)',
             'shipments.create' => 'Create shipments',
             'credit_memos.create' => 'Create credit memos (refunds)',
+            'orders.create' => 'Create orders for customers (phone orders)',
+            'returns.view' => 'View returns',
+            'returns.manage' => 'Create returns and change their status',
         ]],
         'customers' => ['label' => 'Customers', 'permissions' => [
             'customers.view' => 'View customers',
-            'customers.edit' => 'Block and unblock customers',
+            'customers.edit' => 'Edit customers: account, addresses, notes, password reset, block',
+            'customers.create' => 'Create customer accounts',
+            'customers.delete' => 'Delete customer accounts',
+            'customer_groups.manage' => 'Manage customer groups',
         ]],
         'marketing' => ['label' => 'Marketing', 'permissions' => [
             'coupons.view' => 'View coupons',
@@ -87,8 +93,9 @@ final class Permissions
 
         return [
             ['name' => 'Owner', 'description' => 'Everything, including admin users and roles.', 'is_system' => true, 'permissions' => self::all()],
-            ['name' => 'Sales staff', 'description' => 'Orders, invoices, shipments, refunds; can look up customers.', 'is_system' => false,
-                'permissions' => ['orders.view', 'orders.edit', 'invoices.create', 'shipments.create', 'credit_memos.create', 'customers.view']],
+            ['name' => 'Sales staff', 'description' => 'Orders, invoices, shipments, refunds, returns; can look up and add customers.', 'is_system' => false,
+                'permissions' => ['orders.view', 'orders.edit', 'invoices.create', 'shipments.create', 'credit_memos.create', 'customers.view',
+                    'orders.create', 'returns.view', 'returns.manage', 'customers.create']],
             ['name' => 'Catalog manager', 'description' => 'Products and categories.', 'is_system' => false,
                 'permissions' => ['products.view', 'products.edit', 'products.delete', 'categories.edit', 'products.import', 'reviews.view', 'reviews.moderate']],
             ['name' => 'Marketing', 'description' => 'Coupons and content.', 'is_system' => false,

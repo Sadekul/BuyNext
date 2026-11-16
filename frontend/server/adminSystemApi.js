@@ -32,7 +32,7 @@ import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from
  *   PUT    /api/admin/home                          { hero, banners, featuredProductIds } → { home }
  *   GET    /api/admin/reports/sales|products|customers|coupons|low-stock?from&to&groupBy&limit
  *   GET    /api/admin/reports/sales.csv|products.csv  → the CSV file, with the API's Content-Type and Content-Disposition
- *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog }
+ *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog, returns }
  *   PATCH  /api/admin/settings                      { group: { key: value } } → all settings
  */
 
@@ -225,6 +225,14 @@ const SETTING_RULES = {
   catalog: {
     reviewsRequireApproval: isBoolean('Choose whether new reviews wait for approval.'),
   },
+  returns: {
+    returnsEnabled: isBoolean('Choose whether customers can request returns.'),
+    returnWindowDays: (value) => (Number.isInteger(value) && value >= 1 && value <= 365 ? null : 'Enter a whole number of days from 1 to 365.'),
+    returnReasons: (value) =>
+      Array.isArray(value) && value.length >= 1 && value.length <= 20 && value.every((reason) => isText(reason, { min: 1, max: 60 })) && new Set(value.map((reason) => reason.trim().toLowerCase())).size === value.length
+        ? null
+        : 'Keep 1 to 20 different reasons, each up to 60 characters.',
+  },
 }
 
 /** PATCH /settings: { group: { key: value } }, known groups and keys only; errors as "group.key". */
@@ -238,6 +246,7 @@ export function validateSettings(body) {
     if (Object.keys(checked.values).length > 0) values[group] = checked.values
   }
   if (values.tax?.taxRates) values.tax.taxRates = values.tax.taxRates.map((rate) => ({ country: rate.country.trim(), rate: rate.rate }))
+  if (values.returns?.returnReasons) values.returns.returnReasons = values.returns.returnReasons.map((reason) => reason.trim())
   if (values.checkout?.allowedCountries) values.checkout.allowedCountries = [...new Set(values.checkout.allowedCountries.map((country) => country.trim()))]
   if (Object.keys(errors).length === 0 && Object.keys(values).length === 0) errors.settings = ['Change at least one setting.']
   return Object.keys(errors).length > 0 ? { errors } : { values }

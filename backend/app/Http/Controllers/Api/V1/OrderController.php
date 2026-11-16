@@ -47,7 +47,7 @@ class OrderController extends Controller
     {
         $order = Order::where('number', strtoupper($number))
             ->where('customer_id', $request->user()->id)
-            ->with(['items', 'history', ...Order::DOCUMENTS])
+            ->with(['items', 'history', 'returns.items', ...Order::DOCUMENTS])
             ->first();
 
         return $order ? new OrderResource($order) : response()->json(['message' => 'Order not found.'], 404);

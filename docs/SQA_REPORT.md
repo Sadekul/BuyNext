@@ -157,11 +157,22 @@ Built by three agents in parallel (backend; storefront with the sign-in service 
 
 Checks: backend 212 feature tests; frontend 294 unit tests; admin 57; browser checks 450 on the dev server and 443 on the production build (new `catalog.mjs`: 116).
 
+## Backend phase 6 (customers and sales) — 2026-11-16
+
+Built by three agents in parallel (backend; storefront with its sign-in service routes; admin app with its routes) against [backend/PHASE6_CONTRACT.md](backend/PHASE6_CONTRACT.md), then verified with the new `customers.mjs` browser suite (address book, group pricing end to end, staff-created customers setting their own password by code, phone orders, bulk invoice and ship, the full return → refund flow, a Viewer's limits). Security points checked: customers only reach their own addresses and returns (another customer's id answers 404); admins never see or set customer passwords; changing a customer's email signs them out and requires a new code; staff-only payment methods are refused on the storefront; returns can't exceed what was shipped minus what was already returned or refunded, and stock is restocked only once; every new admin route names a permission.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| C1 | Medium | The automatic cleanup of unconfirmed sign-ups would have deleted a real customer a week after an admin changed their email (the change makes the email unconfirmed again) | Only accounts that were never confirmed, never signed in, have no orders, and weren't created by staff are cleaned up |
+| C2 | Test | The account separation check assumed the second test shopper had no orders at all, which phase 6's tests changed | It now checks that none of the first shopper's orders (87) appear for the second |
+
+Checks: backend 250 feature tests; frontend 337 unit tests; admin 78; browser checks 611 on the dev server and 604 on the production build (new `customers.mjs`: 161).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
 - With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin creates the invoice, and refunds record money the shop returns by the original method. Tax is 0 until phase 4.
-- Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
+- Customers can't change their own email in the store yet (an admin can, and the customer then confirms it by code at the next sign-in).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
 - The local database keeps a few records from the agents' and browser checks' verification: test orders and invoices, deactivated test admins (for example "Verify Viewer" and "Smoke Sales"), and disabled test coupons.
 - Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database (the catalog suite parks them in Home decoration before deleting them, because a deleted product still keeps its category).

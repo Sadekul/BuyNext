@@ -75,6 +75,8 @@ class PlaceOrderRequest extends FormRequest
             'billing_address' => ['nullable', 'array'],
             ...$address('billing_address', 'required_with:billing_address'),
             'expected_total' => ['nullable', 'numeric', 'min:0'],
+            // Phase 6: signed-in customers may add the shipping address to their address book (ignored for guests).
+            'save_address' => ['sometimes', 'boolean'],
         ];
     }
 

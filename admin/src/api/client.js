@@ -18,6 +18,8 @@ export class ApiError extends Error {
     this.permission = typeof data?.permission === 'string' ? data.permission : null
     // CSV import refused because of row errors: the API's report, rows and all.
     this.report = data?.report && typeof data.report === 'object' ? data.report : null
+    // An order the server refused line by line (out of stock, options needed…): [{ productId, variantId, code, message }].
+    this.problems = Array.isArray(data?.problems) ? data.problems : null
   }
 }
 

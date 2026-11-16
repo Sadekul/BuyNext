@@ -20,8 +20,10 @@ class OneTimeCodes
     /**
      * Emails a new code unless one was sent less than a minute ago.
      * Returns the seconds until another code may be sent.
+     * $setPassword (phase 6): a reset code worded as "Set your password", for
+     * accounts staff created and password resets staff send.
      */
-    public function send(string $email, string $purpose, string $firstName): int
+    public function send(string $email, string $purpose, string $firstName, bool $setPassword = false): int
     {
         $email = self::normalize($email);
         $wait = $this->secondsUntilResend($email, $purpose);
@@ -41,7 +43,7 @@ class OneTimeCodes
             ]);
         });
 
-        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName));
+        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName, $setPassword));
 
         return config('buynest.codes.resend_cooldown_seconds');
     }

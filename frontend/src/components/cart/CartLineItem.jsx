@@ -9,11 +9,19 @@ import { getProductPricing } from '../../utils/pricing'
 import { cartLineKey } from '../../reducers/cartReducer'
 import './CartLineItem.css'
 
-/** One cart row. `compact` is used in the drawer; the cart page uses the full layout. */
-function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = false }) {
-  const { salePrice, originalPrice, hasDiscount } = getProductPricing(item)
+/**
+ * One cart row. `compact` is used in the drawer; the cart page uses the full layout.
+ * `pricedLine` (REAL_SHOP): the server's line for this item. Its prices win
+ * (they include a customer group's discount) while its quantity matches.
+ */
+function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, pricedLine, compact = false }) {
+  const local = getProductPricing(item)
+  const server = pricedLine?.available !== false && typeof pricedLine?.salePrice === 'number' && pricedLine.quantity === item.quantity ? pricedLine : null
+  const salePrice = server ? server.salePrice : local.salePrice
+  const originalPrice = server ? (server.price ?? local.originalPrice) : local.originalPrice
+  const hasDiscount = server ? salePrice < originalPrice : local.hasDiscount
   const limits = getPurchaseLimits(item)
-  const lineTotal = salePrice * item.quantity
+  const lineTotal = server ? server.lineTotal : salePrice * item.quantity
   const key = cartLineKey(item)
   const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title
 
@@ -34,6 +42,7 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = 
           {hasDiscount && <s>{formatPrice(originalPrice)}</s>}
           <span className="visually-hidden"> each</span>
         </p>
+        {server?.groupDiscountPercent > 0 && <p className="cart-line__group">Includes your {Number(server.groupDiscountPercent.toFixed(2))}% group discount</p>}
         {/* Announced through the page's summary live region, not individually. */}
         {item.notice && <p className="cart-line__notice">{item.notice}</p>}
 

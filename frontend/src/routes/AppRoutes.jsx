@@ -28,6 +28,9 @@ const CheckoutPage = lazy(() => import('../pages/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('../pages/OrderConfirmationPage'))
 const TrackOrderPage = lazy(() => import('../pages/TrackOrderPage'))
 const InvoicePage = lazy(() => import('../pages/InvoicePage'))
+const AddressBookPage = lazy(() => import('../pages/AddressBookPage'))
+const ReturnsPage = lazy(() => import('../pages/ReturnsPage'))
+const ReturnDetailsPage = lazy(() => import('../pages/ReturnDetailsPage'))
 const CmsPage = lazy(() => import('../pages/CmsPage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
@@ -79,6 +82,10 @@ function AppRoutes() {
             <Route index element={<ProfilePage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:orderId" element={<OrderDetailsPage />} />
+            {/* Address book and returns live on BuyNest's API (phase 6). */}
+            {REAL_SHOP && <Route path="addresses" element={<AddressBookPage />} />}
+            {REAL_SHOP && <Route path="returns" element={<ReturnsPage />} />}
+            {REAL_SHOP && <Route path="returns/:returnNumber" element={<ReturnDetailsPage />} />}
           </Route>
           {/* Outside the account layout: the invoice prints on its own. */}
           {REAL_SHOP && <Route path="account/orders/:orderId/invoices/:invoiceNumber" element={<InvoicePage />} />}

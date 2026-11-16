@@ -71,5 +71,13 @@ return [
             'paypal' => 'PayPal',
             'cod' => 'Cash on delivery',
         ],
+
+        // Phase 6: only staff may choose these, for orders they create in the admin.
+        // Bank transfer waits for the money (pending payment, like card); cash is
+        // handled like cash on delivery (processing, may ship before the invoice).
+        'admin_payment_methods' => [
+            'bank_transfer' => 'Bank transfer',
+            'cash' => 'Cash',
+        ],
     ],
 ];

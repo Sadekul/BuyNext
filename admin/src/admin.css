@@ -1712,3 +1712,357 @@
 .variant-table input[aria-label^='SKU'] {
   min-width: 13rem;
 }
+
+/* ---------- Customers and sales (phase 6) ---------- */
+
+/* Tabs (customer detail): the selected tab is underlined in the brand color, never color alone. */
+.tabs__list {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs__tab {
+  flex: none;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.tabs__tab:hover {
+  color: var(--color-text);
+}
+
+.tabs__tab[aria-selected='true'] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
+}
+
+.tabs__panel {
+  padding-top: var(--space-5);
+}
+
+.tabs__panel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.tabs__panel > .form,
+.tabs__panel > section > .form {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.customer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.stats--customer {
+  margin-bottom: var(--space-6);
+}
+
+.address-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.address-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.address-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.address-card__badges:empty {
+  display: none;
+}
+
+.address-card__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.note-form {
+  margin-bottom: var(--space-5);
+}
+
+.note-body {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Create order: the form, and the totals beside it on wide screens. */
+.create-order {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.create-order__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.create-order__main > .panel--padded + .panel--padded {
+  margin-top: 0;
+}
+
+.create-order__summary > .btn {
+  margin-top: var(--space-4);
+}
+
+@media (min-width: 1100px) {
+  .create-order {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+
+  .create-order__summary {
+    position: sticky;
+    top: var(--space-5);
+  }
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.picker__search,
+.coupon-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.picker__search .field,
+.coupon-row .field {
+  flex: 1 1 14rem;
+}
+
+/* The search button lines up with the input, not with the hint under it. */
+.picker__search > .btn,
+.coupon-row > .btn {
+  margin-bottom: 1.25rem;
+}
+
+.picker .picker-list {
+  margin-top: var(--space-3);
+}
+
+.picker .picker-list li {
+  flex-wrap: wrap;
+}
+
+.variant-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+
+.variant-picker .field {
+  flex: 1 1 14rem;
+}
+
+.chosen-customer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.chosen-customer p {
+  margin: 0;
+}
+
+.qty-input {
+  width: 5rem;
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  text-align: right;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.qty-input[aria-invalid='true'] {
+  border-color: var(--color-sale);
+}
+
+.table th .field__error {
+  display: block;
+}
+
+.totals {
+  padding: 0;
+}
+
+.totals dd {
+  text-align: right;
+}
+
+.create-order__summary ul.field__error {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+/* Order grid bulk bar extras. */
+.bulk-bar__check {
+  align-self: center;
+}
+
+.bulk-bar__hint {
+  flex-basis: 100%;
+}
+
+.print-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Print pages: one document per sheet; the admin around them doesn't print. */
+.print-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.print-bar .back-link {
+  margin: 0;
+}
+
+.print-bar h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+
+.print-bar p {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.print-doc {
+  margin-bottom: var(--space-8);
+  padding: var(--space-6);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.print-doc__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.print-doc__header h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xl);
+}
+
+.print-doc__header p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.print-doc__store {
+  font-size: var(--text-lg) !important;
+  font-weight: 700;
+}
+
+.print-doc__section {
+  margin-bottom: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.print-doc__section h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Phones: tighter documents, so four columns fit without sideways scrolling. */
+@media (max-width: 600px) {
+  .print-doc {
+    padding: var(--space-4);
+  }
+
+  .print-doc__table th,
+  .print-doc__table td {
+    padding: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+}
+
+@media print {
+  .admin__sidebar,
+  .skip-link,
+  .no-print {
+    display: none !important;
+  }
+
+  .admin,
+  .admin__main {
+    display: block;
+    padding: 0;
+    margin: 0;
+  }
+
+  .print-doc {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    break-after: page;
+  }
+
+  .print-doc:last-child {
+    break-after: auto;
+  }
+
+  .print-doc__table {
+    break-inside: auto;
+  }
+
+  .print-doc__table tr {
+    break-inside: avoid;
+  }
+}

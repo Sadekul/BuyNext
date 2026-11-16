@@ -31,6 +31,8 @@ class Settings
         'inventory' => ['low_stock_threshold'],
         // Phase 5: Settings → Catalog. The contract calls it reviews.require_approval.
         'catalog' => ['reviews_require_approval'],
+        // Phase 6: Settings → Returns (RMA).
+        'returns' => ['returns_enabled', 'return_window_days', 'return_reasons'],
     ];
 
     public const DEFAULTS = [
@@ -51,6 +53,9 @@ class Settings
         'enabled_payment_methods' => ['card', 'paypal', 'cod'],
         'low_stock_threshold' => 10,
         'reviews_require_approval' => true, // false: new reviews are public at once
+        'returns_enabled' => true,
+        'return_window_days' => 30, // from the delivered date, or the last shipment without one
+        'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price'];
@@ -140,6 +145,12 @@ class Settings
         return array_values(array_intersect(array_keys(config('buynest.store.payment_methods')), $this->get('enabled_payment_methods', [])));
     }
 
+    /** Phase 6: what staff may choose for an order they create: the enabled methods, plus bank transfer and cash (admin only). */
+    public function adminPaymentMethods(): array
+    {
+        return array_values(array_unique([...$this->paymentMethods(), ...array_keys(config('buynest.store.admin_payment_methods'))]));
+    }
+
     /**
      * The tax rate for a shipping country, in hundredths of a percent
      * (19.00% → 1900), so tax can be calculated in integers. null: tax is
@@ -191,6 +202,10 @@ class Settings
             'checkout.enabled_payment_methods.*' => ['string', 'distinct', Rule::in(array_keys(config('buynest.store.payment_methods')))],
             'inventory.low_stock_threshold' => ['integer', 'min:0', 'max:100000'],
             'catalog.reviews_require_approval' => ['boolean'],
+            'returns.returns_enabled' => ['boolean'],
+            'returns.return_window_days' => ['integer', 'min:1', 'max:365'],
+            'returns.return_reasons' => ['array', 'min:1', 'max:20'],
+            'returns.return_reasons.*' => ['string', 'min:1', 'max:60', 'distinct:ignore_case'],
         ];
     }
 
@@ -199,13 +214,13 @@ class Settings
     {
         return match (true) {
             in_array($key, self::MONEY_KEYS, true) => Pricing::format(Pricing::toCents((string) $value)),
-            in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-            $key === 'low_stock_threshold' => (int) $value,
+            in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval', 'returns_enabled'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            in_array($key, ['low_stock_threshold', 'return_window_days'], true) => (int) $value,
             $key === 'tax_rates' => array_values(array_map(fn ($rate) => [
                 'country' => trim($rate['country']),
                 'rate' => Pricing::format(Pricing::toCents((string) $rate['rate'])),
             ], $value)),
-            in_array($key, ['allowed_countries', 'enabled_methods', 'enabled_payment_methods'], true) => array_values(array_map('trim', $value)),
+            in_array($key, ['allowed_countries', 'enabled_methods', 'enabled_payment_methods', 'return_reasons'], true) => array_values(array_map('trim', $value)),
             is_string($value) => trim($value) === '' ? null : trim($value),
             default => $value,
         };

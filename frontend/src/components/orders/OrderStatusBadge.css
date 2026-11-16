@@ -29,3 +29,20 @@
   color: var(--color-text-muted);
   background: var(--color-bg-muted);
 }
+
+/* Returns (RMA) */
+.order-badge--return-received,
+.order-badge--return-refunded {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.order-badge--return-rejected {
+  color: var(--color-sale);
+  background: var(--color-sale-soft);
+}
+
+.order-badge--return-closed {
+  color: var(--color-text-muted);
+  background: var(--color-bg-muted);
+}

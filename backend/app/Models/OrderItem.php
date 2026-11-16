@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** One line of an order: a snapshot of the product and its price at checkout. */
 #[Fillable([
     'order_id', 'product_id', 'variant_id', 'sku', 'name', 'variant_label', 'thumbnail_url', 'unit_price', 'discount_percent',
-    'sale_price', 'quantity', 'line_total',
+    'group_discount_percent', 'sale_price', 'quantity', 'line_total',
 ])]
 class OrderItem extends Model
 {
@@ -20,6 +20,7 @@ class OrderItem extends Model
         return [
             'unit_price' => 'decimal:2',
             'discount_percent' => 'decimal:2',
+            'group_discount_percent' => 'decimal:2',
             'sale_price' => 'decimal:2',
             'line_total' => 'decimal:2',
             'quantity' => 'integer',

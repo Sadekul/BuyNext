@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { LuShoppingBag } from 'react-icons/lu'
 import CartLineItem from '../components/cart/CartLineItem'
 import CartSummary from '../components/cart/CartSummary'
+import GroupDiscountNote from '../components/cart/GroupDiscountNote'
+import { useAuth } from '../hooks/useAuth'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import { useCart } from '../hooks/useCart'
@@ -17,6 +19,7 @@ import './CartPage.css'
 
 function CartPage() {
   const cart = useCart()
+  const { user } = useAuth()
   // Re-check prices and stock once each time the cart page opens.
   const refresh = useProductRefresh({ hasItems: cart.items.length > 0, onProducts: cart.refreshProducts })
   // REAL_SHOP: the server prices the cart and decides whether the coupon applies
@@ -30,6 +33,8 @@ function CartPage() {
   const problems = REAL_SHOP ? (pricing.data?.problems ?? []) : []
   const { unavailableCount, canCheckout } = cart.totals
   const changedCount = cart.items.filter((item) => item.notice).length
+  // The server's line for each item (its prices include a customer group's discount).
+  const pricedLine = (item) => pricing.data?.lines.find((line) => cartLineKey(line) === cartLineKey(item))
 
   if (cart.items.length === 0) {
     return (
@@ -71,7 +76,7 @@ function CartPage() {
           <ul className="cart-page__list">
             {cart.items.map((item) => (
               <li key={cartLineKey(item)}>
-                <CartLineItem item={item} onQuantityChange={cart.updateQuantity} onRemove={cart.removeItem} />
+                <CartLineItem item={item} pricedLine={REAL_SHOP ? pricedLine(item) : undefined} onQuantityChange={cart.updateQuantity} onRemove={cart.removeItem} />
               </li>
             ))}
           </ul>
@@ -93,6 +98,7 @@ function CartPage() {
           isCheckingCoupon={REAL_SHOP && pricing.isFetching}
           showTax={!REAL_SHOP || settings.taxEnabled}
         >
+          {REAL_SHOP && <GroupDiscountNote group={pricing.data?.customerGroup ?? user?.group} amount={pricing.data?.totals.groupDiscount} />}
           {problems.length > 0 && (
             <p className="cart-page__blocker" role="alert">
               {problems.map((problem) => problem.message).join(' ')}

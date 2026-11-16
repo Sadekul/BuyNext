@@ -89,7 +89,7 @@ class CreditMemoTest extends TestCase
         $first = $this->refund($number, [$tea => 1, $mug => 0], ['restock' => true, 'note' => 'Damaged box.'])->assertCreated();
         $memo = CreditMemo::sole();
         $first->assertJsonPath('data', [
-            'number' => 'CM-'.(100000 + $memo->id), 'order_number' => $number,
+            'number' => 'CM-'.(100000 + $memo->id), 'order_number' => $number, 'return_number' => null,
             'items' => [['order_item_id' => $tea, 'name' => $this->tea->name, 'variant_label' => null, 'sku' => $this->tea->sku, 'quantity' => 1, 'amount' => '2.99']],
             'subtotal' => '2.99', 'shipping_refund' => '0.00', 'adjustment' => '0.00', 'total' => '2.99', 'restocked' => true,
             'created_at' => $memo->created_at->toIso8601ZuluString(), 'admin_name' => 'Store Admin', 'note' => 'Damaged box.',

@@ -367,7 +367,7 @@ describe('with BuyNest accounts (VITE_ACCOUNTS_BACKEND=laravel)', () => {
     const listCall = calls.find((entry) => entry.path === '/api/admin/v1/customers')
     expect(listCall.init.headers.Authorization).toBe('Bearer 1|ACCESS')
 
-    const blocked = await call('customers/5', { service: 'admin', method: 'PATCH', cookie: 'buynest_admin_at=1|ACCESS', body: { isActive: false, email: 'x' } })
+    const blocked = await call('customers/5', { service: 'admin', method: 'PATCH', cookie: 'buynest_admin_at=1|ACCESS', body: { isActive: false, password: 'x' } })
     expect(await blocked.json()).toMatchObject({ id: 5, isActive: false })
     expect(sentBody(calls.at(-1))).toEqual({ is_active: false })
 

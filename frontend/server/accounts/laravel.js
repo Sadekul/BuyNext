@@ -31,6 +31,16 @@ function failed({ status, data }) {
   return { ok: false, status, body }
 }
 
+/*
+ * Phase 6: the customer's group ({ name, discount_percent }), so the store can
+ * say "Wholesale price: 10% off". Answers without one (sign-in, an older API)
+ * leave `group` out.
+ */
+const customerGroup = (group) =>
+  group && typeof group === 'object' && typeof group.name === 'string'
+    ? { name: group.name, discountPercent: Number(group.discount_percent ?? 0) || 0 }
+    : undefined
+
 export const customerProfile = (customer) => ({
   id: customer.id,
   firstName: customer.first_name,
@@ -39,6 +49,7 @@ export const customerProfile = (customer) => ({
   phone: customer.phone,
   emailVerified: customer.email_verified === true,
   role: 'customer',
+  ...(customerGroup(customer.group) && { group: customerGroup(customer.group) }),
 })
 /*
  * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin

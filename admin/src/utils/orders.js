@@ -1,4 +1,4 @@
-import { LuArchive, LuBan, LuCalendarClock, LuCircleCheck, LuCircleSlash, LuClock, LuLock, LuPackage, LuPackageCheck, LuPencilLine, LuTruck, LuUndo2 } from 'react-icons/lu'
+import { LuArchive, LuBan, LuCircleX, LuPackageOpen, LuStore, LuHeadset, LuCalendarClock, LuCircleCheck, LuCircleSlash, LuClock, LuLock, LuPackage, LuPackageCheck, LuPencilLine, LuTruck, LuUndo2 } from 'react-icons/lu'
 
 /*
  * Order, payment, and product statuses for StatusBadge: icon + words, the
@@ -49,6 +49,10 @@ export function orderActions(order) {
     refund: ['paid', 'partially_refunded'].includes(order.paymentStatus),
     // Once paid, money has to go back with a refund instead.
     cancel: ['pending_payment', 'processing'].includes(order.status) && !invoiced,
+    // Phase 6: returns are for shipped or delivered orders with something left to return; staff may override the window.
+    return: order.returnEligibility
+      ? order.returnEligibility.eligible || order.returnEligibility.code === 'window_closed'
+      : ['shipped', 'delivered'].includes(order.status) && shipped,
   }
 }
 
@@ -66,4 +70,32 @@ export const COUPON_STATUSES = {
 export const couponStatus = (status) => COUPON_STATUSES[status] ?? unknown(status)
 export const COUPON_FILTERS = Object.fromEntries(Object.entries(COUPON_STATUSES).map(([status, { label }]) => [status, label]))
 
-export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery' }
+export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery', bank_transfer: 'Bank transfer', cash: 'Cash' }
+/** Payment methods only admins may choose for an order they create (phase 6). */
+export const ADMIN_ONLY_PAYMENT_METHODS = ['bank_transfer', 'cash']
+
+/** Where an order came from (phase 6): the store's checkout, or an admin (phone order). */
+export const ORDER_SOURCES = {
+  storefront: { label: 'Storefront', tone: 'neutral', icon: LuStore },
+  admin: { label: 'Admin', tone: 'info', icon: LuHeadset },
+}
+export const orderSource = (source) => ORDER_SOURCES[source] ?? ORDER_SOURCES.storefront
+
+/*
+ * Returns (RMA), docs/backend/PHASE6_CONTRACT.md §6:
+ * requested → approved | rejected, approved → received, received → refunded | closed.
+ * `refunded` is set by the credit memo ("Refund this return").
+ */
+export const RETURN_STATUSES = {
+  requested: { label: 'Requested', tone: 'warning', icon: LuClock },
+  approved: { label: 'Approved', tone: 'info', icon: LuCircleCheck },
+  rejected: { label: 'Rejected', tone: 'neutral', icon: LuCircleX },
+  received: { label: 'Received', tone: 'info', icon: LuPackageOpen },
+  refunded: { label: 'Refunded', tone: 'success', icon: LuUndo2 },
+  closed: { label: 'Closed', tone: 'neutral', icon: LuLock },
+}
+export const returnStatus = (status) => RETURN_STATUSES[status] ?? unknown(status)
+/** The status moves a return allows (besides the refund, which is a credit memo). */
+export const RETURN_MOVES = { requested: ['approved', 'rejected'], approved: ['received'], received: ['closed'] }
+export const RETURN_CONDITIONS = { unopened: 'Unopened', opened: 'Opened', damaged: 'Damaged' }
+export const RETURN_RESOLUTIONS = { refund: 'Refund', replace: 'Replacement' }

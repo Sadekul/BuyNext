@@ -85,7 +85,8 @@ class AdminAccessTest extends TestCase
 
         $all = $this->getJson('/api/admin/v1/customers', $this->bearer($token))->assertOk();
         $all->assertJsonPath('meta.total', 3)->assertJsonMissingPath('data.0.password');
-        $this->assertSame(['id', 'first_name', 'last_name', 'email', 'phone', 'email_verified_at', 'is_active', 'last_login_at', 'created_at'], array_keys($all->json('data.0')));
+        $this->assertSame(['id', 'first_name', 'last_name', 'email', 'phone', 'email_verified_at', 'email_verified', 'is_active', 'status', 'group', 'orders_count',
+            'created_by_admin', 'last_login_at', 'created_at'], array_keys($all->json('data.0')));
 
         $this->getJson('/api/admin/v1/customers?search=rafi', $this->bearer($token))->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.first_name', 'Rafi');
         $this->getJson('/api/admin/v1/customers?status=unverified', $this->bearer($token))->assertJsonPath('meta.total', 1);

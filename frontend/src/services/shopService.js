@@ -49,6 +49,8 @@ export function validateCart({ items, couponCode, shippingMethod, email, country
  * POST /api/shop/orders → the new order (201). Guests and signed-in customers
  * alike; the server attaches the order to the account when there is a session.
  * ApiError 409 (data.cart: the new prices) or 422 (fieldErrors, data.problems).
+ * `values.saveAddress` (signed in) keeps the shipping address in the address
+ * book; the server skips it when the book is full or already has it.
  */
 export function placeOrder({ items, couponCode, values, expectedTotal }) {
   const { shipping, billingSameAsShipping, billing } = values
@@ -64,6 +66,8 @@ export function placeOrder({ items, couponCode, values, expectedTotal }) {
       shippingAddress: shipping,
       billingAddress: billingSameAsShipping ? null : billing,
       expectedTotal,
+      // Signed-in customers (phase 6): add the shipping address to the address book afterwards.
+      ...(values.saveAddress === true && { saveAddress: true }),
     },
     SHOP,
   )

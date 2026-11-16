@@ -19,6 +19,7 @@ class CreditMemoResource extends JsonResource
         return [
             'number' => $this->number,
             'order_number' => $this->order?->number,
+            'return_number' => $this->return_id ? $this->orderReturn?->number : null, // phase 6
             'items' => $this->items->map(fn ($item) => [
                 'order_item_id' => $item->order_item_id,
                 'name' => $item->orderItem?->name,

@@ -19,6 +19,10 @@ class AdminOrderResource extends OrderResource
                 'name' => trim("{$customer->first_name} {$customer->last_name}"),
                 'email' => $customer->email,
             ] : null,
+            // Phase 6: where the order came from, and who placed an admin order.
+            'source' => $this->source ?? 'storefront',
+            'created_by_admin' => $this->created_by_admin_id && $this->createdBy
+                ? ['id' => $this->createdBy->id, 'name' => $this->createdBy->name] : null,
         ];
     }
 

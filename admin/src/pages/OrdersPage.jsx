@@ -1,15 +1,17 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { LuSearch } from 'react-icons/lu'
-import { adminKeys, getOrders } from '../api/admin'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { LuDownload, LuPlus, LuSearch } from 'react-icons/lu'
+import { adminKeys, getOrders, ordersCsvUrl } from '../api/admin'
 import { LIVE_DATA } from '../api/mode'
+import { useAdminAuth } from '../auth/useAdminAuth'
+import OrderBulkActions from '../components/OrderBulkActions'
 import PageHeader from '../components/PageHeader'
 import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatMoney } from '../utils/format'
-import { ORDER_STATUSES, PAYMENT_STATUSES, orderStatus, paymentStatus } from '../utils/orders'
+import { ORDER_SOURCES, ORDER_STATUSES, PAYMENT_STATUSES, orderSource, orderStatus, paymentStatus } from '../utils/orders'
 
 const LIMIT = 20
 
@@ -79,21 +81,43 @@ function DemoOrdersPage() {
 
 /**
  * Real orders from BuyNest's API, newest first: search (number, email, name),
- * status and payment filters, pages. Filters live in the URL.
+ * status, payment, and source filters, pages. Filters live in the URL.
+ * Phase 6: tick orders for a mass action (invoice, ship, cancel, print),
+ * export the filtered grid as CSV, and create an order for a customer.
  */
 function LiveOrdersPage() {
   const [params, setParams] = useSearchParams()
+  const queryClient = useQueryClient()
+  const location = useLocation()
+  const { can } = useAdminAuth()
   const q = params.get('q') ?? ''
   const status = params.get('status') ?? ''
   const payment = params.get('paymentStatus') ?? ''
+  const source = params.get('source') ?? ''
   const skip = Number(params.get('skip')) || 0
   const [draft, setDraft] = useState(q)
-  const query = { q, status, paymentStatus: payment, skip, limit: LIMIT }
+  const query = { q, status, paymentStatus: payment, source, skip, limit: LIMIT }
   const orders = useQuery({
     queryKey: adminKeys.orders(query),
     queryFn: ({ signal }) => getOrders(query, { signal }),
     placeholderData: keepPreviousData,
   })
+  // The ticked orders, for this page and these filters only.
+  const pageKey = JSON.stringify(query)
+  const [selection, setSelection] = useState({ pageKey, numbers: [] })
+  const selected = selection.pageKey === pageKey ? selection.numbers : []
+  const select = (numbers) => setSelection({ pageKey, numbers })
+  const [summary, setSummary] = useState(null)
+  const summaryRef = useRef(null)
+  useEffect(() => {
+    if (summary) summaryRef.current?.focus()
+  }, [summary])
+
+  function bulkDone(result) {
+    select([])
+    setSummary(result)
+    for (const key of [['orders'], ['order'], adminKeys.overview, ['invoices'], ['shipments'], ['products'], ['product']]) queryClient.invalidateQueries({ queryKey: key })
+  }
 
   function update(changes) {
     const next = new URLSearchParams(params)
@@ -104,11 +128,53 @@ function LiveOrdersPage() {
     setParams(next)
   }
 
-  const filtered = Boolean(q || status || payment)
+  const filtered = Boolean(q || status || payment || source)
+  const pageOrders = orders.data?.orders ?? []
+  const allSelected = pageOrders.length > 0 && pageOrders.every((order) => selected.includes(order.number))
+  const toggleOne = (number, checked) => select(checked ? [...selected, number] : selected.filter((item) => item !== number))
   return (
     <>
       <title>Orders | BuyNest Admin</title>
-      <PageHeader title="Orders" description={orders.data ? `${formatCount(orders.data.total)} ${filtered ? 'matching orders' : 'orders'}` : undefined} />
+      <PageHeader
+        title="Orders"
+        description={orders.data ? `${formatCount(orders.data.total)} ${filtered ? 'matching orders' : 'orders'}` : undefined}
+        actions={
+          <>
+            <a href={ordersCsvUrl({ q, status, paymentStatus: payment, source })} className="btn btn--outline" download>
+              <LuDownload aria-hidden="true" /> Export CSV
+            </a>
+            {can('orders.create') && (
+              <Link to="/orders/new" className="btn btn--primary">
+                <LuPlus aria-hidden="true" /> Create order
+              </Link>
+            )}
+          </>
+        }
+      />
+      {location.state?.notice && (
+        <p className="notice" role="status">
+          {location.state.notice}
+        </p>
+      )}
+      <div role="status">
+        {summary && (
+          <div ref={summaryRef} tabIndex={-1} className="notice notice--success bulk-summary">
+            <p>
+              {summary.done.length === 1 ? '1 order' : `${formatCount(summary.done.length)} orders`} {summary.verb}.
+              {summary.skipped.length > 0 && ` ${formatCount(summary.skipped.length)} skipped:`}
+            </p>
+            {summary.skipped.length > 0 && (
+              <ul>
+                {summary.skipped.map((item) => (
+                  <li key={item.number}>
+                    <Link to={`/orders/${item.number}`}>{item.number}</Link>: {item.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="toolbar">
         <form
@@ -149,7 +215,19 @@ function LiveOrdersPage() {
             ))}
           </select>
         </label>
+        <label className="toolbar__select">
+          <span>Source</span>
+          <select value={source} onChange={(event) => update({ source: event.target.value, skip: 0 })}>
+            <option value="">All sources</option>
+            {Object.entries(ORDER_SOURCES).map(([value, { label }]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      {selected.length > 0 && <OrderBulkActions selected={selected} onDone={bulkDone} onClear={() => select([])} />}
 
       {orders.isPending && <Loading label="Loading orders…" />}
       {orders.error && <ErrorState error={orders.error} onRetry={orders.refetch} />}
@@ -159,9 +237,21 @@ function LiveOrdersPage() {
           <table className="table">
             <thead>
               <tr>
+                <th scope="col" className="table__check">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all orders on this page"
+                    checked={allSelected}
+                    ref={(node) => {
+                      if (node) node.indeterminate = selected.length > 0 && !allSelected
+                    }}
+                    onChange={(event) => select(event.target.checked ? pageOrders.map((order) => order.number) : [])}
+                  />
+                </th>
                 <th scope="col">Order</th>
                 <th scope="col">Customer</th>
                 <th scope="col">Placed</th>
+                <th scope="col">Source</th>
                 <th scope="col">Status</th>
                 <th scope="col">Payment</th>
                 <th scope="col" className="num">
@@ -171,7 +261,10 @@ function LiveOrdersPage() {
             </thead>
             <tbody>
               {orders.data.orders.map((order) => (
-                <tr key={order.number}>
+                <tr key={order.number} className={selected.includes(order.number) ? 'is-selected' : undefined}>
+                  <td className="table__check">
+                    <input type="checkbox" aria-label={`Select order ${order.number}`} checked={selected.includes(order.number)} onChange={(event) => toggleOne(order.number, event.target.checked)} />
+                  </td>
                   <td>
                     <Link to={`/orders/${order.number}`}>{order.number}</Link>
                   </td>
@@ -180,6 +273,9 @@ function LiveOrdersPage() {
                     <small className="muted"> · {order.guest ? 'Guest' : 'Account'}</small>
                   </td>
                   <td>{formatDate(order.placedAt)}</td>
+                  <td>
+                    <StatusBadge {...orderSource(order.source)} />
+                  </td>
                   <td>
                     <StatusBadge {...orderStatus(order.status)} />
                   </td>

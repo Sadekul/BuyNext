@@ -69,6 +69,20 @@ The agreement: [docs/backend/PHASE5_CONTRACT.md](../docs/backend/PHASE5_CONTRACT
 | Import / export | CSV with `sku,name,category_slug,brand,price,discount_percent,stock_quantity,status,description,tags,image_urls`. Import checks every row first (dry run by default); any error saves nothing. Export cells that could run as formulas get a `'`. |
 | Reviews | Customers write one review per product (plain text, 10 per hour); `verified_purchase` when they have a non-cancelled order with it. Staff approve/reject/delete; only approved reviews are public and `rating_average` / `review_count` follow them. Settings → Catalog → `reviews_require_approval` (default on). |
 
+## What's here (phase 6: Magento-style customers and sales)
+
+The agreement: [docs/backend/PHASE6_CONTRACT.md](../docs/backend/PHASE6_CONTRACT.md) (its "Implementation notes" list every shape the contract left open). Modeled on Magento's Customers → All customers / Customer groups, the address book, Sales → Orders → Create new order, Sales → Shipments, Returns (RMA), and the order grid's mass actions.
+
+| Area | What it does |
+| --- | --- |
+| Address book | Up to 20 addresses per customer (store: `/me/addresses`; admin: `/customers/{id}/addresses`), one default shipping and one default billing (the first address gets both). Country must be one the store ships to. Checkout's `save_address: true` adds the shipping address unless the book is full or already has it. `App\Services\AddressBook`. |
+| Customer groups | General (built in, 0%, new sign-ups and guests), Wholesale (10%), VIP (5%); staff add more (0–90%). The group discount comes off every line's sale price after the product discount and before coupons, in the cart, at checkout, and in admin orders (`Pricing::quote(..., group:)`). Orders keep the group name and each line's `group_discount_percent`; `sale_price` is after it, so refunds are unchanged. A group with customers can't be deleted. |
+| Customers in the admin | Full profile (addresses, orders, lifetime spent, reviews, staff notes), edit (a new email is unverified and signs the customer out), create (no password: a "Set your password" email with a reset code), send a password reset, delete (refused while an order is open; orders and reviews stay without the link), CSV export, filters by group, status, verified, sign-up date. Staff never see or set a password. Accounts staff created are never pruned as abandoned sign-ups. |
+| Phone orders | `POST /orders/quote` and `POST /orders` in the admin use the storefront's `Checkout` service (prices, group discount, coupons, tax, stock with row locks). Staff may also choose `bank_transfer` (waits for payment) and `cash` (like cash on delivery). Orders have `source` (`storefront`/`admin`) and who created them. |
+| Shipments and packing slips | A shipments list (carrier, dates, search by shipment, tracking, or order number) and detail; `GET /orders/{number}/packing-slip` (items, quantities, variant labels, ship-to; no prices). |
+| Returns (RMA) | `RMA-…`. Customers request returns for shipped/delivered orders inside the window (Settings → Returns: on/off, days, reasons), at most what was shipped minus what's already returned or refunded. `requested → approved/rejected → received → refunded/closed`; receiving can restock; "Refund this return" is a credit memo with `return_number` (the return becomes refunded and is never restocked twice). Staff can create returns and override the window. Every change notes the order history and emails the customer. `App\Services\Returns`. |
+| Order grid | Mass invoice, ship (carrier, no tracking), cancel: each order on its own, answer `{ done, skipped: [{ number, reason }] }`; each action checks its own permission. CSV export with the grid's filters. |
+
 Uploads need the public storage link once: `php artisan storage:link` (creates `public/storage`, git-ignored; uploaded files in `storage/app/public` are git-ignored too).
 
 ### Permissions
@@ -77,8 +91,8 @@ Uploads need the public storage link once: `php artisan storage:link` (creates `
 | --- | --- |
 | Dashboard | `dashboard.view` |
 | Catalog | `products.view` (also the category tree), `products.edit` (also images, options, variants, mass actions), `products.delete` (also the bulk `delete`), `categories.edit`, `products.import` (CSV import and export), `reviews.view`, `reviews.moderate` |
-| Sales | `orders.view` (orders, invoices, credit memo lists, refundable amounts), `orders.edit`, `invoices.create`, `shipments.create`, `credit_memos.create` |
-| Customers | `customers.view`, `customers.edit` |
+| Sales | `orders.view` (orders, invoices, credit memo and shipment lists, refundable amounts, packing slips, order export, the bulk route), `orders.edit`, `invoices.create`, `shipments.create`, `credit_memos.create`, `orders.create` (phone orders and their quote), `returns.view`, `returns.manage` |
+| Customers | `customers.view` (also groups, addresses, notes, export), `customers.edit` (account, addresses, notes, password reset, block), `customers.create`, `customers.delete`, `customer_groups.manage` |
 | Marketing | `coupons.view`, `coupons.edit` |
 | Content | `content.view`, `content.edit` |
 | Reports | `reports.view` |
@@ -101,18 +115,22 @@ Storefront (customers), `/api/v1`:
 | POST | `/auth/forgot-password` | `email` → same answer for every email |
 | POST | `/auth/reset-password` | `email, code, password, password_confirmation` |
 | POST | `/auth/logout` | access token → this device signed out |
-| GET / PATCH | `/me` | profile; PATCH changes `first_name, last_name, phone` (not the email) |
+| GET / PATCH | `/me` | profile with `group { name, discount_percent }`; PATCH changes `first_name, last_name, phone` (not the email) |
+| GET / POST | `/me/addresses` | the address book (max 20; first address = both defaults) → 201 |
+| PATCH / DELETE | `/me/addresses/{id}` | own addresses only (else 404) |
+| POST | `/orders/{number}/returns` | customer; `items[{order_item_id, quantity}], reason, comment` → 201; own shipped/delivered orders inside the window |
+| GET | `/returns`, `/returns/{number}` | customer; own returns only |
 | GET | `/products` | public; `search, category` (with its subcategories), `brand[], min_price, max_price` (sale price), `min_rating, available=1, sort` (`price, rating, discount, name, newest`), `direction, page, per_page` (12, max 100); items have `has_variants`, `review_count` |
 | GET | `/products/{id}` | public; with `images`, approved `reviews`, `options` and active `variants`; drafts, archived, deleted, or in a hidden category → 404 `Product not found.` |
 | POST | `/products/{id}/reviews` | customer; `rating, title?, comment` → 201 (`pending` unless approval is off); second review → 422 `already_reviewed`; 10 per hour |
 | GET | `/categories` | public; the visible tree (`children`), branches with something to buy |
 | GET | `/home` | public; `{ hero, banners (active, by position), featured_products [products] }` |
 | GET | `/pages/{slug}` | public; published pages only, else 404 |
-| GET | `/store` | public; store name, support contacts, enabled shipping methods with prices, free-shipping threshold, countries, payment methods, guest checkout, tax on/off |
-| POST | `/cart/validate` | public; `items[{product_id, variant_id?, quantity}], coupon_code, shipping_method, email?, country?` → lines, problems, coupon, shipping options, totals, `tax_estimated`. Optional customer Bearer token (per-customer coupon limits; a bad token → 401) |
+| GET | `/store` | public; store name, support contacts, enabled shipping methods with prices, free-shipping threshold, countries, payment methods, guest checkout, tax on/off, returns on/off, return window days, return reasons |
+| POST | `/cart/validate` | public; `items[{product_id, variant_id?, quantity}], coupon_code, shipping_method, email?, country?` → lines (`sale_price` after the group discount, `base_sale_price`, `group_discount_percent`), problems, coupon, shipping options, totals (+ `group_discount`), `tax_estimated`, `customer_group`. Optional customer Bearer token (per-customer coupon limits, group price; a bad token → 401) |
 | POST | `/orders` | guest, or customer Bearer token (any other token → 401/403); `items, coupon_code, shipping_method, payment_method, email, phone, shipping_address, billing_address, expected_total` → 201; 422 with `problems` for stock, or for a shipping/payment method or country that is off; 409 when `expected_total` differs; 403 `guest_checkout_disabled` for guests when guest checkout is off. 10 per minute per visitor |
 | GET | `/orders` | customer; their orders, newest first |
-| GET | `/orders/{number}` | customer; someone else's → 404. Includes `invoices`, `shipments`, `credit_memos` |
+| GET | `/orders/{number}` | customer; someone else's → 404. Includes `invoices`, `shipments`, `credit_memos`, `returns`, `return_eligibility` |
 | GET | `/orders/{number}/invoices/{invoice}` | customer; the printable invoice (own orders only, else 404) |
 | POST | `/orders/lookup` | guest; `number, email` → the order, or the same 404 whichever is wrong (limited like sign-in) |
 
@@ -122,7 +140,15 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | --- | --- | --- |
 | POST | `/auth/login`, `/auth/refresh`, `/auth/logout` | as for customers |
 | GET | `/me` | the signed-in admin, with `role { id, name }` and `permissions [keys]` |
-| GET / PATCH | `/customers`, `/customers/{id}` | `search, status, page, per_page`; PATCH `is_active` |
+| GET / POST | `/customers` | [customers.view / customers.create] `search, status` (`active, blocked, verified, unverified`), `verified, group_id, created_from, created_to, page, per_page`; POST `first_name, last_name, email, phone, group_id?` → 201, "Set your password" email |
+| GET | `/customers/export.csv` | [customers.view] the list filters |
+| GET / PATCH / DELETE | `/customers/{id}` | [customers.view / customers.edit / customers.delete] full profile; PATCH `first_name, last_name, email, phone, group_id, is_active`; DELETE → 204 (422 while an order is open) |
+| POST | `/customers/{id}/password-reset` | [customers.edit] emails a reset code (429 within a minute) |
+| GET / POST | `/customers/{id}/addresses` | [customers.view / customers.edit] |
+| PATCH / DELETE | `/customers/{id}/addresses/{address}` | [customers.edit] |
+| GET / POST | `/customers/{id}/notes` | [customers.view / customers.edit] `body` (max 2000) → 201 |
+| GET / POST | `/customer-groups` | [customers.view / customer_groups.manage] `name, code?, discount_percent` → 201 |
+| PATCH / DELETE | `/customer-groups/{id}` | [customer_groups.manage] General can't be deleted or change code; a group in use can't be deleted |
 | GET | `/overview` | products, orders (revenue excludes cancelled), customers, low stock products, latest orders |
 | GET / POST | `/products` | list every status (`search, category, status, sort, direction, page, per_page`); create → 201 |
 | GET / PATCH / DELETE | `/products/{id}` | detail with images; partial update; soft delete → 204 |
@@ -141,12 +167,21 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/reviews` | [reviews.view] `status, product_id, rating, search, page, per_page`; `meta.counts` per status |
 | PATCH / DELETE | `/reviews/{id}` | [reviews.moderate] `status` |
 | POST | `/reviews/bulk` | [reviews.moderate] `ids, status` → `{ updated }` |
-| GET | `/orders` | `search` (number, email, name), `status, payment_status, page, per_page` |
+| GET | `/orders` | `search` (number, email, name), `status, payment_status, source, customer_id, page, per_page` |
+| GET | `/orders/export.csv` | [orders.view] the grid's filters |
+| POST | `/orders/quote` | [orders.create] the phone-order body → the cart/validate answer + `payment_methods` (nothing saved) |
+| POST | `/orders` | [orders.create] `customer_id` or `guest`, `items, shipping_address, billing_address` or `same_as_shipping, shipping_method, payment_method` (+ `bank_transfer`, `cash`), `coupon_code, note, notify_customer, expected_total` → 201, `source: "admin"` |
+| POST | `/orders/bulk` | [orders.view + the action's key] `numbers` (1–100), `action` (`invoice, ship, cancel`), `carrier` (ship), `notify_customer` → `{ done, skipped }` |
+| GET | `/orders/{number}/packing-slip` | [orders.view] items, quantities, variant labels, ship-to; no prices |
+| POST | `/orders/{number}/returns` | [returns.manage] like the customer's, plus `override_window, notify_customer` → 201 |
+| GET | `/shipments`, `/shipments/{number}` | [orders.view] `carrier, from, to, search, page, per_page`; detail with items |
+| GET | `/returns`, `/returns/{number}` | [returns.view] `status, search, page, per_page`; `meta.counts` per status |
+| PATCH | `/returns/{number}` | [returns.manage] `status, admin_note, resolution, notify_customer, items[{return_item_id, condition}], restock` |
 | GET / PATCH | `/orders/{number}` | detail with history and documents; PATCH `status, payment_status: "paid", note, notify_customer` (cancel refused once invoiced) |
 | POST | `/orders/{number}/invoices` | `note, notify_customer` → 201 InvoiceResource |
 | POST | `/orders/{number}/shipments` | `carrier, tracking_number, note, notify_customer` → 201 ShipmentResource |
 | GET | `/orders/{number}/refundable` | per item `ordered, refunded, refundable, unit_refund`; `shipping_refundable`, `max_total` |
-| POST | `/orders/{number}/credit-memos` | `items[{order_item_id, quantity}], shipping_refund, adjustment, restock, note, notify_customer` → 201 CreditMemoResource |
+| POST | `/orders/{number}/credit-memos` | `items[{order_item_id, quantity}], shipping_refund, adjustment, restock, note, notify_customer, return_number?` → 201 CreditMemoResource (a received return becomes refunded, never restocked twice) |
 | GET | `/invoices`, `/invoices/{number}` | `search` (invoice number, order number, email), `page, per_page` |
 | GET | `/credit-memos`, `/credit-memos/{number}` | same |
 | GET / POST | `/coupons` | `search, status` (`active, inactive, scheduled, expired, used_up`), `page, per_page`; create → 201 |
@@ -164,9 +199,9 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/reports/sales`, `/reports/sales.csv` | [reports.view] `from, to, group_by` (`day, week, month`) |
 | GET | `/reports/products`, `/reports/products.csv` | [reports.view] best sellers; `from, to, limit` (10, max 100) |
 | GET | `/reports/customers`, `/reports/coupons`, `/reports/low-stock` | [reports.view] |
-| GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory, catalog }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
+| GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory, catalog, returns }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
 
-The older routes need: `/overview` dashboard.view; `/customers` customers.view, PATCH customers.edit; `/categories`, GET `/products…` products.view; POST/PATCH `/products` products.edit, DELETE products.delete; GET `/orders…`, `/invoices…`, `/credit-memos…`, `/refundable` orders.view; PATCH `/orders/{number}` orders.edit; POST invoices/shipments/credit-memos their `*.create`; `/coupons` coupons.view / coupons.edit.
+The older routes need: `/overview` dashboard.view; `/categories`, GET `/products…` products.view; POST/PATCH `/products` products.edit, DELETE products.delete; GET `/orders…`, `/invoices…`, `/credit-memos…`, `/refundable` orders.view; PATCH `/orders/{number}` orders.edit; POST invoices/shipments/credit-memos their `*.create`; `/coupons` coupons.view / coupons.edit.
 
 Errors follow Laravel: 401 `Unauthenticated.`, 403 (`permission_denied` when the role doesn't allow it), 404, 422 `{ message, errors: { field: [...] } }`, 429 with `Retry-After`.
 
@@ -199,14 +234,14 @@ Create a real admin (the first one this way; then from the admin's Admin users p
 
 ## Email
 
-In development (`APP_ENV=local`, `MAIL_MAILER=log`, `DEV_MAILBOX=true`) every email is kept in a **test inbox**: open http://127.0.0.1:8000/dev/mailbox to read the codes, order confirmations, order status, payment, shipment, and refund emails. Nothing reaches real people. That page doesn't exist outside local development.
+In development (`APP_ENV=local`, `MAIL_MAILER=log`, `DEV_MAILBOX=true`) every email is kept in a **test inbox**: open http://127.0.0.1:8000/dev/mailbox to read the codes (including "Set your password"), order confirmations, order status, payment, shipment, refund, and return emails. Nothing reaches real people. That page doesn't exist outside local development.
 
 For real email, change only the settings: `MAIL_MAILER=smtp` with `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (or a provider such as Mailgun, Postmark, or SES), and `DEV_MAILBOX=false`.
 
 ## Tests
 
 ```bash
-php artisan test     # 212 feature tests, against the buynest_test database (no network: products come from factories)
+php artisan test     # 250 feature tests, against the buynest_test database (no network: products come from factories)
 vendor/bin/pint      # code style
 ```
 

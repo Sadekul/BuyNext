@@ -81,7 +81,8 @@ class AdminPermissionsTest extends TestCase
         $sales = $this->signInAdmin(Admin::factory()->role('Sales staff')->create());
         $this->asAdmin($sales, 'GET', '/api/admin/v1/me')->assertOk()
             ->assertJsonPath('data.role.name', 'Sales staff')
-            ->assertJsonPath('data.permissions', ['orders.view', 'orders.edit', 'invoices.create', 'shipments.create', 'credit_memos.create', 'customers.view']);
+            ->assertJsonPath('data.permissions', ['orders.view', 'orders.edit', 'invoices.create', 'shipments.create', 'credit_memos.create',
+                'orders.create', 'returns.view', 'returns.manage', 'customers.view', 'customers.create']);
     }
 
     public function test_sales_staff_work_on_orders_but_cannot_touch_products(): void

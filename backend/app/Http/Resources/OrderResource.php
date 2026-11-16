@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Order;
 use App\Services\Pricing;
+use App\Services\Returns;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,12 +31,23 @@ class OrderResource extends JsonResource
             'shipping_address' => $this->shipping_address,
             'billing_address' => $this->billing_address,
             'coupon_code' => $this->coupon_code,
+            'customer_group' => $this->customer_group, // phase 6: the group's name when the order was placed (null before)
             'items' => self::itemsOf($this->resource),
             'totals' => self::totalsOf($this->resource),
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
             'history' => $this->whenLoaded('history', fn () => $this->history->map(fn ($entry) => $this->historyEntry($entry))->values()),
             // Phase 3 documents (Order::DOCUMENTS eager-loads them).
             ...$this->documents($request),
+            // Phase 6: on order detail pages (the returns are loaded there): its returns and what can still be returned.
+            ...($this->relationLoaded('returns') ? [
+                'returns' => $this->returns->map(fn ($return) => [
+                    'number' => $return->number,
+                    'status' => $return->status,
+                    'items_count' => (int) $return->items->sum('quantity'),
+                    'created_at' => $return->created_at?->toIso8601ZuluString(),
+                ])->values(),
+                'return_eligibility' => app(Returns::class)->eligibility($this->resource),
+            ] : []),
         ];
     }
 
@@ -75,6 +87,7 @@ class OrderResource extends JsonResource
             'thumbnail_url' => $item->thumbnail_url,
             'price' => $item->unit_price,
             'discount_percent' => (float) $item->discount_percent,
+            'group_discount_percent' => (float) $item->group_discount_percent,
             'sale_price' => $item->sale_price,
             'quantity' => $item->quantity,
             'line_total' => $item->line_total,

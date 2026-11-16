@@ -1,4 +1,4 @@
-import { LuBan, LuCircleCheck, LuClock, LuLock, LuPackage, LuPackageCheck, LuUndo2, LuTruck } from 'react-icons/lu'
+import { LuBan, LuCircleCheck, LuCircleX, LuClock, LuLock, LuPackage, LuPackageCheck, LuPackageOpen, LuUndo2, LuTruck } from 'react-icons/lu'
 
 /*
  * Order statuses as icon + words (never colour alone). Real orders
@@ -21,6 +21,22 @@ export const PAYMENT_STATUSES = {
   partially_refunded: { label: 'Partly refunded', icon: LuUndo2 },
   refunded: { label: 'Refunded', icon: LuUndo2 },
 }
+
+/*
+ * Return (RMA) statuses (docs/backend/PHASE6_CONTRACT.md §6):
+ * requested → approved | rejected, approved → received, received → refunded | closed.
+ * `help` says what happens next, in the customer's words.
+ */
+export const RETURN_STATUSES = {
+  requested: { label: 'Requested', icon: LuClock, help: "We've received your request and will reply by email, usually within two business days." },
+  approved: { label: 'Approved', icon: LuCircleCheck, help: 'Your return was approved. Send the items back as described in our email; we will let you know when they arrive.' },
+  rejected: { label: 'Not approved', icon: LuCircleX, help: "We couldn't accept this return. Our email explains why; reply to it if you have questions." },
+  received: { label: 'Items received', icon: LuPackageOpen, help: "The items arrived and we're checking them. Your refund or replacement follows." },
+  refunded: { label: 'Refunded', icon: LuUndo2, help: 'Refunded by the method you paid with; your bank may take a few days to show it.' },
+  closed: { label: 'Closed', icon: LuLock, help: 'This return is complete.' },
+}
+
+export const returnStatus = (status) => RETURN_STATUSES[status] ?? { label: status, icon: LuUndo2, help: '' }
 
 export const orderStatus = (status) => ORDER_STATUSES[status] ?? { label: status, icon: LuPackage }
 export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: status, icon: LuClock }

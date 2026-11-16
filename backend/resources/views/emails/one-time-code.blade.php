@@ -9,6 +9,9 @@
       <p style="margin:0 0 24px">{{ $intro }}</p>
       <p style="margin:0 0 24px;font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;background:#eef2ff;border-radius:8px;padding:16px">{{ $code }}</p>
       <p style="margin:0 0 8px;font-size:14px;color:#57534e">The code expires in {{ $minutes }} minutes and works once.</p>
+      @isset($expiredHint)
+        <p style="margin:0 0 8px;font-size:14px;color:#57534e">{{ $expiredHint }}</p>
+      @endisset
       <p style="margin:0;font-size:14px;color:#57534e">Didn't ask for this? You can ignore this email. Never share this code: BuyNest staff will never ask for it.</p>
     </td></tr>
   </table>

@@ -26,7 +26,7 @@ const PRODUCT_FIELDS = {
   status: 'status',
 }
 const FORM_FIELD = Object.fromEntries(Object.entries(PRODUCT_FIELDS).map(([form, api]) => [api, form]))
-const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer' }
+const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber' }
 // The admin's sort names → the API's.
 const PRODUCT_SORT = { title: 'name', price: 'price', stock: 'stock', rating: 'rating', newest: 'newest' }
 
@@ -92,6 +92,8 @@ function adminOrderRow(raw) {
     paymentStatus: raw.payment_status,
     paymentMethod: raw.payment_method,
     placedAt: raw.placed_at,
+    // Phase 6: where the order came from (storefront | admin).
+    source: raw.source ?? 'storefront',
   }
 }
 
@@ -114,6 +116,8 @@ function adminOrderDetail(raw) {
     },
     lines: (raw.items ?? []).map((item) => ({
       id: item.product_id,
+      // Phase 6: the order line itself (returns name it).
+      orderItemId: item.id ?? item.order_item_id ?? null,
       sku: item.sku,
       title: item.name,
       variantLabel: item.variant_label ?? null,
@@ -131,6 +135,12 @@ function adminOrderDetail(raw) {
     shipments: (raw.shipments ?? []).map(adminShipment),
     invoices: (raw.invoices ?? []).map(adminInvoice),
     creditMemos: (raw.credit_memos ?? []).map(adminCreditMemo),
+    // Phase 6: where it came from, the customer's group then, who created it, its returns.
+    source: raw.source ?? 'storefront',
+    customerGroup: typeof raw.customer_group === 'string' ? raw.customer_group : null,
+    createdByAdmin: typeof raw.created_by_admin?.name === 'string' ? raw.created_by_admin.name : null,
+    returns: (Array.isArray(raw.returns) ? raw.returns : []).map((entry) => ({ number: entry.number, status: entry.status, itemCount: entry.items_count ?? null, createdAt: entry.created_at ?? null })),
+    returnEligibility: returnEligibility(raw.return_eligibility),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -140,6 +150,27 @@ function adminOrderDetail(raw) {
       createdAt: entry.created_at,
     })),
     live: true,
+  }
+}
+
+/** Phase 6: whether the order can be returned now, and how much of each line. */
+function returnEligibility(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  return {
+    eligible: raw.eligible === true,
+    code: typeof raw.code === 'string' ? raw.code : null,
+    message: typeof raw.message === 'string' ? raw.message : null,
+    deadline: raw.deadline ?? null,
+    windowDays: Number.isInteger(raw.window_days) ? raw.window_days : null,
+    reasons: (Array.isArray(raw.reasons) ? raw.reasons : []).filter((reason) => typeof reason === 'string'),
+    items: (Array.isArray(raw.items) ? raw.items : []).map((item) => ({
+      orderItemId: item.order_item_id,
+      name: item.name ?? '',
+      variantLabel: item.variant_label ?? null,
+      sku: item.sku ?? null,
+      ordered: item.ordered ?? 0,
+      returnable: item.returnable ?? 0,
+    })),
   }
 }
 
@@ -184,6 +215,7 @@ export function adminCreditMemo(raw) {
     adjustment: money(raw.adjustment) ?? 0,
     total: money(raw.total),
     restocked: raw.restocked === true,
+    returnNumber: typeof raw.return_number === 'string' ? raw.return_number : null,
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
@@ -324,12 +356,13 @@ export const laravelAdminData = {
     return answer(result, [200, 204], () => ({ id: Number(id), deleted: true, live: true }))
   },
 
-  async listOrders(token, { q, status, paymentStatus, limit, skip }, request) {
+  async listOrders(token, { q, status, paymentStatus, source, limit, skip }, request) {
     const { page, perPage } = pageOf({ limit, skip })
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
     if (q) params.set('search', q)
     if (status) params.set('status', status)
     if (paymentStatus) params.set('payment_status', paymentStatus)
+    if (source) params.set('source', source)
     const result = await laravel(`/api/admin/v1/orders?${params}`, { token, request })
     return answer(result, [200], (data) => ({ orders: data.data.map(adminOrderRow), total: data.meta?.total ?? data.data.length, limit, skip, live: true }))
   },
@@ -360,6 +393,7 @@ export const laravelAdminData = {
       restock: memo.restock,
       ...(memo.note && { note: memo.note }),
       notify_customer: memo.notifyCustomer,
+      ...(memo.returnNumber && { return_number: memo.returnNumber }),
     }
     const result = await laravel(`/api/admin/v1/orders/${number}/credit-memos`, { method: 'POST', token, request, body })
     return answer(result, [200, 201], (data) => ({ creditMemo: adminCreditMemo(data.data), live: true }), ORDER_FIELDS)

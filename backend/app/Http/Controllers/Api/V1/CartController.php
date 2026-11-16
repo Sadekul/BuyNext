@@ -32,7 +32,8 @@ class CartController extends Controller
         $customer = $customer instanceof Customer ? $customer : null;
 
         $quote = $pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? $settings->defaultShippingMethod(),
-            customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null);
+            customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null,
+            group: $customer?->priceGroup()); // phase 6: the customer's group price (guests: General)
 
         return response()->json(['data' => $quote->toArray()]);
     }

@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { LuArrowLeft, LuPackageX } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
+import ReturnRequestForm from '../components/orders/ReturnRequestForm'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
@@ -22,7 +23,7 @@ function NotFound() {
   )
 }
 
-function OrderSection({ order, invoiceLink }) {
+function OrderSection({ order, invoiceLink, children }) {
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
@@ -34,6 +35,7 @@ function OrderSection({ order, invoiceLink }) {
         Order {id}
       </h2>
       <OrderDetailsView order={order} invoiceLink={invoiceLink} />
+      {children}
     </section>
   )
 }
@@ -54,8 +56,12 @@ function ServerOrderDetailsPage() {
   if (request.isPending) return <Loader label="Loading the order…" />
   if (request.error?.status === 404) return <NotFound />
   if (request.error) return <ErrorMessage title="We couldn't load this order" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
-  // The customer's own order: its invoices open as printable pages.
-  return <OrderSection order={request.data} invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)} />
+  // The customer's own order: its invoices open as printable pages, and items can be returned (phase 6).
+  return (
+    <OrderSection order={request.data} invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)}>
+      <ReturnRequestForm order={request.data} />
+    </OrderSection>
+  )
 }
 
 /** /account/orders/:orderId */

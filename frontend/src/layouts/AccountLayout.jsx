@@ -1,13 +1,21 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import { LuHeart, LuLogOut, LuPackage, LuUser } from 'react-icons/lu'
+import { LuHeart, LuLogOut, LuMapPin, LuPackage, LuUndo2, LuUser } from 'react-icons/lu'
 import { useAuth } from '../hooks/useAuth'
 import { ROUTES } from '../constants/routes'
+import { REAL_SHOP } from '../constants/shop'
 import { cn } from '../utils/classNames'
 import './AccountLayout.css'
 
+// The address book and returns need BuyNest's API (REAL_SHOP); the demo has neither.
 const ACCOUNT_LINKS = [
   { label: 'Profile', to: ROUTES.account, icon: LuUser, end: true },
   { label: 'Orders', to: ROUTES.orders, icon: LuPackage },
+  ...(REAL_SHOP
+    ? [
+        { label: 'Address book', to: ROUTES.addresses, icon: LuMapPin },
+        { label: 'Returns', to: ROUTES.returns, icon: LuUndo2 },
+      ]
+    : []),
   { label: 'Wishlist', to: ROUTES.wishlist, icon: LuHeart },
 ]
 

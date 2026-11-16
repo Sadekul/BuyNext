@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Admin;
+use App\Models\Coupon;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Shipment;
@@ -19,7 +20,43 @@ use Illuminate\Validation\ValidationException;
  */
 class OrderDocuments
 {
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private Inventory $inventory) {}
+
+    /**
+     * Cancels an order (PATCH status "cancelled", and the bulk action): puts
+     * every item back in stock (its variant; also products deleted since),
+     * gives the coupon use back, and writes the history and audit entries.
+     * Refused once the order has an invoice (refund it instead), and for
+     * statuses that can't move to cancelled. The caller sends the email.
+     */
+    public function cancel(Order $order, Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): void
+    {
+        $from = $order->status;
+        if (! $order->canMoveTo('cancelled')) {
+            $label = str_replace('_', ' ', $from);
+            throw ValidationException::withMessages([$errorKey => $from === 'cancelled' ? 'This order is already cancelled.' : "A {$label} order can't be cancelled."]);
+        }
+        if ($order->invoices()->exists()) {
+            throw ValidationException::withMessages([$errorKey => 'This order has been invoiced (paid), so it can\'t be cancelled. Create a refund (credit memo) instead.']);
+        }
+
+        $order->load('items');
+        $this->inventory->restock($order->items->map(fn ($item) => [
+            'product_id' => $item->product_id, 'variant_id' => $item->variant_id, 'quantity' => $item->quantity,
+        ])->all(), withTrashed: true);
+        Coupon::releaseFor($order);
+        $order->forceFill(['status' => 'cancelled'])->save();
+
+        $order->history()->create([
+            'status' => 'cancelled',
+            'payment_status' => $order->payment_status,
+            'note' => $note ?? 'Order cancelled; items returned to stock.',
+            'admin_id' => $admin->id,
+            'customer_notified' => $notify,
+        ]);
+        $this->audit->record('order.status_changed', "Order {$order->number}: {$from} → cancelled.", 'order', $order->id,
+            Audit::diff(['status' => $from, 'note' => null], ['status' => 'cancelled', 'note' => $note]), $admin);
+    }
 
     /** Records the payment of the full grand total: paid, and pending_payment → processing. */
     public function invoice(Order $order, Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): Invoice
@@ -61,7 +98,7 @@ class OrderDocuments
 
     /**
      * Ships every item (one shipment per order in phase 3): processing → shipped.
-     * Cash on delivery may ship unpaid; card/PayPal must be invoiced first.
+     * Cash on delivery (and cash, phase 6) may ship unpaid; card/PayPal/bank transfer must be invoiced first.
      * $historyNote replaces the generated history note (the PATCH shortcut
      * keeps phase 2's behaviour: the staff note IS the history note).
      */
@@ -73,7 +110,7 @@ class OrderDocuments
             $order->shipments()->exists(), in_array($order->status, ['shipped', 'delivered'], true) => 'This order has already been shipped.',
             $order->status === 'pending_payment' => $notPaidYet,
             $order->status !== 'processing' => 'A '.str_replace('_', ' ', $order->status).' order can\'t be shipped.',
-            $order->payment_method !== 'cod' && ! $order->invoices()->exists() => $notPaidYet,
+            ! in_array($order->payment_method, Order::PAY_LATER_METHODS, true) && ! $order->invoices()->exists() => $notPaidYet,
             default => null,
         };
         if ($problem) {

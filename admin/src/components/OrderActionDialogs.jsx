@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { adminKeys, createCreditMemo, createInvoice, createShipment, getRefundable, updateOrder } from '../api/admin'
+import { adminKeys, createCreditMemo, createInvoice, createReturn, createShipment, getRefundable, getSettings, updateOrder } from '../api/admin'
+import { useAdminAuth } from '../auth/useAdminAuth'
 import Field from './Field'
 import FormDialog from './FormDialog'
 import { ErrorState, Loading } from './States'
@@ -159,9 +160,9 @@ const REFUND_DESCRIPTION = 'Records a refund (credit memo). No payment provider 
  * shipping, an adjustment, and restocking. The total updates as you type; the
  * server computes the exact amounts (each line's share of the coupon, to the cent).
  */
-export function RefundDialog({ order, onDone, onCancel }) {
+export function RefundDialog({ order, prefill, onDone, onCancel }) {
   const limits = useQuery({ queryKey: adminKeys.refundable(order.number), queryFn: ({ signal }) => getRefundable(order.number, { signal }), staleTime: 0 })
-  if (limits.data) return <RefundForm order={order} limits={limits.data} onDone={onDone} onCancel={onCancel} />
+  if (limits.data) return <RefundForm order={order} limits={limits.data} prefill={prefill} onDone={onDone} onCancel={onCancel} />
   return (
     <FormDialog isOpen wide title={`Refund order ${order.number}`} description={REFUND_DESCRIPTION} submitLabel="Refund" busy onSubmit={() => {}} onCancel={onCancel}>
       {limits.isPending ? <Loading label="Loading what can be refunded…" /> : <ErrorState error={limits.error} onRetry={limits.refetch} />}
@@ -172,11 +173,18 @@ export function RefundDialog({ order, onDone, onCancel }) {
 // unit_refund is rounded down; the last unit of each line takes the leftover cents.
 const ESTIMATE_NOTE = 'An estimate: the last unit of each line includes any leftover cents. The credit memo shows the exact amount.'
 
-function RefundForm({ order, limits, onDone, onCancel }) {
-  const [quantities, setQuantities] = useState(() => Object.fromEntries(limits.items.map((item) => [item.orderItemId, ''])))
+/**
+ * `prefill` (phase 6, "Refund this return"): { returnNumber, quantities: { orderItemId: n }, restock }.
+ * The credit memo then names the return, which becomes refunded; items the
+ * return already put back into stock are not restocked twice (the API makes sure).
+ */
+function RefundForm({ order, limits, prefill, onDone, onCancel }) {
+  const [quantities, setQuantities] = useState(() =>
+    Object.fromEntries(limits.items.map((item) => [item.orderItemId, prefill?.quantities?.[item.orderItemId] ? String(Math.min(prefill.quantities[item.orderItemId], item.refundable)) : ''])),
+  )
   const [shipping, setShipping] = useState('')
   const [adjustment, setAdjustment] = useState('')
-  const [restock, setRestock] = useState(false) // like the API: stock goes back only when asked
+  const [restock, setRestock] = useState(prefill?.restock ?? false) // like the API: stock goes back only when asked
   const [note, setNote] = useState('')
   const [notify, setNotify] = useState(true)
   const [errors, setErrors] = useState({})
@@ -195,7 +203,7 @@ function RefundForm({ order, limits, onDone, onCancel }) {
     onSuccess: ({ creditMemo }) => {
       const full = toCents(creditMemo.total) >= toCents(limits.maxTotal)
       onDone(
-        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''} Return the money by the original payment method.`,
+        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''} Return the money by the original payment method.`,
       )
     },
     onError: (error, sent) => {
@@ -227,7 +235,15 @@ function RefundForm({ order, limits, onDone, onCancel }) {
     setErrors(found)
     if (Object.keys(found).length > 0) return
     const items = chosen.filter(({ quantity }) => quantity > 0).map(({ item, quantity }) => ({ orderItemId: item.orderItemId, quantity }))
-    create.mutate({ items, shippingRefund: shippingValue, adjustment: adjustmentValue, restock, note: note.trim() || undefined, notifyCustomer: notify })
+    create.mutate({
+      items,
+      shippingRefund: shippingValue,
+      adjustment: adjustmentValue,
+      restock,
+      note: note.trim() || undefined,
+      notifyCustomer: notify,
+      ...(prefill?.returnNumber && { returnNumber: prefill.returnNumber }),
+    })
   }
 
   const totalError = errors.total?.[0] ?? errors.items?.[0]
@@ -235,8 +251,8 @@ function RefundForm({ order, limits, onDone, onCancel }) {
     <FormDialog
       isOpen
       wide
-      title={`Refund order ${order.number}`}
-      description={REFUND_DESCRIPTION}
+      title={prefill?.returnNumber ? `Refund return ${prefill.returnNumber}` : `Refund order ${order.number}`}
+      description={prefill?.returnNumber ? `${REFUND_DESCRIPTION} Filled in with the returned items of order ${order.number}.` : REFUND_DESCRIPTION}
       submitLabel={`Refund ${formatMoney(Math.max(totalCents, 0) / 100)}`}
       busy={create.isPending}
       error={formError(create.error, ['items', 'shippingRefund', 'adjustment', 'restock', 'note', 'total'])}
@@ -318,6 +334,7 @@ function RefundForm({ order, limits, onDone, onCancel }) {
         <input type="checkbox" checked={restock} onChange={(event) => setRestock(event.target.checked)} />
         Return the refunded items to stock
       </label>
+      {prefill?.returnNumber && prefill.alreadyRestocked && <p className="field__hint">The return already put its items back into stock when it was received; they won't be added twice.</p>}
       <NoteAndEmail note={note} setNote={setNote} notify={notify} setNotify={setNotify} error={errors.note?.[0]} emailLabel="Email the customer about the refund" />
       {/* Live total: announced politely as it changes. */}
       <p className="refund-total" aria-live="polite">
@@ -332,6 +349,173 @@ function RefundForm({ order, limits, onDone, onCancel }) {
           {totalError}
         </p>
       )}
+    </FormDialog>
+  )
+}
+
+const DEFAULT_REASONS = ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other']
+
+/**
+ * Create a return for a customer (returns.manage), from the order: which
+ * items and how many, the reason, and a comment. The store's rules apply
+ * (shipped or delivered, quantities not already returned or refunded); an
+ * admin may override the return window.
+ */
+export function CreateReturnDialog({ order, onDone, onCancel }) {
+  const { can } = useAdminAuth()
+  const settings = useQuery({ queryKey: adminKeys.settings, queryFn: ({ signal }) => getSettings({ signal }), enabled: can('settings.view'), staleTime: 60_000 })
+  const eligibility = order.returnEligibility
+  const reasons = eligibility?.reasons?.length ? eligibility.reasons : settings.data?.returns?.returnReasons?.length ? settings.data.returns.returnReasons : DEFAULT_REASONS
+  // What the server says is still returnable per line (shipped, minus returned or refunded).
+  const lines = (eligibility?.items ?? []).map((item) => ({ orderItemId: item.orderItemId, title: item.name, variantLabel: item.variantLabel, sku: item.sku, quantity: item.ordered, returnable: item.returnable }))
+  const windowClosed = eligibility?.code === 'window_closed'
+  const [quantities, setQuantities] = useState(() => Object.fromEntries(lines.map((line) => [line.orderItemId, ''])))
+  const [reason, setReason] = useState('')
+  const [comment, setComment] = useState('')
+  const [overrideWindow, setOverrideWindow] = useState(windowClosed)
+  const [notify, setNotify] = useState(true)
+  const [errors, setErrors] = useState({})
+  const create = useMutation({
+    mutationFn: (values) => createReturn(order.number, values),
+    onSuccess: (result) => onDone(`${result.return?.number ? `Return ${result.return.number}` : 'A return'} created for order ${order.number}.${notify ? ' The customer was emailed.' : ''}`),
+    onError: (error, sent) => {
+      const mapped = {}
+      for (const [field, messages] of Object.entries(error.fieldErrors ?? {})) {
+        const match = /^items\.(\d+)\./.exec(field)
+        const item = match && sent.items[Number(match[1])]
+        mapped[item ? `item-${item.orderItemId}` : field] = messages
+      }
+      setErrors(mapped)
+    },
+  })
+
+  function submit() {
+    const found = {}
+    const items = []
+    for (const line of lines) {
+      const text = quantities[line.orderItemId]
+      if (text.trim() === '') continue
+      const quantity = Number(text)
+      if (!Number.isInteger(quantity) || quantity < 0) found[`item-${line.orderItemId}`] = ['Enter a whole number.']
+      else if (quantity > line.returnable) found[`item-${line.orderItemId}`] = [line.returnable === 0 ? 'Nothing left to return.' : `At most ${line.returnable} can be returned.`]
+      else if (quantity > 0) items.push({ orderItemId: line.orderItemId, quantity })
+    }
+    if (items.length === 0 && Object.keys(found).length === 0) found.items = ['Enter how many of at least one item come back.']
+    if (!reason) found.reason = ['Choose a reason.']
+    setErrors(found)
+    if (Object.keys(found).length > 0) return
+    create.mutate({ items, reason, comment: comment.trim() || undefined, overrideWindow, notifyCustomer: notify })
+  }
+
+  return (
+    <FormDialog
+      isOpen
+      wide
+      title={`Create a return for order ${order.number}`}
+      description={
+        windowClosed && eligibility?.message
+          ? `${eligibility.message} As staff you can still create it.`
+          : 'Only shipped items can be returned, and not more than were shipped, already returned, or refunded.'
+      }
+      submitLabel="Create return"
+      busy={create.isPending}
+      error={formError(create.error, ['items', 'reason', 'comment', 'overrideWindow'])}
+      onSubmit={submit}
+      onCancel={onCancel}
+    >
+      {lines.length === 0 ? (
+        <p className="muted">{eligibility?.message ?? 'Nothing on this order can be returned.'}</p>
+      ) : (
+        <table className="table refund-table">
+          <caption className="visually-hidden">Items to return</caption>
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col" className="num">
+                Ordered
+              </th>
+              <th scope="col" className="num">
+                Returnable
+              </th>
+              <th scope="col" className="num">
+                Return qty
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line) => {
+              const key = `item-${line.orderItemId}`
+              const error = errors[key]?.[0]
+              const id = `return-qty-${line.orderItemId}`
+              const name = line.variantLabel ? `${line.title} (${line.variantLabel})` : line.title
+              return (
+                <tr key={line.orderItemId}>
+                  <th scope="row">
+                    {name}
+                    {line.sku && <small className="muted"> · {line.sku}</small>}
+                    {error && (
+                      <span id={`${id}-error`} className="field__error">
+                        {error}
+                      </span>
+                    )}
+                  </th>
+                  <td className="num">{line.quantity}</td>
+                  <td className="num">{line.returnable}</td>
+                  <td className="num">
+                    <label htmlFor={id} className="visually-hidden">
+                      Quantity of {name} to return (up to {line.returnable})
+                    </label>
+                    <input
+                      id={id}
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max={line.returnable}
+                      step="1"
+                      placeholder="0"
+                      disabled={line.returnable === 0}
+                      value={quantities[line.orderItemId]}
+                      aria-invalid={error ? true : undefined}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                      onChange={(event) => setQuantities((current) => ({ ...current, [line.orderItemId]: event.target.value }))}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+      {errors.items && (
+        <p className="field__error" role="alert">
+          {errors.items[0]}
+        </p>
+      )}
+      <Field label="Reason" error={errors.reason?.[0]}>
+        {(a11y) => (
+          <select {...a11y} value={reason} onChange={(event) => setReason(event.target.value)}>
+            <option value="">Choose…</option>
+            {reasons.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      <Field label="Comment (optional)" error={errors.comment?.[0]} hint="What the customer said; they can see it.">
+        {(a11y) => <textarea {...a11y} rows={2} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} />}
+      </Field>
+      {windowClosed && (
+        <label className="checkbox">
+          <input type="checkbox" checked={overrideWindow} onChange={(event) => setOverrideWindow(event.target.checked)} />
+          Allow it although the return window has passed
+        </label>
+      )}
+      <label className="checkbox">
+        <input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} />
+        Email the customer about the return
+      </label>
     </FormDialog>
   )
 }

@@ -83,7 +83,7 @@ export function CheckboxField({ label, error, className, ...inputProps }) {
   )
 }
 
-/** Labelled <select> with the same label/error wiring. `options` = string[]. */
+/** Labelled <select> with the same label/error wiring. `options` = string[], or { value, label }[] when they differ. */
 export function SelectField({ label, error, options, className, ...selectProps }) {
   const id = useId()
   const errorId = `${id}-error`
@@ -99,11 +99,14 @@ export function SelectField({ label, error, options, className, ...selectProps }
         aria-describedby={error ? errorId : undefined}
         {...selectProps}
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const { value, label: text } = typeof option === 'string' ? { value: option, label: option } : option
+          return (
+            <option key={value} value={value}>
+              {text}
+            </option>
+          )
+        })}
       </select>
       {error && (
         <p id={errorId} className="form-field__error">

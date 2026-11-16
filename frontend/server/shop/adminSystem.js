@@ -280,6 +280,8 @@ const SETTINGS = {
   inventory: { low_stock_threshold: 'lowStockThreshold' },
   // Phase 5: reviews wait for approval unless this is off.
   catalog: { reviews_require_approval: 'reviewsRequireApproval' },
+  // Phase 6: returns (RMA).
+  returns: { returns_enabled: 'returnsEnabled', return_window_days: 'returnWindowDays', return_reasons: 'returnReasons' },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']

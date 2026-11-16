@@ -68,7 +68,13 @@ export const fromTotals = (raw = {}) => ({
   // Orders (phase 3): what was paid (invoices) and refunded (credit memos). Carts have neither.
   ...(raw.paid !== undefined && { paid: money(raw.paid) ?? 0 }),
   ...(raw.refunded !== undefined && { refunded: money(raw.refunded) ?? 0 }),
+  // Phase 6: what the customer group's discount took off (already inside the subtotal).
+  ...(raw.group_discount !== undefined && { groupDiscount: money(raw.group_discount) ?? 0 }),
 })
+
+/** Phase 6: the shopper's customer group as the API names it ({ name, discount_percent }), or null. */
+export const fromGroup = (raw) =>
+  raw && typeof raw === 'object' && typeof raw.name === 'string' ? { name: raw.name, discountPercent: Number(raw.discount_percent ?? 0) || 0 } : null
 
 /** A cart or order line: the storefront's item shape (title, thumbnail) plus the server's prices. */
 export const fromLine = (raw) => ({
@@ -83,6 +89,9 @@ export const fromLine = (raw) => ({
   lineTotal: money(raw.line_total),
   // Phase 5: the variant bought ("Size: M / Color: Red"); lines without one keep their old shape.
   ...(Number.isInteger(raw.variant_id) && { variantId: raw.variant_id, variantLabel: str(raw.variant_label) ?? null }),
+  // Phase 6: a customer group's discount on the line. salePrice already includes it;
+  // baseSalePrice is the product's own sale price before it.
+  ...(Number(raw.group_discount_percent) > 0 && { groupDiscountPercent: Number(raw.group_discount_percent), baseSalePrice: money(raw.base_sale_price) }),
 })
 
 const fromProblem = (raw) => ({
@@ -108,6 +117,8 @@ export function fromCart(raw = {}) {
     // Phase 4 tax: false when no country was given, so the tax shown is not final (0).
     totals: fromTotals(raw.totals),
     taxEstimated: (raw.tax_estimated ?? raw.totals?.tax_estimated) === true,
+    // Phase 6: the group the cart was priced for (General for guests).
+    customerGroup: fromGroup(raw.customer_group),
   }
 }
 
@@ -139,6 +150,34 @@ export function fromInvoice(raw) {
   }
 }
 
+/**
+ * Phase 6: whether the customer may return items of this order, and which
+ * (the API's `return_eligibility`). Only orders the customer opens with their
+ * session carry it.
+ */
+export const fromReturnEligibility = (raw) =>
+  raw && typeof raw === 'object'
+    ? {
+        eligible: raw.eligible === true,
+        code: typeof raw.code === 'string' ? raw.code : null,
+        message: str(raw.message) ?? null,
+        deadline: str(raw.deadline) ?? null,
+        windowDays: Number.isInteger(raw.window_days) ? raw.window_days : null,
+        reasons: (Array.isArray(raw.reasons) ? raw.reasons : []).filter((reason) => typeof reason === 'string'),
+        items: (Array.isArray(raw.items) ? raw.items : []).map((item) => ({
+          orderItemId: item.order_item_id,
+          title: str(item.name) ?? '',
+          variantLabel: str(item.variant_label) ?? null,
+          sku: item.sku ?? null,
+          thumbnail: item.thumbnail_url ?? null,
+          ordered: item.ordered ?? 0,
+          returnable: Number.isInteger(item.returnable) ? item.returnable : 0,
+        })),
+      }
+    : null
+
+const fromReturnSummary = (raw) => ({ number: raw.number, status: raw.status, createdAt: raw.created_at ?? null })
+
 const fromHistory = (raw) => ({
   status: raw.status,
   paymentStatus: raw.payment_status ?? null,
@@ -167,6 +206,10 @@ export function fromOrder(raw) {
     shipments: (raw.shipments ?? []).map(fromShipment),
     invoices: (raw.invoices ?? []).map(fromInvoiceSummary),
     creditMemos: (raw.credit_memos ?? []).map(fromCreditMemoSummary),
+    // Phase 6: the price group at the time of the order, returns asked for, and what can still be returned.
+    ...(typeof raw.customer_group === 'string' && { customerGroup: raw.customer_group }),
+    ...(Array.isArray(raw.returns) && { returns: raw.returns.map(fromReturnSummary) }),
+    ...(raw.return_eligibility && { returnEligibility: fromReturnEligibility(raw.return_eligibility) }),
   }
 }
 
@@ -243,6 +286,8 @@ export const laravelShop = {
         shipping_address: toAddress(body.shippingAddress),
         billing_address: toAddress(body.billingAddress),
         expected_total: typeof body.expectedTotal === 'number' ? body.expectedTotal.toFixed(2) : undefined,
+        // Phase 6: signed-in customers can keep the shipping address in their address book.
+        ...(token && body.saveAddress === true && { save_address: true }),
       },
     })
     return answer(result, [200, 201], (data) => fromOrder(data.data))

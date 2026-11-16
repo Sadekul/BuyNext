@@ -53,7 +53,7 @@ class OrderPlacementTest extends TestCase
             ->assertJsonPath('data.items.0', [
                 'product_id' => $this->mascara->id, 'variant_id' => null, 'sku' => $this->mascara->sku, 'name' => $this->mascara->name, 'variant_label' => null,
                 'thumbnail_url' => $this->mascara->thumbnail_url,
-                'price' => '9.99', 'discount_percent' => 10.48, 'sale_price' => '8.94', 'quantity' => 2, 'line_total' => '17.88',
+                'price' => '9.99', 'discount_percent' => 10.48, 'group_discount_percent' => 0, 'sale_price' => '8.94', 'quantity' => 2, 'line_total' => '17.88',
             ])
             ->assertJsonPath('data.history.0.status', 'processing')
             ->assertJsonPath('data.history.0.note', 'Order placed.');

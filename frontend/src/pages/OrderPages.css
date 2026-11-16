@@ -163,3 +163,25 @@
   background: var(--color-sale-soft);
   border-radius: var(--radius-md);
 }
+
+/* Return details (REAL_SHOP) */
+.return-details {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.return-details div {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 3fr;
+  gap: var(--space-4);
+}
+
+.return-details dt {
+  font-weight: 600;
+}
+
+.return-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
