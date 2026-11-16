@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Services\CustomerCarts;
 use App\Services\Pricing;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,11 @@ class CartController extends Controller
         $quote = $pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? $settings->defaultShippingMethod(),
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null,
             group: $customer?->priceGroup()); // phase 6: the customer's group price (guests: General)
+
+        // Phase 7: a signed-in customer's cart is saved (restore on another device, abandoned carts report).
+        if ($customer) {
+            app(CustomerCarts::class)->save($customer, $data['items'], $quote->subtotalCents);
+        }
 
         return response()->json(['data' => $quote->toArray()]);
     }

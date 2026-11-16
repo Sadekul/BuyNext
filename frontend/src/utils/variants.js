@@ -1,3 +1,5 @@
+import { effectiveDiscountPercent } from './pricing'
+
 /*
  * Configurable products (phase 5): a product with options (Size, Color) sells
  * only through a variant, one per combination of option values. The shopper
@@ -74,12 +76,15 @@ export function variantLabel(product, variant) {
  * and label.
  */
 export function withVariant(product, variant) {
+  // The server's final price wins when a catalog price rule makes it lower (phase 7).
+  const discountPercentage = effectiveDiscountPercent(variant.price, product.discountPercentage ?? 0, variant.finalPrice ?? null)
   let availabilityStatus = 'In Stock'
   if (!variant.inStock || variant.stock === 0) availabilityStatus = 'Out of Stock'
   else if (variant.stock !== null && variant.stock <= 5) availabilityStatus = 'Low Stock'
   return {
     ...product,
     price: variant.price,
+    discountPercentage,
     stock: variant.stock,
     sku: variant.sku ?? product.sku,
     availabilityStatus,

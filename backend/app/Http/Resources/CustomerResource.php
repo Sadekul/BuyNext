@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Newsletter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,8 @@ class CustomerResource extends JsonResource
             'email_verified' => $this->email_verified_at !== null,
             // Phase 6: the price group, so the storefront can say "Wholesale price: 10% off at checkout".
             'group' => $this->priceGroup()?->summary(),
+            // Phase 7: the Account → newsletter toggle.
+            'newsletter' => app(Newsletter::class)->isSubscribed($this->resource),
             'created_at' => $this->created_at?->toIso8601ZuluString(),
         ];
     }

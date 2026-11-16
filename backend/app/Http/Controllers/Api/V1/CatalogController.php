@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\SearchTerms;
 use App\Support\CategoryTree;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,14 +15,19 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 /** The public catalog: no sign-in, only products for sale (active, in a visible category). */
 class CatalogController extends Controller
 {
+    public function __construct(private SearchTerms $searchTerms) {}
+
     /**
      * GET /api/v1/products?search&category&brand[]&min_price&max_price&min_rating&available
      *     &sort=price|rating|discount|name|newest&direction=asc|desc&page&per_page
+     * Prices include catalog price rules for everyone (ProductResource); the price filters and
+     * sort use the product's own sale price (rules are matched in PHP, not SQL).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
+            'suggest' => ['nullable', 'boolean'],
             'category' => ['nullable', 'string', 'max:100'],
             'brand' => ['nullable', 'array', 'max:50'],
             'brand.*' => ['string', 'max:80'],
@@ -56,8 +62,21 @@ class CatalogController extends Controller
                 ->whereColumn('stock_quantity', '>=', 'min_order_quantity'));
 
         $this->sort($query, $data['sort'] ?? null, $data['direction'] ?? null);
+        $page = $query->paginate($data['per_page'] ?? 12)->withQueryString();
+        $products = ProductResource::collection($page);
 
-        return ProductResource::collection($query->paginate($data['per_page'] ?? 12)->withQueryString());
+        // Phase 7: search terms. A search is counted (once per visitor per hour) and an exact term with a
+        // redirect tells the storefront where to go (meta.redirect_url; null when the term has none).
+        if (array_key_exists('search', $data) && filled($data['search'])) {
+            $term = SearchTerms::normalize($data['search']);
+            // Typing in the search box asks for suggestions on every few letters: those aren't searches.
+            if (! $request->boolean('suggest')) {
+                $this->searchTerms->record($term, $page->total(), $request->ip());
+            }
+            $products->additional(['meta' => ['redirect_url' => $this->searchTerms->redirectFor($term)]]);
+        }
+
+        return $products;
     }
 
     /**

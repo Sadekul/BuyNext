@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router'
 import { LuMail, LuPhone } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
+import PageMeta from '../components/common/PageMeta'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import NotFoundPage from './NotFoundPage'
@@ -9,6 +10,7 @@ import { useStoreSettings } from '../hooks/useStoreSettings'
 import { cmsPageQuery } from '../queries/contentQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
+import { toDescription } from '../utils/pageMeta'
 import './CmsPage.css'
 
 /**
@@ -89,8 +91,7 @@ function CmsPage() {
   const page = pageRequest.data
   return (
     <div className="section container">
-      <title>{`${page.metaTitle ?? page.title} | ${SITE.name}`}</title>
-      {page.metaDescription && <meta name="description" content={page.metaDescription} />}
+      <PageMeta title={page.metaTitle ?? page.title} description={toDescription(page.metaDescription ?? page.body)} canonicalPath={ROUTES.page(page.slug ?? slug)} />
       <Breadcrumb items={[{ label: 'Home', to: ROUTES.home }, { label: page.title }]} />
       <article className="cms-page" aria-labelledby="cms-page-title">
         <h1 id="cms-page-title" className="cms-page__title">

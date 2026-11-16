@@ -16,7 +16,10 @@ class AdminPermissionsTest extends TestCase
     use PlacesOrders, RefreshDatabase;
 
     // The only admin routes anyone signed in (or not yet) may use.
-    private const OPEN = ['POST api/admin/v1/auth/login', 'POST api/admin/v1/auth/refresh', 'POST api/admin/v1/auth/logout', 'GET api/admin/v1/me'];
+    private const OPEN = ['POST api/admin/v1/auth/login', 'POST api/admin/v1/auth/refresh', 'POST api/admin/v1/auth/logout', 'GET api/admin/v1/me',
+        // Phase 7: filtered by each notification's permission / only the admin's own preferences.
+        'GET api/admin/v1/notifications', 'POST api/admin/v1/notifications/read-all', 'POST api/admin/v1/notifications/{id}/read',
+        'GET api/admin/v1/preferences/{key}', 'PUT api/admin/v1/preferences/{key}'];
 
     /** @return list<RoutingRoute> */
     private function adminRoutes(): array
@@ -45,7 +48,9 @@ class AdminPermissionsTest extends TestCase
                 continue;
             }
             $this->assertCount(1, $permissions, $this->routeName($route).' has no can.admin:<permission> middleware');
-            $this->assertTrue(Permissions::exists($permissions->first()), $this->routeName($route)." uses an unknown permission {$permissions->first()}");
+            foreach (explode('|', $permissions->first()) as $key) {
+                $this->assertTrue(Permissions::exists($key), $this->routeName($route)." uses an unknown permission {$key}");
+            }
         }
     }
 
@@ -69,6 +74,17 @@ class AdminPermissionsTest extends TestCase
                 ]);
         }
         $this->asAdmin($headers, 'GET', '/api/admin/v1/me')->assertOk()->assertJsonPath('data.permissions', []);
+    }
+
+    public function test_marketing_can_load_the_lookups_its_rule_forms_need_but_not_customers(): void
+    {
+        $headers = $this->signInAdmin(Admin::factory()->role(['coupons.view', 'coupons.edit', 'price_rules.manage'])->create());
+
+        $this->asAdmin($headers, 'GET', '/api/admin/v1/customer-groups')->assertOk();
+        $this->asAdmin($headers, 'GET', '/api/admin/v1/categories')->assertOk();
+        $this->asAdmin($headers, 'GET', '/api/admin/v1/products')->assertOk();
+        $this->asAdmin($headers, 'GET', '/api/admin/v1/customers')->assertForbidden();
+        $this->asAdmin($headers, 'GET', '/api/admin/v1/products/1')->assertForbidden();
     }
 
     public function test_me_lists_the_role_and_its_permissions(): void

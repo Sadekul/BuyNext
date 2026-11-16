@@ -11,6 +11,9 @@ import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { MAX_DEPTH, descendantIds, siblingsOf, slugify, withPaths } from '../utils/categories'
 import { formatCount } from '../utils/format'
+// Phase 7: after a delete, offer a redirect from the category's address.
+import RedirectOffer from '../components/RedirectOffer'
+import { storePaths } from '../utils/redirects'
 
 const ACTIVE = { tone: 'success', label: 'Active' }
 const HIDDEN = { tone: 'neutral', label: 'Inactive' }
@@ -29,6 +32,7 @@ function CategoriesPage() {
   const [dialog, setDialog] = useState(null) // { category? , parentId? }
   const [toDelete, setToDelete] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [deleted, setDeleted] = useState(null) // { category, parentSlug } just deleted
   const [announcement, setAnnouncement] = useState('')
   const noticeRef = useRef(null)
   const opener = useRef(null)
@@ -66,8 +70,10 @@ function CategoriesPage() {
     mutationFn: (category) => deleteCategory(category.id),
     onSuccess: async (_, category) => {
       setToDelete(null)
+      const parentSlug = list.find((item) => item.id === category.parentId)?.slug ?? null
       await refresh()
       say(`${category.name} was deleted.`)
+      setDeleted({ category, parentSlug })
     },
     // Still has subcategories or products: the server's message says how many.
     onError: (error) => {
@@ -191,6 +197,15 @@ function CategoriesPage() {
       <p className="visually-hidden" aria-live="polite">
         {announcement}
       </p>
+      {deleted && (
+        <RedirectOffer
+          key={deleted.category.id}
+          fromPath={storePaths.category(deleted.category)}
+          suggestedTo={deleted.parentSlug ? `/categories/${deleted.parentSlug}` : '/products'}
+          what={`the deleted category ${deleted.category.name}`}
+          onClose={() => setDeleted(null)}
+        />
+      )}
 
       {categories.isPending && <Loading label="Loading categories…" />}
       {categories.error && <ErrorState error={categories.error} onRetry={categories.refetch} />}

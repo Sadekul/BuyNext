@@ -14,7 +14,7 @@ import { CUSTOMER, clearedCookies, notSignedIn, sessionCookies } from './session
  *   POST /api/auth/login            { email | username, password, remember } → profile
  *   GET  /api/auth/me                                                        → profile
  *   POST /api/auth/refresh                                                   → { ok: true }
- *   PUT  /api/auth/profile          { firstName, lastName, phone }           → profile
+ *   PUT  /api/auth/profile          { firstName, lastName, phone, newsletter? } → profile (newsletter: Laravel accounts, phase 7)
  *   POST /api/auth/logout                                                    → { ok: true }
  * Laravel accounts only (DummyJSON answers 404):
  *   POST /api/auth/register         { firstName, lastName, email, phone, password, confirmPassword, acceptTerms }

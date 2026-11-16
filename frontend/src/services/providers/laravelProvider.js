@@ -37,7 +37,7 @@ export const laravelProvider = {
     searchProducts: (query, options) => ({ path: '/api/catalog/products', params: { search: query, ...pageParams(options) } }),
     productsByCategory: (slug, options) => ({ path: '/api/catalog/products', params: { category: slug, ...pageParams(options) } }),
     productDetail: (id) => ({ path: `/api/catalog/products/${encodeURIComponent(id)}` }),
-    suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit } }),
+    suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit, suggest: 1 } }),
     categories: () => ({ path: '/api/catalog/categories' }),
   },
   adapter: {

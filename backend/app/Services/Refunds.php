@@ -211,7 +211,11 @@ class Refunds
     private function paidShares(Order $order): array
     {
         $lineCents = $order->items->mapWithKeys(fn (OrderItem $item) => [$item->id => Pricing::toCents($item->line_total)])->all();
-        $discountShares = $this->share(Pricing::toCents($order->discount_total), $lineCents);
+        // Phase 7: each line's own share of the cart rules (a rule for some lines only never touches the others);
+        // orders from before share the order's discount in proportion.
+        $discountShares = $order->items->every(fn (OrderItem $item) => $item->discount_amount !== null)
+            ? $order->items->mapWithKeys(fn (OrderItem $item) => [$item->id => Pricing::toCents($item->discount_amount)])->all()
+            : $this->share(Pricing::toCents($order->discount_total), $lineCents);
         $paid = array_map(fn ($id) => $lineCents[$id] - $discountShares[$id], array_combine(array_keys($lineCents), array_keys($lineCents)));
         $shipping = Pricing::toCents($order->shipping_total);
 
@@ -229,32 +233,9 @@ class Refunds
         return [$paid, $shipping];
     }
 
-    /**
-     * Splits $total over $weights (key => cents) in proportion, in whole cents
-     * that add up exactly: each share is floored, and the leftover cents go
-     * to the biggest dropped fractions first (then the earlier key).
-     */
     private function share(int $total, array $weights): array
     {
-        $sum = array_sum($weights);
-        $shares = [];
-        $dropped = [];
-        foreach ($weights as $key => $weight) {
-            $exact = $sum > 0 ? $total * $weight : 0; // share × sum, kept in integers
-            $shares[$key] = $sum > 0 ? intdiv($exact, $sum) : 0;
-            $dropped[$key] = $sum > 0 ? $exact % $sum : 0;
-        }
-        $order = array_flip(array_keys($weights)); // the earlier key wins a tie
-        $leftover = $total - array_sum($shares);
-        uksort($dropped, fn ($a, $b) => [$dropped[$b], $order[$a]] <=> [$dropped[$a], $order[$b]]);
-        foreach (array_keys($dropped) as $key) {
-            if ($leftover-- <= 0) {
-                break;
-            }
-            $shares[$key]++;
-        }
-
-        return $shares;
+        return Pricing::share($total, $weights);
     }
 
     /** Puts refunded units back in stock (the variant, for variant lines): only products that still exist (not deleted). */

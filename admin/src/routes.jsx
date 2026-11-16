@@ -31,6 +31,14 @@ import { ShipmentDetailPage, ShipmentsPage } from './pages/ShipmentsPages'
 import { ReturnDetailPage, ReturnsPage } from './pages/ReturnsPages'
 import { InvoicesPrintPage, PackingSlipsPrintPage } from './pages/PrintPages'
 import { firstAllowedPath } from './utils/permissions'
+// Phase 7 (system): email templates and URL redirects.
+import { EmailTemplateEditorPage, EmailTemplatesPage } from './pages/EmailTemplatesPages'
+import RedirectsPage from './pages/RedirectsPage'
+// Phase 7 (marketing): price rules, newsletter, abandoned carts, search terms.
+import { CatalogRuleFormPage, CatalogRulesPage } from './pages/CatalogRulesPages'
+import { CampaignEditorPage, CampaignsPage, SubscribersPage } from './pages/NewsletterPages'
+import AbandonedCartsPage from './pages/AbandonedCartsPage'
+import SearchTermsPage from './pages/SearchTermsPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -89,6 +97,20 @@ export function AdminRoutes() {
             <Route path="admins" element={guarded('admins.manage', <AdminUsersPage />)} />
             <Route path="roles" element={guarded('admins.manage', <RolesPage />)} />
             <Route path="audit" element={guarded('audit.view', <AuditLogPage />)} />
+            {/* Phase 7 (system): email templates and URL redirects. */}
+            <Route path="email-templates" element={guarded('email_templates.manage', <EmailTemplatesPage />)} />
+            <Route path="email-templates/:templateKey" element={guarded('email_templates.manage', <EmailTemplateEditorPage />)} />
+            <Route path="redirects" element={guarded('seo.manage', <RedirectsPage />)} />
+            {/* Phase 7 (marketing): price rules (read with coupons.view), newsletter, abandoned carts, search terms. */}
+            <Route path="catalog-rules" element={guarded('coupons.view', <CatalogRulesPage />)} />
+            <Route path="catalog-rules/new" element={guarded('price_rules.manage', <CatalogRuleFormPage />)} />
+            <Route path="catalog-rules/:ruleId" element={guarded('coupons.view', <CatalogRuleFormPage />)} />
+            <Route path="newsletter/subscribers" element={guarded('newsletter.view', <SubscribersPage />)} />
+            <Route path="newsletter/campaigns" element={guarded('newsletter.view', <CampaignsPage />)} />
+            <Route path="newsletter/campaigns/new" element={guarded('newsletter.send', <CampaignEditorPage />)} />
+            <Route path="newsletter/campaigns/:campaignId" element={guarded('newsletter.view', <CampaignEditorPage />)} />
+            <Route path="abandoned-carts" element={guarded('reports.view', <AbandonedCartsPage />)} />
+            <Route path="search-terms" element={guarded('reports.view', <SearchTermsPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

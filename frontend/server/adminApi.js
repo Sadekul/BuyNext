@@ -2,6 +2,10 @@ import { json, pick, readBody, upstream } from './http.js'
 import { accounts } from './accounts/index.js'
 import { laravelAdminData } from './shop/admin.js'
 import { SYSTEM_ROUTES, isReportName } from './adminSystemApi.js'
+// Phase 7 (marketing): price rules, cart-rule coupon fields, newsletter, abandoned carts, search terms.
+import { COUPON_KINDS, checkCouponRuleFields, matchMarketingRoute } from './adminMarketingApi.js'
+// Phase 7 (system): email templates, URL redirects, notifications, grid preferences.
+import { CONTENT_RESOURCES, matchContentRoute } from './adminContentApi.js'
 import { CATALOG_ROUTES, NAMED_ACTIONS, PRODUCT_PARTS } from './adminCatalogApi.js'
 import { laravelCatalogData } from './shop/adminCatalog.js'
 import {
@@ -63,7 +67,9 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  *   GET    /api/admin/invoices/:number             (INV-100001)
  *   GET    /api/admin/credit-memos?q&limit&skip    → { creditMemos, total, limit, skip }
  *   GET    /api/admin/credit-memos/:number         (CM-100001)
- *   GET    /api/admin/coupons?q&status&limit&skip  (status: active | inactive | scheduled | expired | used_up)
+ *   GET    /api/admin/coupons?q&status&kind&limit&skip  (status: active | inactive | scheduled | expired | used_up; phase 7 kind: code | automatic)
+ *            phase 7 coupon fields: customerGroupIds, appliesTo (all | categories | products), categoryIds, productIds, freeShipping,
+ *            buyQuantity, getQuantity (type buy_x_get_y), autoApply (code null)
  *   POST   /api/admin/coupons                      → 201 { coupon } (validated)
  *   GET    /api/admin/coupons/:id
  *   PATCH  /api/admin/coupons/:id                  → { coupon } (validated, partial)
@@ -129,7 +135,8 @@ const ID_FORMATS = {
 }
 const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable', 'packing-slip', 'returns']
 const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
-const COUPON_TYPES = ['percent', 'fixed', 'free_shipping']
+// Phase 7 (marketing): + buy_x_get_y.
+const COUPON_TYPES = ['percent', 'fixed', 'free_shipping', 'buy_x_get_y']
 const COUPON_FILTERS = ['active', 'inactive', 'scheduled', 'expired', 'used_up']
 const notFound = (what = 'That item') => json({ message: `${what} was not found.` }, 404)
 const passThrough = ({ status, data }) => json({ message: data?.message ?? 'The request failed.' }, status)
@@ -151,6 +158,9 @@ const PRODUCT_RULES = {
   discountPercentage: (value) => (typeof value === 'number' && value >= 0 && value <= 90 ? null : 'Enter a discount from 0 to 90%.'),
   stock: (value) => (Number.isInteger(value) && value >= 0 && value <= 100_000 ? null : 'Enter a whole number of units from 0 to 100,000.'),
   status: (value) => (PRODUCT_STATUSES.includes(value) ? null : 'Choose active, draft, or archived.'),
+  // Phase 7 (system): SEO; empty or null = none (the store falls back to the name and description).
+  metaTitle: (value) => (value === null || (typeof value === 'string' && value.trim().length <= 190) ? null : 'Keep the meta title under 190 characters.'),
+  metaDescription: (value) => (value === null || (typeof value === 'string' && value.trim().length <= 500) ? null : 'Keep the meta description under 500 characters.'),
 }
 const REQUIRED_ON_CREATE = ['title', 'category', 'price', 'stock']
 
@@ -166,6 +176,8 @@ export function validateProduct(body, { partial }) {
     if (problem) errors[field] = [problem]
     else values[field] = typeof body[field] === 'string' ? body[field].trim() : body[field]
   }
+  // Phase 7 (system): a blank meta field is stored as null.
+  for (const field of ['metaTitle', 'metaDescription']) if (values[field] === '') values[field] = null
   if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) {
     errors.title = ['Change at least one field.']
   }
@@ -235,10 +247,11 @@ export function validateCreditMemo(body) {
 const nullable = (rule) => (value) => (value === null ? null : rule(value))
 const isDate = (value) => typeof value === 'string' && value.length <= 40 && /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(value) && !Number.isNaN(Date.parse(value))
 const COUPON_RULES = {
-  code: (value) => (typeof value === 'string' && /^[A-Za-z0-9_-]{3,40}$/.test(value.trim()) ? null : 'Use 3 to 40 letters, digits, dashes, or underscores.'),
+  // Phase 7 (marketing): null for an automatic rule (checkCouponRuleFields decides when it's needed).
+  code: nullable((value) => (typeof value === 'string' && /^[A-Za-z0-9_-]{3,40}$/.test(value.trim()) ? null : 'Use 3 to 40 letters, digits, dashes, or underscores.')),
   // Empty: the API writes one from the rules ("10% off your order").
   description: nullable((value) => (typeof value === 'string' && value.trim().length <= 255 ? null : 'Keep the description under 255 characters (shoppers see it).')),
-  type: (value) => (COUPON_TYPES.includes(value) ? null : 'Choose percent, fixed amount, or free shipping.'),
+  type: (value) => (COUPON_TYPES.includes(value) ? null : 'Choose percent, fixed amount, free shipping, or buy X get Y.'),
   value: (value) => (isMoney(value) ? null : 'Enter a value of 0 or more with at most 2 decimals.'),
   minSubtotal: nullable((value) => (isMoney(value) ? null : 'Enter a minimum of 0 or more with at most 2 decimals, or leave it empty.')),
   startsAt: nullable((value) => (isDate(value) ? null : 'Enter a valid start date, or leave it empty.')),
@@ -254,7 +267,7 @@ export function validateCoupon(body, { partial }) {
   const values = {}
   for (const [field, rule] of Object.entries(COUPON_RULES)) {
     if (body[field] === undefined) {
-      if (!partial && ['code', 'type'].includes(field)) errors[field] = [rule(undefined)]
+      if (!partial && field === 'type') errors[field] = [rule(undefined)]
       continue
     }
     const problem = rule(body[field])
@@ -263,7 +276,9 @@ export function validateCoupon(body, { partial }) {
   }
   if (values.code) values.code = values.code.toUpperCase()
   if (values.description === '') values.description = null
-  if (values.type === 'free_shipping') values.value = 0 // free shipping has no amount
+  // Phase 7 (marketing): groups, eligible lines, free shipping, buy X get Y, automatic rules (adminMarketingApi.js).
+  checkCouponRuleFields(body, values, errors, { partial })
+  if (values.type === 'free_shipping' || values.type === 'buy_x_get_y') values.value = 0 // no amount: free shipping, or the free units
   else if (values.type && values.value === undefined && !errors.value && !partial) errors.value = ['Enter the discount.']
   if (values.type === 'percent' && values.value !== undefined && (values.value < 1 || values.value > 100)) errors.value = ['Enter a percentage from 1 to 100.']
   if (values.type === 'fixed' && values.value !== undefined && values.value <= 0) errors.value = ['Enter an amount above 0.']
@@ -509,7 +524,8 @@ const ROUTES = {
 
   async 'GET coupons'(ctx) {
     if (!realData()) return liveOnly()
-    const filters = { ...listFilters(ctx.url), status: oneOf(ctx.url.searchParams.get('status'), COUPON_FILTERS) }
+    // Phase 7 (marketing): ?kind=code|automatic.
+    const filters = { ...listFilters(ctx.url), status: oneOf(ctx.url.searchParams.get('status'), COUPON_FILTERS), kind: oneOf(ctx.url.searchParams.get('kind'), COUPON_KINDS) }
     return fromLaravel(await laravelAdminData.listCoupons(ctx.token, filters, ctx.request))
   },
 
@@ -580,6 +596,11 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 7 (marketing): catalog-rules, newsletter, search-terms, reports/abandoned-carts, reports/search-terms.
+  const marketing = matchMarketingRoute(method, segments)
+  if (marketing !== undefined) return marketing
+  // Phase 7 (system): email-templates, redirects, notifications, preferences (adminContentApi.js has their routes).
+  if (CONTENT_RESOURCES.includes(segments[0])) return matchContentRoute(method, segments)
   const [resource, id, document, ...rest] = segments
   // Phase 5: actions on a list (products/bulk) and a product's parts (products/1/images/2).
   if (document === undefined && [...NAMED_ACTIONS, ...SALES_NAMED_ACTIONS].includes(`${resource}/${id}`)) return { route: ROUTES[`${method} ${resource}/${id}`] }

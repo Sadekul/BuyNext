@@ -43,10 +43,18 @@ final class Permissions
         'marketing' => ['label' => 'Marketing', 'permissions' => [
             'coupons.view' => 'View coupons',
             'coupons.edit' => 'Create, edit, and delete coupons',
+            // Phase 7 (part A): catalog price rules (reading them needs coupons.view).
+            'price_rules.manage' => 'Create, edit, and delete catalog price rules',
+            // Phase 7 (part B): newsletter.
+            'newsletter.view' => 'View newsletter subscribers and campaigns',
+            'newsletter.send' => 'Write and send newsletters, unsubscribe subscribers, send cart reminders',
         ]],
         'content' => ['label' => 'Content', 'permissions' => [
             'content.view' => 'View pages and home page content',
             'content.edit' => 'Edit pages and home page content',
+            // Phase 7 (part B): email templates and SEO (sitemap, URL redirects, search terms).
+            'email_templates.manage' => 'Edit, test, and reset email templates',
+            'seo.manage' => 'Manage URL redirects and search term redirects',
         ]],
         'reports' => ['label' => 'Reports', 'permissions' => [
             'reports.view' => 'View and download reports',
@@ -99,7 +107,9 @@ final class Permissions
             ['name' => 'Catalog manager', 'description' => 'Products and categories.', 'is_system' => false,
                 'permissions' => ['products.view', 'products.edit', 'products.delete', 'categories.edit', 'products.import', 'reviews.view', 'reviews.moderate']],
             ['name' => 'Marketing', 'description' => 'Coupons and content.', 'is_system' => false,
-                'permissions' => ['coupons.view', 'coupons.edit', 'content.view', 'content.edit']],
+                'permissions' => ['coupons.view', 'coupons.edit', 'content.view', 'content.edit',
+                    'newsletter.view', 'newsletter.send', 'seo.manage', // phase 7 (part B)
+                    'price_rules.manage']], // phase 7 (part A)
             ['name' => 'Viewer', 'description' => 'Can look at everything, change nothing.', 'is_system' => false, 'permissions' => $views],
         ];
     }

@@ -56,7 +56,15 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
 
   function submitSearch() {
     if (!trimmedQuery) return
-    goTo(`${ROUTES.products}?q=${encodeURIComponent(trimmedQuery)}`)
+    // The store can send an exact term straight to a page (phase 7 search
+    // redirects): the suggestions for this very term already carry it.
+    const redirect = trimmedQuery === debouncedQuery ? request.data?.redirectUrl : null
+    if (redirect && !redirect.startsWith('/')) {
+      onSearch?.(trimmedQuery)
+      window.location.assign(redirect)
+      return
+    }
+    goTo(redirect ?? `${ROUTES.products}?q=${encodeURIComponent(trimmedQuery)}`)
   }
 
   function handleSubmit(event) {

@@ -202,3 +202,10 @@
 .product-details__stock--choose {
   color: var(--color-text-muted);
 }
+
+/* Phase 7: the name of the sale (catalog price rule) behind the price. */
+.product-details__price-rule {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-sale);
+}

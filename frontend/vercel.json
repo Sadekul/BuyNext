@@ -6,6 +6,8 @@
   "redirects": [{ "source": "/admin", "destination": "/admin/", "permanent": false }],
   "rewrites": [
     { "source": "/media/:path*", "destination": "/api/media/:path*" },
+    { "source": "/sitemap.xml", "destination": "/api/seo/sitemap.xml" },
+    { "source": "/robots.txt", "destination": "/api/seo/robots.txt" },
     { "source": "/admin/((?!assets/).*)", "destination": "/admin/index.html" },
     { "source": "/((?!api/|admin/|media/).*)", "destination": "/index.html" }
   ],

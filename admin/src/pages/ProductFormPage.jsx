@@ -11,7 +11,7 @@ import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
-import { EMPTY_PRODUCT, productSchema } from '../utils/productSchema'
+import { EMPTY_PRODUCT, LIVE_ONLY_FIELDS, productSchema } from '../utils/productSchema'
 import { formatMoney } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
@@ -88,8 +88,8 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
 
   const save = useMutation({
     mutationFn: (values) => {
-      // The demo has no product status: don't send it.
-      const sent = LIVE_DATA ? values : Object.fromEntries(Object.entries(values).filter(([field]) => field !== 'status'))
+      // The demo has no product status or SEO fields: don't send them.
+      const sent = LIVE_DATA ? values : Object.fromEntries(Object.entries(values).filter(([field]) => !LIVE_ONLY_FIELDS.includes(field)))
       return isNew ? createProduct(sent) : updateProduct(productId, sent)
     },
     onSuccess: (response, values) => {
@@ -185,6 +185,19 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
           {(a11y) => <textarea {...a11y} rows={5} {...register('description')} />}
         </Field>
       </div>
+      {LIVE_DATA && (
+        <fieldset className="form__fieldset seo-fields">
+          <legend>Search engines</legend>
+          <div className="form__grid">
+            <Field label="Meta title (optional)" error={errors.metaTitle?.message} hint="The browser tab and search result title. Empty: the product name.">
+              {(a11y) => <input {...a11y} maxLength={190} {...register('metaTitle')} />}
+            </Field>
+            <Field label="Meta description (optional)" error={errors.metaDescription?.message} hint="The search result snippet. Empty: the start of the description." className="seo-fields__wide">
+              {(a11y) => <textarea {...a11y} rows={2} maxLength={500} {...register('metaDescription')} />}
+            </Field>
+          </div>
+        </fieldset>
+      )}
 
       <div className="form__actions">
         {can('products.edit') ? (

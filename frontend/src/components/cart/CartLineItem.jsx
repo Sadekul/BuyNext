@@ -42,6 +42,8 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, pricedLine
           {hasDiscount && <s>{formatPrice(originalPrice)}</s>}
           <span className="visually-hidden"> each</span>
         </p>
+        {/* Phase 7: the catalog price rule that set this price ("VIP price", "Black Friday"). */}
+        {server?.priceLabel && <p className="cart-line__price-label">{server.priceLabel}</p>}
         {server?.groupDiscountPercent > 0 && <p className="cart-line__group">Includes your {Number(server.groupDiscountPercent.toFixed(2))}% group discount</p>}
         {/* Announced through the page's summary live region, not individually. */}
         {item.notice && <p className="cart-line__notice">{item.notice}</p>}

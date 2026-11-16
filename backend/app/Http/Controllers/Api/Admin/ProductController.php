@@ -21,7 +21,7 @@ class ProductController extends Controller
 {
     // What the audit log records about a product (not counters like ratings).
     private const AUDITED = ['name', 'sku', 'status', 'price', 'discount_percent', 'stock_quantity', 'min_order_quantity',
-        'category_id', 'brand_id', 'description', 'thumbnail_url'];
+        'category_id', 'brand_id', 'description', 'thumbnail_url', 'meta_title', 'meta_description'];
 
     public function __construct(private Audit $audit) {}
 
@@ -176,6 +176,9 @@ class ProductController extends Controller
                 Rule::unique('products', 'sku')->ignore($product?->id), Rule::unique('product_variants', 'sku')],
             'brand' => ['nullable', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:5000'],
+            // Phase 7: SEO (empty = use the name / description).
+            'meta_title' => ['nullable', 'string', 'max:190'],
+            'meta_description' => ['nullable', 'string', 'max:500'],
             'discount_percent' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:90'],
             'status' => ['nullable', Rule::in(Product::STATUSES)],
             'min_order_quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
@@ -222,6 +225,11 @@ class ProductController extends Controller
         foreach (['price', 'stock_quantity', 'description'] as $field) {
             if (array_key_exists($field, $data)) {
                 $product->{$field} = $data[$field];
+            }
+        }
+        foreach (['meta_title', 'meta_description'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $product->{$field} = filled($data[$field]) ? trim($data[$field]) : null;
             }
         }
         if (array_key_exists('category', $data)) {

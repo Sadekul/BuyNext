@@ -41,7 +41,12 @@ await addToCart(page, 123)
 
 // 1. The first shopper signs in: her guest items come with her
 await storefrontSignIn(page, SHOPPER)
+// The guest items move into the account right after sign-in (and the saved cart is restored): give it a moment.
 let counts = await headerCounts(page)
+for (let waited = 0; waited < 5000 && !(counts.wishlist === 1 && counts.cart >= 1); waited += 250) {
+  await page.waitForTimeout(250)
+  counts = await headerCounts(page)
+}
 log(counts.wishlist === 1 && counts.cart >= 1, `guest items carried into the account on sign-in (${JSON.stringify(counts)})`)
 
 // 2. The first shopper saves two more and adds to the cart

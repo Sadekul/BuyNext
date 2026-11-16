@@ -11,10 +11,13 @@ export const STORAGE_KEYS = {
   // The signed-in customer's name and avatar for the header. No tokens: the
   // session itself lives in HttpOnly cookies (server/authBff.js).
   profile: 'buynest.session.v2',
+  // Phase 7 (REAL_SHOP): the cart lines the server last saved for the account
+  // ("<key>.user-<id>"), so signing in again doesn't add them twice (hooks/useSavedCartSync.js).
+  cartSync: 'buynest.cartSync.v1',
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */
-export const ACCOUNT_STORES = [STORAGE_KEYS.cart, STORAGE_KEYS.wishlist, STORAGE_KEYS.orders]
+export const ACCOUNT_STORES = [STORAGE_KEYS.cart, STORAGE_KEYS.wishlist, STORAGE_KEYS.orders, STORAGE_KEYS.cartSync]
 
 /**
  * Older keys that may still hold data from previous versions (v1 sessions held

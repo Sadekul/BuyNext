@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Coupon;
 use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -20,7 +19,7 @@ use Illuminate\Support\Collection;
  */
 class Pricing
 {
-    public function __construct(private Settings $settings) {}
+    public function __construct(private Settings $settings, private CatalogRules $catalogRules, private CartRules $cartRules) {}
 
     /** "9.99" → 999. Decimal strings from the database have 2 places, so this is exact. */
     public static function toCents(string|int|float $amount): int
@@ -108,7 +107,7 @@ class Pricing
             $product = $products->get($productId);
             $variant = $variantId ? $variants->get($variantId) : null;
             $problem = $this->problemWith($product, $variantId ?: null, $variant, $quantity, $tree);
-            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null, $groupBasisPoints);
+            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null, $groupBasisPoints, $group);
             if ($problem) {
                 $problems[] = ['product_id' => $productId, 'variant_id' => $variantId ?: null, ...$problem];
             }
@@ -120,15 +119,25 @@ class Pricing
         $subtotal = array_sum(array_column($charged, 'line_cents'));
         $groupDiscount = array_sum(array_map(fn ($line) => ($line['base_sale_cents'] - $line['sale_cents']) * $line['quantity'], $charged));
 
-        [$coupon, $discount, $couponError, $couponRecord] = $this->coupon($couponCode, $subtotal, $customerId, $email, $lock);
+        // Phase 7: cart price rules (the best automatic rule + the typed code), each spread over its eligible lines.
+        // The best automatic rule is chosen with the chosen method's normal price (what free shipping would save).
+        $methods = $this->settings->shippingMethods();
+        $chosenId = isset($methods[$shippingMethod]) ? $shippingMethod : (isset($methods[$this->settings->defaultShippingMethod()])
+            ? $this->settings->defaultShippingMethod() : array_key_first($methods));
+        $rules = $this->cartRules->apply($lines, $couponCode, $subtotal, $customerId, $email, $group,
+            $chosenId !== null ? $methods[$chosenId]['price_cents'] : 0, $lock);
+        foreach ($lines as $key => $line) {
+            $lines[$key]['discount_cents'] = $line['available'] ? ($rules['line_discounts'][$key] ?? 0) : null;
+        }
+        $discount = $rules['discount_cents'];
         $afterDiscount = $subtotal - $discount;
         $freeStandard = $afterDiscount >= $this->settings->cents('free_shipping_threshold');
-        // A free_shipping coupon makes every method free (not just standard).
-        $freeEverything = $couponRecord?->type === 'free_shipping';
+        // A free-shipping rule makes every method free (not just standard).
+        $freeEverything = $rules['free_shipping'];
 
         // Only the methods switched on in the settings (with their prices from there).
         $options = [];
-        foreach ($this->settings->shippingMethods() as $id => $method) {
+        foreach ($methods as $id => $method) {
             $options[$id] = [
                 'id' => $id,
                 'label' => $method['label'],
@@ -143,8 +152,8 @@ class Pricing
         return new CartQuote(
             lines: $lines,
             problems: $problems,
-            coupon: $coupon,
-            couponError: $couponError,
+            coupon: $rules['coupon'],
+            couponError: $rules['error'],
             shippingMethod: $method,
             shippingOptions: array_values($options),
             itemCount: $itemCount,
@@ -154,10 +163,11 @@ class Pricing
             taxCents: $tax,
             // Prices that already include tax: the tax is shown, but not added again.
             totalCents: $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax),
-            couponId: $couponRecord?->id,
+            couponId: collect($rules['applied'])->map(fn ($rule) => $rule['coupon'])->first(fn ($rule) => ! $rule->auto_apply)?->id,
             taxEstimated: ! $this->settings->get('tax_enabled') || $country !== null,
             group: $group,
             groupDiscountCents: $groupDiscount,
+            appliedRules: $rules['applied'],
         );
     }
 
@@ -182,26 +192,32 @@ class Pricing
     }
 
     /**
-     * [coupon|null, discount cents, error|null, Coupon|null]. The rules live in
-     * the coupons table (Coupon::problemFor() has the checks and messages).
-     * With $lock (checkout) the coupon row stays locked until the order is
-     * written, so two checkouts can't both take the last use.
+     * Splits $total over $weights (key => cents) in proportion, in whole cents
+     * that add up exactly: each share is floored, and the leftover cents go
+     * to the biggest dropped fractions first (then the earlier key).
+     * Used for cart rule discounts (eligible lines) and refunds.
      */
-    public function coupon(?string $code, int $subtotalCents, ?int $customerId = null, ?string $email = null, bool $lock = false): array
+    public static function share(int $total, array $weights): array
     {
-        $code = Coupon::normalize($code);
-        if ($code === '') {
-            return [null, 0, null, null];
+        $sum = array_sum($weights);
+        $shares = [];
+        $dropped = [];
+        foreach ($weights as $key => $weight) {
+            $exact = $sum > 0 ? $total * $weight : 0; // share × sum, kept in integers
+            $shares[$key] = $sum > 0 ? intdiv($exact, $sum) : 0;
+            $dropped[$key] = $sum > 0 ? $exact % $sum : 0;
+        }
+        $order = array_flip(array_keys($weights)); // the earlier key wins a tie
+        $leftover = $total - array_sum($shares);
+        uksort($dropped, fn ($a, $b) => [$dropped[$b], $order[$a]] <=> [$dropped[$a], $order[$b]]);
+        foreach (array_keys($dropped) as $key) {
+            if ($leftover-- <= 0) {
+                break;
+            }
+            $shares[$key]++;
         }
 
-        $query = Coupon::where('code', $code);
-        $record = ($lock ? $query->lockForUpdate() : $query)->first();
-        $problem = $record ? $record->problemFor($subtotalCents, $customerId, $email) : 'This code is not valid.';
-        if ($problem) {
-            return [null, 0, $problem, null];
-        }
-
-        return [['code' => $record->code, 'description' => $record->description], $record->discountCents($subtotalCents), null, $record];
+        return $shares;
     }
 
     /** Products by id, including deleted ones (so the cart can say "no longer available"). */
@@ -245,12 +261,13 @@ class Pricing
     }
 
     private function line(int $productId, ?int $variantId, ?Product $product, ?ProductVariant $variant, int $quantity, ?string $problem,
-        int $groupBasisPoints = 0): array
+        int $groupBasisPoints = 0, ?CustomerGroup $group = null): array
     {
         $available = $product !== null && ! in_array($problem, self::UNAVAILABLE, true);
         $sellsVariant = $available && $variant !== null;
         $priceCents = $available ? ($sellsVariant ? $variant->priceCents($product) : $product->priceCents()) : null;
-        $baseSaleCents = $available ? ($sellsVariant ? $variant->salePriceCents($product) : $product->salePriceCents()) : null;
+        // Phase 7: the own sale price, or a catalog price rule's when lower (for everyone or the shopper's group).
+        [$baseSaleCents, $rule] = $available ? $this->catalogRules->price($product, $sellsVariant ? $variant : null, $group) : [null, null];
         $saleCents = $available ? self::groupPriceCents($baseSaleCents, $groupBasisPoints) : null;
 
         return [
@@ -266,6 +283,8 @@ class Pricing
             'discount_percent' => $available ? (float) $product->discount_percent : null,
             'group_discount_percent' => $available ? $groupBasisPoints / 100 : null,
             'base_sale_cents' => $baseSaleCents,
+            'price_rule' => $rule ? ['id' => $rule['id'], 'name' => $rule['name']] : null,
+            'price_label' => $rule['label'] ?? null,
             'sale_cents' => $saleCents,
             'quantity' => $quantity,
             'line_cents' => $available ? $saleCents * $quantity : 0,

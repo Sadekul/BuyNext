@@ -11,6 +11,9 @@ import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate } from '../utils/format'
+// Phase 7: after a delete or an address change, offer a redirect from the old address.
+import RedirectOffer from '../components/RedirectOffer'
+import { storePaths } from '../utils/redirects'
 
 const LIMIT = 20
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -26,6 +29,9 @@ const toSlug = (title) =>
 export function ContentPagesPage() {
   const { can } = useAdminAuth()
   const [skip, setSkip] = useState(0)
+  // A page just deleted in the editor comes back here with its old address.
+  const location = useLocation()
+  const [deleted, setDeleted] = useState(location.state?.deletedPage ?? null)
   const pages = useQuery({ queryKey: adminKeys.pages({ skip }), queryFn: ({ signal }) => getPages({ limit: LIMIT, skip }, { signal }) })
 
   return (
@@ -42,6 +48,14 @@ export function ContentPagesPage() {
           )
         }
       />
+      {deleted && (
+        <>
+          <p className="notice notice--success" role="status">
+            "{deleted.title}" was deleted.
+          </p>
+          <RedirectOffer fromPath={storePaths.page(deleted)} suggestedTo="/" what={`the deleted page "${deleted.title}"`} onClose={() => setDeleted(null)} />
+        </>
+      )}
       {pages.isPending && <Loading label="Loading pages…" />}
       {pages.error && <ErrorState error={pages.error} onRetry={pages.refetch} />}
       {pages.data && pages.data.pages.length === 0 && <Empty>No pages yet.</Empty>}
@@ -128,6 +142,7 @@ function PageEditor({ saved }) {
   // After "Create page" the editor reopens at the page's address, carrying the message.
   const [notice, setNotice] = useState(location.state?.notice ? { tone: 'success', text: location.state.notice } : null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [movedFrom, setMovedFrom] = useState(null) // the old slug, after the address changed
   const noticeRef = useRef(null)
 
   const set = (field) => (event) => {
@@ -138,7 +153,9 @@ function PageEditor({ saved }) {
 
   const save = useMutation({
     mutationFn: (body) => (isNew ? createPage(body) : updatePage(saved.id, body)),
-    onSuccess: ({ page }) => {
+    // The address before this save (for the redirect offer when it changes).
+    onMutate: () => ({ oldSlug: saved?.slug }),
+    onSuccess: ({ page }, _body, context) => {
       queryClient.setQueryData(adminKeys.page(page.id), { ...page, live: true })
       queryClient.invalidateQueries({ queryKey: ['pages'] })
       // The server's cleaned HTML replaces what was typed, so the textarea shows what the store shows.
@@ -147,6 +164,7 @@ function PageEditor({ saved }) {
       const text = `${isNew ? 'Page created' : 'Saved'}${page.isPublished ? ' and published' : ' as a draft'}.${cleaned}`
       if (isNew) return navigate(`/pages/${page.id}`, { replace: true, state: { notice: text } })
       setNotice({ tone: 'success', text })
+      if (context?.oldSlug && page.slug !== context.oldSlug) setMovedFrom(context.oldSlug)
       requestAnimationFrame(() => noticeRef.current?.focus())
     },
     onError: (error) => {
@@ -159,7 +177,7 @@ function PageEditor({ saved }) {
     mutationFn: () => deletePage(saved.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pages'] })
-      navigate('/pages', { replace: true })
+      navigate('/pages', { replace: true, state: { deletedPage: { slug: saved.slug, title: saved.title } } })
     },
     onError: (error) => {
       setConfirmDelete(false)
@@ -210,6 +228,16 @@ function PageEditor({ saved }) {
           </p>
         )}
       </div>
+
+      {movedFrom && (
+        <RedirectOffer
+          key={movedFrom}
+          fromPath={storePaths.page({ slug: movedFrom })}
+          suggestedTo={storePaths.page({ slug: values.slug })}
+          what="this page's old address"
+          onClose={() => setMovedFrom(null)}
+        />
+      )}
 
       <div className="editor">
         <form className="form panel" noValidate onSubmit={submit}>

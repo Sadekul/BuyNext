@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
+use App\Services\CatalogRules;
 use App\Services\Pricing;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -18,6 +19,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Phase 5: has_variants and review_count (approved reviews) everywhere; the
  * detail adds options and the active variants ([] for simple products), and
  * reviews are the approved ones only.
+ *
+ * Phase 7: sale_price and the variants' final_price include catalog price
+ * rules for everyone (price_rule: { id, name } | null); discount_percent stays
+ * the product's own.
  *
  * @mixin Product
  */
@@ -34,17 +39,25 @@ class ProductResource extends JsonResource
 
     public function toArray(Request $request): array
     {
+        // Phase 7: a catalog price rule for everyone shows as the sale price when it is lower.
+        $rules = app(CatalogRules::class);
+        [$saleCents, $rule] = $rules->publicPrice($this->resource);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
             'sku' => $this->sku,
             'description' => $this->when($this->detail, $this->description),
+            // Phase 7 (part B, SEO): null = the storefront falls back to the name and description.
+            'meta_title' => $this->when($this->detail, $this->meta_title),
+            'meta_description' => $this->when($this->detail, $this->meta_description),
             'brand' => $this->brand ? ['name' => $this->brand->name] : null,
             'category' => ['slug' => $this->category->slug, 'name' => $this->category->name],
             'price' => $this->price,
             'discount_percent' => (float) $this->discount_percent,
-            'sale_price' => Pricing::format($this->salePriceCents()),
+            'sale_price' => Pricing::format($saleCents),
+            'price_rule' => $rule,
             'rating_average' => $this->rating_average,
             'review_count' => $this->review_count,
             'stock_quantity' => $this->stock_quantity,
@@ -75,7 +88,7 @@ class ProductResource extends JsonResource
                     'sku' => $variant->sku,
                     'option_value_ids' => $variant->option_value_ids,
                     'price' => $variant->unitPrice($this->resource),
-                    'final_price' => Pricing::format($variant->salePriceCents($this->resource)),
+                    'final_price' => Pricing::format($rules->publicPrice($this->resource, $variant)[0]),
                     'stock_quantity' => $variant->stock_quantity,
                     'in_stock' => $variant->stock_quantity > 0,
                 ])->values() : []),

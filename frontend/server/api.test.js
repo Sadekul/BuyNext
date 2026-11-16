@@ -747,7 +747,11 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
         'PATCH /api/admin/v1/coupons/3': { body: { data: { ...coupon, is_active: false, status: 'inactive' } } },
       })
       const list = await (await admin('coupons?status=expired&q=win')).json()
-      expect(list.coupons[0]).toEqual({ id: 3, code: 'WINTER5', description: '$5 off', type: 'fixed', value: 5, minSubtotal: 25, startsAt: null, endsAt: '2026-12-31T23:59:00Z', usageLimit: 100, usageLimitPerCustomer: 1, timesUsed: 0, isActive: true, status: 'active', createdAt: 'T', updatedAt: 'T' })
+      expect(list.coupons[0]).toEqual({
+        id: 3, code: 'WINTER5', description: '$5 off', type: 'fixed', value: 5, minSubtotal: 25, startsAt: null, endsAt: '2026-12-31T23:59:00Z', usageLimit: 100, usageLimitPerCustomer: 1, timesUsed: 0, isActive: true, status: 'active', createdAt: 'T', updatedAt: 'T',
+        // Phase 7 cart price rule fields, defaulted for a phase 3 coupon.
+        customerGroupIds: [], appliesTo: 'all', categoryIds: [], productIds: [], freeShipping: false, buyQuantity: null, getQuantity: null, autoApply: false,
+      })
       expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '1', per_page: '20', search: 'win', status: 'expired' })
       await admin('coupons?status=used_up')
       expect(new URLSearchParams(calls.at(-1).search).get('status')).toBe('used_up')

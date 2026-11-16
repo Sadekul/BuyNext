@@ -30,7 +30,15 @@ final readonly class CartQuote
         // Phase 6: the shopper's customer group (null only when no group exists) and what its discount took off the subtotal.
         public ?CustomerGroup $group = null,
         public int $groupDiscountCents = 0,
+        // Phase 7: the cart price rules applied (CartRules::apply()['applied']: automatic first, then the code).
+        public array $appliedRules = [],
     ) {}
+
+    /** The applied rules as the cart and orders show them. */
+    public function appliedRulesSummary(): array
+    {
+        return array_map(CartRules::summary(...), $this->appliedRules);
+    }
 
     public function hasProblems(): bool
     {
@@ -58,6 +66,10 @@ final readonly class CartQuote
                 'sale_price' => $money($line['sale_cents']),
                 'quantity' => $line['quantity'],
                 'line_total' => $money($line['line_cents']),
+                // Phase 7: this line's share of the cart rules' discount, and the catalog price rule behind its price.
+                'discount' => $money($line['discount_cents'] ?? null),
+                'price_rule' => $line['price_rule'] ?? null,
+                'price_label' => $line['price_label'] ?? null,
                 'stock_quantity' => $line['stock_quantity'],
                 'min_order_quantity' => $line['min_order_quantity'],
                 'available' => $line['available'],
@@ -65,6 +77,7 @@ final readonly class CartQuote
             'problems' => $this->problems,
             'coupon' => $this->coupon,
             'coupon_error' => $this->couponError,
+            'applied_rules' => $this->appliedRulesSummary(),
             'shipping_options' => array_map(fn (array $option) => [
                 'id' => $option['id'],
                 'label' => $option['label'],

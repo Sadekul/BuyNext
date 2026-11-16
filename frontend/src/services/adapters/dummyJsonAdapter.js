@@ -91,5 +91,7 @@ export function normalizeUser(raw) {
     address, // only in /auth/me
     // BuyNest accounts (phase 6): the customer group and its discount, e.g. { name: 'Wholesale', discountPercent: 10 }.
     group: raw.group && typeof raw.group.name === 'string' ? { name: raw.group.name, discountPercent: Number(raw.group.discountPercent) || 0 } : null,
+    // BuyNest accounts (phase 7): whether they get the newsletter. Left out when unknown (DummyJSON).
+    ...(typeof raw.newsletter === 'boolean' && { newsletter: raw.newsletter }),
   }
 }

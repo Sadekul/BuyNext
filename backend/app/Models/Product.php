@@ -28,7 +28,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'sku', 'name', 'slug', 'description', 'category_id', 'brand_id', 'price', 'discount_percent',
     'stock_quantity', 'min_order_quantity', 'status', 'rating_average', 'thumbnail_url',
-    'warranty', 'shipping_info', 'return_policy', 'weight', 'tags',
+    'warranty', 'shipping_info', 'return_policy', 'weight', 'tags', 'meta_title', 'meta_description',
 ])]
 class Product extends Model
 {

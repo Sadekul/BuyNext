@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { LuArrowLeft, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
+import PageMeta from '../components/common/PageMeta'
 import ProductGallery from '../components/product/ProductGallery'
 import WishlistButton from '../components/product/WishlistButton'
 import ProductBadge from '../components/product/ProductBadge'
@@ -18,13 +19,14 @@ import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { useCart } from '../hooks/useCart'
+import { useStoreRedirect } from '../hooks/useStoreRedirect'
 import { categoriesQuery, productQuery, relatedProductsQuery } from '../queries/productQueries'
 import { HAS_CATEGORY_TREE } from '../services/categoryService'
 import { ROUTES } from '../constants/routes'
-import { SITE } from '../constants/site'
 import { REAL_SHOP } from '../constants/shop'
 import { formatPrice, formatSlug } from '../utils/formatters'
 import { getProductPricing } from '../utils/pricing'
+import { toDescription } from '../utils/pageMeta'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { categoryAncestors } from '../utils/categories'
 import { chooseValue, findVariant, hasVariants, initialSelection, variantPriceRange, withVariant } from '../utils/variants'
@@ -52,15 +54,7 @@ function ProductDetailsPage() {
   }
 
   const isNotFound = !isValidId || request.error?.status === 404
-  if (isNotFound) {
-    return (
-      <div className="section container">
-        <EmptyState icon={LuPackageX} title="Product not found" message="This product doesn't exist or is no longer available.">
-          <Button to={ROUTES.products}>Browse all products</Button>
-        </EmptyState>
-      </div>
-    )
-  }
+  if (isNotFound) return <ProductNotFound />
 
   if (request.error) {
     return (
@@ -74,6 +68,26 @@ function ProductDetailsPage() {
   // route's component, so without a new key the gallery selection and the
   // chosen quantity would carry over to the next product.
   return <ProductDetails key={request.data.id} product={request.data} />
+}
+
+/** A missing product: an admin redirect (phase 7, e.g. for a deleted product) wins, else "not found". */
+function ProductNotFound() {
+  const { checking } = useStoreRedirect()
+  if (checking) {
+    return (
+      <div className="section container">
+        <Loader label="Loading product…" />
+      </div>
+    )
+  }
+  return (
+    <div className="section container">
+      <PageMeta title="Product not found" noindex />
+      <EmptyState icon={LuPackageX} title="Product not found" message="This product doesn't exist or is no longer available.">
+        <Button to={ROUTES.products}>Browse all products</Button>
+      </EmptyState>
+    </div>
+  )
 }
 
 function ProductDetails({ product }) {
@@ -143,8 +157,14 @@ function ProductDetails({ product }) {
 
   return (
     <div className="product-details section container">
-      {/* React 19 moves <title> into <head> automatically. */}
-      <title>{`${product.title} | ${SITE.name}`}</title>
+      {/* The tab title plus search and link-preview tags (the admin's SEO fields when set). */}
+      <PageMeta
+        title={product.metaTitle ?? product.title}
+        description={toDescription(product.metaDescription ?? product.description)}
+        image={product.thumbnail}
+        type="product"
+        canonicalPath={ROUTES.productDetails(product.id)}
+      />
 
       <div className="product-details__top">
         {canGoBack ? (
@@ -181,6 +201,8 @@ function ProductDetails({ product }) {
                   {formatPrice(originalPrice)}
                 </s>
                 <ProductBadge variant="sale">Save {roundedDiscount}%</ProductBadge>
+                {/* Phase 7: the store-wide sale (catalog price rule) behind this price. */}
+                {product.priceRule && <span className="product-details__price-rule">{product.priceRule.name}</span>}
               </>
             )}
           </div>

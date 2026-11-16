@@ -245,3 +245,52 @@ export const getReturns = (params, { signal } = {}) => api.get('/api/admin/retur
 export const getReturn = (number, { signal } = {}) => api.get(`/api/admin/returns/${number}`, { signal })
 /** returns.manage: { status, adminNote?, notifyCustomer, items?: [{ returnItemId, condition }], restock? } → { return }. */
 export const updateReturn = (number, values) => api.patch(`/api/admin/returns/${number}`, values)
+
+/*
+ * ---- Phase 7, system part (docs/backend/PHASE7_CONTRACT.md §4, §5, §7) ----
+ * Email templates (email_templates.manage), URL redirects (seo.manage),
+ * header notifications (no permission: filtered by the server), and each
+ * admin's own grid preferences. BuyNest's backend only.
+ */
+export const systemKeys = {
+  emailTemplates: ['email-templates'],
+  emailTemplate: (key) => ['email-template', key],
+  redirects: (params) => ['redirects', params],
+  notifications: ['notifications'],
+  preferences: (key) => ['preferences', key],
+}
+/** { templates: [{ key, name, description, subject, isCustomized, updatedAt }] }. */
+export const getEmailTemplates = ({ signal } = {}) => api.get('/api/admin/email-templates', { signal })
+/** The template + { body, defaultSubject, defaultBody, variables: [{ name, description, kind: text | block, required }], requiredGroups: [[names]] }. */
+export const getEmailTemplate = (key, { signal } = {}) => api.get(`/api/admin/email-templates/${key}`, { signal })
+/** { subject, body } → { template }. 422 for unknown variables or a missing required one. */
+export const updateEmailTemplate = (key, values) => api.put(`/api/admin/email-templates/${key}`, values)
+/** The draft { subject, body } rendered with sample data → { subject, html }. Nothing is saved. */
+export const previewEmailTemplate = (key, values, { signal } = {}) => api.post(`/api/admin/email-templates/${key}/preview`, values, { signal })
+/** Sends the draft, with sample data, to the signed-in admin's own email → { sent, to, message }. */
+export const testEmailTemplate = (key, values) => api.post(`/api/admin/email-templates/${key}/test`, values)
+/** Deletes the customization → { template } (the default again). */
+export const resetEmailTemplate = (key) => api.post(`/api/admin/email-templates/${key}/reset`, {})
+
+/** ?q&limit&skip → { redirects: [{ id, fromPath, toPath, statusCode, hits, createdAt, updatedAt }], total }. */
+export const getRedirects = (params, { signal } = {}) => api.get('/api/admin/redirects', { params, signal })
+/** { fromPath, toPath, statusCode: 301 | 302 } → { redirect }. */
+export const createRedirect = (values) => api.post('/api/admin/redirects', values)
+export const updateRedirect = (id, values) => api.patch(`/api/admin/redirects/${id}`, values)
+export const deleteRedirect = (id) => api.delete(`/api/admin/redirects/${id}`)
+/** A CSV of from_path,to_path[,status_code] → { created, updated, skipped, errors: [{ row, message }] }. */
+export function importRedirects(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/api/admin/redirects/import', form, { timeout: UPLOAD_TIMEOUT })
+}
+
+/** { notifications: [{ id, type, severity, title, body, link, createdAt, readAt }], unreadCount }. */
+export const getNotifications = (params, { signal } = {}) => api.get('/api/admin/notifications', { params, signal })
+export const markNotificationRead = (id) => api.post(`/api/admin/notifications/${id}/read`, {})
+export const markAllNotificationsRead = () => api.post('/api/admin/notifications/read-all', {})
+
+/** The admin's own grid settings: { key, columns: [ids] | null, pageSize | null, sort, direction, filters: [{ name, query }] }; PUT replaces them all. */
+export const getPreferences = (key, { signal } = {}) => api.get(`/api/admin/preferences/${key}`, { signal })
+export const savePreferences = (key, value) => api.put(`/api/admin/preferences/${key}`, value)
+/* ---- end of phase 7, system part ---- */

@@ -15,6 +15,6 @@ class DevMail extends Model
 
     protected function casts(): array
     {
-        return ['created_at' => 'datetime'];
+        return ['created_at' => 'datetime', 'headers' => 'array'];
     }
 }

@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { handleApiRequest } from './server/api.js'
 import { handleMediaRequest } from './server/mediaApi.js'
+import { handleSeoRequest } from './server/seoApi.js'
 
 /*
  * The shop owner's dashboard (../admin, a separate React app) at /admin/:
@@ -78,7 +79,7 @@ function loadServerEnv(mode) {
 /*
  * Serves BuyNest's server-side services (server/api.js: sign-in at
  * /api/auth/*, admin at /api/admin/*; server/mediaApi.js: uploaded product
- * photos at /media/*) in `npm run dev` and `npm run preview`,
+ * photos at /media/*; server/seoApi.js: /sitemap.xml and /robots.txt) in `npm run dev` and `npm run preview`,
  * the way the Vercel/Netlify functions do in production. Converts Node's request/response to the Web standard
  * Request/Response the service is written against.
  */
@@ -126,6 +127,9 @@ function apiServices() {
   const mount = (server) => {
     server.middlewares.use('/api', middleware(handleApiRequest))
     server.middlewares.use('/media', middleware(handleMediaRequest))
+    // Files for search engines (server/seoApi.js), like the Vercel/Netlify functions.
+    server.middlewares.use('/sitemap.xml', middleware(handleSeoRequest))
+    server.middlewares.use('/robots.txt', middleware(handleSeoRequest))
   }
   return { name: 'buynest-api-services', configureServer: mount, configurePreviewServer: mount }
 }

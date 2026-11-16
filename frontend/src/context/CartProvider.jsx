@@ -8,6 +8,7 @@ import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSett
 import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
 import { REAL_SHOP } from '../constants/shop'
+import { useSavedCartSync, writeSavedCartBaseline } from '../hooks/useSavedCartSync'
 
 const STORAGE_OPTIONS = {
   storageKey: STORAGE_KEYS.cart,
@@ -31,8 +32,12 @@ const STORAGE_OPTIONS = {
  */
 function CartProvider({ children }) {
   // Reducer + localStorage persistence + cross-tab sync (see usePersistentReducer).
-  const { user } = useAuth()
+  const { user, status, authorizedRequest } = useAuth()
   const [cart, dispatch] = usePersistentReducer(cartReducer, STORAGE_OPTIONS, user?.id)
+  // REAL_SHOP (phase 7): the account's cart saved on the server comes back on
+  // sign-in, on any device. Called after usePersistentReducer on purpose: its
+  // guest-cart merge must run first (see the hook).
+  useSavedCartSync({ status, userId: user?.id ?? null, itemCount: cart.items.length, dispatch, authorizedRequest })
   const [isCartOpen, setIsCartOpen] = useState(false)
   // Shipping prices and the free-shipping threshold: the server's settings in REAL_SHOP, the demo's otherwise.
   // An empty cart needs no prices, so it doesn't ask for them.
@@ -51,9 +56,14 @@ function CartProvider({ children }) {
   )
   const removeItem = useCallback((lineKey) => dispatch({ type: CART_ACTIONS.REMOVED, lineKey: String(lineKey) }), [dispatch])
   const clearCart = useCallback(() => dispatch({ type: CART_ACTIONS.CLEARED }), [dispatch])
+  const userId = user?.id ?? null
   const removeOrderedItems = useCallback(
-    (lineKeys) => dispatch({ type: CART_ACTIONS.ORDER_PLACED, lineKeys: lineKeys.map(String) }),
-    [dispatch],
+    (lineKeys) => {
+      dispatch({ type: CART_ACTIONS.ORDER_PLACED, lineKeys: lineKeys.map(String) })
+      // The server empties the account's saved cart when an order is placed (phase 7).
+      if (REAL_SHOP && userId) writeSavedCartBaseline(userId, {})
+    },
+    [dispatch, userId],
   )
   const applyCoupon = useCallback((code) => dispatch({ type: CART_ACTIONS.COUPON_APPLIED, code }), [dispatch])
   const removeCoupon = useCallback(() => dispatch({ type: CART_ACTIONS.COUPON_REMOVED }), [dispatch])

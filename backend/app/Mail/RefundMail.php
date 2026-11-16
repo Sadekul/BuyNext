@@ -2,35 +2,48 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\CreditMemo;
+use App\Support\EmailBlocks;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** "Refund for order BN-…": what was refunded (items, shipping, adjustment). */
+/** "Refund for order BN-…": what was refunded (items, shipping, adjustment) (template credit_memo). */
 class RefundMail extends Mailable
 {
+    use RendersEmailTemplate;
+
     public function __construct(public CreditMemo $memo) {}
 
-    public function envelope(): Envelope
+    protected function templateKey(): string
     {
-        return new Envelope(subject: "Refund for order {$this->memo->order->number}");
+        return 'credit_memo';
     }
 
-    public function content(): Content
+    protected function templateValues(): array
     {
-        $order = $this->memo->order;
+        $memo = $this->memo;
+        $order = $memo->order;
+        $totals = [];
+        if ((float) $memo->shipping_refund > 0) {
+            $totals[] = ['Shipping', self::money($memo->shipping_refund)];
+        }
+        if ((float) $memo->adjustment != 0) {
+            $totals[] = ['Adjustment', (float) $memo->adjustment < 0 ? '-$'.ltrim($memo->adjustment, '-') : self::money($memo->adjustment)];
+        }
+        $totals[] = ['Refund total', self::money($memo->total), true];
 
-        return new Content(
-            view: 'emails.refund',
-            text: 'emails.refund-text',
-            with: [
-                'order' => $order,
-                'memo' => $this->memo,
-                'name' => $order->shipping_address['first_name'] ?? 'there',
-                'paymentLabel' => config("buynest.store.payment_methods.{$order->payment_method}", $order->payment_method),
-                'note' => $this->memo->note,
-            ],
-        );
+        return [
+            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'order_number' => $order->number,
+            'credit_memo_number' => $memo->number,
+            'refund_total' => $memo->total,
+            'payment_method' => config("buynest.store.payment_methods.{$order->payment_method}")
+                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", $order->payment_method),
+            'items_table' => EmailBlocks::itemsTable(
+                $memo->items->map(fn ($item) => ["{$item->orderItem->displayName()} × {$item->quantity}", self::money($item->amount)])->all(),
+                $totals,
+            ),
+            'note' => EmailBlocks::note($memo->note, self::storeName()),
+        ];
     }
 }

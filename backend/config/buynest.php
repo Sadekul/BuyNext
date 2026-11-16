@@ -34,6 +34,14 @@ return [
     // on the visitor's real IP address, which rate limits then use.
     'bff_key' => env('BFF_SHARED_KEY'),
 
+    // Phase 7: the storefront's address, for links in emails (newsletter
+    // confirm/unsubscribe, cart reminders) and the sitemap.
+    'storefront_url' => rtrim((string) env('STOREFRONT_URL', 'http://localhost:5173'), '/'),
+
+    // Phase 7: newsletter sign-ups per visitor per minute, and per email per hour.
+    'newsletter_per_minute' => (int) env('BUYNEST_NEWSLETTER_PER_MINUTE', 10),
+    'newsletter_per_email_per_hour' => (int) env('BUYNEST_NEWSLETTER_PER_EMAIL_PER_HOUR', 3),
+
     // Local test inbox at /dev/mailbox (only when APP_ENV=local).
     'dev_mailbox' => (bool) env('DEV_MAILBOX', false),
 

@@ -32,6 +32,7 @@ class OrderResource extends JsonResource
             'billing_address' => $this->billing_address,
             'coupon_code' => $this->coupon_code,
             'customer_group' => $this->customer_group, // phase 6: the group's name when the order was placed (null before)
+            'applied_rules' => $this->applied_rules ?? [], // phase 7: the cart price rules applied ([] before)
             'items' => self::itemsOf($this->resource),
             'totals' => self::totalsOf($this->resource),
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
@@ -91,6 +92,9 @@ class OrderResource extends JsonResource
             'sale_price' => $item->sale_price,
             'quantity' => $item->quantity,
             'line_total' => $item->line_total,
+            // Phase 7: the line's share of the cart rules (null before phase 7) and its catalog price rule label.
+            'discount' => $item->discount_amount,
+            'price_label' => $item->price_label,
         ])->values()->all();
     }
 

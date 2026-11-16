@@ -10,11 +10,19 @@ import {
   LuFileText,
   LuHouse,
   LuLayoutDashboard,
+  // Phase 7 (marketing).
+  LuMailPlus,
+  LuMails,
+  LuPercent,
+  LuShoppingCart,
+  LuTextSearch,
+  LuMail,
   LuNewspaper,
   LuReceipt,
   LuScrollText,
   LuSettings,
   LuShieldCheck,
+  LuSignpost,
   LuTicketPercent,
   LuUndo2,
   LuUserCog,
@@ -58,6 +66,13 @@ export const PERMISSION_LABELS = {
   'settings.edit': 'Change store settings',
   'admins.manage': 'Manage admin users and roles',
   'audit.view': 'View the audit log',
+  // Phase 7 (system).
+  'email_templates.manage': 'Edit email templates',
+  'seo.manage': 'Manage URL redirects and search-term redirects',
+  // Phase 7 (marketing).
+  'price_rules.manage': 'Create, edit, and delete catalog price rules',
+  'newsletter.view': 'View newsletter subscribers and campaigns',
+  'newsletter.send': 'Write and send newsletters, unsubscribe people, and send cart reminders',
 }
 export const permissionLabel = (key) => PERMISSION_LABELS[key] ?? key
 
@@ -99,12 +114,26 @@ const LIVE_NAV = [
       { to: '/customer-groups', label: 'Customer groups', icon: LuUsersRound, permission: 'customers.view' },
     ],
   },
-  { heading: 'Marketing', items: [{ to: '/coupons', label: 'Coupons', icon: LuTicketPercent, permission: 'coupons.view' }] },
+  {
+    heading: 'Marketing',
+    items: [
+      // Phase 7 (marketing): price rules, newsletter, abandoned carts, search terms.
+      { to: '/catalog-rules', label: 'Catalog price rules', icon: LuPercent, permission: 'coupons.view' },
+      { to: '/coupons', label: 'Coupons', icon: LuTicketPercent, permission: 'coupons.view' },
+      { to: '/newsletter/subscribers', label: 'Newsletter subscribers', icon: LuMailPlus, permission: 'newsletter.view' },
+      { to: '/newsletter/campaigns', label: 'Newsletter campaigns', icon: LuMails, permission: 'newsletter.view' },
+      { to: '/abandoned-carts', label: 'Abandoned carts', icon: LuShoppingCart, permission: 'reports.view' },
+      { to: '/search-terms', label: 'Search terms', icon: LuTextSearch, permission: 'reports.view' },
+    ],
+  },
   {
     heading: 'Content',
     items: [
       { to: '/pages', label: 'Pages', icon: LuNewspaper, permission: 'content.view' },
       { to: '/home-page', label: 'Home page', icon: LuHouse, permission: 'content.view' },
+      // Phase 7 (system).
+      { to: '/email-templates', label: 'Email templates', icon: LuMail, permission: 'email_templates.manage' },
+      { to: '/redirects', label: 'URL redirects', icon: LuSignpost, permission: 'seo.manage' },
     ],
   },
   { to: '/reports', label: 'Reports', icon: LuChartColumn, permission: 'reports.view' },

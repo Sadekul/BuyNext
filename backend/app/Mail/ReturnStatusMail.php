@@ -2,14 +2,16 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\OrderReturn;
+use App\Support\EmailBlocks;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** "Your return RMA-… was approved / received / …": sent when a return is created and on every status change. */
+/** "Your return RMA-… was approved / received / …": sent when a return is created and on every status change (template return_status). */
 class ReturnStatusMail extends Mailable
 {
+    use RendersEmailTemplate;
+
     private const TEXT = [
         'requested' => ['We received your return request', 'We received your return request and will review it shortly. We\'ll email you as soon as it\'s approved.'],
         'approved' => ['Your return was approved', 'Your return was approved. Please pack the items securely and send them back to us, with the return number on the parcel.'],
@@ -21,31 +23,28 @@ class ReturnStatusMail extends Mailable
 
     public function __construct(public OrderReturn $return) {}
 
-    public function envelope(): Envelope
+    protected function templateKey(): string
     {
-        return new Envelope(subject: self::TEXT[$this->return->status][0]." ({$this->return->number})");
+        return 'return_status';
     }
 
-    public function content(): Content
+    protected function templateValues(): array
     {
         $order = $this->return->order;
 
-        return new Content(
-            view: 'emails.return-status',
-            text: 'emails.return-status-text',
-            with: [
-                'heading' => self::TEXT[$this->return->status][0],
-                'intro' => self::TEXT[$this->return->status][1],
-                'name' => $order->shipping_address['first_name'] ?? 'there',
-                'order' => $order,
-                'items' => $this->return->items->map(fn ($item) => [
-                    'name' => $item->orderItem?->displayName() ?? 'Item',
-                    'quantity' => $item->quantity,
-                ])->all(),
-                // Staff notes reach the customer only in an email (this one is being sent).
-                'note' => $this->return->admin_note,
-                'resolution' => $this->return->resolution === 'replace' ? 'We\'ll send you a replacement.' : null,
-            ],
-        );
+        return [
+            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'return_number' => $this->return->number,
+            'order_number' => $order->number,
+            'reason' => $this->return->reason,
+            'status' => $this->return->status,
+            'status_heading' => self::TEXT[$this->return->status][0],
+            'status_message' => self::TEXT[$this->return->status][1],
+            'items_table' => EmailBlocks::list($this->return->items
+                ->map(fn ($item) => ($item->orderItem?->displayName() ?? 'Item')." × {$item->quantity}")->all()),
+            'resolution' => $this->return->resolution === 'replace' ? EmailBlocks::paragraph('We\'ll send you a replacement.') : '',
+            // Staff notes reach the customer only in an email (this one is being sent).
+            'note' => EmailBlocks::note($this->return->admin_note, self::storeName()),
+        ];
     }
 }

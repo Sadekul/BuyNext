@@ -20,16 +20,18 @@ class CouponController extends Controller
     private const MONEY = 'regex:/^\d{1,7}(\.\d{1,2})?$/';
 
     private const AUDITED = ['code', 'description', 'type', 'value', 'min_subtotal', 'starts_at', 'ends_at',
-        'usage_limit', 'usage_limit_per_customer', 'is_active'];
+        'usage_limit', 'usage_limit_per_customer', 'is_active',
+        'customer_group_ids', 'applies_to', 'category_ids', 'product_ids', 'free_shipping', 'buy_quantity', 'get_quantity', 'auto_apply'];
 
     public function __construct(private Audit $audit) {}
 
-    /** GET /api/admin/v1/coupons?search&status&page&per_page - newest first. */
+    /** GET /api/admin/v1/coupons?search&status&kind=code|automatic&page&per_page - newest first. */
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(Coupon::STATUSES)],
+            'kind' => ['nullable', Rule::in(['code', 'automatic'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -39,6 +41,7 @@ class CouponController extends Controller
                 $query->where(fn ($q) => $q->where('code', 'like', $like)->orWhere('description', 'like', $like));
             })
             ->when($data['status'] ?? null, fn ($query, $status) => $query->withStatus($status))
+            ->when($data['kind'] ?? null, fn ($query, $kind) => $query->where('auto_apply', $kind === 'automatic'))
             ->latest('id')
             ->paginate($data['per_page'] ?? 20)
             ->withQueryString();
@@ -89,12 +92,12 @@ class CouponController extends Controller
         if ($coupon->redemptions()->exists()) {
             $wasActive = $coupon->is_active;
             $coupon->forceFill(['is_active' => false])->save();
-            $this->audit->record('coupon.disabled', "Coupon {$coupon->code} disabled (orders used it, so it is kept).", 'coupon', $coupon->id,
+            $this->audit->record('coupon.disabled', "Coupon {$coupon->name()} disabled (orders used it, so it is kept).", 'coupon', $coupon->id,
                 Audit::diff(['is_active' => $wasActive], ['is_active' => false]));
 
             return new CouponResource($coupon->fresh());
         }
-        $this->audit->record('coupon.deleted', "Coupon {$coupon->code} deleted.", 'coupon', $coupon->id,
+        $this->audit->record('coupon.deleted', "Coupon {$coupon->name()} deleted.", 'coupon', $coupon->id,
             Audit::deleted(Audit::fieldsOf($coupon, self::AUDITED)));
         $coupon->delete();
 
@@ -107,11 +110,15 @@ class CouponController extends Controller
         $creating = $coupon === null;
         $required = $creating ? 'required' : 'sometimes';
         if ($request->has('code')) {
-            $request->merge(['code' => Coupon::normalize($request->input('code'))]);
+            $code = Coupon::normalize($request->input('code'));
+            $request->merge(['code' => $code === '' ? null : $code]);
         }
+        // Phase 7: an automatic rule has no code; a coupon needs one.
+        $auto = $request->has('auto_apply') ? $request->boolean('auto_apply') : (bool) $coupon?->auto_apply;
+        $codeRequired = $auto ? 'nullable' : ($creating || $request->has('auto_apply') ? 'required' : 'sometimes');
 
         $data = $request->validate([
-            'code' => [$required, 'string', 'min:3', 'max:40', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('coupons', 'code')->ignore($coupon?->id)],
+            'code' => [$codeRequired, 'string', 'min:3', 'max:40', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('coupons', 'code')->ignore($coupon?->id)],
             'description' => ['nullable', 'string', 'max:160'],
             'type' => [$required, Rule::in(Coupon::TYPES)],
             'value' => ['nullable', self::MONEY],
@@ -121,11 +128,27 @@ class CouponController extends Controller
             'usage_limit' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'usage_limit_per_customer' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'is_active' => ['nullable', 'boolean'],
+            // Phase 7: cart price rule conditions and actions.
+            'auto_apply' => ['sometimes', 'boolean'],
+            'customer_group_ids' => ['sometimes', 'nullable', 'array', 'max:100'],
+            'customer_group_ids.*' => ['integer', 'distinct', Rule::exists('customer_groups', 'id')],
+            'applies_to' => ['sometimes', Rule::in(Coupon::APPLIES_TO)],
+            'category_ids' => ['sometimes', 'nullable', 'array', 'max:500'],
+            'category_ids.*' => ['integer', 'distinct', Rule::exists('categories', 'id')],
+            'product_ids' => ['sometimes', 'nullable', 'array', 'max:1000'],
+            'product_ids.*' => ['integer', 'distinct', Rule::exists('products', 'id')->whereNull('deleted_at')],
+            'free_shipping' => ['sometimes', 'boolean'],
+            'buy_quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'get_quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ], [
             'code.required' => 'Enter a code.',
             'code.regex' => 'A code has only letters, digits, dashes, and underscores.',
             'code.unique' => 'There is already a coupon with this code.',
-            'type.in' => 'Choose a type: percent, fixed, or free shipping.',
+            'type.in' => 'Choose a type: percent, fixed, free shipping, or buy X get Y.',
+            'applies_to.in' => 'Choose what the rule applies to: all, categories, or products.',
+            'customer_group_ids.*.exists' => 'This customer group doesn\'t exist.',
+            'category_ids.*.exists' => 'This category doesn\'t exist.',
+            'product_ids.*.exists' => 'This product doesn\'t exist.',
             'value.regex' => 'Enter the value as a number with at most 2 decimals.',
             'min_subtotal.regex' => 'Enter the minimum as an amount, for example 50.00.',
         ]);
@@ -150,6 +173,34 @@ class CouponController extends Controller
         }
         if ($type === 'free_shipping') {
             $data['value'] = '0.00'; // free shipping has no merchandise discount
+            $data['free_shipping'] = true;
+        }
+
+        // Phase 7: automatic rules, buy X get Y, and what the rule applies to.
+        if ($auto && filled($data['code'] ?? ($request->has('code') ? null : $coupon?->code))) {
+            $errors['code'] = 'An automatic rule has no code.';
+        }
+        if ($type === 'buy_x_get_y') {
+            $data['value'] = '0.00'; // the free units are the discount
+            foreach (['buy_quantity' => 'buy', 'get_quantity' => 'get free'] as $field => $word) {
+                if ((array_key_exists($field, $data) ? $data[$field] : $coupon?->{$field}) === null) {
+                    $errors[$field] = "Enter how many units to {$word} (1-100).";
+                }
+            }
+        } elseif (array_key_exists('type', $data)) {
+            $data['buy_quantity'] = $data['get_quantity'] = null;
+        }
+        foreach (['customer_group_ids', 'category_ids', 'product_ids'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = array_values(array_map('intval', $data[$field] ?? []));
+            }
+        }
+        $appliesTo = $data['applies_to'] ?? $coupon?->applies_to ?? 'all';
+        foreach (['categories' => 'category_ids', 'products' => 'product_ids'] as $kind => $field) {
+            $ids = array_key_exists($field, $data) ? $data[$field] : ($coupon?->{$field} ?? []);
+            if ($appliesTo === $kind && $ids === []) {
+                $errors[$field] = $kind === 'categories' ? 'Choose at least one category.' : 'Choose at least one product.';
+            }
         }
         $startsAt = array_key_exists('starts_at', $data) ? $data['starts_at'] : $coupon?->starts_at;
         $endsAt = array_key_exists('ends_at', $data) ? $data['ends_at'] : $coupon?->ends_at;
@@ -174,15 +225,17 @@ class CouponController extends Controller
                 $coupon->type,
                 Pricing::toCents($coupon->value ?? 0),
                 $coupon->min_subtotal !== null ? Pricing::toCents($coupon->min_subtotal) : null,
+                $coupon->buy_quantity,
+                $coupon->get_quantity,
             );
         }
         $coupon->save();
 
         if ($creating) {
-            $this->audit->record('coupon.created', "Coupon {$coupon->code} created.", 'coupon', $coupon->id,
+            $this->audit->record('coupon.created', "Coupon {$coupon->name()} created.", 'coupon', $coupon->id,
                 Audit::created(Audit::fieldsOf($coupon, self::AUDITED)));
         } elseif ($changes = Audit::diff($before, Audit::fieldsOf($coupon, self::AUDITED))) {
-            $this->audit->record('coupon.updated', "Coupon {$coupon->code} updated.", 'coupon', $coupon->id, $changes);
+            $this->audit->record('coupon.updated', "Coupon {$coupon->name()} updated.", 'coupon', $coupon->id, $changes);
         }
     }
 

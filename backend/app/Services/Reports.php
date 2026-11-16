@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Coupon;
+use App\Models\CouponRedemption;
 use App\Models\CreditMemo;
 use App\Models\Customer;
 use App\Models\Order;
@@ -137,17 +139,27 @@ class Reports
         ];
     }
 
-    /** [{ code, uses, discount_total }] - most used first. (A free-shipping coupon's discount is 0.00: it lowers shipping, not the merchandise.) */
+    /**
+     * [{ coupon_id, code, name, automatic, uses, discount_total }] - most used first. Phase 7: from the rule uses
+     * (coupon_redemptions) of the range's orders, so automatic rules (no code) are listed by name.
+     * (A free-shipping rule's discount is 0.00: it lowers shipping, not the merchandise.)
+     */
     public function coupons(CarbonImmutable $from, CarbonImmutable $to): array
     {
-        return $this->orders($from, $to)->whereNotNull('coupon_code')
-            ->selectRaw('coupon_code, count(*) as uses, sum(discount_total) as discount_total')
-            ->groupBy('coupon_code')->orderByDesc('uses')->orderBy('coupon_code')->get()
-            ->map(fn ($row) => [
-                'code' => $row->coupon_code,
-                'uses' => (int) $row->uses,
-                'discount_total' => Pricing::format(Pricing::toCents((string) $row->discount_total)),
-            ])->all();
+        $rows = CouponRedemption::query()
+            ->whereIn('order_id', $this->orders($from, $to)->select('id'))
+            ->selectRaw('coupon_id, count(*) as uses, sum(discount) as discount_total')
+            ->groupBy('coupon_id')->get();
+        $coupons = Coupon::whereIn('id', $rows->pluck('coupon_id'))->get()->keyBy('id');
+
+        return $rows->map(fn ($row) => [
+            'coupon_id' => (int) $row->coupon_id,
+            'code' => $coupons[$row->coupon_id]->code ?? null,
+            'name' => $coupons[$row->coupon_id]->description ?? null,
+            'automatic' => (bool) ($coupons[$row->coupon_id]->auto_apply ?? false),
+            'uses' => (int) $row->uses,
+            'discount_total' => Pricing::format(Pricing::toCents((string) ($row->discount_total ?? 0))),
+        ])->sortBy([['uses', 'desc'], fn ($a, $b) => strcmp($a['code'] ?? $a['name'] ?? '', $b['code'] ?? $b['name'] ?? '')])->values()->all();
     }
 
     /** Products (not deleted, any status) below the low-stock threshold, lowest stock first. */

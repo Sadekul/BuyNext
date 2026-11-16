@@ -1,6 +1,8 @@
 import { laravel } from '../http.js'
 import { camelPath, fromAddress, fromLine, fromOrder, fromShipment, fromTotals } from './laravel.js'
 import { productParts } from './adminCatalog.js'
+// Phase 7 (system): the dashboard's new blocks.
+import { dashboardBlocks } from './adminContent.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -24,6 +26,9 @@ const PRODUCT_FIELDS = {
   discountPercentage: 'discount_percent',
   stock: 'stock_quantity',
   status: 'status',
+  // Phase 7 (system): SEO.
+  metaTitle: 'meta_title',
+  metaDescription: 'meta_description',
 }
 const FORM_FIELD = Object.fromEntries(Object.entries(PRODUCT_FIELDS).map(([form, api]) => [api, form]))
 const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber' }
@@ -62,6 +67,9 @@ export function adminProduct(raw) {
     minimumOrderQuantity: raw.min_order_quantity ?? 1,
     images: (raw.images ?? []).map((image) => image.url),
     tags: raw.tags ?? [],
+    // Phase 7 (system): SEO (empty = the store falls back to the name and description).
+    metaTitle: raw.meta_title ?? '',
+    metaDescription: raw.meta_description ?? '',
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
     // Phase 5: images with their ids and alt text, options, and variants.
@@ -256,6 +264,15 @@ export function adminCoupon(raw) {
     timesUsed: raw.times_used ?? 0,
     isActive: raw.is_active === true,
     status: raw.status,
+    // Phase 7 (marketing): cart price rules.
+    customerGroupIds: Array.isArray(raw.customer_group_ids) ? raw.customer_group_ids : [],
+    appliesTo: raw.applies_to ?? 'all',
+    categoryIds: Array.isArray(raw.category_ids) ? raw.category_ids : [],
+    productIds: Array.isArray(raw.product_ids) ? raw.product_ids : [],
+    freeShipping: raw.free_shipping === true,
+    buyQuantity: raw.buy_quantity ?? null,
+    getQuantity: raw.get_quantity ?? null,
+    autoApply: raw.auto_apply === true,
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
   }
@@ -273,6 +290,15 @@ const COUPON_FIELDS = {
   usageLimit: 'usage_limit',
   usageLimitPerCustomer: 'usage_limit_per_customer',
   isActive: 'is_active',
+  // Phase 7 (marketing): cart price rules.
+  customerGroupIds: 'customer_group_ids',
+  appliesTo: 'applies_to',
+  categoryIds: 'category_ids',
+  productIds: 'product_ids',
+  freeShipping: 'free_shipping',
+  buyQuantity: 'buy_quantity',
+  getQuantity: 'get_quantity',
+  autoApply: 'auto_apply',
 }
 const COUPON_MONEY = ['value', 'minSubtotal']
 const toCouponBody = (values) =>
@@ -284,40 +310,50 @@ const cents = (value) => (typeof value === 'number' ? value.toFixed(2) : undefin
 export const laravelAdminData = {
   async overview(token, request) {
     const result = await laravel('/api/admin/v1/overview', { token, request })
+    // Phase 7 (system): each block is only there with its permission (products.view, orders.view, …): null when left out.
     return answer(result, [200], ({ data }) => ({
-      products: {
-        total: data.products.total,
-        active: data.products.active,
-        outOfStock: data.products.out_of_stock,
-        lowStock: data.products.low_stock,
-        inventoryValue: money(data.products.inventory_value),
-      },
-      orders: {
-        total: data.orders.total,
-        revenue: money(data.orders.revenue),
-        unitsSold: data.orders.units_sold,
-        averageOrder: money(data.orders.average_order),
-        byStatus: data.orders.by_status ?? {},
-      },
-      customers: { total: data.customers.total },
-      lowStockProducts: (data.low_stock_products ?? []).map((product) => ({
-        id: product.id,
-        title: product.name,
-        sku: product.sku,
-        category: typeof product.category === 'object' ? product.category?.slug : product.category,
-        stock: product.stock_quantity,
-        thumbnail: product.thumbnail_url,
-      })),
-      latestOrders: (data.latest_orders ?? []).map((order) => ({
-        id: order.number,
-        number: order.number,
-        customer: order.customer_name || order.email,
-        email: order.email,
-        items: order.items,
-        total: money(order.total),
-        status: order.status,
-        placedAt: order.placed_at,
-      })),
+      products: data.products
+        ? {
+            total: data.products.total,
+            active: data.products.active,
+            outOfStock: data.products.out_of_stock,
+            lowStock: data.products.low_stock,
+            inventoryValue: money(data.products.inventory_value),
+          }
+        : null,
+      orders: data.orders
+        ? {
+            total: data.orders.total,
+            revenue: money(data.orders.revenue),
+            unitsSold: data.orders.units_sold,
+            averageOrder: money(data.orders.average_order),
+            byStatus: data.orders.by_status ?? {},
+          }
+        : null,
+      customers: data.customers ? { total: data.customers.total } : null,
+      lowStockProducts: Array.isArray(data.low_stock_products)
+        ? data.low_stock_products.map((product) => ({
+            id: product.id,
+            title: product.name,
+            sku: product.sku,
+            category: typeof product.category === 'object' ? product.category?.slug : product.category,
+            stock: product.stock_quantity,
+            thumbnail: product.thumbnail_url,
+          }))
+        : null,
+      latestOrders: Array.isArray(data.latest_orders)
+        ? data.latest_orders.map((order) => ({
+            id: order.number,
+            number: order.number,
+            customer: order.customer_name || order.email,
+            email: order.email,
+            items: order.items,
+            total: money(order.total),
+            status: order.status,
+            placedAt: order.placed_at,
+          }))
+        : null,
+      ...dashboardBlocks(data),
       lowStockThreshold: data.low_stock_threshold,
       live: true,
     }))

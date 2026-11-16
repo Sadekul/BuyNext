@@ -15,8 +15,19 @@ import { PRODUCT_STATUSES, productStatus } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { withPaths } from '../utils/categories'
+// Phase 7: column chooser, rows per page, saved filters; the redirect offer after a delete.
+import GridPreferences from '../components/GridPreferences'
+import RedirectOffer from '../components/RedirectOffer'
+import { useGridPreferences } from '../utils/useGridPreferences'
+import { storePaths } from '../utils/redirects'
 
-const LIMIT = 20
+const COLUMNS = [
+  { id: 'product', label: 'Product', required: true },
+  { id: 'category', label: 'Category' },
+  { id: 'price', label: 'Price' },
+  { id: 'stock', label: 'Stock' },
+  { id: 'status', label: 'Status' },
+]
 
 /**
  * Product list: search, category (and, with real data, status) filters,
@@ -33,13 +44,16 @@ function ProductsPage() {
   const sortBy = params.get('sortBy') ?? ''
   const order = params.get('order') ?? 'asc'
   const skip = Number(params.get('skip')) || 0
+  const grid = useGridPreferences('products_grid', COLUMNS)
+  const limit = grid.pageSize
   const [draft, setDraft] = useState(q)
   const [toDelete, setToDelete] = useState(null)
+  const [deleted, setDeleted] = useState(null) // a product just deleted: offer a redirect from its address
   const [notice, setNotice] = useState(null)
   const [summary, setSummary] = useState(null) // the last mass action's result
   const summaryRef = useRef(null)
 
-  const query = { q, category, status, sortBy, order, skip, limit: LIMIT }
+  const query = { q, category, status, sortBy, order, skip, limit }
   // The ticked products, for this page and these filters only (a new page starts empty).
   const pageKey = JSON.stringify(query)
   const [selection, setSelection] = useState({ pageKey, ids: [] })
@@ -62,6 +76,7 @@ function ProductsPage() {
       }
       // Past orders keep their own copy of the product (name, price), so they don't change.
       setNotice(`"${product.title}" deleted. It is no longer in the store; past orders still show it.`)
+      setDeleted(product)
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: adminKeys.overview })
     },
@@ -134,6 +149,7 @@ function ProductsPage() {
           {notice}
         </p>
       )}
+      {deleted && <RedirectOffer key={deleted.id} fromPath={storePaths.product(deleted)} suggestedTo={deleted.category ? `/categories/${deleted.category}` : '/products'} what={`the deleted product "${deleted.title}"`} onClose={() => setDeleted(null)} />}
       <div role="status">
         {summary && (
           <div ref={summaryRef} tabIndex={-1} className="notice notice--success bulk-summary">
@@ -214,6 +230,16 @@ function ProductsPage() {
           </select>
         </label>
       </div>
+      <GridPreferences
+        prefs={grid}
+        noun="products"
+        onPageSize={() => update({ skip: 0 })}
+        current={{ q, category, status, sortBy, order: sortBy ? order : '' }}
+        onApply={(saved) => {
+          setDraft(saved.q ?? '')
+          setParams(new URLSearchParams(Object.entries(saved).filter(([, value]) => value !== '' && value !== null)))
+        }}
+      />
 
       {products.isPending && <Loading label="Loading products…" />}
       {products.error && <ErrorState error={products.error} onRetry={products.refetch} />}
@@ -240,12 +266,14 @@ function ProductsPage() {
                   </th>
                 )}
                 <th scope="col">Product</th>
-                <th scope="col">Category</th>
-                <th scope="col" className="num">
-                  Price
-                </th>
-                <th scope="col">Stock</th>
-                {LIVE_DATA && <th scope="col">Status</th>}
+                {grid.isVisible('category') && <th scope="col">Category</th>}
+                {grid.isVisible('price') && (
+                  <th scope="col" className="num">
+                    Price
+                  </th>
+                )}
+                {grid.isVisible('stock') && <th scope="col">Stock</th>}
+                {LIVE_DATA && grid.isVisible('status') && <th scope="col">Status</th>}
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
                 </th>
@@ -268,12 +296,14 @@ function ProductsPage() {
                       </span>
                     </Link>
                   </td>
-                  <td>{formatSlug(product.category)}</td>
-                  <td className="num">{formatMoney(product.price)}</td>
-                  <td>
-                    <StatusBadge stock={product.stock} /> <span className="muted">{formatCount(product.stock)}</span>
-                  </td>
-                  {LIVE_DATA && (
+                  {grid.isVisible('category') && <td>{formatSlug(product.category)}</td>}
+                  {grid.isVisible('price') && <td className="num">{formatMoney(product.price)}</td>}
+                  {grid.isVisible('stock') && (
+                    <td>
+                      <StatusBadge stock={product.stock} /> <span className="muted">{formatCount(product.stock)}</span>
+                    </td>
+                  )}
+                  {LIVE_DATA && grid.isVisible('status') && (
                     <td>
                       <StatusBadge {...productStatus(product.status)} />
                     </td>
@@ -294,7 +324,7 @@ function ProductsPage() {
               ))}
             </tbody>
           </table>
-          <Pagination total={products.data.total} limit={LIMIT} skip={skip} onChange={(nextSkip) => update({ skip: nextSkip })} />
+          <Pagination total={products.data.total} limit={limit} skip={skip} onChange={(nextSkip) => update({ skip: nextSkip })} />
         </div>
       )}
 

@@ -5,6 +5,8 @@ import { Loading } from '../components/States'
 import AccessDenied from '../pages/AccessDenied'
 import { fullName } from '../utils/format'
 import { allowedNav } from '../utils/permissions'
+import { LIVE_DATA } from '../api/mode'
+import NotificationsBell from '../components/NotificationsBell'
 
 function NavItem({ to, label, icon: Icon, end }) {
   return (
@@ -88,9 +90,17 @@ function AdminLayout() {
           </button>
         </div>
       </aside>
-      <main id="admin-main" className="admin__main" tabIndex={-1}>
-        <Outlet />
-      </main>
+      <div className="admin__content">
+        {/* Phase 7: the header with the notifications bell (BuyNest's backend only). */}
+        {LIVE_DATA && (
+          <header className="admin__topbar">
+            <NotificationsBell />
+          </header>
+        )}
+        <main id="admin-main" className="admin__main" tabIndex={-1}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

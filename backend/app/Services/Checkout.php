@@ -113,6 +113,7 @@ class Checkout
             'shipping_label' => $quote->shippingMethod['label'],
             'shipping_eta' => $quote->shippingMethod['eta'],
             'coupon_code' => $quote->coupon['code'] ?? null,
+            'applied_rules' => $quote->appliedRulesSummary(),
             'subtotal' => Pricing::format($quote->subtotalCents),
             'discount_total' => Pricing::format($quote->discountCents),
             'shipping_total' => Pricing::format($quote->shippingCents),
@@ -150,18 +151,21 @@ class Checkout
                 'sale_price' => Pricing::format($line['sale_cents']),
                 'quantity' => $line['quantity'],
                 'line_total' => Pricing::format($line['line_cents']),
+                'discount_amount' => Pricing::format($line['discount_cents'] ?? 0),
+                'price_label' => $line['price_label'],
             ]);
         }
 
-        // Count the coupon use. Its row was locked by quote(), so the usage
-        // limits checked there still hold: no other checkout can get in between.
-        if ($quote->couponId) {
-            Coupon::whereKey($quote->couponId)->increment('times_used');
+        // Count each rule's use (the code and an automatic rule). Their rows were locked by quote(), so the
+        // usage limits checked there still hold: no other checkout can get in between.
+        foreach ($quote->appliedRules as $rule) {
+            Coupon::whereKey($rule['coupon']->id)->increment('times_used');
             CouponRedemption::create([
-                'coupon_id' => $quote->couponId,
+                'coupon_id' => $rule['coupon']->id,
                 'order_id' => $order->id,
                 'customer_id' => $customer?->id,
                 'email' => $data['email'],
+                'discount' => Pricing::format($rule['discount_cents']),
             ]);
         }
 

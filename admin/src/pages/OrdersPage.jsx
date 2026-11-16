@@ -12,8 +12,20 @@ import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatMoney } from '../utils/format'
 import { ORDER_SOURCES, ORDER_STATUSES, PAYMENT_STATUSES, orderSource, orderStatus, paymentStatus } from '../utils/orders'
+// Phase 7: column chooser, rows per page, saved filters.
+import GridPreferences from '../components/GridPreferences'
+import { useGridPreferences } from '../utils/useGridPreferences'
 
 const LIMIT = 20
+const COLUMNS = [
+  { id: 'order', label: 'Order', required: true },
+  { id: 'customer', label: 'Customer' },
+  { id: 'placed', label: 'Placed' },
+  { id: 'source', label: 'Source' },
+  { id: 'status', label: 'Status' },
+  { id: 'payment', label: 'Payment' },
+  { id: 'total', label: 'Total' },
+]
 
 /**
  * Demo: orders = DummyJSON's carts (the demo API's only order-like data).
@@ -95,8 +107,10 @@ function LiveOrdersPage() {
   const payment = params.get('paymentStatus') ?? ''
   const source = params.get('source') ?? ''
   const skip = Number(params.get('skip')) || 0
+  const grid = useGridPreferences('orders_grid', COLUMNS)
+  const limit = grid.pageSize
   const [draft, setDraft] = useState(q)
-  const query = { q, status, paymentStatus: payment, source, skip, limit: LIMIT }
+  const query = { q, status, paymentStatus: payment, source, skip, limit }
   const orders = useQuery({
     queryKey: adminKeys.orders(query),
     queryFn: ({ signal }) => getOrders(query, { signal }),
@@ -227,6 +241,16 @@ function LiveOrdersPage() {
           </select>
         </label>
       </div>
+      <GridPreferences
+        prefs={grid}
+        noun="orders"
+        onPageSize={() => update({ skip: 0 })}
+        current={{ q, status, paymentStatus: payment, source }}
+        onApply={(saved) => {
+          setDraft(saved.q ?? '')
+          setParams(new URLSearchParams(Object.entries(saved).filter(([, value]) => value !== '' && value !== null)))
+        }}
+      />
       {selected.length > 0 && <OrderBulkActions selected={selected} onDone={bulkDone} onClear={() => select([])} />}
 
       {orders.isPending && <Loading label="Loading orders…" />}
@@ -249,14 +273,16 @@ function LiveOrdersPage() {
                   />
                 </th>
                 <th scope="col">Order</th>
-                <th scope="col">Customer</th>
-                <th scope="col">Placed</th>
-                <th scope="col">Source</th>
-                <th scope="col">Status</th>
-                <th scope="col">Payment</th>
-                <th scope="col" className="num">
-                  Total
-                </th>
+                {grid.isVisible('customer') && <th scope="col">Customer</th>}
+                {grid.isVisible('placed') && <th scope="col">Placed</th>}
+                {grid.isVisible('source') && <th scope="col">Source</th>}
+                {grid.isVisible('status') && <th scope="col">Status</th>}
+                {grid.isVisible('payment') && <th scope="col">Payment</th>}
+                {grid.isVisible('total') && (
+                  <th scope="col" className="num">
+                    Total
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -268,26 +294,34 @@ function LiveOrdersPage() {
                   <td>
                     <Link to={`/orders/${order.number}`}>{order.number}</Link>
                   </td>
-                  <td>
-                    {order.customer}
-                    <small className="muted"> · {order.guest ? 'Guest' : 'Account'}</small>
-                  </td>
-                  <td>{formatDate(order.placedAt)}</td>
-                  <td>
-                    <StatusBadge {...orderSource(order.source)} />
-                  </td>
-                  <td>
-                    <StatusBadge {...orderStatus(order.status)} />
-                  </td>
-                  <td>
-                    <StatusBadge {...paymentStatus(order.paymentStatus)} />
-                  </td>
-                  <td className="num">{formatMoney(order.total)}</td>
+                  {grid.isVisible('customer') && (
+                    <td>
+                      {order.customer}
+                      <small className="muted"> · {order.guest ? 'Guest' : 'Account'}</small>
+                    </td>
+                  )}
+                  {grid.isVisible('placed') && <td>{formatDate(order.placedAt)}</td>}
+                  {grid.isVisible('source') && (
+                    <td>
+                      <StatusBadge {...orderSource(order.source)} />
+                    </td>
+                  )}
+                  {grid.isVisible('status') && (
+                    <td>
+                      <StatusBadge {...orderStatus(order.status)} />
+                    </td>
+                  )}
+                  {grid.isVisible('payment') && (
+                    <td>
+                      <StatusBadge {...paymentStatus(order.paymentStatus)} />
+                    </td>
+                  )}
+                  {grid.isVisible('total') && <td className="num">{formatMoney(order.total)}</td>}
                 </tr>
               ))}
             </tbody>
           </table>
-          <Pagination total={orders.data.total} limit={LIMIT} skip={skip} onChange={(next) => update({ skip: next })} />
+          <Pagination total={orders.data.total} limit={limit} skip={skip} onChange={(next) => update({ skip: next })} />
         </div>
       )}
     </>

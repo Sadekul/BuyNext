@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuPencil } from 'react-icons/lu'
 import EditNameForm from '../components/forms/EditNameForm'
+import { CheckboxField } from '../components/forms/FormField'
 import { profileQuery, userKeys } from '../queries/userQueries'
 import { updateProfile } from '../services/authService'
 import { REAL_ACCOUNTS } from '../constants/accounts'
@@ -47,6 +48,18 @@ function ProfilePage() {
     },
     onSettled: () => {
       if (REAL_ACCOUNTS) queryClient.invalidateQueries({ queryKey: profileKey })
+    },
+  })
+
+  /*
+   * The newsletter switch (BuyNest accounts, phase 7). No confirmation email:
+   * the account's address is already verified. Shown once the API says
+   * whether the customer is subscribed.
+   */
+  const newsletter = useMutation({
+    mutationFn: (subscribed) => authorizedRequest(() => updateProfile({ newsletter: subscribed })),
+    onSuccess: (updated, subscribed) => {
+      queryClient.setQueryData(profileKey, (current) => ({ ...current, newsletter: updated.newsletter ?? subscribed }))
     },
   })
 
@@ -107,6 +120,25 @@ function ProfilePage() {
           </div>
         ))}
       </dl>
+
+      {REAL_ACCOUNTS && typeof profile.newsletter === 'boolean' && (
+        <section className="profile__newsletter" aria-labelledby="profile-newsletter-title">
+          <h2 id="profile-newsletter-title" className="profile__section-title">
+            Newsletter
+          </h2>
+          <CheckboxField
+            label="Email me new arrivals, deals, and style tips"
+            checked={newsletter.isPending ? newsletter.variables : profile.newsletter}
+            disabled={newsletter.isPending}
+            onChange={(event) => newsletter.mutate(event.target.checked)}
+          />
+          <p className="profile__status" role="status">
+            {newsletter.isPending && 'Saving…'}
+            {newsletter.isSuccess && (newsletter.data?.newsletter ?? newsletter.variables ? "You're subscribed to the newsletter." : "You're unsubscribed from the newsletter.")}
+            {newsletter.isError && `Couldn't change your newsletter setting: ${newsletter.error.message}`}
+          </p>
+        </section>
+      )}
 
       <p className="profile__note">
         {REAL_ACCOUNTS

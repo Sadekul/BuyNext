@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuKeyRound, LuPencil, LuPlus } from 'react-icons/lu'
+import { LuKeyRound, LuPencil, LuPlus, LuSearch } from 'react-icons/lu'
 import { adminKeys, createAdmin, getAdmins, getRoles, resetAdminPassword, updateAdmin } from '../api/admin'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -23,13 +23,17 @@ function AdminUsersPage() {
   const queryClient = useQueryClient()
   const { user } = useAdminAuth()
   const [skip, setSkip] = useState(0)
+  const [q, setQ] = useState('')
+  const [draft, setDraft] = useState('')
+  const [status, setStatus] = useState('')
   const [dialog, setDialog] = useState(null) // { type: 'create' | 'edit' | 'password', admin? }
   const [confirming, setConfirming] = useState(null) // { admin, isActive }
   const [notice, setNotice] = useState(null)
   const noticeRef = useRef(null)
   const opener = useRef(null)
 
-  const admins = useQuery({ queryKey: adminKeys.admins({ skip }), queryFn: ({ signal }) => getAdmins({ limit: LIMIT, skip }, { signal }) })
+  const filters = { skip, ...(q && { q }), ...(status && { status }) }
+  const admins = useQuery({ queryKey: adminKeys.admins(filters), queryFn: ({ signal }) => getAdmins({ limit: LIMIT, ...filters }, { signal }) })
   const roles = useQuery({ queryKey: adminKeys.roles, queryFn: ({ signal }) => getRoles({ signal }) })
 
   function done(text, tone = 'success') {
@@ -76,6 +80,40 @@ function AdminUsersPage() {
             {notice.text}
           </p>
         )}
+      </div>
+
+      <div className="toolbar">
+        <form
+          role="search"
+          className="toolbar__search"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setQ(draft.trim())
+            setSkip(0)
+          }}
+        >
+          <label htmlFor="admin-search" className="visually-hidden">
+            Search admin users
+          </label>
+          <input id="admin-search" type="search" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Search by name or email" />
+          <button type="submit" className="btn btn--outline">
+            <LuSearch aria-hidden="true" /> Search
+          </button>
+        </form>
+        <label className="toolbar__select">
+          <span>Status</span>
+          <select
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value)
+              setSkip(0)
+            }}
+          >
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Deactivated</option>
+          </select>
+        </label>
       </div>
 
       {admins.isPending && <Loading label="Loading admin users…" />}

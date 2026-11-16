@@ -82,7 +82,7 @@ class CouponTest extends TestCase
         $this->coupon(['code' => 'OLD', 'ends_at' => now()->subMinute()]);
         $this->assertSame('This code has expired.', $this->couponError('OLD'));
         $this->coupon(['code' => 'BIG', 'min_subtotal' => '60.50']);
-        $this->assertSame('Spend at least $60.50 to use this code.', $this->couponError('BIG', 2));
+        $this->assertSame('Spend $10.50 more to use this code.', $this->couponError('BIG', 2));
         $this->assertNull($this->couponError('BIG', 3));
         $this->coupon(['code' => 'GONE', 'usage_limit' => 2])->forceFill(['times_used' => 2])->save();
         $this->assertSame('This code has been fully used.', $this->couponError('GONE'));
@@ -103,7 +103,7 @@ class CouponTest extends TestCase
             'This code is not valid.',                    // inactive
             'This code isn\'t active yet.',               // not started
             'This code has expired.',                     // ended (starts_at cleared, ends_at past)
-            'Spend at least $1000 to use this code.',     // minimum
+            'Spend $975.00 more to use this code.',     // minimum (phase 7: says how much more)
             'This code has been fully used.',             // total uses
             'You\'ve already used this code.',            // per customer (guest email)
             null,
@@ -222,7 +222,7 @@ class CouponTest extends TestCase
             ->assertJsonPath('data.times_used', 0)
             ->assertJsonPath('data.is_active', true)
             ->assertJsonPath('data.status', 'active');
-        $this->assertSame('Spend at least $40 to use this code.', $this->couponError('spring-25', 1));
+        $this->assertSame('Spend $15.00 more to use this code.', $this->couponError('spring-25', 1));
         $this->assertSame('12.50', $this->cart('spring-25', 2)->json('data.totals.discount'));
 
         // Validation.

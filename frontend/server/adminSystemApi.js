@@ -276,7 +276,10 @@ function downloadName(disposition, report) {
 const live = (handler) => (ctx) => (realData() ? handler(ctx) : liveOnly())
 
 export const SYSTEM_ROUTES = {
-  'GET admins': live(async (ctx) => fromLaravel(await laravelSystemData.listAdmins(ctx.token, { q: search(ctx.url), ...pageParams(ctx.url) }, ctx.request))),
+  'GET admins': live(async (ctx) => {
+    const status = ['active', 'inactive'].includes(ctx.url.searchParams.get('status')) ? ctx.url.searchParams.get('status') : undefined
+    return fromLaravel(await laravelSystemData.listAdmins(ctx.token, { q: search(ctx.url), status, ...pageParams(ctx.url) }, ctx.request))
+  }),
   'POST admins': live(async (ctx) => {
     const { values, errors } = validateAdminUser(await readBody(ctx.request), { partial: false })
     if (errors) return invalid(errors)

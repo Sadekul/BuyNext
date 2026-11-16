@@ -123,6 +123,8 @@ export function withServerPricing(localTotals, serverCart) {
     total: totals.total,
     coupon: serverCart.coupon,
     couponError: serverCart.couponError,
+    // Phase 7: each cart price rule that applied (automatic ones too), for the summary rows.
+    appliedRules: serverCart.appliedRules ?? [],
   }
   const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount)
   // Totals built without store rules (older callers) use the demo threshold.

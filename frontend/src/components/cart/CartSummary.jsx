@@ -1,4 +1,5 @@
 import CouponForm from './CouponForm'
+import DiscountRows from './DiscountRows'
 import FreeShippingProgress from './FreeShippingProgress'
 import { formatPrice } from '../../utils/formatters'
 import './CartSummary.css'
@@ -27,12 +28,7 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
             <dd>{formatPrice(totals.productSavings)}</dd>
           </div>
         )}
-        {totals.discount > 0 && (
-          <div className="cart-summary__saving">
-            <dt>Discount ({couponCode})</dt>
-            <dd>−{formatPrice(totals.discount)}</dd>
-          </div>
-        )}
+        <DiscountRows rules={totals.appliedRules} discount={totals.discount} couponCode={couponCode} />
         <div>
           <dt>Estimated shipping</dt>
           <dd>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>

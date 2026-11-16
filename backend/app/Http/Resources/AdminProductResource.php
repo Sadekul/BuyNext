@@ -54,6 +54,9 @@ class AdminProductResource extends ProductResource
             ...$base,
             // Staff edit the description, so even lists include it.
             'description' => $this->description,
+            // Phase 7: SEO fields (null = the storefront uses the name and description).
+            'meta_title' => $this->meta_title,
+            'meta_description' => $this->meta_description,
             'status' => $this->status,
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'updated_at' => $this->updated_at?->toIso8601ZuluString(),

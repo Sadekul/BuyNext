@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\DevMail;
+use App\Services\CatalogRules;
 use App\Services\HtmlSanitizer;
 use App\Services\Settings;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Settings::class);
         // The sanitizer's allow-list is built once.
         $this->app->singleton(HtmlSanitizer::class);
+        // Phase 7 (part A): the compiled catalog price rules, read once per request.
+        $this->app->singleton(CatalogRules::class);
     }
 
     public function boot(): void
@@ -53,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
                         'subject' => (string) $message->getSubject(),
                         'html' => $message->getHtmlBody(),
                         'text' => $message->getTextBody(),
+                        // Phase 7: the List-Unsubscribe header of newsletters, so it can be checked by hand.
+                        'headers' => $message->getHeaders()->has('List-Unsubscribe')
+                            ? ['List-Unsubscribe' => $message->getHeaders()->get('List-Unsubscribe')->getBodyAsString()] : null,
                     ]);
                 }
             });

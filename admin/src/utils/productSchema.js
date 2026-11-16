@@ -33,6 +33,11 @@ export const productSchema = z.object({
     .max(100_000, 'Enter a whole number of units from 0 to 100,000.'),
   // Only active products are in the store (real data only; the demo ignores it).
   status: z.enum(['active', 'draft', 'archived'], { error: 'Choose active, draft, or archived.' }),
+  // Phase 7: SEO (real data only). Empty = the store uses the name and description.
+  metaTitle: z.string().trim().max(190, 'Keep the meta title under 190 characters.'),
+  metaDescription: z.string().trim().max(500, 'Keep the meta description under 500 characters.'),
 })
 
-export const EMPTY_PRODUCT = { title: '', brand: '', category: '', description: '', price: 0, discountPercentage: 0, stock: 0, status: 'active' }
+export const EMPTY_PRODUCT = { title: '', brand: '', category: '', description: '', price: 0, discountPercentage: 0, stock: 0, status: 'active', metaTitle: '', metaDescription: '' }
+/** Fields only BuyNest's backend has (the demo data has no status or SEO fields). */
+export const LIVE_ONLY_FIELDS = ['status', 'metaTitle', 'metaDescription']

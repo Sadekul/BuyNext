@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { LuFilterX, LuSearchX, LuSlidersHorizontal } from 'react-icons/lu'
 import CategoryNav from '../components/product/CategoryNav'
 import Breadcrumb from '../components/common/Breadcrumb'
+import PageMeta from '../components/common/PageMeta'
 import ActiveFilters from '../components/product/ActiveFilters'
 import CatalogFilters from '../components/product/CatalogFilters'
 import ProductGrid from '../components/product/ProductGrid'
@@ -16,9 +17,11 @@ import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import { useQuery } from '@tanstack/react-query'
-import { catalogQuery } from '../queries/productQueries'
+import { catalogQuery, suggestionsQuery } from '../queries/productQueries'
 import { useCategories } from '../hooks/useCategories'
+import { HAS_SEO } from '../services/seoService'
 import { useCart } from '../hooks/useCart'
+import { useStoreRedirect } from '../hooks/useStoreRedirect'
 import { ROUTES } from '../constants/routes'
 import { PRODUCTS_PER_PAGE, getSortOption } from '../constants/catalog'
 import {
@@ -31,6 +34,8 @@ import {
   sortProducts,
 } from '../utils/catalog'
 import { formatPrice } from '../utils/formatters'
+import { toDescription } from '../utils/pageMeta'
+import { followRedirect } from '../utils/safeRedirect'
 import { readCatalogParams, withFilters, withParam } from '../utils/catalogParams'
 import { categoryAncestors, childCategories, topLevelCategories } from '../utils/categories'
 import './ProductListingPage.css'
@@ -56,6 +61,14 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const searchQuery = searchParams.get('q')?.trim() ?? ''
   const sortOption = getSortOption(searchParams.get('sort'), defaultSort)
 
+  // Phase 7: an exact search term the store sends straight to a page (the
+  // same small request the search box's suggestions make, so usually cached).
+  const navigate = useNavigate()
+  const searchRedirect = useQuery({ ...suggestionsQuery(searchQuery), enabled: HAS_SEO && searchQuery.length > 0 }).data?.redirectUrl ?? null
+  useEffect(() => {
+    if (searchRedirect) followRedirect(searchRedirect, navigate)
+  }, [searchRedirect, navigate])
+
   const categoriesRequest = useCategories()
   const categories = categoriesRequest.data ?? []
   const currentCategory = categories.find((category) => category.slug === categorySlug)
@@ -73,8 +86,20 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   // old Catalog's local state (open quick view, mobile filter panel).
   const scopeKey = searchQuery ? `search:${searchQuery}` : `category:${categorySlug ?? 'all'}`
 
+  // Search and link-preview tags: a category's own SEO fields (admin, phase 5) when set.
+  // Search results are left out of search engines (noindex): they're endless and thin.
+  const meta = currentCategory
+    ? {
+        title: currentCategory.metaTitle ?? currentCategory.name,
+        description: toDescription(currentCategory.metaDescription ?? currentCategory.description ?? `Shop ${currentCategory.name} at BuyNest.`),
+        image: currentCategory.image,
+        canonicalPath: ROUTES.category(currentCategory.slug),
+      }
+    : { title: heading, noindex: Boolean(searchQuery) }
+
   return (
     <div className="listing section container">
+      <PageMeta {...meta} />
       <header className="listing__header">
         {ancestors.length > 0 && (
           <Breadcrumb
@@ -113,13 +138,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
           onRetry={categoriesRequest.refetch}
         />
       ) : isUnknownCategory ? (
-        <EmptyState
-          icon={LuSearchX}
-          title="Category not found"
-          message={`We don't have a category called "${categorySlug}".`}
-        >
-          <Button to={ROUTES.products}>Browse all products</Button>
-        </EmptyState>
+        <UnknownCategory slug={categorySlug} />
       ) : (
         <Catalog
           key={scopeKey}
@@ -131,6 +150,17 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         />
       )}
     </div>
+  )
+}
+
+/** A category that doesn't exist: an admin redirect (phase 7, e.g. a renamed category) wins, else "not found". */
+function UnknownCategory({ slug }) {
+  const { checking } = useStoreRedirect()
+  if (checking) return <ProductGridSkeleton />
+  return (
+    <EmptyState icon={LuSearchX} title="Category not found" message={`We don't have a category called "${slug}".`}>
+      <Button to={ROUTES.products}>Browse all products</Button>
+    </EmptyState>
   )
 }
 

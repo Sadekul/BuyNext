@@ -85,6 +85,18 @@ The agreement: [docs/backend/PHASE6_CONTRACT.md](../docs/backend/PHASE6_CONTRACT
 
 Uploads need the public storage link once: `php artisan storage:link` (creates `public/storage`, git-ignored; uploaded files in `storage/app/public` are git-ignored too).
 
+## What's here (phase 7, part B: newsletter, email templates, SEO, carts, dashboard)
+
+The agreement: [docs/backend/PHASE7_CONTRACT.md](../docs/backend/PHASE7_CONTRACT.md) ("Implementation notes — part B" has every shape).
+
+| Area | What it does |
+| --- | --- |
+| Newsletter | Double opt-in: `POST /api/v1/newsletter` always answers 202 with the same message; the email has a confirm link (7 days); every newsletter has a signed unsubscribe link and a `List-Unsubscribe` header. Customers toggle it in Account (`PATCH /me { newsletter }`). Campaigns (sanitized HTML) are sent by queued `SendNewsletterBatch` jobs, 100 per batch (`QUEUE_CONNECTION=sync` in development runs them at once; with a real queue run `php artisan queue:work`). `App\Services\Newsletter`. |
+| Email templates | Every email renders from a template (`App\Support\EmailTemplateCatalog` = defaults in code, `email_templates` = staff changes) through `App\Services\EmailTemplates`: `{{ variables }}` from a fixed list per template, text escaped, prebuilt blocks (`items_table`, `address`, `button`, …) from `App\Support\EmailBlocks`, the store frame in `resources/views/emails/layout.blade.php`, plain text made from the HTML. Preview, test send, reset to default. |
+| SEO | Product `meta_title`/`meta_description`; `GET /api/v1/sitemap.xml` (cached 15 min, links use `STOREFRONT_URL`); URL redirects (`/redirects` admin with CSV import, public lookup `GET /api/v1/redirects?path=`). |
+| Saved and abandoned carts | `POST /cart/validate` with a customer token saves the cart; an order marks it converted. `GET /me/cart` and `POST /me/cart/merge` restore it on another device. Reports → Abandoned carts (idle ≥ 1 hour) and a reminder email (once per 72 hours, active customers only). `App\Services\CustomerCarts`. |
+| Dashboard and notifications | `/overview` blocks depend on the admin's `*.view` keys. The bell (`/notifications`) gets low stock / out of stock, customer return requests, reviews waiting, failed newsletter batches (model events in `App\Providers\MarketingServiceProvider`), filtered by permission, one unread per subject. `/preferences/{key}` keeps each admin's grid columns, page size, and saved filters. |
+
 ### Permissions
 
 | Area | Keys |
@@ -93,13 +105,13 @@ Uploads need the public storage link once: `php artisan storage:link` (creates `
 | Catalog | `products.view` (also the category tree), `products.edit` (also images, options, variants, mass actions), `products.delete` (also the bulk `delete`), `categories.edit`, `products.import` (CSV import and export), `reviews.view`, `reviews.moderate` |
 | Sales | `orders.view` (orders, invoices, credit memo and shipment lists, refundable amounts, packing slips, order export, the bulk route), `orders.edit`, `invoices.create`, `shipments.create`, `credit_memos.create`, `orders.create` (phone orders and their quote), `returns.view`, `returns.manage` |
 | Customers | `customers.view` (also groups, addresses, notes, export), `customers.edit` (account, addresses, notes, password reset, block), `customers.create`, `customers.delete`, `customer_groups.manage` |
-| Marketing | `coupons.view`, `coupons.edit` |
-| Content | `content.view`, `content.edit` |
+| Marketing | `coupons.view`, `coupons.edit`, `newsletter.view`, `newsletter.send` (campaigns, unsubscribing, cart reminders) |
+| Content | `content.view`, `content.edit`, `email_templates.manage` (Owner-only by default), `seo.manage` (redirects, search terms) |
 | Reports | `reports.view` |
 | Settings | `settings.view`, `settings.edit` |
 | System | `admins.manage` (admin users, roles, the permission list), `audit.view` |
 
-Signing in, refreshing, signing out, and `GET /me` need no permission.
+Signing in, refreshing, signing out, and `GET /me` need no permission; nor do `/notifications…` (filtered by each notification's permission) and `/preferences/{key}` (the admin's own).
 
 ## Endpoints
 
@@ -186,6 +198,16 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/credit-memos`, `/credit-memos/{number}` | same |
 | GET / POST | `/coupons` | `search, status` (`active, inactive, scheduled, expired, used_up`), `page, per_page`; create → 201 |
 | GET / PATCH / DELETE | `/coupons/{id}` | partial update; DELETE: used coupons are only disabled (200), unused ones deleted (204) |
+| GET / POST | `/catalog-rules` | Phase 7 catalog price rules: `search, status, page, per_page` [coupons.view]; create [price_rules.manage] → 201 |
+| GET / PATCH / DELETE | `/catalog-rules/{id}`, GET `/catalog-rules/{id}/preview` | read [coupons.view]; change [price_rules.manage]; preview = first 50 affected products with old and new price |
+| GET / POST / PATCH / DELETE | `/search-terms`, `/search-terms/{id}` | [seo.manage] per-term redirects; report: GET `/reports/search-terms?type=top\|zero` [reports.view] |
+| GET | `/newsletter/subscribers`, `/newsletter/subscribers/export.csv` | [newsletter.view] `status, source, search, page, per_page`; `meta.counts`; POST `/newsletter/subscribers/{id}/unsubscribe` [newsletter.send] |
+| GET / POST / PATCH / DELETE | `/newsletter/campaigns`, `/newsletter/campaigns/{id}` | read [newsletter.view]; change drafts [newsletter.send]; POST `/{id}/test` (to yourself), `/{id}/send` → 202 |
+| GET / PUT | `/email-templates`, `/email-templates/{key}` | [email_templates.manage] PUT `subject, body`; POST `/{key}/preview`, `/{key}/test`, `/{key}/reset` |
+| GET / POST / PATCH / DELETE | `/redirects`, `/redirects/{id}`, POST `/redirects/import` | [seo.manage] |
+| GET | `/reports/abandoned-carts` | [reports.view] `min_age_hours, max_age_days, min_subtotal, search, sort`; POST `/reports/abandoned-carts/{customer}/remind` [newsletter.send] |
+| GET / POST | `/notifications`, `/notifications/{id}/read`, `/notifications/read-all` | (no key) `unread=1`, `meta.unread_count` |
+| GET / PUT | `/preferences/{key}` | (no key) `products_grid`, `orders_grid`, `customers_grid` |
 | GET / POST | `/admins` | [admins.manage] `search, role_id, status` (`active, inactive`), `page, per_page`; create `name, email, role_id, password, is_active?` → 201 |
 | GET / PATCH | `/admins/{id}` | [admins.manage] PATCH `name, email, role_id, is_active` (the rules above → 422) |
 | POST | `/admins/{id}/reset-password` | [admins.manage] `password` → signed out everywhere |
@@ -241,7 +263,7 @@ For real email, change only the settings: `MAIL_MAILER=smtp` with `MAIL_HOST`, `
 ## Tests
 
 ```bash
-php artisan test     # 250 feature tests, against the buynest_test database (no network: products come from factories)
+php artisan test     # 303 feature tests, against the buynest_test database (no network: products come from factories)
 vendor/bin/pint      # code style
 ```
 
@@ -250,6 +272,6 @@ vendor/bin/pint      # code style
 - `APP_ENV=production`, `APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer.
 - A strong `BFF_SHARED_KEY`, shared only with the storefront's server functions.
 - Don't expose this API publicly if you don't need to: only the storefront's server calls it.
-- Run the scheduler (`php artisan schedule:run` every minute) so unconfirmed sign-ups are cleaned up.
+- Run the scheduler (`php artisan schedule:run` every minute) so unconfirmed sign-ups are cleaned up and catalog price rules start and end on time (`buynest:refresh-price-rules`; reads also check the time).
 - Product photos: run `php artisan storage:link` once, keep `storage/app/public` on persistent disk (not a throwaway container filesystem) and include it in backups. The web server must serve `/storage/...` to the storefront's server functions, which pass photos to shoppers at `/media/...`.
 - Uploads: allow request bodies up to 60 MB in the web server and PHP (`upload_max_filesize=5M`, `max_file_uploads=10`, `post_max_size=60M`).

@@ -50,6 +50,8 @@ export const customerProfile = (customer) => ({
   emailVerified: customer.email_verified === true,
   role: 'customer',
   ...(customerGroup(customer.group) && { group: customerGroup(customer.group) }),
+  // Phase 7: whether the customer gets the newsletter (left out by an older API).
+  ...(typeof customer.newsletter === 'boolean' && { newsletter: customer.newsletter }),
 })
 /*
  * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin
@@ -119,7 +121,13 @@ export const laravelAccounts = {
     ...sessionApi('/api/v1', 'customer', customerProfile),
 
     async updateProfile(token, body, request) {
-      const changes = { first_name: str(body.firstName), last_name: str(body.lastName), phone: str(body.phone) }
+      const changes = {
+        first_name: str(body.firstName),
+        last_name: str(body.lastName),
+        phone: str(body.phone),
+        // Phase 7: the newsletter switch in the account (no confirmation email: the address is verified).
+        ...(typeof body.newsletter === 'boolean' && { newsletter: body.newsletter }),
+      }
       const result = await laravel('/api/v1/me', { method: 'PATCH', token, request, body: changes })
       return result.status === 200 ? { ok: true, profile: customerProfile(result.data.data) } : failed(result)
     },

@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AbandonedCartController;
 use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\AuditController;
+use App\Http\Controllers\Api\Admin\CatalogRuleController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CouponController;
 use App\Http\Controllers\Api\Admin\CreditMemoController;
@@ -10,13 +12,18 @@ use App\Http\Controllers\Api\Admin\CustomerAddressController;
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Api\Admin\CustomerGroupController;
 use App\Http\Controllers\Api\Admin\CustomerNoteController;
+use App\Http\Controllers\Api\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\Admin\HomeController as AdminHomeController;
 use App\Http\Controllers\Api\Admin\InvoiceController;
+use App\Http\Controllers\Api\Admin\NewsletterCampaignController;
+use App\Http\Controllers\Api\Admin\NewsletterSubscriberController;
+use App\Http\Controllers\Api\Admin\NotificationController;
 use App\Http\Controllers\Api\Admin\OrderBulkController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\OrderCreateController;
 use App\Http\Controllers\Api\Admin\OverviewController;
 use App\Http\Controllers\Api\Admin\PageController as AdminPageController;
+use App\Http\Controllers\Api\Admin\PreferenceController;
 use App\Http\Controllers\Api\Admin\ProductBulkController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
@@ -26,17 +33,22 @@ use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\Admin\ReturnController as AdminReturnController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\RoleController;
+use App\Http\Controllers\Api\Admin\SearchTermController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\ShipmentController;
+use App\Http\Controllers\Api\Admin\UrlRedirectController;
 use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
+use App\Http\Controllers\Api\V1\CustomerCartController;
+use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
+use App\Http\Controllers\Api\V1\SeoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -72,7 +84,22 @@ Route::prefix('v1')->group(function () {
         Route::post('orders/{number}/returns', [ReturnController::class, 'store']);
         Route::get('returns', [ReturnController::class, 'index']);
         Route::get('returns/{number}', [ReturnController::class, 'show']);
+        // Phase 7: newsletter, templates, SEO, carts, dashboard, notifications (part B) - the saved cart.
+        Route::get('me/cart', [CustomerCartController::class, 'show']);
+        Route::post('me/cart/merge', [CustomerCartController::class, 'merge']);
     });
+
+    // Phase 7: newsletter, templates, SEO, carts, dashboard, notifications (part B) - public store routes.
+    Route::middleware('throttle:newsletter')->controller(NewsletterController::class)->group(function () {
+        Route::post('newsletter', 'subscribe');
+        Route::post('newsletter/confirm', 'confirm');
+        Route::post('newsletter/unsubscribe', 'unsubscribe');
+    });
+    Route::middleware('throttle:api')->group(function () {
+        Route::get('sitemap.xml', [SeoController::class, 'sitemap']);
+        Route::get('redirects', [SeoController::class, 'redirect']);
+    });
+    // End of phase 7 part B store routes.
 
     // Phase 5: customers write reviews (10 per hour per customer; staff approve them unless Settings → Catalog says otherwise).
     Route::post('products/{id}/reviews', [ReviewController::class, 'store'])->whereNumber('id')
@@ -130,20 +157,20 @@ Route::prefix('admin/v1')->group(function () {
             Route::get('customers/{id}/notes', [CustomerNoteController::class, 'index'])->middleware('can.admin:customers.view');
             Route::post('customers/{id}/notes', [CustomerNoteController::class, 'store'])->middleware('can.admin:customers.edit');
         });
-        Route::get('customer-groups', [CustomerGroupController::class, 'index'])->middleware('can.admin:customers.view');
+        Route::get('customer-groups', [CustomerGroupController::class, 'index'])->middleware('can.admin:customers.view|coupons.view|price_rules.manage');
         Route::post('customer-groups', [CustomerGroupController::class, 'store'])->middleware('can.admin:customer_groups.manage');
         Route::patch('customer-groups/{id}', [CustomerGroupController::class, 'update'])->whereNumber('id')->middleware('can.admin:customer_groups.manage');
         Route::delete('customer-groups/{id}', [CustomerGroupController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:customer_groups.manage');
 
         // Categories are listed for the product form, so products.view is enough.
-        Route::get('categories', [AdminCategoryController::class, 'index'])->middleware('can.admin:products.view');
+        Route::get('categories', [AdminCategoryController::class, 'index'])->middleware('can.admin:products.view|coupons.view|price_rules.manage');
         // Phase 5: the category tree.
         Route::post('categories', [AdminCategoryController::class, 'store'])->middleware('can.admin:categories.edit');
         Route::post('categories/reorder', [AdminCategoryController::class, 'reorder'])->middleware('can.admin:categories.edit');
         Route::patch('categories/{id}', [AdminCategoryController::class, 'update'])->whereNumber('id')->middleware('can.admin:categories.edit');
         Route::delete('categories/{id}', [AdminCategoryController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:categories.edit');
 
-        Route::get('products', [AdminProductController::class, 'index'])->middleware('can.admin:products.view');
+        Route::get('products', [AdminProductController::class, 'index'])->middleware('can.admin:products.view|coupons.view|price_rules.manage');
         // Phase 5: CSV import/export, mass actions (delete also checks products.delete).
         Route::get('products/export.csv', [ProductTransferController::class, 'export'])->middleware('can.admin:products.import');
         Route::post('products/import', [ProductTransferController::class, 'import'])->middleware('can.admin:products.import');
@@ -202,6 +229,61 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('coupons/{id}', [CouponController::class, 'show'])->whereNumber('id')->middleware('can.admin:coupons.view');
         Route::patch('coupons/{id}', [CouponController::class, 'update'])->whereNumber('id')->middleware('can.admin:coupons.edit');
         Route::delete('coupons/{id}', [CouponController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:coupons.edit');
+
+        // Phase 7: price rules and search terms (part A). Catalog price rules are read with coupons.view.
+        Route::get('catalog-rules', [CatalogRuleController::class, 'index'])->middleware('can.admin:coupons.view');
+        Route::post('catalog-rules', [CatalogRuleController::class, 'store'])->middleware('can.admin:price_rules.manage');
+        Route::whereNumber('id')->group(function () {
+            Route::get('catalog-rules/{id}', [CatalogRuleController::class, 'show'])->middleware('can.admin:coupons.view');
+            Route::get('catalog-rules/{id}/preview', [CatalogRuleController::class, 'preview'])->middleware('can.admin:coupons.view');
+            Route::patch('catalog-rules/{id}', [CatalogRuleController::class, 'update'])->middleware('can.admin:price_rules.manage');
+            Route::delete('catalog-rules/{id}', [CatalogRuleController::class, 'destroy'])->middleware('can.admin:price_rules.manage');
+            Route::patch('search-terms/{id}', [SearchTermController::class, 'update'])->middleware('can.admin:seo.manage');
+            Route::delete('search-terms/{id}', [SearchTermController::class, 'destroy'])->middleware('can.admin:seo.manage');
+        });
+        Route::get('search-terms', [SearchTermController::class, 'index'])->middleware('can.admin:seo.manage');
+        Route::post('search-terms', [SearchTermController::class, 'store'])->middleware('can.admin:seo.manage');
+        Route::get('reports/search-terms', [SearchTermController::class, 'report'])->middleware('can.admin:reports.view');
+        // End of phase 7 part A routes.
+
+        // Phase 7: newsletter, templates, SEO, carts, dashboard, notifications (part B).
+        Route::get('newsletter/subscribers', [NewsletterSubscriberController::class, 'index'])->middleware('can.admin:newsletter.view');
+        Route::get('newsletter/subscribers/export.csv', [NewsletterSubscriberController::class, 'export'])->middleware('can.admin:newsletter.view');
+        Route::post('newsletter/subscribers/{id}/unsubscribe', [NewsletterSubscriberController::class, 'unsubscribe'])->whereNumber('id')->middleware('can.admin:newsletter.send');
+        Route::get('newsletter/campaigns', [NewsletterCampaignController::class, 'index'])->middleware('can.admin:newsletter.view');
+        Route::post('newsletter/campaigns', [NewsletterCampaignController::class, 'store'])->middleware('can.admin:newsletter.send');
+        Route::whereNumber('id')->controller(NewsletterCampaignController::class)->group(function () {
+            Route::get('newsletter/campaigns/{id}', 'show')->middleware('can.admin:newsletter.view');
+            Route::patch('newsletter/campaigns/{id}', 'update')->middleware('can.admin:newsletter.send');
+            Route::delete('newsletter/campaigns/{id}', 'destroy')->middleware('can.admin:newsletter.send');
+            Route::post('newsletter/campaigns/{id}/test', 'test')->middleware('can.admin:newsletter.send');
+            Route::post('newsletter/campaigns/{id}/send', 'send')->middleware('can.admin:newsletter.send');
+        });
+        Route::middleware('can.admin:email_templates.manage')->controller(EmailTemplateController::class)->group(function () {
+            Route::get('email-templates', 'index');
+            Route::get('email-templates/{key}', 'show');
+            Route::put('email-templates/{key}', 'update');
+            Route::post('email-templates/{key}/preview', 'preview');
+            Route::post('email-templates/{key}/test', 'test');
+            Route::post('email-templates/{key}/reset', 'reset');
+        });
+        Route::middleware('can.admin:seo.manage')->controller(UrlRedirectController::class)->group(function () {
+            Route::get('redirects', 'index');
+            Route::post('redirects', 'store');
+            Route::post('redirects/import', 'import');
+            Route::get('redirects/{id}', 'show')->whereNumber('id');
+            Route::patch('redirects/{id}', 'update')->whereNumber('id');
+            Route::delete('redirects/{id}', 'destroy')->whereNumber('id');
+        });
+        Route::get('reports/abandoned-carts', [AbandonedCartController::class, 'index'])->middleware('can.admin:reports.view');
+        Route::post('reports/abandoned-carts/{customer}/remind', [AbandonedCartController::class, 'remind'])->whereNumber('customer')->middleware('can.admin:newsletter.send');
+        // No permission key: filtered by each notification's own permission / the admin's own preferences.
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/read-all', [NotificationController::class, 'readAll']);
+        Route::post('notifications/{id}/read', [NotificationController::class, 'read'])->whereNumber('id');
+        Route::get('preferences/{key}', [PreferenceController::class, 'show'])->where('key', '[a-z_]+');
+        Route::put('preferences/{key}', [PreferenceController::class, 'update'])->where('key', '[a-z_]+');
+        // End of phase 7 part B admin routes.
 
         // Phase 4: admin users, roles, audit log, content, reports, settings.
         Route::middleware('can.admin:admins.manage')->group(function () {

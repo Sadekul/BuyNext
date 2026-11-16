@@ -83,7 +83,7 @@ class CartPricingTest extends TestCase
     {
         $short = $this->validateCart([[$this->chair, 2]], 'SAVE20');
         $this->assertTotals($short, 2, '149.98', '0.00', '0.00', '149.98');
-        $short->assertJsonPath('data.coupon', null)->assertJsonPath('data.coupon_error', 'Spend at least $150 to use this code.');
+        $short->assertJsonPath('data.coupon', null)->assertJsonPath('data.coupon_error', 'Spend $0.02 more to use this code.');
 
         $cent = $this->product(['price' => '0.02']);
         $ok = $this->validateCart([[$this->chair, 2], [$cent, 1]], 'save20');

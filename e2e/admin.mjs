@@ -62,13 +62,13 @@ log(!(await ctx.cookies()).some((cookie) => cookie.name === 'buynest_at'), 'sign
 log(await visible(page.getByText(ADMIN_USER.name)), `sidebar shows the admin (${ADMIN_USER.name})`)
 await page.locator('.stat').first().waitFor()
 const stats = await page.locator('.stat').allInnerTexts()
-log(stats.length === 7 && /Revenue/.test(stats[0]) && /\$/.test(stats[0]) && stats.some((tile) => /Average order/.test(tile)), `overview: hero revenue + 6 tiles incl. average order (${stats[0]?.replace(/\n/g, ' ')})`)
+log(stats.length === 7 && /Lifetime sales/.test(stats[0]) && /\$/.test(stats[0]) && stats.some((tile) => /Average order/.test(tile)), `overview: lifetime sales + 6 tiles incl. average order (${stats[0]?.replace(/\n/g, ' ')})`)
 log((await page.locator('#restock-title').count()) === 1 && (await page.locator('.status svg').count()) > 0, 'overview: restock table with icon + label status badges')
 await axe(page, 'overview')
 await page.screenshot({ path: 'admin-overview-1440.png', fullPage: true })
 
 // Products: search, category, sort
-await page.getByRole('link', { name: 'Products' }).click()
+await page.getByRole('link', { name: 'Products', exact: true }).click()
 await page.getByRole('table').waitFor()
 log(/194 products/.test(await page.locator('.page-header').innerText()), 'products: 194 products listed')
 await page.getByLabel('Search products').fill('phone')
@@ -145,7 +145,7 @@ await page.getByRole('button', { name: 'Delete product' }).click()
 log(await visible(page.getByRole('status').filter({ hasText: LARAVEL ? 'is no longer in the store' : 'deleted (demo)' })), `delete: ${LARAVEL ? 'deleted' : 'demo notice'} after confirming`)
 
 // Orders
-await page.getByRole('link', { name: 'Orders' }).click()
+await page.getByRole('link', { name: 'Orders', exact: true }).click()
 await page.getByRole('table').waitFor()
 const ordersHeader = await page.locator('.page-header').innerText()
 if (LARAVEL) {
@@ -167,7 +167,7 @@ if ((await page.locator('tbody a').count()) > 0) {
   log(await visible(page.getByRole('heading', { name: 'Customer' })), 'order detail: items, totals, and customer')
   await axe(page, 'order detail')
 }
-await page.getByRole('link', { name: 'Customers' }).click()
+await page.getByRole('link', { name: 'All customers', exact: true }).click()
 await page.getByRole('table').waitFor()
 const customersJson = await page.evaluate(async () => (await fetch('/api/admin/customers?limit=100')).text())
 log(!/password|ssn|iban|cardNumber|"ip"|token/i.test(customersJson), 'customers: API response has no passwords, tokens, SSN, bank, or IP data')

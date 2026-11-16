@@ -361,6 +361,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
         return
       }
       if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
+      // The code stopped applying (phase 7 messages say why: "Spend $20.00 more
+      // to use this code", "This code applies to Shoes only"): re-price, so the
+      // summary and the code box show the server's answer too.
+      const couponMessage = error.fieldErrors?.couponCode?.[0]
+      if (couponMessage) {
+        pricing.refetch()
+        setError('root.server', { message: `${cart.couponCode ? `${cart.couponCode}: ` : ''}${couponMessage} Remove the code or change your cart to continue.` })
+        return
+      }
       // Stock problems (422 on the items) explain themselves; so does a coupon
       // the server refused (couponCode), which has no field in this form.
       const stockProblems = error.data?.problems?.map((problem) => problem.message).join(' ')
@@ -470,7 +479,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           </h2>
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
           {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} />}
-          <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
+          <OrderTotals totals={totals} couponCode={cart.couponCode} appliedRules={serverCart?.appliedRules} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
           <CouponForm
             appliedCode={cart.couponCode}
             coupon={coupon}

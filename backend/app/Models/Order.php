@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'customer_id', 'customer_group', 'source', 'created_by_admin_id', 'email', 'phone', 'status', 'payment_status', 'payment_method', 'shipping_method',
-    'shipping_label', 'shipping_eta', 'coupon_code', 'subtotal', 'discount_total', 'shipping_total',
+    'shipping_label', 'shipping_eta', 'coupon_code', 'applied_rules', 'subtotal', 'discount_total', 'shipping_total',
     'tax_total', 'grand_total', 'shipping_address', 'billing_address', 'placed_at',
 ])]
 class Order extends Model
@@ -62,6 +62,7 @@ class Order extends Model
             'tax_total' => 'decimal:2',
             'grand_total' => 'decimal:2',
             'shipping_address' => 'array',
+            'applied_rules' => 'array', // phase 7: the cart price rules applied (CartRules::summary())
             'billing_address' => 'array',
             'placed_at' => 'datetime',
         ];

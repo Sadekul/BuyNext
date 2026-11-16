@@ -10,7 +10,7 @@ import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatMoney } from '../utils/format'
 import { COUPON_FILTERS, couponStatus } from '../utils/orders'
-import { describeCouponValue } from '../utils/couponSchema'
+import { APPLIES_TO, couponName, describeCouponValue } from '../utils/couponSchema'
 import { useAdminAuth } from '../auth/useAdminAuth'
 
 const LIMIT = 20
@@ -19,6 +19,9 @@ const LIMIT = 20
 function conditions(coupon) {
   const parts = []
   if (coupon.minSubtotal) parts.push(`Spend ${formatMoney(coupon.minSubtotal)}+`)
+  // Phase 7: cart price rule limits.
+  if (coupon.appliesTo && coupon.appliesTo !== 'all') parts.push(APPLIES_TO[coupon.appliesTo] ?? coupon.appliesTo)
+  if (coupon.customerGroupIds?.length) parts.push(`${coupon.customerGroupIds.length} customer ${coupon.customerGroupIds.length === 1 ? 'group' : 'groups'}`)
   if (coupon.startsAt) parts.push(`from ${formatDate(coupon.startsAt)}`)
   if (coupon.endsAt) parts.push(`until ${formatDate(coupon.endsAt)}`)
   if (coupon.usageLimitPerCustomer) parts.push(`${coupon.usageLimitPerCustomer} per customer`)
@@ -34,6 +37,7 @@ function CouponsPage() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const status = params.get('status') ?? ''
+  const kind = params.get('kind') ?? ''
   const skip = Number(params.get('skip')) || 0
   const [draft, setDraft] = useState(q)
   const [pending, setPending] = useState(null) // { coupon, action: 'disable' | 'delete' }
@@ -41,7 +45,7 @@ function CouponsPage() {
   const noticeRef = useRef(null)
   const queryClient = useQueryClient()
   const { can } = useAdminAuth()
-  const query = { q, status, skip, limit: LIMIT }
+  const query = { q, status, kind, skip, limit: LIMIT }
   const coupons = useQuery({ queryKey: adminKeys.coupons(query), queryFn: ({ signal }) => getCoupons(query, { signal }), placeholderData: keepPreviousData })
 
   useEffect(() => {
@@ -54,9 +58,10 @@ function CouponsPage() {
       setPending(null)
       queryClient.invalidateQueries({ queryKey: ['coupons'] })
       queryClient.invalidateQueries({ queryKey: ['coupon'] })
-      if (action === 'disable') setNotice({ tone: 'success', text: `${coupon.code} is disabled. Shoppers can no longer use it.` })
-      else if (result.disabled) setNotice({ tone: 'success', text: `${coupon.code} has been used, so it was disabled instead of deleted. Past orders keep it.` })
-      else setNotice({ tone: 'success', text: `${coupon.code} deleted.` })
+      const name = couponName(coupon)
+      if (action === 'disable') setNotice({ tone: 'success', text: `${name} is disabled. Shoppers can no longer use it.` })
+      else if (result.disabled) setNotice({ tone: 'success', text: `${name} has been used, so it was disabled instead of deleted. Past orders keep it.` })
+      else setNotice({ tone: 'success', text: `${name} deleted.` })
     },
     onError: (error) => {
       setPending(null)
@@ -73,13 +78,13 @@ function CouponsPage() {
     setParams(next)
   }
 
-  const filtered = Boolean(q || status)
+  const filtered = Boolean(q || status || kind)
   return (
     <>
       <title>Coupons | BuyNest Admin</title>
       <PageHeader
         title="Coupons"
-        description={coupons.data ? `${formatCount(coupons.data.total)} ${filtered ? 'matching codes' : 'codes'}` : 'Discount codes for the cart'}
+        description={coupons.data ? `${formatCount(coupons.data.total)} ${filtered ? 'matching rules' : 'cart price rules'} · codes and automatic discounts` : 'Cart price rules: codes and automatic discounts'}
         actions={
           can('coupons.edit') && (
             <Link to="/coupons/new" className="btn btn--primary">
@@ -124,11 +129,20 @@ function CouponsPage() {
             ))}
           </select>
         </label>
+        {/* Phase 7: codes or automatic rules. */}
+        <label className="toolbar__select">
+          <span>Kind</span>
+          <select value={kind} onChange={(event) => update({ kind: event.target.value, skip: 0 })}>
+            <option value="">Codes and automatic</option>
+            <option value="code">With a code</option>
+            <option value="automatic">Automatic (no code)</option>
+          </select>
+        </label>
       </div>
 
       {coupons.isPending && <Loading label="Loading coupons…" />}
       {coupons.error && <ErrorState error={coupons.error} onRetry={coupons.refetch} />}
-      {coupons.data && coupons.data.coupons.length === 0 && <Empty>{filtered ? 'No codes match.' : 'No coupons yet.'}</Empty>}
+      {coupons.data && coupons.data.coupons.length === 0 && <Empty>{filtered ? 'No rules match.' : 'No coupons yet.'}</Empty>}
       {coupons.data && coupons.data.coupons.length > 0 && (
         <div className="table-wrap" aria-busy={coupons.isFetching}>
           <table className="table">
@@ -151,10 +165,10 @@ function CouponsPage() {
                 <tr key={coupon.id}>
                   <td>
                     <Link to={`/coupons/${coupon.id}`}>
-                      <strong>{coupon.code}</strong>
+                      <strong>{couponName(coupon)}</strong>
                     </Link>
                     <br />
-                    <small className="muted">{coupon.description}</small>
+                    <small className="muted">{coupon.autoApply ? 'Automatic, no code' : coupon.description}</small>
                   </td>
                   <td>{describeCouponValue(coupon, formatMoney)}</td>
                   <td className="muted">{conditions(coupon)}</td>
@@ -168,15 +182,15 @@ function CouponsPage() {
                   <td className="table__actions">
                     {can('coupons.edit') && (
                       <>
-                      <Link to={`/coupons/${coupon.id}`} className="icon-button" aria-label={`Edit ${coupon.code}`}>
+                      <Link to={`/coupons/${coupon.id}`} className="icon-button" aria-label={`Edit ${couponName(coupon)}`}>
                         <LuPencil aria-hidden="true" />
                       </Link>
                       {coupon.isActive && (
-                        <button type="button" className="btn btn--outline btn--sm" onClick={() => setPending({ coupon, action: 'disable' })} aria-label={`Disable ${coupon.code}`}>
+                        <button type="button" className="btn btn--outline btn--sm" onClick={() => setPending({ coupon, action: 'disable' })} aria-label={`Disable ${couponName(coupon)}`}>
                           Disable
                         </button>
                       )}
-                      <button type="button" className="icon-button icon-button--danger" onClick={() => setPending({ coupon, action: 'delete' })} aria-label={`Delete ${coupon.code}`}>
+                      <button type="button" className="icon-button icon-button--danger" onClick={() => setPending({ coupon, action: 'delete' })} aria-label={`Delete ${couponName(coupon)}`}>
                         <LuTrash2 aria-hidden="true" />
                       </button>
                       </>
@@ -192,7 +206,7 @@ function CouponsPage() {
 
       <ConfirmDialog
         isOpen={pending !== null}
-        title={pending?.action === 'delete' ? `Delete ${pending?.coupon.code}?` : `Disable ${pending?.coupon.code}?`}
+        title={pending?.action === 'delete' ? `Delete ${pending && couponName(pending.coupon)}?` : `Disable ${pending && couponName(pending.coupon)}?`}
         message={
           pending?.action === 'delete'
             ? 'Shoppers can no longer use it. If it was already used on orders, it is disabled instead, so those orders keep it.'

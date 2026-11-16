@@ -92,3 +92,24 @@ export function getInvoice(number, invoice, { signal } = {}) {
 export function lookupOrder({ number, email }, { signal } = {}) {
   return apiClient.post('/api/shop/orders/lookup', { number: number.trim().toUpperCase(), email: email.trim() }, { ...SHOP, signal })
 }
+
+/**
+ * GET /api/shop/me/cart → { items, itemCount, updatedAt }: the signed-in
+ * customer's saved cart (phase 7), as priced cart lines ({ productId,
+ * variantId?, variantLabel?, title, thumbnail, price, salePrice,
+ * discountPercentage, stock, minimumOrderQuantity, quantity }). Sold-out
+ * items are left out; quantities are capped by stock.
+ */
+export function getSavedCart({ signal } = {}) {
+  return apiClient.get('/api/shop/me/cart', { ...SHOP, signal })
+}
+
+/**
+ * POST /api/shop/me/cart/merge { items } → the saved cart after ADDING these
+ * lines to it (same answer as getSavedCart). Only once per sign-in, with the
+ * lines the server doesn't have yet: calling it twice adds them twice.
+ */
+export function mergeSavedCart(items, { signal } = {}) {
+  const lines = items.map((item) => ({ productId: item.productId, ...(item.variantId && { variantId: item.variantId }), quantity: item.quantity }))
+  return apiClient.post('/api/shop/me/cart/merge', { items: lines }, { ...SHOP, signal })
+}

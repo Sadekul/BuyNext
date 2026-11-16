@@ -168,6 +168,23 @@ Built by three agents in parallel (backend; storefront with its sign-in service 
 
 Checks: backend 250 feature tests; frontend 337 unit tests; admin 78; browser checks 611 on the dev server and 604 on the production build (new `customers.mjs`: 161).
 
+## Backend phase 7 (marketing and system) — 2026-11-16
+
+Built by five agents in parallel (two backend; storefront with its sign-in service routes; two admin) against [backend/PHASE7_CONTRACT.md](backend/PHASE7_CONTRACT.md), then verified with the new `marketing.mjs` browser suite. Security and privacy points checked: the newsletter sign-up answers the same for known and unknown emails, needs a confirmation link, and every newsletter carries a signed unsubscribe link and a `List-Unsubscribe` header; email templates refuse unknown variables, require the code or link an email needs, and escape inserted values; campaign and template HTML is cleaned on the server and previewed in a sandboxed frame; search terms are counted without storing who searched; a saved cart is merged into another device exactly once; every new admin route names a permission.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| M1 | Medium | After the move to editable templates, the plain-text part of code emails had lost the "Your code:" label (the code stood alone on a line) | The three code emails label the code in both parts |
+| M2 | Medium | A signed-in shopper who emptied the cart from the drawer got the old items back at the next sign-in (the server only saved carts it priced) | Emptying the cart tells the server, with a test |
+| M3 | Medium | The Marketing role couldn't load the customer group, category, and product pickers its rule and coupon forms need | Those three lists accept any of several permissions (`can.admin:a\|b`); Marketing still can't see customers |
+| M4 | Low | A group member's cart line was labeled with a store-wide sale's name when a group-only rule also applied | Labeled "<group> price" whenever a group rule took part |
+| M5 | Low | The search box's suggestions recorded every partial word ("ip", "iph") in the Search terms report | Suggestions send a `suggest` flag and aren't recorded, with a test |
+| M6 | Low | The test inbox recorded the `List-Unsubscribe` header but didn't show it | Shown in the inbox page and its JSON |
+| M7 | Low | The Admin users page had no search or status filter, so once the staff list passed one page an admin could only be found by paging (the browser check for a newly created admin failed for that reason) | Search by name or email and an Active/Deactivated filter, like the other grids |
+| M8 | Test | Saved carts (phase 7) carried items from one browser suite into the next; the dashboard redesign and the renamed "All customers" menu entry broke older checks; a checkout unit test typed slower than its time limit under load; the guest-items check read the header before the items moved over | Each suite starts with both test shoppers' saved carts emptied; checks updated to the new design with exact link names; longer limits for form-typing tests; the check waits up to 5 s |
+
+Checks: backend 305 feature tests; frontend 408 unit tests; admin 107; browser checks 798 on the dev server and 791 on the production build (new `marketing.mjs`: 187).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

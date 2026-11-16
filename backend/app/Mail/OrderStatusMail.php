@@ -2,14 +2,16 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\Order;
+use App\Support\EmailBlocks;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** "Your order has shipped / been delivered / been cancelled", sent when staff change the status. */
+/** "Your order has shipped / been delivered / been cancelled", sent when staff change the status (template order_status). */
 class OrderStatusMail extends Mailable
 {
+    use RendersEmailTemplate;
+
     public const STATUSES = ['shipped', 'delivered', 'cancelled'];
 
     private const TEXT = [
@@ -20,21 +22,21 @@ class OrderStatusMail extends Mailable
 
     public function __construct(public Order $order, public ?string $note = null) {}
 
-    public function envelope(): Envelope
+    protected function templateKey(): string
     {
-        return new Envelope(subject: self::TEXT[$this->order->status][0]." ({$this->order->number})");
+        return 'order_status';
     }
 
-    public function content(): Content
+    protected function templateValues(): array
     {
-        return new Content(
-            view: 'emails.order-status',
-            text: 'emails.order-status-text',
-            with: [
-                'heading' => self::TEXT[$this->order->status][0],
-                'intro' => self::TEXT[$this->order->status][1],
-                'name' => $this->order->shipping_address['first_name'] ?? 'there',
-            ],
-        );
+        return [
+            'customer_first_name' => $this->order->shipping_address['first_name'] ?? 'there',
+            'order_number' => $this->order->number,
+            'order_total' => $this->order->grand_total,
+            'status' => $this->order->status,
+            'status_heading' => self::TEXT[$this->order->status][0] ?? 'Your order was updated',
+            'status_message' => self::TEXT[$this->order->status][1] ?? '',
+            'note' => EmailBlocks::note($this->note, self::storeName()),
+        ];
     }
 }

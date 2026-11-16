@@ -20,6 +20,9 @@
     <dt>To</dt><dd>{{ $mail->to }}</dd>
     <dt>Subject</dt><dd>{{ $mail->subject }}</dd>
     <dt>Sent</dt><dd>{{ $mail->created_at->toDayDateTimeString() }}</dd>
+    @foreach ($mail->headers ?? [] as $name => $value)
+      <dt>{{ $name }}</dt><dd>{{ $value }}</dd>
+    @endforeach
   </dl>
   {{-- sandbox: the email's HTML can't run scripts or reach this page --}}
   <iframe title="Email content" sandbox srcdoc="{{ $mail->html ?? e($mail->text) }}"></iframe>

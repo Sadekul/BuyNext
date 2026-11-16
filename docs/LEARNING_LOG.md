@@ -205,3 +205,16 @@
 - Partial success in bulk actions: each order in its own transaction, answered with done and skipped lists
 - Account lifecycle: staff-created accounts get a "set your password" code instead of a password; changing an email unverifies it and signs the customer out
 - React side: tabs with arrow-key navigation (ARIA tabs pattern), print pages with print-only CSS, pre-filling forms from saved data, showing server-calculated totals instead of recalculating in the browser
+
+## Backend phase 7: Magento-style marketing and system
+
+- Rule engines for prices: matching by customer group, category tree, product, and dates; priorities and "stop further rules"; "best price wins" and never below a floor; caching active rules and clearing the cache when rules or categories change
+- Discounts that refunds can trust: spreading a cart discount over eligible lines only and storing each line's share
+- Privacy-safe forms: a newsletter sign-up that answers the same for known and unknown emails, double opt-in, signed unsubscribe links, `List-Unsubscribe` headers
+- Queued jobs in batches for bulk email, and why jobs dispatch after the database commit
+- Template systems with a fixed variable list: escaping inserted values, refusing unknown variables, requiring the variables an email can't work without (a code or a link)
+- SEO basics: titles, meta descriptions, canonical links, Open Graph tags, sitemap.xml and robots.txt, 301 vs 302 redirects
+- Counting search terms without storing who searched (hashed IP kept only in a short-lived cache)
+- Syncing state across devices without double counting: merging a saved cart exactly once per sign-in, with a per-device record and a cross-tab lock
+- Admin UX patterns: a notifications bell (polling paused in hidden tabs, popover focus management), saved grid views, previewing user HTML in a sandboxed iframe
+- Coordination lesson: two agents sharing one test database must not run tests at the same time

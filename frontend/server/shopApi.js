@@ -1,6 +1,8 @@
 import { json, readBody } from './http.js'
 import { laravelShop } from './shop/laravel.js'
 import { laravelCustomer } from './shop/customer.js'
+import { laravelNewsletter } from './shop/newsletter.js'
+import { laravelCart } from './shop/cart.js'
 import { CUSTOMER, notSignedIn } from './session.js'
 
 /*
@@ -36,6 +38,13 @@ import { CUSTOMER, notSignedIn } from './session.js'
  *   GET    /api/shop/returns/:number           → return (someone else's → 404)
  * POST /api/shop/orders also takes `saveAddress: true` (signed in: the
  * shipping address goes into the address book after the order is placed).
+ *
+ * Phase 7:
+ *   POST /api/shop/newsletter              { email, source? } → 202 { message } (the same answer for every address)
+ *   POST /api/shop/newsletter/confirm      { token } → { message, email, status }   (the link in the confirmation email)
+ *   POST /api/shop/newsletter/unsubscribe  { token } → { message, email, status }   (the link in every newsletter)
+ *   GET  /api/shop/me/cart                 → { items, itemCount, updatedAt } (customer session: the saved cart, priced lines)
+ *   POST /api/shop/me/cart/merge           { items: [{ productId, variantId?, quantity }] } → the same, after adding these lines
  *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
@@ -118,6 +127,30 @@ const ROUTES = {
   async 'GET returns/:number'({ request, cookies, param }) {
     if (!cookies[CUSTOMER.access]) return notSignedIn()
     return reply(await laravelCustomer.getReturn(cookies[CUSTOMER.access], param, request))
+  },
+
+  // ---- phase 7: newsletter (no sign-in) and the saved cart ----
+
+  async 'POST newsletter'({ request }) {
+    return reply(await laravelNewsletter.subscribe(await readBody(request), request), 202)
+  },
+
+  async 'POST newsletter/confirm'({ request }) {
+    return reply(await laravelNewsletter.confirm(await readBody(request), request))
+  },
+
+  async 'POST newsletter/unsubscribe'({ request }) {
+    return reply(await laravelNewsletter.unsubscribe(await readBody(request), request))
+  },
+
+  async 'GET me/cart'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCart.get(cookies[CUSTOMER.access], request))
+  },
+
+  async 'POST me/cart/merge'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelCart.merge(cookies[CUSTOMER.access], await readBody(request), request))
   },
 }
 

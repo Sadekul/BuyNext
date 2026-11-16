@@ -88,7 +88,8 @@ export async function resetPassword({ email, code, password, confirmPassword }, 
 }
 
 /**
- * PUT /api/auth/profile { firstName, lastName, phone? } → the updated customer.
+ * PUT /api/auth/profile { firstName, lastName, phone? } or { newsletter } → the updated customer.
+ * (`newsletter`, BuyNest accounts only, phase 7: subscribes or unsubscribes at once.)
  * Saved with BuyNest accounts; SIMULATED with DummyJSON (returns the change
  * but forgets it). The account is taken from the session, so customers can
  * only edit their own profile.

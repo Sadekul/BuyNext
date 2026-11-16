@@ -39,8 +39,30 @@ export const NOT_ADMIN = LARAVEL ? SHOPPER : { username: 'averyp', password: 'av
 export const ID_LABEL = LARAVEL ? 'Email' : 'Username'
 const idOf = (account) => account.email ?? account.username
 
-export function launch() {
+export async function launch() {
+  if (LARAVEL) await Promise.all([SHOPPER, SHOPPER_2].map(clearSavedCart))
   return chromium.launch({ executablePath: process.env.CHROME_PATH ?? '/usr/bin/google-chrome', args: ['--no-sandbox'] })
+}
+
+/**
+ * Empties an account's cart saved on the server (phase 7 restores it at sign-in on any device),
+ * so each suite starts from a known cart however the previous run ended.
+ */
+export async function clearSavedCart(account) {
+  const call = async (path, init = {}) => {
+    const response = await fetch(`${LARAVEL_URL}${path}`, {
+      ...init,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
+    })
+    if (!response.ok) throw new Error(`clearSavedCart: ${path} answered ${response.status}`)
+    return response.json()
+  }
+  const login = await call('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: account.email, password: account.password }) })
+  await call('/api/v1/cart/validate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${login.data.tokens.access_token}` },
+    body: JSON.stringify({ items: [] }),
+  })
 }
 
 /** PASS/FAIL lines, printed at the end; any FAIL makes the process exit with 1. */
@@ -108,7 +130,7 @@ export async function latestCode(email, { after = 0 } = {}) {
     const response = await fetch(`${LARAVEL_URL}/dev/mailbox/latest?to=${encodeURIComponent(email.toLowerCase())}`)
     if (response.ok) {
       const { data } = await response.json()
-      const code = data.text.match(/Your code: (\d{6})/)?.[1]
+      const code = data.text.match(/Your code:\s*(\d{6})/)?.[1]
       if (code && data.id > after) return { code, id: data.id, subject: data.subject }
     }
     await new Promise((resolve) => setTimeout(resolve, 250))

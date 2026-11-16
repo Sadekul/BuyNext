@@ -11,6 +11,8 @@ import { json, laravel, pick } from './http.js'
  *   GET /api/catalog/home           → GET /api/v1/home         ({ data: { hero, banners, featured_products } })
  *   GET /api/catalog/pages/:slug    → GET /api/v1/pages/:slug  ({ data }, published pages only)
  *   GET /api/catalog/store          → GET /api/v1/store        ({ data }: shipping, countries, payment, tax rules)
+ *   GET /api/catalog/redirects?path=/old → GET /api/v1/redirects?path=/old ({ data: { from_path, to_path, status_code } }, or 404)
+ *                                        the admin's URL redirects, checked by the storefront's "not found" page (phase 7)
  * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
  *
  * Only these paths and the query keys below are forwarded (an allow-list), so
@@ -18,7 +20,7 @@ import { json, laravel, pick } from './http.js'
  * public and may be cached for a minute by the browser and the host's CDN.
  */
 
-const QUERY_KEYS = ['search', 'category', 'brand[]', 'min_price', 'max_price', 'min_rating', 'available', 'sort', 'direction', 'page', 'per_page']
+const QUERY_KEYS = ['search', 'suggest', 'category', 'brand[]', 'min_price', 'max_price', 'min_rating', 'available', 'sort', 'direction', 'page', 'per_page']
 const MAX_VALUE_LENGTH = 100
 const CACHE = 'public, max-age=60'
 
@@ -34,6 +36,13 @@ function forwardedQuery(url) {
   return query ? `?${query}` : ''
 }
 
+/** Phase 7: ?path=/old-page (a store path, no query or fragment needed) → the API's lookup, or null. */
+function redirectLookup(url) {
+  const path = url.searchParams.get('path') ?? ''
+  if (!/^\/[^\s]{0,511}$/.test(path)) return null
+  return `/api/v1/redirects?${new URLSearchParams({ path })}`
+}
+
 /** /api/catalog/<segments> → the Laravel path, or null. */
 function upstreamPath(segments, url) {
   const [resource, id, ...rest] = segments
@@ -43,6 +52,7 @@ function upstreamPath(segments, url) {
   if (resource === 'categories' && id === undefined) return '/api/v1/categories'
   if ((resource === 'home' || resource === 'store') && id === undefined) return `/api/v1/${resource}`
   if (resource === 'pages' && isSlug(id)) return `/api/v1/pages/${id}`
+  if (resource === 'redirects' && id === undefined) return redirectLookup(url)
   return null
 }
 
@@ -58,7 +68,7 @@ export async function handleCatalogRequest(request, segments) {
   const { status, data } = await laravel(path, { request })
   if (status !== 200) return json({ message: data?.message ?? 'The catalog could not be loaded.' }, status)
   // Only the documented keys: Laravel's `links`, `meta.links`, and `meta.path` hold the API's internal address.
-  const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to']) }) }
+  const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url']) }) }
   const response = json(body)
   response.headers.set('Cache-Control', CACHE)
   return response

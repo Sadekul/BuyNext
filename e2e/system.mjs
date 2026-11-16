@@ -66,7 +66,10 @@ try {
   const created = await api('/api/admin/v1/admins', { method: 'POST', token: owner, body: { name: 'Sam Sales', email: staffEmail, password: staffPassword, role_id: sales.id } })
   log(created.status === 201, `Owner creates a Sales staff admin (${created.status})`)
   await admin.goto(`${BASE}/admin/admins`, { waitUntil: 'networkidle' })
-  log(await visible(admin.locator('tbody').getByText(staffEmail)), 'Admin users list shows the new admin')
+  // Earlier runs leave deactivated test admins behind, so find the new one with the search box.
+  await admin.getByLabel('Search admin users').fill(staffEmail)
+  await admin.getByRole('button', { name: 'Search', exact: true }).click()
+  log(await visible(admin.locator('tbody').getByText(staffEmail)), 'Admin users list shows the new admin (found with the search box)')
   await axe(admin, 'admin users')
   await admin.goto(`${BASE}/admin/roles`, { waitUntil: 'networkidle' })
   log(await visible(admin.getByText('Sales staff').first()), 'Roles page lists the roles')

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use App\Models\Coupon;
 use App\Models\CreditMemo;
 use App\Models\Customer;
 use App\Models\Order;
@@ -150,7 +151,8 @@ class ReportsTest extends TestCase
         ]);
 
         $this->report('coupons?from=2026-11-01&to=2026-11-05')->assertOk()->assertJsonPath('data', [
-            ['code' => 'NEST10', 'uses' => 1, 'discount_total' => '6.00'],
+            ['coupon_id' => Coupon::where('code', 'NEST10')->value('id'), 'code' => 'NEST10', 'name' => '10% off your order', 'automatic' => false,
+                'uses' => 1, 'discount_total' => '6.00'],
         ]);
     }
 

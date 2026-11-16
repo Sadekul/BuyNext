@@ -41,6 +41,9 @@ const sent = (fetchMock, path) => JSON.parse(fetchMock.mock.calls.find(([url]) =
 
 const checkoutRoutes = <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
 
+// Typing a whole guest address key by key can take several seconds on a busy machine (the full suite runs files in parallel).
+const TYPES_THE_CHECKOUT_FORM = { timeout: 20_000 }
+
 async function fillGuestCheckout(user) {
   await screen.findByLabelText('Email') // the form appears once the store settings are in
   const fields = { Email: 'ava@example.com', Phone: '+1 555 010 0100', 'First name': 'Ava', 'Last name': 'Guest', 'Street address': '12 Market Street', City: 'Springfield', 'State / region': 'Oregon', 'Postal code': '29112' }
@@ -48,7 +51,7 @@ async function fillGuestCheckout(user) {
 }
 
 describe('guest checkout with server prices', () => {
-  it('lets a guest check out: sends ids and quantities only, then confirms the order', async () => {
+  it('lets a guest check out: sends ids and quantities only, then confirms the order', TYPES_THE_CHECKOUT_FORM, async () => {
     seedCart()
     const fetchMock = mockFetch({ ...CATALOG, 'POST /api/shop/cart/validate': { body: CART }, 'POST /api/shop/orders': { status: 201, body: ORDER } })
     const user = userEvent.setup()
@@ -82,7 +85,7 @@ describe('guest checkout with server prices', () => {
     expect(screen.queryByRole('textbox', { name: /card/i })).not.toBeInTheDocument() // never any card fields
   })
 
-  it('shows new prices when they changed (409) and does not place the order', async () => {
+  it('shows new prices when they changed (409) and does not place the order', TYPES_THE_CHECKOUT_FORM, async () => {
     seedCart()
     const newCart = { ...CART, totals: { ...TOTALS, subtotal: 19.98, total: 24.97 } }
     mockFetch({ ...CATALOG, 'POST /api/shop/cart/validate': { body: CART }, 'POST /api/shop/orders': { status: 409, body: { message: 'Prices changed', code: 'prices_changed', cart: newCart } } })
@@ -96,7 +99,7 @@ describe('guest checkout with server prices', () => {
     expect(screen.queryByRole('heading', { name: /Thank you/ })).not.toBeInTheDocument()
   })
 
-  it("shows the server's field errors on the form (422)", async () => {
+  it("shows the server's field errors on the form (422)", TYPES_THE_CHECKOUT_FORM, async () => {
     seedCart()
     mockFetch({
       ...CATALOG,

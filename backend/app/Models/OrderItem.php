@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** One line of an order: a snapshot of the product and its price at checkout. */
 #[Fillable([
     'order_id', 'product_id', 'variant_id', 'sku', 'name', 'variant_label', 'thumbnail_url', 'unit_price', 'discount_percent',
-    'group_discount_percent', 'sale_price', 'quantity', 'line_total',
+    'group_discount_percent', 'sale_price', 'quantity', 'line_total', 'discount_amount', 'price_label',
 ])]
 class OrderItem extends Model
 {
@@ -23,6 +23,7 @@ class OrderItem extends Model
             'group_discount_percent' => 'decimal:2',
             'sale_price' => 'decimal:2',
             'line_total' => 'decimal:2',
+            'discount_amount' => 'decimal:2', // phase 7: its share of the cart rules' discount (null before)
             'quantity' => 'integer',
         ];
     }

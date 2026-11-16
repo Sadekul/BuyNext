@@ -29,7 +29,7 @@ class DevMailboxController extends Controller
         $mail = DevMail::where('to', mb_strtolower((string) $request->query('to')))->latest('id')->first();
 
         return $mail
-            ? response()->json(['data' => $mail->only(['id', 'to', 'subject', 'text', 'created_at'])])
+            ? response()->json(['data' => $mail->only(['id', 'to', 'subject', 'text', 'headers', 'created_at'])])
             : response()->json(['message' => 'No email for that address.'], 404);
     }
 

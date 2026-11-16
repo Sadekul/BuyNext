@@ -29,6 +29,8 @@ function OrderItems({ items }) {
               {/* A product deleted since the order has no page any more. */}
               {item.productId ? <Link to={ROUTES.productDetails(item.productId)}>{item.title}</Link> : item.title}
               {item.variantLabel && <span className="order-items__variant">{item.variantLabel}</span>}
+              {/* Phase 7: the catalog price rule that set the price ("VIP price", "Black Friday"). */}
+              {item.priceLabel && <span className="order-items__price-label">{item.priceLabel}</span>}
               <span className="order-items__meta">
                 {item.quantity} × {formatPrice(salePrice)}
               </span>

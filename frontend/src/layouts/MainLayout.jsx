@@ -10,6 +10,7 @@ import CartDrawer from '../components/cart/CartDrawer'
 import Loader from '../components/ui/Loader'
 import { ANNOUNCEMENTS } from '../constants/site'
 import { useNavLinks } from '../hooks/useNavLinks'
+import { usePageMetaDefaults } from '../hooks/usePageMetaDefaults'
 
 /**
  * Shared page shell. <Outlet /> is where React Router renders the matched
@@ -21,6 +22,8 @@ import { useNavLinks } from '../hooks/useNavLinks'
 function MainLayout() {
   const { pathname } = useLocation()
   const { links, mobileLinks } = useNavLinks()
+  // Description, canonical link, and Open Graph tags on every page (utils/pageMeta.js).
+  usePageMetaDefaults()
 
   return (
     <>

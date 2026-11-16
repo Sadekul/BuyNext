@@ -2,33 +2,33 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\Invoice;
+use App\Support\EmailBlocks;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** "Payment received": sent when staff invoice an order (and chose to notify the customer). */
+/** "Payment received": sent when staff invoice an order and chose to notify the customer (template invoice). */
 class InvoiceMail extends Mailable
 {
+    use RendersEmailTemplate;
+
     public function __construct(public Invoice $invoice) {}
 
-    public function envelope(): Envelope
+    protected function templateKey(): string
     {
-        return new Envelope(subject: "Payment received for order {$this->invoice->order->number}");
+        return 'invoice';
     }
 
-    public function content(): Content
+    protected function templateValues(): array
     {
         $order = $this->invoice->order;
 
-        return new Content(
-            view: 'emails.invoice',
-            text: 'emails.invoice-text',
-            with: [
-                'order' => $order,
-                'name' => $order->shipping_address['first_name'] ?? 'there',
-                'note' => $this->invoice->note,
-            ],
-        );
+        return [
+            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'order_number' => $order->number,
+            'invoice_number' => $this->invoice->number,
+            'invoice_amount' => $this->invoice->amount,
+            'note' => EmailBlocks::note($this->invoice->note, self::storeName()),
+        ];
     }
 }

@@ -250,7 +250,15 @@ const REPORT_MAPS = {
     topCustomers: (data?.top_customers ?? []).map((row) => ({ id: row.id ?? null, name: row.name ?? '', email: row.email ?? '', orders: row.orders ?? 0, spent: money(row.spent) ?? 0 })),
   }),
   coupons: (data) => ({
-    coupons: (Array.isArray(data) ? data : []).map((row) => ({ code: row.code ?? '', uses: row.uses ?? 0, discountTotal: money(row.discount_total) ?? 0 })),
+    // Phase 7 (marketing): automatic rules have no code, only a name.
+    coupons: (Array.isArray(data) ? data : []).map((row) => ({
+      couponId: row.coupon_id ?? null,
+      code: row.code ?? '',
+      name: row.name ?? '',
+      automatic: row.automatic === true,
+      uses: row.uses ?? 0,
+      discountTotal: money(row.discount_total) ?? 0,
+    })),
   }),
   'low-stock': (data) => ({
     products: (Array.isArray(data) ? data : []).map((row) => ({

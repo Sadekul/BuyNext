@@ -346,7 +346,7 @@ function CouponsReport({ range }) {
           <caption className="visually-hidden">Coupon use</caption>
           <thead>
             <tr>
-              <th scope="col">Code</th>
+              <th scope="col">Code or rule</th>
               <th scope="col" className="num">
                 Uses
               </th>
@@ -357,9 +357,16 @@ function CouponsReport({ range }) {
           </thead>
           <tbody>
             {report.data.coupons.map((row) => (
-              <tr key={row.code}>
+              <tr key={row.couponId ?? row.code}>
                 <th scope="row">
-                  <code>{row.code}</code>
+                  {/* Phase 7 (marketing): an automatic rule has no code, so it goes by its name. */}
+                  {row.automatic || !row.code ? (
+                    <>
+                      {row.name} <small className="muted">(automatic)</small>
+                    </>
+                  ) : (
+                    <code>{row.code}</code>
+                  )}
                 </th>
                 <td className="num">{formatCount(row.uses)}</td>
                 <td className="num">{formatMoney(row.discountTotal)}</td>

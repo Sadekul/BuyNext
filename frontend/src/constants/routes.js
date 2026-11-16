@@ -22,5 +22,7 @@ export const ROUTES = {
   forgotPassword: '/forgot-password',
   verifyEmail: '/verify-email',
   page: (slug) => `/pages/${slug}`, // CMS pages (REAL_SHOP)
+  newsletterConfirm: '/newsletter/confirm', // links in newsletter emails (REAL_SHOP)
+  newsletterUnsubscribe: '/newsletter/unsubscribe',
   componentLab: '/learn',
 }

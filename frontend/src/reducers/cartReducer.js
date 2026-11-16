@@ -1,6 +1,6 @@
 import { formatPrice } from '../utils/formatters'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
-import { getProductPricing } from '../utils/pricing'
+import { effectiveDiscountPercent, getProductPricing } from '../utils/pricing'
 import { storedInteger, storedProductSnapshot, storedText } from '../utils/storedValues'
 
 /*
@@ -19,6 +19,7 @@ export const CART_ACTIONS = {
   COUPON_REMOVED: 'cart/couponRemoved',
   PRODUCTS_REFRESHED: 'cart/productsRefreshed',
   REPLACED: 'cart/replaced',
+  SAVED_CART_LOADED: 'cart/savedCartLoaded',
 }
 
 export const EMPTY_CART = { items: [], couponCode: null }
@@ -177,9 +178,71 @@ export function cartReducer(state, action) {
     case CART_ACTIONS.REPLACED:
       return action.state
 
+    // A signed-in customer's saved cart arrived from the server (phase 7,
+    // hooks/useSavedCartSync.js). `mode: 'replace'`: the server's merged cart
+    // becomes this cart; `mode: 'add'`: the lines' quantities are added.
+    // Quantities stay within stock and the minimum order either way.
+    case CART_ACTIONS.SAVED_CART_LOADED: {
+      const lines = (action.lines ?? []).map(savedLineToItem).filter(Boolean)
+      if (action.mode === 'replace') {
+        const items = lines.map((line) => {
+          const existing = state.items.find((item) => cartLineKey(item) === cartLineKey(line))
+          const merged = existing ? { ...existing, ...line, brand: existing.brand, category: existing.category } : line
+          return { ...merged, quantity: clampQuantity(line.quantity, getPurchaseLimits(merged)), notice: null, isUnavailable: false }
+        })
+        return { ...state, items }
+      }
+      const items = [...state.items]
+      for (const line of lines) {
+        const index = items.findIndex((item) => cartLineKey(item) === cartLineKey(line))
+        if (index === -1) {
+          items.push({ ...line, quantity: clampQuantity(line.quantity, getPurchaseLimits(line)) })
+          continue
+        }
+        const merged = { ...items[index], ...line, brand: items[index].brand, category: items[index].category }
+        items[index] = { ...merged, quantity: clampQuantity(items[index].quantity + line.quantity, getPurchaseLimits(merged)), isUnavailable: false }
+      }
+      return { ...state, items }
+    }
+
     default:
       return state
   }
+}
+
+/** The availability label the cart shows, from a stock count. */
+const availabilityOf = (stock) => {
+  if (stock === null || stock === undefined) return null
+  if (stock <= 0) return 'Out of Stock'
+  return stock <= 5 ? 'Low Stock' : 'In Stock'
+}
+
+/**
+ * A line of the customer's saved cart, as the shop service sends it
+ * (server/shop/cart.js), → a cart item. Lines the cart can't sell
+ * (no product id, no price, nothing in stock) give null.
+ */
+export function savedLineToItem(line) {
+  if (!line || !Number.isInteger(line.productId) || line.productId < 1) return null
+  if (typeof line.price !== 'number' || typeof line.title !== 'string' || !Number.isInteger(line.quantity) || line.quantity < 1) return null
+  const item = {
+    productId: line.productId,
+    ...variantFields(Number.isInteger(line.variantId) && line.variantId > 0 ? line.variantId : null, line.variantLabel),
+    title: line.title,
+    brand: null,
+    category: null,
+    thumbnail: typeof line.thumbnail === 'string' ? line.thumbnail : null,
+    price: line.price,
+    // The server's sale price may come from a catalog price rule: shown as a discount.
+    discountPercentage: effectiveDiscountPercent(line.price, line.discountPercentage ?? 0, line.salePrice ?? null),
+    stock: Number.isInteger(line.stock) ? line.stock : null,
+    minimumOrderQuantity: Number.isInteger(line.minimumOrderQuantity) ? line.minimumOrderQuantity : 1,
+    availabilityStatus: availabilityOf(line.stock),
+    quantity: line.quantity,
+    notice: null,
+    isUnavailable: false,
+  }
+  return getPurchaseLimits(item).canBuy ? item : null
 }
 
 /**

@@ -2,33 +2,50 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\Order;
+use App\Support\EmailBlocks;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** "Thanks for your order": items, totals, address, and what happens next. */
+/** "Thanks for your order": items, totals, address, and what happens next (template order_confirmation). */
 class OrderPlacedMail extends Mailable
 {
+    use RendersEmailTemplate;
+
     public function __construct(public Order $order) {}
 
-    public function envelope(): Envelope
+    protected function templateKey(): string
     {
-        return new Envelope(subject: "Your BuyNest order {$this->order->number}");
+        return 'order_confirmation';
     }
 
-    public function content(): Content
+    protected function templateValues(): array
     {
-        return new Content(
-            view: 'emails.order-placed',
-            text: 'emails.order-placed-text',
-            with: [
-                'name' => $this->order->shipping_address['first_name'] ?? 'there',
-                'paymentLabel' => config("buynest.store.payment_methods.{$this->order->payment_method}", $this->order->payment_method),
-                'nextSteps' => $this->order->payment_method === 'cod'
-                    ? 'We are preparing your order now. Please pay the courier in cash when it arrives.'
-                    : 'Your items are reserved. Online payment is not connected yet: we will contact you with a secure payment link, and we start preparing your order as soon as it is paid.',
-            ],
-        );
+        $order = $this->order;
+        $totals = [['Subtotal', self::money($order->subtotal)]];
+        if ((float) $order->discount_total > 0) {
+            $totals[] = ['Discount'.($order->coupon_code ? " ({$order->coupon_code})" : ''), '-'.self::money($order->discount_total)];
+        }
+        $totals[] = ["Shipping ({$order->shipping_label})", self::money($order->shipping_total)];
+        $totals[] = ['Tax', self::money($order->tax_total)];
+        $totals[] = ['Total', self::money($order->grand_total), true];
+
+        return [
+            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'order_number' => $order->number,
+            'order_total' => $order->grand_total,
+            'payment_method' => config("buynest.store.payment_methods.{$order->payment_method}")
+                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", $order->payment_method),
+            'shipping_method' => $order->shipping_label,
+            'delivery_estimate' => $order->shipping_eta,
+            'next_steps' => $order->payment_method === 'cod'
+                ? 'We are preparing your order now. Please pay the courier in cash when it arrives.'
+                : 'Your items are reserved. Online payment is not connected yet: we will contact you with a secure payment link, and we start preparing your order as soon as it is paid.',
+            'items_table' => EmailBlocks::itemsTable(
+                $order->items->map(fn ($item) => ["{$item->displayName()} × {$item->quantity}", self::money($item->line_total)])->all(),
+                $totals,
+            ),
+            'address' => EmailBlocks::address($order->shipping_address),
+        ];
     }
 }

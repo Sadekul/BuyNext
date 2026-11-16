@@ -12,6 +12,9 @@ use Symfony\Component\HttpFoundation\Response;
  * (App\Support\Permissions). Runs after token.kind:admin, before the
  * controller, so a refused request changes nothing. The admin app hides what
  * a role can't do, but this is what actually stops it.
+ *
+ * can.admin:<a>|<b> - any one of the keys is enough (lookup lists that
+ * several areas' forms need, such as categories for coupon rules).
  */
 class EnsureAdminPermission
 {
@@ -19,7 +22,9 @@ class EnsureAdminPermission
     {
         $admin = $request->user();
 
-        if (! $admin instanceof Admin || ! $admin->hasPermission($permission)) {
+        $allowed = $admin instanceof Admin
+            && collect(explode('|', $permission))->contains(fn (string $key) => $admin->hasPermission($key));
+        if (! $allowed) {
             return response()->json([
                 'message' => 'Your role doesn\'t allow this.',
                 'code' => 'permission_denied',

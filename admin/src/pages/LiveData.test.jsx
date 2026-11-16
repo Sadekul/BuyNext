@@ -341,6 +341,10 @@ describe('sales documents and coupons', () => {
     const sent = sentTo(fetchMock, 'POST', '/api/admin/coupons')
     const last = JSON.parse(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST').at(-1)[1].body)
     expect(sent.code).toBe('TAKEN')
-    expect(last).toEqual({ code: 'SPRING15', description: '15% off spring', type: 'percent', value: 15, minSubtotal: null, startsAt: null, endsAt: new Date('2026-12-31T23:59').toISOString(), usageLimit: null, usageLimitPerCustomer: 1, isActive: true })
+    expect(last).toEqual({
+      code: 'SPRING15', description: '15% off spring', type: 'percent', value: 15, minSubtotal: null, startsAt: null, endsAt: new Date('2026-12-31T23:59').toISOString(), usageLimit: null, usageLimitPerCustomer: 1, isActive: true,
+      // Phase 7: the cart price rule fields, at their defaults (a code for the whole cart, everyone).
+      autoApply: false, buyQuantity: null, getQuantity: null, freeShipping: false, appliesTo: 'all', categoryIds: [], productIds: [], customerGroupIds: [],
+    })
   })
 })

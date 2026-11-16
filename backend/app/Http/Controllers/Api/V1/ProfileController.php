@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PhoneNumber;
 use App\Http\Resources\CustomerResource;
+use App\Services\Newsletter;
 use Illuminate\Http\Request;
 
 /** The signed-in customer's own profile. The account always comes from the token, never from the request. */
@@ -17,10 +18,12 @@ class ProfileController extends Controller
     }
 
     /**
-     * PATCH /api/v1/me { first_name?, last_name?, phone? }
+     * PATCH /api/v1/me { first_name?, last_name?, phone?, newsletter? }
      * The email isn't changed here: a new address must be verified first.
+     * Phase 7: newsletter true/false subscribes or unsubscribes the account's
+     * email at once (it's verified, so no confirmation email).
      */
-    public function update(Request $request): CustomerResource
+    public function update(Request $request, Newsletter $newsletter): CustomerResource
     {
         if (is_string($request->phone)) {
             $request->merge(['phone' => PhoneNumber::normalize($request->phone)]);
@@ -29,8 +32,13 @@ class ProfileController extends Controller
             'first_name' => ['sometimes', 'required', 'string', 'max:60'],
             'last_name' => ['sometimes', 'required', 'string', 'max:60'],
             'phone' => ['sometimes', 'required', 'string', PhoneNumber::RULE],
+            'newsletter' => ['sometimes', 'boolean'],
         ], ['phone.regex' => 'Enter a valid phone number, including the country code (for example +1 555 010 0100).']);
 
+        if (array_key_exists('newsletter', $data)) {
+            $newsletter->setForCustomer($request->user(), (bool) $data['newsletter']);
+            unset($data['newsletter']);
+        }
         $request->user()->update(array_map(fn ($value) => is_string($value) ? trim($value) : $value, $data));
 
         return new CustomerResource($request->user()->fresh());

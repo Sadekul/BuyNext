@@ -14,8 +14,19 @@ import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, fullName } from '../utils/format'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { accountStatus } from '../utils/customers'
+// Phase 7: column chooser, rows per page, saved filters (BuyNest's backend).
+import GridPreferences from '../components/GridPreferences'
+import { useGridPreferences } from '../utils/useGridPreferences'
 
-const LIMIT = 20
+const COLUMNS = [
+  { id: 'name', label: 'Name', required: true },
+  { id: 'email', label: 'Email' },
+  { id: 'phone', label: 'Phone' },
+  { id: 'group', label: 'Group' },
+  { id: 'status', label: 'Status' },
+  { id: 'joined', label: 'Joined' },
+  { id: 'lastLogin', label: 'Last sign-in' },
+]
 const ROLE_LABELS = { admin: 'Admin', moderator: 'Moderator', user: 'Customer' }
 const VERIFIED_FILTERS = [
   { value: '', label: 'Confirmed or not' },
@@ -48,6 +59,8 @@ function CustomersPage() {
   const createdFrom = params.get('createdFrom') ?? ''
   const createdTo = params.get('createdTo') ?? ''
   const skip = Number(params.get('skip')) || 0
+  const grid = useGridPreferences('customers_grid', COLUMNS)
+  const limit = grid.pageSize
   const [draft, setDraft] = useState(q)
   const [confirming, setConfirming] = useState(null) // the customer about to be blocked
   const [adding, setAdding] = useState(false)
@@ -59,8 +72,8 @@ function CustomersPage() {
 
   const filters = LIVE_DATA ? { q, status, verified, groupId, createdFrom, createdTo } : { q, status }
   const customers = useQuery({
-    queryKey: adminKeys.customers({ ...filters, skip }),
-    queryFn: ({ signal }) => getCustomers({ ...filters, skip, limit: LIMIT }, { signal }),
+    queryKey: adminKeys.customers({ ...filters, skip, limit }),
+    queryFn: ({ signal }) => getCustomers({ ...filters, skip, limit }, { signal }),
     placeholderData: keepPreviousData,
   })
   const groups = useQuery({ queryKey: adminKeys.customerGroups, queryFn: ({ signal }) => getCustomerGroups({ signal }), enabled: LIVE_DATA, staleTime: 60_000 })
@@ -185,6 +198,18 @@ function CustomersPage() {
         )}
       </div>
 
+      {profiles && (
+        <GridPreferences
+          prefs={grid}
+          noun="customers"
+          onPageSize={() => update({ skip: 0 })}
+          current={filters}
+          onApply={(saved) => {
+            setDraft(saved.q ?? '')
+            setParams(new URLSearchParams(Object.entries(saved).filter(([, value]) => value !== '' && value !== null)))
+          }}
+        />
+      )}
       {customers.isPending && <Loading label="Loading customers…" />}
       {customers.error && <ErrorState error={customers.error} onRetry={customers.refetch} />}
       {customers.data && customers.data.customers.length === 0 && <Empty>No customers match.</Empty>}
@@ -196,12 +221,12 @@ function CustomersPage() {
               {manageable ? (
                 <tr>
                   <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Phone</th>
-                  {profiles && <th scope="col">Group</th>}
-                  <th scope="col">Status</th>
-                  <th scope="col">Joined</th>
-                  <th scope="col">Last sign-in</th>
+                  {grid.isVisible('email') && <th scope="col">Email</th>}
+                  {grid.isVisible('phone') && <th scope="col">Phone</th>}
+                  {profiles && grid.isVisible('group') && <th scope="col">Group</th>}
+                  {grid.isVisible('status') && <th scope="col">Status</th>}
+                  {grid.isVisible('joined') && <th scope="col">Joined</th>}
+                  {grid.isVisible('lastLogin') && <th scope="col">Last sign-in</th>}
                   <th scope="col">
                     <span className="visually-hidden">Actions</span>
                   </th>
@@ -220,16 +245,20 @@ function CustomersPage() {
                 manageable ? (
                   <tr key={customer.id}>
                     <td>{profiles ? <Link to={`/customers/${customer.id}`}>{fullName(customer)}</Link> : fullName(customer)}</td>
-                    <td>
-                      <a href={`mailto:${customer.email}`}>{customer.email}</a>
-                    </td>
-                    <td>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : <span className="muted">—</span>}</td>
-                    {profiles && <td>{customer.group?.name ?? '—'}</td>}
-                    <td>
-                      <StatusBadge {...accountStatus(customer)} />
-                    </td>
-                    <td>{formatDate(customer.createdAt)}</td>
-                    <td>{formatDate(customer.lastLoginAt, 'Never')}</td>
+                    {grid.isVisible('email') && (
+                      <td>
+                        <a href={`mailto:${customer.email}`}>{customer.email}</a>
+                      </td>
+                    )}
+                    {grid.isVisible('phone') && <td>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : <span className="muted">—</span>}</td>}
+                    {profiles && grid.isVisible('group') && <td>{customer.group?.name ?? '—'}</td>}
+                    {grid.isVisible('status') && (
+                      <td>
+                        <StatusBadge {...accountStatus(customer)} />
+                      </td>
+                    )}
+                    {grid.isVisible('joined') && <td>{formatDate(customer.createdAt)}</td>}
+                    {grid.isVisible('lastLogin') && <td>{formatDate(customer.lastLoginAt, 'Never')}</td>}
                     <td>
                       {!can('customers.edit') ? null : customer.isActive ? (
                         <button
@@ -274,7 +303,7 @@ function CustomersPage() {
               )}
             </tbody>
           </table>
-          <Pagination total={customers.data.total} limit={LIMIT} skip={skip} onChange={(next) => update({ skip: next })} />
+          <Pagination total={customers.data.total} limit={limit} skip={skip} onChange={(next) => update({ skip: next })} />
         </div>
       )}
 

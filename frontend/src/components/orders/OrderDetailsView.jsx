@@ -179,7 +179,7 @@ function OrderDetailsView({ order, invoiceLink }) {
           Items
         </h2>
         <OrderItems items={order.items} />
-        <OrderTotals totals={order.totals} couponCode={order.couponCode ?? order.totals.couponCode} shippingLabel={order.shippingMethod.label} />
+        <OrderTotals totals={order.totals} couponCode={order.couponCode ?? order.totals.couponCode} appliedRules={order.appliedRules} shippingLabel={order.shippingMethod.label} />
         {order.verification && (
           <p className="cart-summary__note">
             Prices verified with the server (DummyJSON cart #{order.verification.cartId}). Its own discounted total was{' '}

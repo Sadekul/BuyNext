@@ -1,19 +1,16 @@
+import DiscountRows from '../cart/DiscountRows'
 import { formatPrice } from '../../utils/formatters'
 
 /** Totals rows shared by checkout, confirmation, and order details. Reuses CartSummary's styles. */
-function OrderTotals({ totals, couponCode, shippingLabel, showTax = true }) {
+/** `appliedRules` (phase 7): the cart price rules the server applied, one row each. */
+function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax = true }) {
   return (
     <dl className="cart-summary__rows">
       <div>
         <dt>Subtotal ({totals.itemCount} {totals.itemCount === 1 ? 'item' : 'items'})</dt>
         <dd>{formatPrice(totals.subtotal)}</dd>
       </div>
-      {totals.discount > 0 && (
-        <div className="cart-summary__saving">
-          <dt>Discount{couponCode && ` (${couponCode})`}</dt>
-          <dd>−{formatPrice(totals.discount)}</dd>
-        </div>
-      )}
+      <DiscountRows rules={appliedRules} discount={totals.discount} couponCode={couponCode} />
       <div>
         <dt>Shipping{shippingLabel && ` (${shippingLabel})`}</dt>
         <dd>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import RegisterPage from './RegisterPage'
@@ -173,8 +173,10 @@ describe('forgot password', () => {
     await user.type(screen.getByLabelText('Confirm new password'), 'BrandNew99')
     await user.click(screen.getByRole('button', { name: 'Save new password' }))
 
-    const notice = await screen.findByRole('status')
-    expect(within(notice).getByText(/Your password has been changed/)).toBeInTheDocument()
+    // Wait for the sign-in page's notice itself: the reset page has a status line too,
+    // so waiting for "a status" could return the old page's before the navigation.
+    const message = await screen.findByText(/Your password has been changed/, {}, { timeout: 5000 })
+    expect(message.closest('[role="status"]')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument() // the sign-in form
     expect(sent(fetchMock, '/api/auth/reset-password')).toEqual({ email: 'nadia@example.com', code: '123456', password: 'BrandNew99', confirmPassword: 'BrandNew99' })
   })

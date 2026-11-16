@@ -92,7 +92,22 @@ export const fromLine = (raw) => ({
   // Phase 6: a customer group's discount on the line. salePrice already includes it;
   // baseSalePrice is the product's own sale price before it.
   ...(Number(raw.group_discount_percent) > 0 && { groupDiscountPercent: Number(raw.group_discount_percent), baseSalePrice: money(raw.base_sale_price) }),
+  // Phase 7: the catalog price rule that set the price ("VIP price", "Black Friday"),
+  // and the line's share of the cart rules' discount. Older lines have neither.
+  ...(typeof raw.price_label === 'string' && raw.price_label.trim() && { priceLabel: raw.price_label.trim().slice(0, 120) }),
+  ...(raw.discount !== undefined && raw.discount !== null && { discount: money(raw.discount) ?? 0 }),
 })
+
+/** Phase 7: a cart price rule that applied (a typed code, or an automatic rule). */
+export const fromAppliedRule = (raw = {}) => ({
+  id: raw.id ?? null,
+  code: str(raw.code) ?? null,
+  label: str(raw.label) ?? str(raw.code) ?? 'Discount',
+  automatic: raw.automatic === true,
+  discount: money(raw.discount) ?? 0,
+  freeShipping: raw.free_shipping === true,
+})
+const fromAppliedRules = (raw) => (Array.isArray(raw) ? raw.slice(0, 20).map(fromAppliedRule) : [])
 
 const fromProblem = (raw) => ({
   productId: raw.product_id ?? null,
@@ -113,6 +128,8 @@ export function fromCart(raw = {}) {
     problems: (raw.problems ?? []).map(fromProblem),
     coupon: raw.coupon ? pick(raw.coupon, ['code', 'description']) : null,
     couponError: raw.coupon_error ?? null,
+    // Phase 7: every cart rule that applied, automatic ones first (each with its label and saving).
+    appliedRules: fromAppliedRules(raw.applied_rules),
     shippingOptions: (raw.shipping_options ?? []).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price) })),
     // Phase 4 tax: false when no country was given, so the tax shown is not final (0).
     totals: fromTotals(raw.totals),
@@ -198,6 +215,7 @@ export function fromOrder(raw) {
     shippingAddress: fromAddress(raw.shipping_address),
     billingAddress: fromAddress(raw.billing_address ?? raw.shipping_address),
     couponCode: raw.coupon_code ?? null,
+    appliedRules: fromAppliedRules(raw.applied_rules),
     items: (raw.items ?? []).map(fromLine),
     totals: fromTotals(raw.totals),
     placedAt: raw.placed_at,
