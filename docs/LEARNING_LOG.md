@@ -145,3 +145,41 @@
 - Asset hashing and caching headers; basic security headers
 - Automated accessibility audit with axe-core (label-in-name, heading order)
 - Release checklist
+
+## Backend phase 1: Real accounts (Laravel + MySQL)
+
+- Laravel basics: routes, controllers, form requests (validation), migrations, models, seeders, Artisan commands (`buynest:create-admin`)
+- Two separate account types (`customers` and `admins` tables) so a customer can never sign in to the admin
+- Laravel Sanctum token pairs: a short access token (60 minutes) plus a rotating refresh token; "remember me" makes the refresh token last longer
+- Middleware order: the token-kind check (`token.kind:customer|admin`) runs before route model binding, so a customer token can't learn which admin ids exist
+- Email one-time codes: stored as an HMAC hash, expire after 10 minutes, lock after 5 wrong tries, resend at most once a minute
+- A backend-for-frontend (the store's own `/api/*` server functions): tokens live in HttpOnly cookies the browser's JavaScript can't read
+- React side: multi-step forms (Register → Verify email, two-step Forgot password), mapping server 422 errors onto fields, safe redirects after sign-in (`utils/safeRedirect.js`), a separate admin session provider
+- Rate limiting per IP and per email; trusting the client IP only from the sign-in service (shared key)
+
+## Backend phase 2: Catalog and real orders
+
+- Importing the DummyJSON catalog into MySQL while keeping product ids, so links keep working
+- Money as whole cents on the server, shown as 2-decimal strings in the API
+- The server is the source of truth for prices: the browser sends what it expects to pay, and the server answers 409 if the total changed
+- Database transactions and row locks (`lockForUpdate`) so two shoppers can't buy the last item twice
+- Guest checkout and order lookup by order number + email
+- React side: switching the data source with `VITE_API_PROVIDER`, cart validation before placing the order, TanStack Query invalidation after an order
+
+## Backend phase 3: Invoices, shipments, refunds, coupons
+
+- Magento-style sales documents: invoice (INV-), shipment (SHP-, carrier tracking links), credit memo (CM-)
+- Partial refunds: splitting a coupon discount across lines in proportion, restocking returned items
+- Coupons stored in the database with a row lock so a limited coupon can't be used beyond its limit
+- Data backfills with a migration (invoices for orders paid before invoices existed) and guards against double invoicing
+- React side: admin dialogs for invoice, ship, and refund with live totals; a printable invoice page
+
+## Backend phase 4: Roles, audit log, content, reports, settings
+
+- Role-based access control: permission keys per area and action, checked by `can.admin:<key>` middleware on every admin route, with a test that fails if a route has none
+- Preventing privilege escalation: only an Owner can grant the Owner role; there is always at least one active Owner
+- An audit log of admin changes that never stores passwords or tokens
+- Sanitizing user-entered HTML on the server with an allow-list (symfony/html-sanitizer)
+- Reports with date ranges and grouping; CSV download with a guard against spreadsheet formula injection
+- A cached settings service: shipping, tax, countries, payment methods, guest checkout, applied by the store immediately
+- React side: hiding navigation and buttons the role can't use (`can()` in `AdminAuthProvider`) while the server still refuses, a "You don't have access" screen for 403, accessible charts as tables, a home page editor with banner reordering
