@@ -21,11 +21,14 @@ import { CUSTOMER, notSignedIn } from './session.js'
  *   GET  /api/shop/orders/:number  → order (customer session; someone else's → 404)
  *   POST /api/shop/orders/lookup   { number, email } → order (guests)
  *   GET  /api/shop/orders/:number/invoices/:invoice → printable invoice (customer session; own orders only)
+ *   POST /api/shop/products/:id/reviews { rating, title?, comment } → 201 review (customer session; phase 5)
+ *                                  422 { code: 'already_reviewed' } for a second review of the same product
  *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */
 
+const isProductId = (value) => /^\d{1,9}$/.test(value ?? '')
 const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
 const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
 const reply = (result, status) => (result.ok ? json(result.data, status ?? result.status) : json(result.body, result.status))
@@ -56,6 +59,11 @@ const ROUTES = {
     return reply(await laravelShop.getInvoice(cookies[CUSTOMER.access], param, invoice, request))
   },
 
+  async 'POST products/:id/reviews'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelShop.submitReview(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
+  },
+
   async 'POST orders/lookup'({ request }) {
     return reply(await laravelShop.lookupOrder(await readBody(request), request))
   },
@@ -67,6 +75,9 @@ function matchRoute(method, segments) {
   if (ROUTES[`${method} ${path}`]) return { route: ROUTES[`${method} ${path}`] }
   if (segments.length === 2 && segments[0] === 'orders' && isOrderNumber(segments[1])) {
     return { route: ROUTES[`${method} orders/:number`], param: segments[1] }
+  }
+  if (segments.length === 3 && segments[0] === 'products' && isProductId(segments[1]) && segments[2] === 'reviews') {
+    return { route: ROUTES[`${method} products/:id/reviews`], param: segments[1] }
   }
   if (segments.length === 4 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'invoices' && isInvoiceNumber(segments[3])) {
     return { route: ROUTES[`${method} orders/:number/invoices/:invoice`], param: segments[1], invoice: segments[3] }

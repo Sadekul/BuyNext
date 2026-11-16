@@ -170,7 +170,7 @@ export function InvoiceDetailPage() {
               {(data.items ?? []).map((item, index) => (
                 <tr key={`${item.sku}-${index}`}>
                   <td>
-                    {item.title} <small className="muted">· {item.sku}</small>
+                    {item.title} {item.variantLabel && `(${item.variantLabel}) `}<small className="muted">· {item.sku}</small>
                   </td>
                   <td className="num">{formatMoney(item.salePrice)}</td>
                   <td className="num">{formatCount(item.quantity)}</td>
@@ -346,7 +346,7 @@ export function CreditMemoDetailPage() {
               {data.items.map((item, index) => (
                 <tr key={`${item.sku}-${index}`}>
                   <td>
-                    {item.name} {item.sku && <small className="muted">· {item.sku}</small>}
+                    {item.name} {item.variantLabel && `(${item.variantLabel}) `}{item.sku && <small className="muted">· {item.sku}</small>}
                   </td>
                   <td className="num">{formatCount(item.quantity)}</td>
                   <td className="num">{formatMoney(item.amount)}</td>

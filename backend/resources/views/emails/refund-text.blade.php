@@ -5,7 +5,7 @@ Hi {{ $name }},
 We have refunded ${{ $memo->total }} for order {{ $order->number }} ({{ $memo->number }}). The money goes back by the way you paid ({{ $paymentLabel }}).
 
 @foreach ($memo->items as $item)
-{{ $item->orderItem->name }} x {{ $item->quantity }}: ${{ $item->amount }}
+{{ $item->orderItem->displayName() }} x {{ $item->quantity }}: ${{ $item->amount }}
 @endforeach
 @if ((float) $memo->shipping_refund > 0)
 Shipping: ${{ $memo->shipping_refund }}

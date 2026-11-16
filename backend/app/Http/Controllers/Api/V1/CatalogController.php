@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
+use App\Support\CategoryTree;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
-/** The public catalog: no sign-in, only `active` products. */
+/** The public catalog: no sign-in, only products for sale (active, in a visible category). */
 class CatalogController extends Controller
 {
     /**
@@ -33,7 +34,8 @@ class CatalogController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Product::active()->with(['category', 'brand'])
+        $tree = CategoryTree::load();
+        $query = Product::forSale($tree)->with(['category', 'brand'])
             ->when($data['search'] ?? null, function ($query, $search) {
                 // addcslashes: a search for "%" means the character, not "anything".
                 $like = '%'.addcslashes($search, '%_\\').'%';
@@ -41,7 +43,11 @@ class CatalogController extends Controller
                     ->orWhereHas('brand', fn ($b) => $b->where('name', 'like', $like))
                     ->orWhereHas('category', fn ($c) => $c->where('name', 'like', $like)));
             })
-            ->when($data['category'] ?? null, fn ($query, $slug) => $query->whereHas('category', fn ($c) => $c->where('slug', $slug)))
+            // A category includes its subcategories' products.
+            ->when($data['category'] ?? null, function ($query, $slug) use ($tree) {
+                $id = Category::where('slug', $slug)->value('id');
+                $query->whereIn('category_id', $id ? $tree->descendantIds($id) : []);
+            })
             ->when($data['brand'] ?? null, fn ($query, $brands) => $query->whereHas('brand', fn ($b) => $b->whereIn('name', $brands)))
             ->when(isset($data['min_price']), fn ($query) => $query->whereRaw(Product::SALE_PRICE_SQL.' >= ?', [$data['min_price']]))
             ->when(isset($data['max_price']), fn ($query) => $query->whereRaw(Product::SALE_PRICE_SQL.' <= ?', [$data['max_price']]))
@@ -54,22 +60,42 @@ class CatalogController extends Controller
         return ProductResource::collection($query->paginate($data['per_page'] ?? 12)->withQueryString());
     }
 
-    /** GET /api/v1/products/{id} - drafts, archived, and deleted products are "not found". */
+    /**
+     * GET /api/v1/products/{id} - drafts, archived, deleted products, and
+     * products in a hidden category are "not found". Approved reviews only;
+     * options and active variants for configurable products.
+     */
     public function show(int $id): ProductResource|JsonResponse
     {
-        $product = Product::active()->with(['category', 'brand', 'images', 'reviews'])->find($id);
+        $product = Product::forSale()->with(['category', 'brand', 'images', 'options.values', 'variants',
+            'reviews' => fn ($q) => $q->where('status', 'approved')])->find($id);
 
         return $product
             ? (new ProductResource($product))->withDetail()
             : response()->json(['message' => 'Product not found.'], 404);
     }
 
-    /** GET /api/v1/categories - only categories that have something to buy. */
+    /**
+     * GET /api/v1/categories - the visible tree (a category and all its
+     * ancestors active), with only the branches that have something to buy.
+     * Item: { id, slug, name, image_url, description, meta_title, meta_description, parent_id, children: [...] }.
+     */
     public function categories(): JsonResponse
     {
-        $categories = Category::whereHas('products', fn ($q) => $q->active())
-            ->orderBy('position')->orderBy('name')
-            ->get(['slug', 'name', 'image_url']);
+        $tree = CategoryTree::load();
+        $counts = Product::forSale($tree)->selectRaw('category_id, COUNT(*) AS n')->groupBy('category_id')->pluck('n', 'category_id');
+        $hasProducts = fn (Category $category) => collect($tree->descendantIds($category->id))->contains(fn ($id) => ($counts[$id] ?? 0) > 0);
+
+        $categories = $tree->nested(fn (Category $category) => [
+            'id' => $category->id,
+            'slug' => $category->slug,
+            'name' => $category->name,
+            'image_url' => $category->image_url,
+            'description' => $category->description,
+            'meta_title' => $category->meta_title,
+            'meta_description' => $category->meta_description,
+            'parent_id' => $category->parent_id,
+        ], fn (Category $category) => $category->is_active && $hasProducts($category));
 
         return response()->json(['data' => $categories]);
     }

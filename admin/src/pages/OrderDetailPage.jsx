@@ -306,7 +306,8 @@ function LiveOrderDetailPage() {
             </thead>
             <tbody>
               {data.lines.map((line, index) => (
-                <tr key={line.id ?? `${line.sku}-${index}`}>
+                // Two variants of one product are two lines with the same product id: the key needs the SKU and position too.
+                <tr key={`${line.id ?? 'deleted'}-${line.sku}-${index}`}>
                   <td>
                     {/* The order keeps a copy of each product; a deleted product has no page any more. */}
                     {line.id ? (
@@ -314,14 +315,14 @@ function LiveOrderDetailPage() {
                         <img src={line.thumbnail} alt="" width="36" height="36" loading="lazy" />
                         <span>
                           {line.title}
-                          <small>{line.sku}</small>
+                          <small>{line.variantLabel ? `${line.variantLabel} · ${line.sku}` : line.sku}</small>
                         </span>
                       </Link>
                     ) : (
                       <span className="table__product">
                         <span>
                           {line.title}
-                          <small>{line.sku} · no longer in the catalog</small>
+                          <small>{line.variantLabel ? `${line.variantLabel} · ` : ''}{line.sku} · no longer in the catalog</small>
                         </span>
                       </span>
                     )}

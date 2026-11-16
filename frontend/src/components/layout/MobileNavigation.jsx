@@ -7,11 +7,11 @@ import { cn } from '../../utils/classNames'
 import { useAuth } from '../../hooks/useAuth'
 import './MobileNavigation.css'
 
-
 /**
  * Mobile/tablet menu. Composition in action: it reuses Modal (drawer variant)
  * for focus trapping and Escape handling, and SearchBar for search.
  * Every link calls `onClose` so the drawer closes after navigating.
+ * Categories with subcategories (BuyNest's category tree) list them indented below.
  */
 function MobileNavigation({ isOpen, onClose, links }) {
   const { isAuthenticated } = useAuth()
@@ -42,6 +42,22 @@ function MobileNavigation({ isOpen, onClose, links }) {
                 >
                   {link.label}
                 </NavLink>
+                {link.children?.length > 0 && (
+                  <ul className="mobile-nav__sublist" aria-label={`${link.label} subcategories`}>
+                    {link.children.map((child) => (
+                      <li key={child.to}>
+                        <NavLink
+                          to={child.to}
+                          end
+                          onClick={onClose}
+                          className={({ isActive }) => cn('mobile-nav__link mobile-nav__link--child', isActive && 'mobile-nav__link--active')}
+                        >
+                          {child.label}
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>

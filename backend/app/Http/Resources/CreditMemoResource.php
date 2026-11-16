@@ -22,6 +22,7 @@ class CreditMemoResource extends JsonResource
             'items' => $this->items->map(fn ($item) => [
                 'order_item_id' => $item->order_item_id,
                 'name' => $item->orderItem?->name,
+                'variant_label' => $item->orderItem?->variant_label,
                 'sku' => $item->orderItem?->sku,
                 'quantity' => $item->quantity,
                 'amount' => $item->amount,

@@ -1,0 +1,94 @@
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 40rem;
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.review-form__title {
+  font-size: var(--text-lg);
+}
+
+.review-form__rating {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.review-form__stars {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.review-form__star {
+  position: relative;
+}
+
+/* Visually hidden but focusable radios: the star labels are what you see. */
+.review-form__star-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none; /* clicks land on the label, which checks the radio */
+}
+
+.review-form__star-label {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.5rem;
+  color: var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.review-form__star-label--on {
+  color: #b45309;
+}
+
+.review-form__star-label--on svg {
+  fill: currentColor;
+}
+
+.review-form__star-input:focus-visible + .review-form__star-label {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.review-form__comment {
+  resize: vertical;
+}
+
+.review-form__error {
+  color: var(--color-sale);
+  font-weight: 600;
+}
+
+.review-form__success,
+.review-form__signin {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.review-form__success {
+  color: var(--color-success);
+  font-weight: 600;
+  background: var(--color-success-soft);
+}
+
+.review-form__signin a {
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: underline;
+}

@@ -42,6 +42,6 @@ describe('Laravel adapter (API contract → BuyNest shapes)', () => {
   it('converts paginated collections and categories', () => {
     const page = normalizeProductPage({ data: [resource], meta: { current_page: 3, per_page: 12, total: 30 } })
     expect(page).toMatchObject({ total: 30, skip: 24, limit: 12 })
-    expect(normalizeCategories({ data: [{ slug: 'a', name: 'A', image_url: null }] })).toEqual([{ slug: 'a', name: 'A' }])
+    expect(normalizeCategories({ data: [{ slug: 'a', name: 'A', image_url: null }] })).toEqual([{ slug: 'a', name: 'A', parentSlug: null, depth: 0 }])
   })
 })

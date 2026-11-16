@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Coupon;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Support\CategoryTree;
 use Illuminate\Support\Collection;
 
 /**
@@ -65,7 +67,7 @@ class Pricing
     }
 
     /**
-     * Prices a cart. $items: [['product_id' => 1, 'quantity' => 2], ...].
+     * Prices a cart. $items: [['product_id' => 1, 'variant_id' => null, 'quantity' => 2], ...].
      * With $lock (inside a DB transaction) the product rows are locked until
      * the transaction ends, so two checkouts can't sell the same last unit.
      */
@@ -78,24 +80,32 @@ class Pricing
     public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null,
         ?string $email = null, ?string $country = null): CartQuote
     {
-        // The same product twice counts as one line (stock is checked on the sum).
+        // The same product (and variant) twice counts as one line (stock is checked on the sum).
+        // The same product with two different variants is two lines.
         $quantities = [];
         foreach ($items as $item) {
-            $id = (int) $item['product_id'];
-            $quantities[$id] = ($quantities[$id] ?? 0) + (int) $item['quantity'];
+            $key = (int) $item['product_id'].':'.(int) ($item['variant_id'] ?? 0);
+            $quantities[$key] = ($quantities[$key] ?? 0) + (int) $item['quantity'];
         }
 
-        $products = $this->loadProducts(array_keys($quantities), $lock);
+        $productIds = array_values(array_unique(array_map(fn ($key) => (int) explode(':', $key)[0], array_keys($quantities))));
+        $variantIds = array_values(array_filter(array_unique(array_map(fn ($key) => (int) explode(':', $key)[1], array_keys($quantities)))));
+        // Products first, then variants, each in id order: the same order everywhere, so checkouts can't deadlock.
+        $products = $this->loadProducts($productIds, $lock);
+        $variants = $this->loadVariants($variantIds, $lock);
+        $tree = CategoryTree::load();
 
         $lines = [];
         $problems = [];
-        foreach ($quantities as $productId => $quantity) {
+        foreach ($quantities as $key => $quantity) {
+            [$productId, $variantId] = array_map('intval', explode(':', $key));
             $product = $products->get($productId);
-            $line = $this->line($productId, $product, $quantity);
-            if ($problem = $this->problemWith($product, $quantity)) {
-                $problems[] = ['product_id' => $productId, ...$problem];
+            $variant = $variantId ? $variants->get($variantId) : null;
+            $problem = $this->problemWith($product, $variantId ?: null, $variant, $quantity, $tree);
+            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null);
+            if ($problem) {
+                $problems[] = ['product_id' => $productId, 'variant_id' => $variantId ?: null, ...$problem];
             }
-            $lines[] = $line;
         }
 
         // Unavailable lines are shown but never charged.
@@ -192,47 +202,85 @@ class Pricing
             return collect();
         }
         sort($ids); // always lock rows in the same order, so two checkouts can't deadlock
-        $query = Product::withTrashed()->with(['category', 'brand'])->whereIn('id', $ids)->orderBy('id');
+        $query = Product::withTrashed()->with(['category', 'brand', 'options.values'])->whereIn('id', $ids)->orderBy('id');
 
         return ($lock ? $query->lockForUpdate() : $query)->get()->keyBy('id');
     }
 
-    private function line(int $productId, ?Product $product, int $quantity): array
+    /** Variants by id; with $lock their rows stay locked too (stock is taken from the variant). */
+    private function loadVariants(array $ids, bool $lock): Collection
     {
-        $available = $product && ! $product->trashed() && $product->status === 'active';
-        $saleCents = $product?->salePriceCents();
+        if ($ids === []) {
+            return collect();
+        }
+        sort($ids);
+        $query = ProductVariant::whereIn('id', $ids)->orderBy('id');
+
+        return ($lock ? $query->lockForUpdate() : $query)->get()->keyBy('id');
+    }
+
+    /** Problems that make a line unavailable (not charged); stock and minimum problems still price the line. */
+    private const UNAVAILABLE = ['unavailable', 'variant_required', 'variant_unavailable'];
+
+    private function line(int $productId, ?int $variantId, ?Product $product, ?ProductVariant $variant, int $quantity, ?string $problem): array
+    {
+        $available = $product !== null && ! in_array($problem, self::UNAVAILABLE, true);
+        $sellsVariant = $available && $variant !== null;
+        $priceCents = $available ? ($sellsVariant ? $variant->priceCents($product) : $product->priceCents()) : null;
+        $saleCents = $available ? ($sellsVariant ? $variant->salePriceCents($product) : $product->salePriceCents()) : null;
 
         return [
             'product_id' => $productId,
+            'variant_id' => $variantId,
             'product' => $product,
+            'variant' => $sellsVariant ? $variant : null,
             'name' => $product?->name,
-            'sku' => $product?->sku,
+            'variant_label' => $sellsVariant ? $variant->label($product->optionValueMap()) : null,
+            'sku' => $sellsVariant ? $variant->sku : $product?->sku,
             'thumbnail_url' => $product?->thumbnail_url,
-            'price_cents' => $available ? $product->priceCents() : null,
+            'price_cents' => $priceCents,
             'discount_percent' => $available ? (float) $product->discount_percent : null,
-            'sale_cents' => $available ? $saleCents : null,
+            'sale_cents' => $saleCents,
             'quantity' => $quantity,
             'line_cents' => $available ? $saleCents * $quantity : 0,
-            'stock_quantity' => $available ? $product->stock_quantity : 0,
+            'stock_quantity' => $available ? ($sellsVariant ? $variant->stock_quantity : $product->stock_quantity) : 0,
             'min_order_quantity' => $product?->min_order_quantity ?? 1,
             'available' => $available,
         ];
     }
 
-    private function problemWith(?Product $product, int $quantity): ?array
+    private function problemWith(?Product $product, ?int $variantId, ?ProductVariant $variant, int $quantity, CategoryTree $tree): ?array
     {
-        if (! $product || $product->trashed() || $product->status !== 'active') {
+        if (! $product || ! $product->isForSale($tree)) {
             return ['code' => 'unavailable', 'message' => 'This product is no longer available.'];
         }
-        if ($quantity > $product->stock_quantity) {
-            return ['code' => 'insufficient_stock', 'message' => $product->stock_quantity === 0
-                ? "{$product->name} is out of stock."
-                : "Only {$product->stock_quantity} of {$product->name} left in stock."];
+        if ($product->has_variants && $variantId === null) {
+            return ['code' => 'variant_required', 'message' => "Choose the options for {$product->name}."];
+        }
+        if ($variantId !== null && (! $product->has_variants || ! $variant || $variant->product_id !== $product->id
+            || ! $variant->is_active || ! $this->isCurrentCombination($product, $variant))) {
+            return ['code' => 'variant_unavailable', 'message' => "This option of {$product->name} is no longer available."];
+        }
+        $stock = $variant ? $variant->stock_quantity : $product->stock_quantity;
+        $label = $variant ? "{$product->name} ({$variant->label($product->optionValueMap())})" : $product->name;
+        if ($quantity > $stock) {
+            return ['code' => 'insufficient_stock', 'message' => $stock === 0
+                ? "{$label} is out of stock."
+                : "Only {$stock} of {$label} left in stock."];
         }
         if ($quantity < $product->min_order_quantity) {
             return ['code' => 'below_minimum', 'message' => "The minimum order for {$product->name} is {$product->min_order_quantity}."];
         }
 
         return null;
+    }
+
+    /** One value of every current option (values removed since make it stale). */
+    private function isCurrentCombination(Product $product, ProductVariant $variant): bool
+    {
+        $map = $product->optionValueMap();
+        $ids = $variant->option_value_ids ?? [];
+
+        return count($ids) === $product->options->count() && array_diff($ids, array_keys($map)) === [];
     }
 }

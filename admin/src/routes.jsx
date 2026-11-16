@@ -21,6 +21,9 @@ import { ContentPagesPage, PageEditorPage } from './pages/ContentPages'
 import HomeEditorPage from './pages/HomeEditorPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import CategoriesPage from './pages/CategoriesPage'
+import ImportExportPage from './pages/ImportExportPage'
+import ReviewsPage from './pages/ReviewsPage'
 import { firstAllowedPath } from './utils/permissions'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
@@ -48,9 +51,12 @@ export function AdminRoutes() {
         <Route path="orders" element={guarded('orders.view', <OrdersPage />)} />
         <Route path="orders/:orderId" element={guarded('orders.view', <OrderDetailPage />)} />
         <Route path="customers" element={guarded('customers.view', <CustomersPage />)} />
-        {/* Sales documents, coupons, and everything of phase 4 exist only with BuyNest's backend. */}
+        {/* Sales documents, coupons, and everything of phases 4 and 5 exist only with BuyNest's backend. */}
         {LIVE_DATA && (
           <>
+            <Route path="categories" element={guarded('products.view', <CategoriesPage />)} />
+            <Route path="import-export" element={guarded('products.import', <ImportExportPage />)} />
+            <Route path="reviews" element={guarded('reviews.view', <ReviewsPage />)} />
             <Route path="invoices" element={guarded('orders.view', <InvoicesPage />)} />
             <Route path="invoices/:number" element={guarded('orders.view', <InvoiceDetailPage />)} />
             <Route path="credit-memos" element={guarded('orders.view', <CreditMemosPage />)} />

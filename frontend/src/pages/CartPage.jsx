@@ -12,6 +12,7 @@ import { REAL_SHOP } from '../constants/shop'
 import { cartPricingQuery } from '../queries/orderQueries'
 import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSettings'
 import { withServerPricing } from '../utils/cartTotals'
+import { cartLineKey } from '../reducers/cartReducer'
 import './CartPage.css'
 
 function CartPage() {
@@ -69,7 +70,7 @@ function CartPage() {
           </h2>
           <ul className="cart-page__list">
             {cart.items.map((item) => (
-              <li key={item.productId}>
+              <li key={cartLineKey(item)}>
                 <CartLineItem item={item} onQuantityChange={cart.updateQuantity} onRemove={cart.removeItem} />
               </li>
             ))}

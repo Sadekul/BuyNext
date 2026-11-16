@@ -153,12 +153,20 @@ export async function fillEmptyAddress(page) {
 export async function preserveStock() {
   if (!LARAVEL) return async () => 0
   const call = async (path, { method = 'GET', token, body } = {}) => {
-    const response = await fetch(`${LARAVEL_URL}${path}`, {
-      method,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
-      body: body && JSON.stringify(body),
-    })
-    return response.json()
+    for (let attempt = 1; ; attempt++) {
+      const response = await fetch(`${LARAVEL_URL}${path}`, {
+        method,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+        body: body && JSON.stringify(body),
+      })
+      // Busy test runs can hit the API's per-minute limit: wait as asked, then retry.
+      if (response.status === 429 && attempt < 4) {
+        await new Promise((resolve) => setTimeout(resolve, (Number(response.headers.get('retry-after')) || 5) * 1000))
+        continue
+      }
+      if (!response.ok) throw new Error(`preserveStock: ${method} ${path} answered ${response.status}`)
+      return response.json()
+    }
   }
   const token = (await call('/api/admin/v1/auth/login', { method: 'POST', body: { email: ADMIN_USER.email, password: ADMIN_USER.password } })).data.tokens.access_token
   const stockLevels = async () => {

@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\Audit;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -27,20 +28,33 @@ class ProductController extends Controller
     /** GET /api/admin/v1/products?search&category&status&sort=name|price|stock|rating|newest&direction&page&per_page */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $data = $request->validate([
+        $data = $request->validate([...self::filterRules(), 'per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
+        return AdminProductResource::collection(self::filtered($data)->with(['category', 'brand'])
+            ->paginate($data['per_page'] ?? 20)
+            ->withQueryString());
+    }
+
+    /** The list filters (shared with the CSV export). */
+    public static function filterRules(): array
+    {
+        return [
             'search' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(Product::STATUSES)],
             'sort' => ['nullable', 'in:name,price,stock,rating,newest'],
             'direction' => ['nullable', 'in:asc,desc'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        ];
+    }
 
+    /** Products matching the list filters, sorted (category: that exact category). */
+    public static function filtered(array $data): Builder
+    {
         $sort = $data['sort'] ?? 'newest';
         $direction = $data['direction'] ?? (in_array($sort, ['name', 'price', 'stock'], true) ? 'asc' : 'desc');
         $column = ['name' => 'name', 'price' => 'price', 'stock' => 'stock_quantity', 'rating' => 'rating_average', 'newest' => 'created_at'][$sort];
 
-        $products = Product::with(['category', 'brand'])
+        return Product::query()
             ->when($data['search'] ?? null, function ($query, $search) {
                 $like = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(fn ($q) => $q->where('name', 'like', $like)->orWhere('sku', 'like', $like)
@@ -49,20 +63,19 @@ class ProductController extends Controller
             ->when($data['category'] ?? null, fn ($query, $slug) => $query->whereHas('category', fn ($c) => $c->where('slug', $slug)))
             ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->orderBy($column, $direction)
-            ->orderBy('id', $direction)
-            ->paginate($data['per_page'] ?? 20)
-            ->withQueryString();
-
-        return AdminProductResource::collection($products);
+            ->orderBy('id', $direction);
     }
 
     /** GET /api/admin/v1/products/{id} */
     public function show(int $id): AdminProductResource|JsonResponse
     {
-        $product = Product::with(['category', 'brand', 'images'])->find($id);
+        $product = Product::with(self::DETAIL)->find($id);
 
         return $product ? (new AdminProductResource($product))->withDetail() : $this->notFound();
     }
+
+    /** What the admin product detail loads. */
+    public const DETAIL = ['category', 'brand', 'images', 'options.values', 'variants'];
 
     /** POST /api/admin/v1/products → 201 */
     public function store(Request $request): JsonResponse
@@ -72,7 +85,7 @@ class ProductController extends Controller
         $product = DB::transaction(function () use ($data) {
             $product = new Product([
                 'name' => $data['name'],
-                'slug' => $this->uniqueSlug($data['name']),
+                'slug' => Product::uniqueSlug($data['name']),
                 // A placeholder until the id exists (see the generated SKU below).
                 'sku' => $data['sku'] ?? 'NEW-'.Str::uuid(),
                 'status' => $data['status'] ?? 'active',
@@ -92,7 +105,7 @@ class ProductController extends Controller
             return $product;
         });
 
-        return (new AdminProductResource($product->load(['category', 'brand', 'images'])))->withDetail()
+        return (new AdminProductResource($product->load(self::DETAIL)))->withDetail()
             ->response()->setStatusCode(201);
     }
 
@@ -112,6 +125,10 @@ class ProductController extends Controller
             if (! empty($data['sku'])) {
                 $product->sku = $data['sku'];
             }
+            if ($product->has_variants) {
+                // Stock is set per variant; the product's is their sum.
+                unset($data['stock_quantity']);
+            }
             $this->fill($product, $data);
             $product->save();
             $this->syncImages($product, $data);
@@ -125,7 +142,7 @@ class ProductController extends Controller
             }
         });
 
-        return (new AdminProductResource($product->fresh(['category', 'brand', 'images'])))->withDetail();
+        return (new AdminProductResource($product->fresh(self::DETAIL)))->withDetail();
     }
 
     /** DELETE /api/admin/v1/products/{id} → 204. A soft delete: past orders keep their snapshots. */
@@ -156,15 +173,16 @@ class ProductController extends Controller
             'price' => [$required, 'numeric', 'decimal:0,2', 'min:0', 'max:1000000'],
             'stock_quantity' => [$required, 'integer', 'min:0', 'max:100000'],
             'sku' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/',
-                Rule::unique('products', 'sku')->ignore($product?->id)],
+                Rule::unique('products', 'sku')->ignore($product?->id), Rule::unique('product_variants', 'sku')],
             'brand' => ['nullable', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:5000'],
             'discount_percent' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:90'],
             'status' => ['nullable', Rule::in(Product::STATUSES)],
             'min_order_quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'thumbnail_url' => ['nullable', 'url', 'max:2048'],
-            'images' => ['nullable', 'array', 'max:10'],
-            'images.*' => ['required', 'url', 'max:2048'],
+            'images' => ['nullable', 'array', 'max:'.Product::MAX_IMAGES],
+            // A web address, or one of the product's uploaded images (/media/products/...), to keep it in the list.
+            'images.*' => ['required', 'string', 'max:2048', 'regex:#^(https?://\S+|/media/products/\d+/[a-f0-9]{32}\.(jpg|png|webp))$#'],
         ];
     }
 
@@ -193,8 +211,8 @@ class ProductController extends Controller
             'status.in' => 'The status must be draft, active, or archived.',
             'min_order_quantity.min' => 'The minimum order must be at least 1.',
             'thumbnail_url.url' => 'The thumbnail must be a web address (https://…).',
-            'images.max' => 'A product can have at most 10 images.',
-            'images.*.url' => 'Each image must be a web address (https://…).',
+            'images.max' => 'A product can have at most '.Product::MAX_IMAGES.' images.',
+            'images.*.regex' => 'Each image must be a web address (https://…).',
         ];
     }
 
@@ -221,28 +239,36 @@ class ProductController extends Controller
         }
     }
 
-    /** `images` replaces the whole gallery when sent; left out, the gallery stays as it is. */
+    /**
+     * `images` replaces the whole gallery when sent; left out, the gallery
+     * stays as it is. An uploaded image listed again keeps its file; one left
+     * out is deleted with its file. The thumbnail then follows the first image.
+     */
     private function syncImages(Product $product, array $data): void
     {
         if (! array_key_exists('images', $data) || $data['images'] === null) {
             return;
         }
-        $product->images()->delete();
+        $existing = $product->images()->get()->groupBy('url');
+        $kept = [];
         foreach (array_values($data['images']) as $position => $url) {
-            $product->images()->create(['url' => $url, 'alt' => $product->name, 'position' => $position]);
+            $image = $existing->get($url)?->first(fn ($image) => ! in_array($image->id, $kept, true));
+            if ($image) {
+                $image->update(['position' => $position]);
+            } elseif (str_starts_with($url, '/media/')) {
+                continue; // another product's upload (or a deleted one): not this product's to list
+            } else {
+                $image = $product->images()->create(['url' => $url, 'alt' => $product->name, 'position' => $position]);
+            }
+            $kept[] = $image->id;
         }
-    }
-
-    /** "Blue Mug" → "blue-mug", or "blue-mug-2" if taken (deleted products keep their slugs too). */
-    private function uniqueSlug(string $name): string
-    {
-        $base = Str::slug($name) ?: 'product';
-        $slug = $base;
-        for ($n = 2; Product::withTrashed()->where('slug', $slug)->exists(); $n++) {
-            $slug = "{$base}-{$n}";
+        foreach ($existing->flatten() as $image) {
+            if (! in_array($image->id, $kept, true)) {
+                $image->delete();
+                DB::afterCommit(fn () => $image->deleteFile());
+            }
         }
-
-        return $slug;
+        $product->syncThumbnail();
     }
 
     /** Like the imported SKUs: CATEGORY-BRAND-NAME-ID, e.g. "BEA-ESS-BLU-195". */

@@ -271,6 +271,7 @@ function RefundForm({ order, limits, onDone, onCancel }) {
               <tr key={item.orderItemId}>
                 <th scope="row">
                   {item.name}
+                  {item.variantLabel && ` (${item.variantLabel})`}
                   {item.sku && <small className="muted"> · {item.sku}</small>}
                   {error && (
                     <span id={`${id}-error`} className="field__error">
@@ -283,7 +284,7 @@ function RefundForm({ order, limits, onDone, onCancel }) {
                 <td className="num">{formatMoney(item.unitRefund)}</td>
                 <td className="num">
                   <label htmlFor={id} className="visually-hidden">
-                    Quantity of {item.name} to refund (up to {item.refundable})
+                    Quantity of {item.variantLabel ? `${item.name} (${item.variantLabel})` : item.name} to refund (up to {item.refundable})
                   </label>
                   <input
                     id={id}

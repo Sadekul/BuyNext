@@ -44,7 +44,7 @@ export const invoiceQuery = (userId, number, invoice, authorizedRequest) =>
  */
 export const cartPricingKey = ({ items, couponCode, shippingMethod, email, country }) => [
   'cart-pricing',
-  items.filter((item) => !item.isUnavailable).map((item) => `${item.productId}x${item.quantity}`),
+  items.filter((item) => !item.isUnavailable).map((item) => `${item.productId}${item.variantId ? `v${item.variantId}` : ''}x${item.quantity}`),
   couponCode ?? null,
   shippingMethod,
   email ?? null, // a guest's email can change whether a code applies (one use per customer)

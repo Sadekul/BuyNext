@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** One line of an order: a snapshot of the product and its price at checkout. */
 #[Fillable([
-    'order_id', 'product_id', 'sku', 'name', 'thumbnail_url', 'unit_price', 'discount_percent',
+    'order_id', 'product_id', 'variant_id', 'sku', 'name', 'variant_label', 'thumbnail_url', 'unit_price', 'discount_percent',
     'sale_price', 'quantity', 'line_total',
 ])]
 class OrderItem extends Model
@@ -35,5 +35,16 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class)->withTrashed();
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class);
+    }
+
+    /** "Blue Shirt (Size: M / Color: Red)" for emails and documents. */
+    public function displayName(): string
+    {
+        return $this->variant_label ? "{$this->name} ({$this->variant_label})" : $this->name;
     }
 }

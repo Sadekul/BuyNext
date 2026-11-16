@@ -23,8 +23,12 @@ export const camelPath = (field) => field.split('.').map(camelKey).join('.')
 // ---- browser → API ----
 
 const toQuantity = (value) => (Number.isInteger(value) ? value : Number.parseInt(value, 10))
+// variant_id (phase 5) only when the line names one: lines without it are sent as before.
 const toItems = (items) =>
-  (Array.isArray(items) ? items.slice(0, 50) : []).map((item) => ({ product_id: toQuantity(item?.productId), quantity: toQuantity(item?.quantity) }))
+  (Array.isArray(items) ? items.slice(0, 50) : []).map((item) => {
+    const variantId = toQuantity(item?.variantId)
+    return { product_id: toQuantity(item?.productId), ...(Number.isInteger(variantId) && variantId > 0 && { variant_id: variantId }), quantity: toQuantity(item?.quantity) }
+  })
 
 const toAddress = (address) =>
   address && typeof address === 'object'
@@ -77,9 +81,16 @@ export const fromLine = (raw) => ({
   salePrice: money(raw.sale_price),
   quantity: raw.quantity,
   lineTotal: money(raw.line_total),
+  // Phase 5: the variant bought ("Size: M / Color: Red"); lines without one keep their old shape.
+  ...(Number.isInteger(raw.variant_id) && { variantId: raw.variant_id, variantLabel: str(raw.variant_label) ?? null }),
 })
 
-const fromProblem = (raw) => ({ productId: raw.product_id ?? null, code: raw.code, message: raw.message })
+const fromProblem = (raw) => ({
+  productId: raw.product_id ?? null,
+  ...(Number.isInteger(raw.variant_id) && { variantId: raw.variant_id }),
+  code: raw.code,
+  message: raw.message,
+})
 
 /** cart/validate data → the checkout's priced cart. */
 export function fromCart(raw = {}) {
@@ -179,6 +190,18 @@ export function failed({ status, data }) {
   return { ok: false, status, body }
 }
 
+/** ReviewResource → the review the storefront shows (no customer id or email). */
+export const fromReview = (raw = {}) => ({
+  id: raw.id ?? null,
+  rating: raw.rating,
+  title: str(raw.title) ?? null,
+  comment: str(raw.comment) ?? '',
+  date: raw.created_at ?? null,
+  reviewerName: str(raw.author_name) ?? null,
+  verifiedPurchase: raw.verified_purchase === true,
+  status: ['pending', 'approved', 'rejected'].includes(raw.status) ? raw.status : 'pending',
+})
+
 const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) ? { ok: true, status: result.status, data: map(result.data) } : failed(result))
 
 export const laravelShop = {
@@ -245,6 +268,24 @@ export const laravelShop = {
   async getInvoice(token, number, invoice, request) {
     const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}`, { token, request })
     return answer(result, [200], (data) => fromInvoice(data.data))
+  },
+
+  /**
+   * A signed-in customer's review of a product (phase 5). Only the three
+   * fields go through; the API strips HTML, checks one review per customer
+   * (422 already_reviewed), and rate-limits.
+   */
+  async submitReview(token, productId, body, request) {
+    const rating = toQuantity(body.rating)
+    const title = str(body.title)?.trim().slice(0, 200)
+    const comment = str(body.comment)?.trim().slice(0, 4000)
+    const result = await laravel(`/api/v1/products/${productId}/reviews`, {
+      method: 'POST',
+      token,
+      request,
+      body: { rating: Number.isInteger(rating) ? rating : null, title: title || null, comment: comment ?? '' },
+    })
+    return answer(result, [200, 201], (data) => fromReview(data.data))
   },
 
   async lookupOrder(body, request) {

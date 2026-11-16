@@ -31,6 +31,7 @@ import { SITE } from '../constants/site'
 import { calculateCartTotals } from '../utils/cartTotals'
 import { formatPrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
+import { cartLineKey } from '../reducers/cartReducer'
 import './CheckoutPage.css'
 
 // API field names → checkout form fields. The shop service (server/shop/laravel.js)
@@ -177,6 +178,15 @@ function CheckoutPage() {
   )
 }
 
+/** Server lines name their variant; the cart's own label fills in if the answer has none. */
+function withVariantLabels(lines, items) {
+  return lines.map((line) => {
+    if (!line.variantId || line.variantLabel) return line
+    const item = items.find((candidate) => cartLineKey(candidate) === cartLineKey(line))
+    return { ...line, variantLabel: item?.variantLabel ?? null }
+  })
+}
+
 function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings }) {
   const cart = useCart()
   const { user, isAuthenticated, authorizedRequest } = useAuth()
@@ -284,7 +294,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     // pages refetch fresh data the next time they're shown (INVALIDATION).
     queryClient.invalidateQueries({ queryKey: productKeys.all })
     navigate(ROUTES.orderConfirmation(order.id), { replace: true })
-    cart.removeOrderedItems(order.items.map((item) => item.productId))
+    cart.removeOrderedItems(order.items.map(cartLineKey))
   }
 
   async function placeRealOrder(values) {
@@ -295,7 +305,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     queryClient.invalidateQueries({ queryKey: orderKeys.all })
     // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
     navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order } })
-    cart.removeOrderedItems(cart.items.filter((item) => !item.isUnavailable).map((item) => item.productId))
+    cart.removeOrderedItems(cart.items.filter((item) => !item.isUnavailable).map(cartLineKey))
   }
 
   async function onSubmit(values) {
@@ -419,7 +429,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           <h2 id="checkout-summary-title" className="cart-summary__title">
             Order summary
           </h2>
-          <OrderItems items={serverCart ? serverCart.lines.filter((line) => line.available) : cart.items} />
+          <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
           <OrderTotals totals={totals} couponCode={cart.couponCode} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
           <CouponForm
             appliedCode={cart.couponCode}

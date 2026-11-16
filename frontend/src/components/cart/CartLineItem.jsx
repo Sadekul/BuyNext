@@ -6,6 +6,7 @@ import { cn } from '../../utils/classNames'
 import { formatPrice } from '../../utils/formatters'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { getProductPricing } from '../../utils/pricing'
+import { cartLineKey } from '../../reducers/cartReducer'
 import './CartLineItem.css'
 
 /** One cart row. `compact` is used in the drawer; the cart page uses the full layout. */
@@ -13,6 +14,8 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = 
   const { salePrice, originalPrice, hasDiscount } = getProductPricing(item)
   const limits = getPurchaseLimits(item)
   const lineTotal = salePrice * item.quantity
+  const key = cartLineKey(item)
+  const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title
 
   return (
     <article className={cn('cart-line', compact && 'cart-line--compact', item.isUnavailable && 'cart-line--unavailable')}>
@@ -24,6 +27,7 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = 
             {item.title}
           </Link>
         </h3>
+        {item.variantLabel && <p className="cart-line__variant">{item.variantLabel}</p>}
         {!compact && item.brand && <p className="cart-line__brand">{item.brand}</p>}
         <p className="cart-line__unit-price">
           {formatPrice(salePrice)}
@@ -39,16 +43,16 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, compact = 
               value={item.quantity}
               min={limits.min}
               max={limits.max}
-              onChange={(quantity) => onQuantityChange(item.productId, quantity)}
-              label={`Quantity for ${item.title}`}
+              onChange={(quantity) => onQuantityChange(key, quantity)}
+              label={`Quantity for ${name}`}
               size="sm"
             />
           )}
           <button
             type="button"
             className="cart-line__remove"
-            onClick={() => onRemove(item.productId)}
-            aria-label={`Remove ${item.title} from cart`}
+            onClick={() => onRemove(key)}
+            aria-label={`Remove ${name} from cart`}
           >
             <LuTrash2 aria-hidden="true" />
             {!compact && 'Remove'}

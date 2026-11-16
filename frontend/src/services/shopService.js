@@ -16,7 +16,21 @@ import { normalizePhone } from '../utils/validation'
 
 const SHOP = { sameOrigin: true } // the customer session cookie, when signed in
 
-const cartLines = (items) => items.filter((item) => !item.isUnavailable).map((item) => ({ productId: item.productId, quantity: item.quantity }))
+// A variant line (phase 5) also names its variant; lines without one are sent exactly as before.
+const cartLines = (items) =>
+  items
+    .filter((item) => !item.isUnavailable)
+    .map((item) => ({ productId: item.productId, ...(item.variantId && { variantId: item.variantId }), quantity: item.quantity }))
+
+/**
+ * POST /api/shop/products/:id/reviews { rating, title?, comment } → the new review
+ * (signed-in customer). `status` is "pending" until a moderator approves it,
+ * or "approved" when the store publishes reviews straight away.
+ * ApiError 422 with data.code "already_reviewed" for a second review.
+ */
+export function submitReview(productId, { rating, title, comment }) {
+  return apiClient.post(`/api/shop/products/${encodeURIComponent(productId)}/reviews`, { rating, title: title || null, comment }, SHOP)
+}
 
 /**
  * POST /api/shop/cart/validate → { lines, problems, coupon, couponError, shippingOptions, totals }.

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuPencil, LuPlus, LuSearch, LuTrash2 } from 'react-icons/lu'
-import { adminKeys, deleteProduct, getCategories, getProducts } from '../api/admin'
+import { LuDownload, LuPencil, LuPlus, LuSearch, LuTrash2 } from 'react-icons/lu'
+import { adminKeys, deleteProduct, getCategories, getProducts, productsCsvUrl } from '../api/admin'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ProductBulkActions from '../components/ProductBulkActions'
 import DemoNotice from '../components/DemoNotice'
 import PageHeader from '../components/PageHeader'
 import Pagination from '../components/Pagination'
@@ -13,12 +14,14 @@ import { formatCount, formatMoney, formatSlug } from '../utils/format'
 import { PRODUCT_STATUSES, productStatus } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
 import { useAdminAuth } from '../auth/useAdminAuth'
+import { withPaths } from '../utils/categories'
 
 const LIMIT = 20
 
 /**
  * Product list: search, category (and, with real data, status) filters,
- * sorting, pages. Filters live in the URL.
+ * sorting, pages. Filters live in the URL. With real data, products can be
+ * ticked (or all on this page) for a mass action (Magento's mass actions).
  */
 function ProductsPage() {
   const [params, setParams] = useSearchParams()
@@ -33,8 +36,15 @@ function ProductsPage() {
   const [draft, setDraft] = useState(q)
   const [toDelete, setToDelete] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [summary, setSummary] = useState(null) // the last mass action's result
+  const summaryRef = useRef(null)
 
   const query = { q, category, status, sortBy, order, skip, limit: LIMIT }
+  // The ticked products, for this page and these filters only (a new page starts empty).
+  const pageKey = JSON.stringify(query)
+  const [selection, setSelection] = useState({ pageKey, ids: [] })
+  const selectedIds = selection.pageKey === pageKey ? selection.ids : []
+  const bulkAllowed = LIVE_DATA && (can('products.edit') || can('products.delete'))
   const products = useQuery({
     queryKey: adminKeys.products(query),
     queryFn: ({ signal }) => getProducts(query, { signal }),
@@ -61,6 +71,27 @@ function ProductsPage() {
     },
   })
 
+  useEffect(() => {
+    if (summary) summaryRef.current?.focus()
+  }, [summary])
+
+  const pageProducts = products.data?.products ?? []
+  const selected = pageProducts.filter((product) => selectedIds.includes(product.id))
+  const allSelected = pageProducts.length > 0 && selected.length === pageProducts.length
+  const select = (ids) => setSelection({ pageKey, ids })
+  const toggleOne = (id, checked) => select(checked ? [...selectedIds, id] : selectedIds.filter((item) => item !== id))
+
+  function bulkDone(result) {
+    select([])
+    setNotice(null)
+    setSummary(result)
+    queryClient.invalidateQueries({ queryKey: ['products'] })
+    queryClient.invalidateQueries({ queryKey: ['product'] })
+    queryClient.invalidateQueries({ queryKey: adminKeys.categories })
+    queryClient.invalidateQueries({ queryKey: adminKeys.overview })
+  }
+  const nameOf = (id) => pageProducts.find((product) => product.id === id)?.title
+
   function update(changes) {
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(changes)) {
@@ -83,11 +114,18 @@ function ProductsPage() {
         title="Products"
         description={products.data ? `${formatCount(products.data.total)} products` : undefined}
         actions={
-          can('products.edit') && (
-            <Link to="/products/new" className="btn btn--primary">
-              <LuPlus aria-hidden="true" /> Add product
-            </Link>
-          )
+          <>
+            {LIVE_DATA && can('products.import') && (
+              <a href={productsCsvUrl({ q, category, status })} className="btn btn--outline" download>
+                <LuDownload aria-hidden="true" /> Export CSV
+              </a>
+            )}
+            {can('products.edit') && (
+              <Link to="/products/new" className="btn btn--primary">
+                <LuPlus aria-hidden="true" /> Add product
+              </Link>
+            )}
+          </>
         }
       />
       {!LIVE_DATA && <DemoNotice />}
@@ -96,6 +134,25 @@ function ProductsPage() {
           {notice}
         </p>
       )}
+      <div role="status">
+        {summary && (
+          <div ref={summaryRef} tabIndex={-1} className="notice notice--success bulk-summary">
+            <p>
+              {summary.updated === 1 ? '1 product' : `${formatCount(summary.updated)} products`} {summary.verb}.
+              {summary.skipped.length > 0 && ` ${formatCount(summary.skipped.length)} skipped:`}
+            </p>
+            {summary.skipped.length > 0 && (
+              <ul>
+                {summary.skipped.map((item) => (
+                  <li key={item.id}>
+                    {item.name ?? nameOf(item.id) ?? `Product #${item.id}`}: {item.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="toolbar">
         <form role="search" className="toolbar__search" onSubmit={handleSearch}>
@@ -118,9 +175,9 @@ function ProductsPage() {
             }}
           >
             <option value="">All categories</option>
-            {categories.data?.map((item) => (
+            {withPaths(categories.data).map((item) => (
               <option key={item.slug} value={item.slug}>
-                {item.name}
+                {item.path}
               </option>
             ))}
           </select>
@@ -161,11 +218,27 @@ function ProductsPage() {
       {products.isPending && <Loading label="Loading products…" />}
       {products.error && <ErrorState error={products.error} onRetry={products.refetch} />}
       {products.data && products.data.products.length === 0 && <Empty>No products match.</Empty>}
+      {bulkAllowed && selected.length > 0 && (
+        <ProductBulkActions selected={selected} categories={categories.data ?? []} onDone={bulkDone} onClear={() => select([])} />
+      )}
       {products.data && products.data.products.length > 0 && (
         <div className="table-wrap" aria-busy={products.isFetching}>
           <table className="table">
             <thead>
               <tr>
+                {bulkAllowed && (
+                  <th scope="col" className="table__check">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all products on this page"
+                      checked={allSelected}
+                      ref={(node) => {
+                        if (node) node.indeterminate = selected.length > 0 && !allSelected
+                      }}
+                      onChange={(event) => select(event.target.checked ? pageProducts.map((product) => product.id) : [])}
+                    />
+                  </th>
+                )}
                 <th scope="col">Product</th>
                 <th scope="col">Category</th>
                 <th scope="col" className="num">
@@ -180,7 +253,12 @@ function ProductsPage() {
             </thead>
             <tbody>
               {products.data.products.map((product) => (
-                <tr key={product.id}>
+                <tr key={product.id} className={selectedIds.includes(product.id) ? 'is-selected' : undefined}>
+                  {bulkAllowed && (
+                    <td className="table__check">
+                      <input type="checkbox" aria-label={`Select ${product.title}`} checked={selectedIds.includes(product.id)} onChange={(event) => toggleOne(product.id, event.target.checked)} />
+                    </td>
+                  )}
                   <td>
                     <Link to={`/products/${product.id}`} className="table__product">
                       <img src={product.thumbnail} alt="" width="36" height="36" loading="lazy" />

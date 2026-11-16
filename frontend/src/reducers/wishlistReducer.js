@@ -28,8 +28,12 @@ const SNAPSHOT_FIELDS = [
   'availabilityStatus',
 ]
 
+// Products with options (size, color) are bought on their page: the wishlist remembers that.
 function toSnapshot(product) {
-  return Object.fromEntries(SNAPSHOT_FIELDS.map((field) => [field, product[field] ?? null]))
+  return {
+    ...Object.fromEntries(SNAPSHOT_FIELDS.map((field) => [field, product[field] ?? null])),
+    ...(product.hasVariants === true && { hasVariants: true }),
+  }
 }
 
 export function wishlistReducer(state, action) {
@@ -53,7 +57,10 @@ export function wishlistReducer(state, action) {
         ...state,
         items: state.items.map((item) => {
           const fresh = freshById.get(item.productId)
-          return fresh ? { ...item, ...toSnapshot(fresh), isUnavailable: false } : { ...item, isUnavailable: true }
+          if (!fresh) return { ...item, isUnavailable: true }
+          const next = { ...item, ...toSnapshot(fresh), isUnavailable: false }
+          if (fresh.hasVariants !== true) delete next.hasVariants // a new object: deleting from it is safe
+          return next
         }),
       }
     }
@@ -85,6 +92,7 @@ export function sanitizeWishlist(value) {
       ...storedProductSnapshot(stored),
       rating: storedNumber(stored.rating, 0, 5),
       addedAt: storedTimestamp(stored.addedAt),
+      ...(stored.hasVariants === true && { hasVariants: true }),
     }
     if (item.title === null || item.price === null) continue
     seen.add(item.productId)

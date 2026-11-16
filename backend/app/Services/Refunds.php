@@ -6,7 +6,6 @@ use App\Models\Admin;
 use App\Models\CreditMemo;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -29,7 +28,7 @@ use Illuminate\Validation\ValidationException;
  */
 class Refunds
 {
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private Inventory $inventory) {}
 
     /**
      * The limits for the admin's refund form (GET .../refundable), in cents:
@@ -91,6 +90,7 @@ class Refunds
             'items' => array_values(array_map(fn (array $limit) => [
                 'order_item_id' => $limit['item']->id,
                 'name' => $limit['item']->name,
+                'variant_label' => $limit['item']->variant_label,
                 'sku' => $limit['item']->sku,
                 'ordered' => $limit['ordered'],
                 'refunded' => $limit['refunded'],
@@ -256,14 +256,13 @@ class Refunds
         return $shares;
     }
 
-    /** Puts refunded units back in stock: only products that still exist (not deleted). */
+    /** Puts refunded units back in stock (the variant, for variant lines): only products that still exist (not deleted). */
     private function restock(array $lines): void
     {
-        $ids = collect($lines)->map(fn ($line) => $line['item']->product_id)->filter()->unique()->sort()->values();
-        $products = Product::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-
-        foreach ($lines as $line) {
-            $products->get($line['item']->product_id)?->increment('stock_quantity', $line['quantity']);
-        }
+        $this->inventory->restock(array_values(array_map(fn ($line) => [
+            'product_id' => $line['item']->product_id,
+            'variant_id' => $line['item']->variant_id,
+            'quantity' => $line['quantity'],
+        ], $lines)));
     }
 }

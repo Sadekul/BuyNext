@@ -36,8 +36,10 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
         // Placing orders: per visitor (the BFF passes the visitor's IP, see TrustBffClientIp).
+        // Reviews: 10 per hour per customer (the route requires a customer token).
+        RateLimiter::for('reviews', fn (Request $request) => Limit::perHour(config('buynest.reviews_per_hour'))->by('customer:'.($request->user()?->getKey() ?? $request->ip())));
         RateLimiter::for('orders', fn (Request $request) => Limit::perMinute(config('buynest.orders_per_minute'))->by('ip:'.$request->ip()));
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(240)->by(
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('buynest.api_per_minute'))->by(
             $request->user() ? $request->user()->getMorphClass().':'.$request->user()->getKey() : 'ip:'.$request->ip(),
         ));
 

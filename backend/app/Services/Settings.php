@@ -29,6 +29,8 @@ class Settings
         'tax' => ['tax_enabled', 'tax_rates', 'prices_include_tax'],
         'checkout' => ['allowed_countries', 'guest_checkout', 'enabled_payment_methods'],
         'inventory' => ['low_stock_threshold'],
+        // Phase 5: Settings → Catalog. The contract calls it reviews.require_approval.
+        'catalog' => ['reviews_require_approval'],
     ];
 
     public const DEFAULTS = [
@@ -48,6 +50,7 @@ class Settings
         'guest_checkout' => true,
         'enabled_payment_methods' => ['card', 'paypal', 'cod'],
         'low_stock_threshold' => 10,
+        'reviews_require_approval' => true, // false: new reviews are public at once
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price'];
@@ -187,6 +190,7 @@ class Settings
             'checkout.enabled_payment_methods' => ['array', 'min:1'],
             'checkout.enabled_payment_methods.*' => ['string', 'distinct', Rule::in(array_keys(config('buynest.store.payment_methods')))],
             'inventory.low_stock_threshold' => ['integer', 'min:0', 'max:100000'],
+            'catalog.reviews_require_approval' => ['boolean'],
         ];
     }
 
@@ -195,7 +199,7 @@ class Settings
     {
         return match (true) {
             in_array($key, self::MONEY_KEYS, true) => Pricing::format(Pricing::toCents((string) $value)),
-            in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN),
             $key === 'low_stock_threshold' => (int) $value,
             $key === 'tax_rates' => array_values(array_map(fn ($rate) => [
                 'country' => trim($rate['country']),

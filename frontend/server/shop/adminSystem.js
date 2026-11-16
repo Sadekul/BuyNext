@@ -278,6 +278,8 @@ const SETTINGS = {
   tax: { tax_enabled: 'taxEnabled', tax_rates: 'taxRates', prices_include_tax: 'pricesIncludeTax' },
   checkout: { allowed_countries: 'allowedCountries', guest_checkout: 'guestCheckout', enabled_payment_methods: 'enabledPaymentMethods' },
   inventory: { low_stock_threshold: 'lowStockThreshold' },
+  // Phase 5: reviews wait for approval unless this is off.
+  catalog: { reviews_require_approval: 'reviewsRequireApproval' },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']

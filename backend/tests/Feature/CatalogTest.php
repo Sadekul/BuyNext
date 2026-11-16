@@ -126,10 +126,13 @@ class CatalogTest extends TestCase
     public function test_categories_list_only_those_with_active_products_in_order(): void
     {
         Category::factory()->create(['slug' => 'empty', 'name' => 'Empty']);
+        // Phase 5: each item is a tree node (top level here).
+        $node = fn (string $slug, string $name) => ['id' => Category::where('slug', $slug)->value('id'), 'slug' => $slug, 'name' => $name, 'image_url' => null,
+            'description' => null, 'meta_title' => null, 'meta_description' => null, 'parent_id' => null, 'children' => []];
 
         $this->getJson('/api/v1/categories')->assertOk()->assertExactJson(['data' => [
-            ['slug' => 'smartphones', 'name' => 'Smartphones', 'image_url' => null],
-            ['slug' => 'beauty', 'name' => 'Beauty', 'image_url' => null],
+            $node('smartphones', 'Smartphones'),
+            $node('beauty', 'Beauty'),
         ]]);
     }
 
@@ -158,7 +161,20 @@ class CatalogTest extends TestCase
         $this->assertSame(3, $apple->stock_quantity); // the shop's stock survives a re-run
         $this->assertCount(1, $apple->images);
         $this->assertCount(1, $apple->reviews);
-        $this->getJson('/api/v1/products/16')->assertOk()->assertJsonPath('data.sale_price', '1.74');
+        // Phase 5: imported reviews are approved (public), imported images are URLs (no file).
+        $this->assertSame('approved', $apple->reviews->first()->status);
+        $this->assertNull($apple->images->first()->path);
+        $this->assertSame(1, $apple->review_count);
+        $this->assertSame('2.96', $apple->rating_average); // DummyJSON's rating is kept
+        $this->getJson('/api/v1/products/16')->assertOk()->assertJsonPath('data.sale_price', '1.74')
+            ->assertJsonPath('data.reviews.0.author_name', 'Lucas Gordon')->assertJsonPath('data.review_count', 1);
+
+        // An image staff uploaded survives a re-run (and leads the gallery's thumbnail).
+        $apple->images()->update(['position' => 1]);
+        $apple->images()->create(['url' => '/media/products/16/'.str_repeat('a', 32).'.png', 'path' => 'products/16/'.str_repeat('a', 32).'.png', 'position' => 0]);
+        $this->artisan('buynest:import-catalog')->assertSuccessful();
+        $this->assertSame(2, $apple->images()->count());
+        $this->assertSame('/media/products/16/'.str_repeat('a', 32).'.png', $apple->fresh()->thumbnail_url);
 
         $this->artisan('buynest:import-catalog', ['--overwrite' => true])->assertSuccessful();
         $this->assertSame(7, $apple->fresh()->stock_quantity);

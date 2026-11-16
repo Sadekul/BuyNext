@@ -40,6 +40,12 @@ return [
     // Orders placed per visitor per minute (checkout clicks, guest or signed in).
     'orders_per_minute' => (int) env('BUYNEST_ORDERS_PER_MINUTE', 10),
 
+    // API requests per signed-in account (or per visitor) per minute.
+    'api_per_minute' => (int) env('BUYNEST_API_PER_MINUTE', 240),
+
+    // Product reviews a customer may post per hour (spam guard).
+    'reviews_per_hour' => (int) env('BUYNEST_REVIEWS_PER_HOUR', 10),
+
     /*
      * Store rules that are code, not settings: the ids and wording of the
      * shipping and payment methods. Everything shop staff can change (prices,

@@ -35,3 +35,14 @@
 .mobile-nav__link--highlight {
   color: var(--color-sale);
 }
+
+.mobile-nav__sublist {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--space-4);
+}
+
+.mobile-nav__link--child {
+  padding-block: var(--space-2);
+  font-weight: 400;
+}

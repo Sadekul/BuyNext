@@ -36,3 +36,22 @@ export const productDetailResponse = (overrides = {}) => ({
   ],
   ...overrides,
 })
+
+/** A configurable product (phase 5): Size (S, M) × Color (Red, Blue); S/Blue doesn't exist, M/Red is sold out. */
+export const configurableTee = {
+  id: 5,
+  title: 'Tee',
+  price: 20,
+  discountPercentage: 10,
+  stock: 7,
+  hasVariants: true,
+  options: [
+    { id: 1, name: 'Size', values: [{ id: 11, value: 'S' }, { id: 12, value: 'M' }] },
+    { id: 2, name: 'Color', values: [{ id: 21, value: 'Red' }, { id: 22, value: 'Blue' }] },
+  ],
+  variants: [
+    { id: 51, sku: 'TEE-S-RED', optionValueIds: [11, 21], price: 20, stock: 4, inStock: true },
+    { id: 52, sku: 'TEE-M-RED', optionValueIds: [12, 21], price: 22, stock: 0, inStock: false },
+    { id: 53, sku: 'TEE-M-BLUE', optionValueIds: [12, 22], price: 22, stock: 3, inStock: true },
+  ],
+}

@@ -18,7 +18,7 @@ import './Header.css'
  *
  * Cart and wishlist counts come from shared state (useCart, useWishlist).
  */
-function Header({ navLinks }) {
+function Header({ navLinks, mobileNavLinks = navLinks }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { totals, openCart } = useCart()
   const { count: wishlistCount } = useWishlist()
@@ -78,7 +78,7 @@ function Header({ navLinks }) {
       <MobileNavigation
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        links={navLinks}
+        links={mobileNavLinks}
       />
     </header>
   )

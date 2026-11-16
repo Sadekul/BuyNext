@@ -95,13 +95,22 @@ class Checkout
 
         foreach ($quote->lines as $line) {
             $product = $line['product'];
+            $variant = $line['variant'];
             // decrement() is one UPDATE ... SET stock = stock - n; the row is locked, so it can't go negative.
-            $product->decrement('stock_quantity', $line['quantity']);
+            // A variant line takes the variant's stock (also locked); the product's stock is their sum.
+            if ($variant) {
+                $variant->decrement('stock_quantity', $line['quantity']);
+                $product->syncVariantStock();
+            } else {
+                $product->decrement('stock_quantity', $line['quantity']);
+            }
 
             $order->items()->create([
                 'product_id' => $product->id,
-                'sku' => $product->sku,
+                'variant_id' => $variant?->id,
+                'sku' => $line['sku'],
                 'name' => $product->name,
+                'variant_label' => $line['variant_label'],
                 'thumbnail_url' => $product->thumbnail_url,
                 'unit_price' => Pricing::format($line['price_cents']),
                 'discount_percent' => $product->discount_percent,

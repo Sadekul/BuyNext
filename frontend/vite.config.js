@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { handleApiRequest } from './server/api.js'
+import { handleMediaRequest } from './server/mediaApi.js'
 
 /*
  * The shop owner's dashboard (../admin, a separate React app) at /admin/:
@@ -76,14 +77,30 @@ function loadServerEnv(mode) {
 
 /*
  * Serves BuyNest's server-side services (server/api.js: sign-in at
- * /api/auth/*, admin at /api/admin/*) in `npm run dev` and `npm run preview`,
+ * /api/auth/*, admin at /api/admin/*; server/mediaApi.js: uploaded product
+ * photos at /media/*) in `npm run dev` and `npm run preview`,
  * the way the Vercel/Netlify functions do in production. Converts Node's request/response to the Web standard
  * Request/Response the service is written against.
  */
+const MAX_DEV_BODY_BYTES = 61 * 1024 * 1024
+
 function apiServices() {
-  async function middleware(req, res) {
+  const middleware = (handler) => async (req, res) => {
+    // Same cap as the largest production route (product photo uploads, 60 MB),
+    // so a huge request can't fill the dev server's memory.
     const chunks = []
-    for await (const chunk of req) chunks.push(chunk)
+    let size = 0
+    for await (const chunk of req) {
+      size += chunk.length
+      if (size > MAX_DEV_BODY_BYTES) {
+        res.statusCode = 413
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ message: 'That upload is too large.' }))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    }
     const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined
     // The visitor's address comes from the connection, never from headers the
     // browser sent (they could fake it to dodge the API's rate limits).
@@ -96,7 +113,7 @@ function apiServices() {
       headers,
       body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
     })
-    const response = await handleApiRequest(request)
+    const response = await handler(request)
     res.statusCode = response.status
     response.headers.forEach((value, name) => {
       if (name !== 'set-cookie') res.setHeader(name, value)
@@ -107,7 +124,8 @@ function apiServices() {
   }
   // No return value: Vite would call a returned function as a post-middleware hook.
   const mount = (server) => {
-    server.middlewares.use('/api', middleware)
+    server.middlewares.use('/api', middleware(handleApiRequest))
+    server.middlewares.use('/media', middleware(handleMediaRequest))
   }
   return { name: 'buynest-api-services', configureServer: mount, configurePreviewServer: mount }
 }
@@ -130,7 +148,8 @@ function contentSecurityPolicy(mode) {
     "script-src 'self'",
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    // Product photos: the catalog imported into Laravel keeps DummyJSON's CDN addresses.
+    // Product photos: the catalog imported into Laravel keeps DummyJSON's CDN addresses;
+    // photos uploaded in the admin come from this site's own /media/* (server/mediaApi.js), covered by 'self'.
     `img-src 'self' data: https://cdn.dummyjson.com ${apiOrigin}`,
     `connect-src 'self' ${apiOrigin}`, // 'self' covers the services at /api (sign-in, catalog, shop)
     "object-src 'none'",

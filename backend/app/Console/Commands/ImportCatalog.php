@@ -118,10 +118,14 @@ class ImportCatalog extends Command
                 $counts['created']++;
             }
 
-            // Images and imported reviews are replaced as a whole (reviews by real customers are kept).
-            $product->images()->delete();
+            // Imported images and reviews are replaced as a whole. Images staff uploaded (with a file)
+            // and reviews by real customers are kept.
+            $product->images()->whereNull('path')->delete();
             foreach (array_values($item['images'] ?? []) as $position => $url) {
-                $product->images()->create(['url' => $url, 'alt' => $item['title'], 'position' => $position]);
+                $product->images()->create(['url' => $url, 'path' => null, 'alt' => $item['title'], 'position' => $position]);
+            }
+            if ($product->images()->whereNotNull('path')->exists()) {
+                $product->syncThumbnail(); // with uploads, the thumbnail follows the first image
             }
             $product->reviews()->whereNull('customer_id')->delete();
             foreach ($item['reviews'] ?? [] as $review) {
@@ -129,9 +133,12 @@ class ImportCatalog extends Command
                     'author_name' => $review['reviewerName'],
                     'rating' => max(1, min(5, (int) $review['rating'])),
                     'comment' => $review['comment'],
+                    'status' => 'approved', // DummyJSON's reviews are part of the demo catalog
                     'created_at' => Carbon::parse($review['date']),
                 ]);
             }
+            // The count of approved reviews; the rating stays DummyJSON's until a review is moderated.
+            $product->refreshReviewStats(rating: false);
         }
 
         // A category picture: the first product's thumbnail (until staff choose one).

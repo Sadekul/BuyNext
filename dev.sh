@@ -34,7 +34,9 @@ start_mysql
 (cd "$ROOT/backend" && php artisan migrate --force --no-interaction >/dev/null)
 
 echo "API:   http://127.0.0.1:8000   (test inbox: http://127.0.0.1:8000/dev/mailbox)"
-(cd "$ROOT/backend" && php artisan serve --host=127.0.0.1 --port=8000 --no-reload >/dev/null 2>&1) &
+# 4 workers: the storefront makes several API calls per page (catalog, menu,
+# photos), and PHP's built-in server handles one request at a time per worker.
+(cd "$ROOT/backend" && PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=127.0.0.1 --port=8000 --no-reload >/dev/null 2>&1) &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null' EXIT
 

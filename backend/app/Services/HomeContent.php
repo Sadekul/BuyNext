@@ -49,7 +49,7 @@ class HomeContent
         return [
             'hero' => $content['hero'],
             'banners' => array_values(array_filter($content['banners'], fn ($banner) => $banner['is_active'])),
-            'featured_products' => $this->products($content['featured_product_ids'], Product::active()->with(['category', 'brand'])),
+            'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand'])),
         ];
     }
 

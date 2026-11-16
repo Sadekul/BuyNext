@@ -5,8 +5,9 @@
   "outputDirectory": "dist",
   "redirects": [{ "source": "/admin", "destination": "/admin/", "permanent": false }],
   "rewrites": [
+    { "source": "/media/:path*", "destination": "/api/media/:path*" },
     { "source": "/admin/((?!assets/).*)", "destination": "/admin/index.html" },
-    { "source": "/((?!api/|admin/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|admin/|media/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

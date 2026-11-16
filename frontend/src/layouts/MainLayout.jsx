@@ -8,7 +8,8 @@ import ScrollToTop from '../components/common/ScrollToTop'
 import ErrorBoundary from '../components/common/ErrorBoundary'
 import CartDrawer from '../components/cart/CartDrawer'
 import Loader from '../components/ui/Loader'
-import { ANNOUNCEMENTS, MAIN_NAV_LINKS } from '../constants/site'
+import { ANNOUNCEMENTS } from '../constants/site'
+import { useNavLinks } from '../hooks/useNavLinks'
 
 /**
  * Shared page shell. <Outlet /> is where React Router renders the matched
@@ -19,6 +20,7 @@ import { ANNOUNCEMENTS, MAIN_NAV_LINKS } from '../constants/site'
  */
 function MainLayout() {
   const { pathname } = useLocation()
+  const { links, mobileLinks } = useNavLinks()
 
   return (
     <>
@@ -28,7 +30,7 @@ function MainLayout() {
       </a>
       <OfflineBanner />
       <AnnouncementBar messages={ANNOUNCEMENTS} />
-      <Header navLinks={MAIN_NAV_LINKS} />
+      <Header navLinks={links} mobileNavLinks={mobileLinks} />
       <main id="main-content" tabIndex={-1}>
         <ErrorBoundary key={pathname}>
           <Suspense fallback={<PageLoader />}>

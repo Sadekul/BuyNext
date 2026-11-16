@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { LuArrowLeft, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -9,6 +9,8 @@ import ProductGrid from '../components/product/ProductGrid'
 import ProductGridSkeleton from '../components/product/ProductGridSkeleton'
 import ProductReviews from '../components/product/ProductReviews'
 import QuantitySelector from '../components/product/QuantitySelector'
+import ReviewForm from '../components/product/ReviewForm'
+import VariantSelector from '../components/product/VariantSelector'
 import RatingStars from '../components/product/RatingStars'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -16,12 +18,16 @@ import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { useCart } from '../hooks/useCart'
-import { productQuery, relatedProductsQuery } from '../queries/productQueries'
+import { categoriesQuery, productQuery, relatedProductsQuery } from '../queries/productQueries'
+import { HAS_CATEGORY_TREE } from '../services/categoryService'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
+import { REAL_SHOP } from '../constants/shop'
 import { formatPrice, formatSlug } from '../utils/formatters'
 import { getProductPricing } from '../utils/pricing'
-import { getPurchaseLimits } from '../utils/inventory'
+import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
+import { categoryAncestors } from '../utils/categories'
+import { chooseValue, findVariant, hasVariants, initialSelection, variantPriceRange, withVariant } from '../utils/variants'
 import './ProductDetailsPage.css'
 
 const RELATED_LIMIT = 4
@@ -74,13 +80,37 @@ function ProductDetails({ product }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { addItem } = useCart()
+  // The category tree (BuyNest's API) names the breadcrumb's parents; the demo needs no extra request.
+  const { data: categories } = useQuery({ ...categoriesQuery(), enabled: HAS_CATEGORY_TREE })
+  const hintId = useId()
 
-  const { min: minQuantity, canBuy } = getPurchaseLimits(product)
+  // Configurable products (BuyNest's API): price, stock, and the cart follow
+  // the chosen variant; buying needs a full selection. Other products (and
+  // every DummyJSON product) skip this.
+  const isConfigurable = hasVariants(product)
+  const [selection, setSelection] = useState(() => initialSelection(product))
+  const variant = isConfigurable ? findVariant(product, selection) : null
+  const purchasable = variant ? withVariant(product, variant) : product
+  const needsChoice = isConfigurable && !variant
+  const missingOptions = needsChoice ? product.options.filter((option) => selection[option.id] === undefined) : []
+
+  const limits = getPurchaseLimits(purchasable)
+  const { min: minQuantity } = limits
+  const canBuy = !needsChoice && limits.canBuy
   const [quantity, setQuantity] = useState(minQuantity)
+  // A newly chosen variant may have less stock than the quantity picked before.
+  const shownQuantity = canBuy ? clampQuantity(quantity, limits) : quantity
 
-  const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
+  // Before a choice, variants with different prices show the lowest ("From …").
+  const priceRange = isConfigurable ? variantPriceRange(product) : null
+  const showFrom = needsChoice && priceRange.min !== priceRange.max
+  const priced = needsChoice ? { ...product, price: priceRange.min } : purchasable
+  const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(priced)
   const images = product.images.length > 0 ? product.images : [product.thumbnail]
-  const categoryName = product.category ? formatSlug(product.category) : null
+  // The category's real name from the tree (BuyNest's API), or the slug made readable.
+  const category = categories?.find((candidate) => candidate.slug === product.category)
+  const categoryName = product.category ? (category?.name ?? formatSlug(product.category)) : null
+  const parentCategories = category && categories ? categoryAncestors(categories, category.slug) : []
 
   // location.key is "default" when this page was the first one loaded
   // (e.g. opened from a bookmark), so there's no in-app page to go back to.
@@ -88,6 +118,7 @@ function ProductDetails({ product }) {
 
   const breadcrumbs = [
     { label: 'Home', to: ROUTES.home },
+    ...parentCategories.map((parent) => ({ label: parent.name, to: ROUTES.category(parent.slug) })),
     ...(product.category ? [{ label: categoryName, to: ROUTES.category(product.category) }] : []),
     { label: product.title },
   ]
@@ -95,7 +126,7 @@ function ProductDetails({ product }) {
   const specifications = [
     ['Brand', product.brand],
     ['Category', categoryName],
-    ['SKU', product.sku],
+    ['SKU', purchasable.sku],
     ['Warranty', product.warrantyInformation],
     ['Shipping', product.shippingInformation],
     ['Returns', product.returnPolicy],
@@ -103,7 +134,11 @@ function ProductDetails({ product }) {
   ].filter(([, value]) => value) // only show what the API actually provided
 
   function handleAddToCart() {
-    addItem(product, quantity)
+    addItem(purchasable, shownQuantity)
+  }
+
+  function handleOptionChange(optionId, valueId) {
+    setSelection((current) => chooseValue(product, current, optionId, valueId))
   }
 
   return (
@@ -121,7 +156,7 @@ function ProductDetails({ product }) {
       </div>
 
       <div className="product-details__main">
-        <ProductGallery images={images} title={product.title} />
+        <ProductGallery images={images} title={product.title} alts={product.images.length > 0 ? product.imageAlts : undefined} />
 
         <div className="product-details__info">
           {product.brand && <p className="product-details__brand">{product.brand}</p>}
@@ -135,7 +170,10 @@ function ProductDetails({ product }) {
           )}
 
           <div className="product-details__price">
-            <span className="product-details__price-current">{formatPrice(salePrice)}</span>
+            <span className="product-details__price-current">
+              {showFrom && <span className="product-details__price-from">From </span>}
+              {formatPrice(salePrice)}
+            </span>
             {hasDiscount && (
               <>
                 <s className="product-details__price-original">
@@ -147,17 +185,34 @@ function ProductDetails({ product }) {
             )}
           </div>
 
-          <StockStatus product={product} canBuy={canBuy} />
+          {/* Live region: the stock line changes as options are chosen. */}
+          <div aria-live="polite">
+            {needsChoice ? (
+              <p className="product-details__stock product-details__stock--choose" id={hintId}>
+                Choose {missingOptions.map((option) => option.name.toLowerCase()).join(' and ')} to add this to your cart
+              </p>
+            ) : (
+              <StockStatus product={purchasable} canBuy={canBuy} />
+            )}
+          </div>
 
           {product.description && <p className="product-details__description">{product.description}</p>}
 
+          {isConfigurable && <VariantSelector product={product} selection={selection} onChange={handleOptionChange} />}
+
           <div className="product-details__purchase">
             {canBuy && (
-              <QuantitySelector value={quantity} min={minQuantity} max={product.stock} onChange={setQuantity} />
+              <QuantitySelector value={shownQuantity} min={minQuantity} max={purchasable.stock} onChange={setQuantity} />
             )}
-            <Button size="lg" onClick={handleAddToCart} disabled={!canBuy} className="product-details__add">
+            <Button
+              size="lg"
+              onClick={handleAddToCart}
+              disabled={!canBuy}
+              className="product-details__add"
+              aria-describedby={needsChoice ? hintId : undefined}
+            >
               <LuShoppingBag aria-hidden="true" />
-              {canBuy ? 'Add to cart' : 'Unavailable'}
+              {canBuy || needsChoice ? 'Add to cart' : 'Unavailable'}
             </Button>
             <WishlistButton product={product} variant="button" />
           </div>
@@ -200,6 +255,8 @@ function ProductDetails({ product }) {
       <section className="product-details__section" id="reviews" aria-labelledby="reviews-title">
         <h2 id="reviews-title">Customer reviews</h2>
         <ProductReviews reviews={product.reviews} />
+        {/* Writing reviews needs BuyNest's API and customer accounts. */}
+        {REAL_SHOP && <ReviewForm productId={product.id} productTitle={product.title} />}
       </section>
 
       {product.category && (

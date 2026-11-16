@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { LuFilterX, LuSearchX, LuSlidersHorizontal } from 'react-icons/lu'
 import CategoryNav from '../components/product/CategoryNav'
+import Breadcrumb from '../components/common/Breadcrumb'
 import ActiveFilters from '../components/product/ActiveFilters'
 import CatalogFilters from '../components/product/CatalogFilters'
 import ProductGrid from '../components/product/ProductGrid'
@@ -31,6 +32,7 @@ import {
 } from '../utils/catalog'
 import { formatPrice } from '../utils/formatters'
 import { readCatalogParams, withFilters, withParam } from '../utils/catalogParams'
+import { categoryAncestors, childCategories, topLevelCategories } from '../utils/categories'
 import './ProductListingPage.css'
 
 /**
@@ -40,6 +42,8 @@ import './ProductListingPage.css'
  *   /deals                 → all products, biggest discount first
  *
  * SERVER-SIDE: search (?q) and category (:slug) choose which products are fetched.
+ * With BuyNest's category tree, a category's products include its
+ * subcategories' (the API does that), and the page links to its subcategories.
  * CLIENT-SIDE: price, rating, brand, and availability filters, sorting, and
  * pagination (DummyJSON has no API parameters for those — see utils/catalog.js).
  *
@@ -57,6 +61,9 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const currentCategory = categories.find((category) => category.slug === categorySlug)
   // DummyJSON answers unknown categories with an empty list, not a 404, so we check ourselves.
   const isUnknownCategory = Boolean(categorySlug && categoriesRequest.data && !currentCategory)
+  // The category tree (BuyNest's API; DummyJSON's categories are all top-level).
+  const ancestors = currentCategory ? categoryAncestors(categories, currentCategory.slug) : []
+  const subcategories = currentCategory ? childCategories(categories, currentCategory.slug) : []
 
   let heading = title
   if (searchQuery) heading = `Results for "${searchQuery}"`
@@ -69,8 +76,33 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   return (
     <div className="listing section container">
       <header className="listing__header">
+        {ancestors.length > 0 && (
+          <Breadcrumb
+            items={[
+              { label: 'All products', to: ROUTES.products },
+              ...ancestors.map((category) => ({ label: category.name, to: ROUTES.category(category.slug) })),
+              { label: currentCategory.name },
+            ]}
+          />
+        )}
         <h1 className="listing__title">{heading}</h1>
-        {categories.length > 0 && <CategoryNav categories={categories} />}
+        {categories.length > 0 && (
+          <CategoryNav categories={topLevelCategories(categories)} activeSlug={ancestors[0]?.slug ?? null} />
+        )}
+        {subcategories.length > 0 && (
+          <nav className="listing__subcategories" aria-label={`${currentCategory.name} subcategories`}>
+            <h2 className="listing__subcategories-title">Shop by subcategory</h2>
+            <ul className="listing__subcategory-list">
+              {subcategories.map((category) => (
+                <li key={category.slug}>
+                  <Link to={ROUTES.category(category.slug)} className="listing__subcategory-link">
+                    {category.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
       </header>
 
       {categorySlug && categoriesRequest.error ? (

@@ -76,13 +76,20 @@ function QuickViewContent({ product, onAddToCart }) {
         {details.description && <p className="quick-view__description">{details.description}</p>}
 
         <div className="quick-view__actions">
-          <Button onClick={() => onAddToCart(details)} disabled={!canBuy}>
-            <LuShoppingBag aria-hidden="true" />
-            {canBuy ? 'Add to cart' : 'Unavailable'}
-          </Button>
-          <Button to={ROUTES.productDetails(details.id)} variant="outline">
-            View full details
-          </Button>
+          {details.hasVariants ? (
+            // Options (size, color) are chosen on the product page.
+            <Button to={ROUTES.productDetails(details.id)}>Choose options</Button>
+          ) : (
+            <>
+              <Button onClick={() => onAddToCart(details)} disabled={!canBuy}>
+                <LuShoppingBag aria-hidden="true" />
+                {canBuy ? 'Add to cart' : 'Unavailable'}
+              </Button>
+              <Button to={ROUTES.productDetails(details.id)} variant="outline">
+                View full details
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

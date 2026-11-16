@@ -16,6 +16,8 @@ export class ApiError extends Error {
     // 403 permission_denied (admin roles): which permission the role lacks.
     this.code = typeof data?.code === 'string' ? data.code : null
     this.permission = typeof data?.permission === 'string' ? data.permission : null
+    // CSV import refused because of row errors: the API's report, rows and all.
+    this.report = data?.report && typeof data.report === 'object' ? data.report : null
   }
 }
 
@@ -23,23 +25,26 @@ const STATUS_MESSAGES = {
   401: 'Please sign in to continue.',
   403: 'This account does not have admin access.',
   404: 'That item was not found.',
+  413: 'The upload is too large.',
   422: 'Please check the highlighted fields.',
 }
 
-async function send(path, { method = 'GET', body, params, signal, keepalive = false } = {}) {
+async function send(path, { method = 'GET', body, params, signal, keepalive = false, timeout: timeoutMs = TIMEOUT_MS } = {}) {
   const url = new URL(path, window.location.origin)
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value))
   }
 
-  const timeout = AbortSignal.timeout(TIMEOUT_MS)
+  const timeout = AbortSignal.timeout(timeoutMs)
+  // Uploads (FormData) go as multipart: the browser writes the Content-Type with its boundary.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
   let response
   try {
     response = await fetch(url, {
       method,
       credentials: 'same-origin',
-      headers: { Accept: 'application/json', ...(body !== undefined && { 'Content-Type': 'application/json' }) },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: { Accept: 'application/json', ...(body !== undefined && !isForm && { 'Content-Type': 'application/json' }) },
+      body: isForm ? body : body !== undefined ? JSON.stringify(body) : undefined,
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       keepalive,
     })

@@ -39,7 +39,9 @@ final readonly class CartQuote
         return [
             'lines' => array_map(fn (array $line) => [
                 'product_id' => $line['product_id'],
+                'variant_id' => $line['variant_id'],
                 'name' => $line['name'],
+                'variant_label' => $line['variant_label'],
                 'sku' => $line['sku'],
                 'thumbnail_url' => $line['thumbnail_url'],
                 'price' => $money($line['price_cents']),

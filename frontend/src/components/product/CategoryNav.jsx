@@ -7,8 +7,9 @@ import './CategoryNav.css'
 /**
  * Category links built from the categories API. Scrolls sideways on small
  * screens (keeping the active link in view) and wraps on large screens.
+ * `activeSlug` highlights a parent while one of its subcategories is open.
  */
-function CategoryNav({ categories }) {
+function CategoryNav({ categories, activeSlug = null }) {
   const navRef = useRef(null)
   const { pathname } = useLocation()
 
@@ -22,6 +23,7 @@ function CategoryNav({ categories }) {
   }, [pathname, categories])
 
   const linkClass = ({ isActive }) => cn('category-nav__link', isActive && 'category-nav__link--active')
+  const categoryClass = (slug) => ({ isActive }) => linkClass({ isActive: isActive || slug === activeSlug })
 
   return (
     <nav ref={navRef} className="category-nav" aria-label="Product categories">
@@ -33,7 +35,7 @@ function CategoryNav({ categories }) {
         </li>
         {categories.map((category) => (
           <li key={category.slug}>
-            <NavLink to={ROUTES.category(category.slug)} className={linkClass}>
+            <NavLink to={ROUTES.category(category.slug)} className={categoryClass(category.slug)}>
               {category.name}
             </NavLink>
           </li>

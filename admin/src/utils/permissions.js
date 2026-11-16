@@ -1,6 +1,9 @@
 import {
+  LuArrowDownUp,
   LuBoxes,
   LuChartColumn,
+  LuFolderTree,
+  LuMessageSquareText,
   LuFileText,
   LuHouse,
   LuLayoutDashboard,
@@ -27,6 +30,9 @@ export const PERMISSION_LABELS = {
   'products.edit': 'Add and edit products',
   'products.delete': 'Delete products',
   'categories.edit': 'Edit categories',
+  'products.import': 'Import and export products (CSV)',
+  'reviews.view': 'View product reviews',
+  'reviews.moderate': 'Approve, reject, and delete reviews',
   'orders.view': 'View orders',
   'orders.edit': 'Change orders (status, notes, cancel)',
   'invoices.create': 'Create invoices',
@@ -58,7 +64,15 @@ const DEMO_NAV = [
 ]
 const LIVE_NAV = [
   { to: '/', label: 'Overview', icon: LuLayoutDashboard, end: true, permission: 'dashboard.view' },
-  { to: '/products', label: 'Products', icon: LuBoxes, permission: 'products.view' },
+  {
+    heading: 'Catalog',
+    items: [
+      { to: '/products', label: 'Products', icon: LuBoxes, permission: 'products.view' },
+      { to: '/categories', label: 'Categories', icon: LuFolderTree, permission: 'products.view' },
+      { to: '/import-export', label: 'Import / Export', icon: LuArrowDownUp, permission: 'products.import' },
+      { to: '/reviews', label: 'Reviews', icon: LuMessageSquareText, permission: 'reviews.view' },
+    ],
+  },
   {
     heading: 'Sales',
     items: [
@@ -100,3 +114,7 @@ export const firstAllowedPath = (can) => {
   for (const entry of allowedNav(can)) return entry.heading ? entry.items[0].to : entry.to
   return null
 }
+
+/** An action's error in words; a 403 permission_denied names the permission the role lacks. */
+export const actionErrorMessage = (error) =>
+  error?.code === 'permission_denied' && error.permission ? `Your role doesn't allow this: ${permissionLabel(error.permission)} (${error.permission}).` : (error?.message ?? 'Something went wrong.')

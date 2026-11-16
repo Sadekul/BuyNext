@@ -32,7 +32,7 @@ import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from
  *   PUT    /api/admin/home                          { hero, banners, featuredProductIds } → { home }
  *   GET    /api/admin/reports/sales|products|customers|coupons|low-stock?from&to&groupBy&limit
  *   GET    /api/admin/reports/sales.csv|products.csv  → the CSV file, with the API's Content-Type and Content-Disposition
- *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory }
+ *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog }
  *   PATCH  /api/admin/settings                      { group: { key: value } } → all settings
  */
 
@@ -221,6 +221,9 @@ const SETTING_RULES = {
   },
   inventory: {
     lowStockThreshold: (value) => (Number.isInteger(value) && value >= 0 && value <= 100_000 ? null : 'Enter a whole number from 0 to 100,000.'),
+  },
+  catalog: {
+    reviewsRequireApproval: isBoolean('Choose whether new reviews wait for approval.'),
   },
 }
 

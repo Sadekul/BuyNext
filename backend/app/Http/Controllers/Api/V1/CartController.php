@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 class CartController extends Controller
 {
     /**
-     * POST /api/v1/cart/validate { items: [{ product_id, quantity }], coupon_code, shipping_method, email?, country? }
+     * POST /api/v1/cart/validate { items: [{ product_id, variant_id?, quantity }], coupon_code, shipping_method, email?, country? }
      * (optional customer Bearer token). country: the shipping country, for tax; without it the
      * tax is 0 and tax_estimated is false (when tax is on).
      */
@@ -43,6 +43,8 @@ class CartController extends Controller
         return [
             'items' => ['present', 'array', 'max:50'],
             'items.*.product_id' => ['required', 'integer', 'min:1'],
+            // Phase 5: products with options sell only through a variant (see Pricing::problemWith()).
+            'items.*.variant_id' => ['nullable', 'integer', 'min:1'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
             'coupon_code' => ['nullable', 'string', 'max:40'],
             // Only the methods switched on in the settings; any other → 422.

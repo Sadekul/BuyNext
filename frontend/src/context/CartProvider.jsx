@@ -44,14 +44,15 @@ function CartProvider({ children }) {
     dispatch({ type: CART_ACTIONS.ADDED, product, quantity })
     setIsCartOpen(true)
   }, [dispatch])
+  // Lines are addressed by cartLineKey(item): the product id, plus the variant id for variant lines.
   const updateQuantity = useCallback(
-    (productId, quantity) => dispatch({ type: CART_ACTIONS.QUANTITY_CHANGED, productId, quantity }),
+    (lineKey, quantity) => dispatch({ type: CART_ACTIONS.QUANTITY_CHANGED, lineKey: String(lineKey), quantity }),
     [dispatch],
   )
-  const removeItem = useCallback((productId) => dispatch({ type: CART_ACTIONS.REMOVED, productId }), [dispatch])
+  const removeItem = useCallback((lineKey) => dispatch({ type: CART_ACTIONS.REMOVED, lineKey: String(lineKey) }), [dispatch])
   const clearCart = useCallback(() => dispatch({ type: CART_ACTIONS.CLEARED }), [dispatch])
   const removeOrderedItems = useCallback(
-    (productIds) => dispatch({ type: CART_ACTIONS.ORDER_PLACED, productIds }),
+    (lineKeys) => dispatch({ type: CART_ACTIONS.ORDER_PLACED, lineKeys: lineKeys.map(String) }),
     [dispatch],
   )
   const applyCoupon = useCallback((code) => dispatch({ type: CART_ACTIONS.COUPON_APPLIED, code }), [dispatch])

@@ -72,8 +72,8 @@ class CreditMemoTest extends TestCase
 
         $this->admin('GET', "/api/admin/v1/orders/{$number}/refundable")->assertOk()->assertExactJson(['data' => [
             'items' => [
-                ['order_item_id' => $tea, 'name' => $this->tea->name, 'sku' => $this->tea->sku, 'ordered' => 3, 'refunded' => 0, 'refundable' => 3, 'unit_refund' => '2.99'],
-                ['order_item_id' => $mug, 'name' => $this->mug->name, 'sku' => $this->mug->sku, 'ordered' => 1, 'refunded' => 0, 'refundable' => 1, 'unit_refund' => '6.99'],
+                ['order_item_id' => $tea, 'name' => $this->tea->name, 'sku' => $this->tea->sku, 'ordered' => 3, 'refunded' => 0, 'refundable' => 3, 'unit_refund' => '2.99', 'variant_label' => null],
+                ['order_item_id' => $mug, 'name' => $this->mug->name, 'sku' => $this->mug->sku, 'ordered' => 1, 'refunded' => 0, 'refundable' => 1, 'unit_refund' => '6.99', 'variant_label' => null],
             ],
             'shipping_refundable' => '4.99',
             'max_total' => '20.97',
@@ -90,7 +90,7 @@ class CreditMemoTest extends TestCase
         $memo = CreditMemo::sole();
         $first->assertJsonPath('data', [
             'number' => 'CM-'.(100000 + $memo->id), 'order_number' => $number,
-            'items' => [['order_item_id' => $tea, 'name' => $this->tea->name, 'sku' => $this->tea->sku, 'quantity' => 1, 'amount' => '2.99']],
+            'items' => [['order_item_id' => $tea, 'name' => $this->tea->name, 'variant_label' => null, 'sku' => $this->tea->sku, 'quantity' => 1, 'amount' => '2.99']],
             'subtotal' => '2.99', 'shipping_refund' => '0.00', 'adjustment' => '0.00', 'total' => '2.99', 'restocked' => true,
             'created_at' => $memo->created_at->toIso8601ZuluString(), 'admin_name' => 'Store Admin', 'note' => 'Damaged box.',
         ]);

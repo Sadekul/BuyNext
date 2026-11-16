@@ -1,0 +1,87 @@
+.variant-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.variant-selector__option {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.variant-selector__legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.variant-selector__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.variant-selector__value {
+  position: relative;
+}
+
+/* Visually hidden but focusable: the label is what you see and click. */
+.variant-selector__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none; /* clicks land on the label, which checks the radio */
+}
+
+.variant-selector__label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.variant-selector__label {
+  cursor: pointer;
+}
+
+.variant-selector__input:not(:disabled) + .variant-selector__label:hover {
+  border-color: var(--color-primary);
+}
+
+.variant-selector__input:checked + .variant-selector__label {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.variant-selector__input:focus-visible + .variant-selector__label {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.variant-selector__input:disabled + .variant-selector__label {
+  cursor: not-allowed;
+}
+
+.variant-selector__label--unavailable {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  background: var(--color-bg-muted);
+  border-style: dashed;
+}

@@ -119,3 +119,8 @@
     height: 4.5rem;
   }
 }
+
+.cart-line__variant {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

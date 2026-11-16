@@ -26,7 +26,7 @@ const isMoneyText = (text) => text.trim() !== '' && Number.isFinite(Number(text)
 
 /**
  * Store settings, one form per group (General, Shipping, Tax, Checkout,
- * Inventory), each saved on its own. The server applies these rules to
+ * Inventory, Catalog), each saved on its own. The server applies these rules to
  * every cart and order. Needs settings.view; saving settings.edit.
  */
 function SettingsPage() {
@@ -44,6 +44,7 @@ function SettingsPage() {
           <TaxForm saved={settings.data.tax} />
           <CheckoutForm saved={settings.data.checkout} />
           <InventoryForm saved={settings.data.inventory} />
+          <CatalogForm saved={settings.data.catalog ?? {}} />
         </div>
       )}
     </>
@@ -413,6 +414,22 @@ function InventoryForm({ saved }) {
       <Field label="Low-stock threshold" error={err(errors, 'lowStockThreshold')} hint="Products with fewer units than this show as low stock in the dashboard and reports.">
         {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={threshold} onChange={(event) => setThreshold(event.target.value)} />}
       </Field>
+    </SettingsGroup>
+  )
+}
+
+function CatalogForm({ saved }) {
+  // Default on (docs/backend/PHASE5_CONTRACT.md §6): reviews wait for an admin.
+  const [requireApproval, setRequireApproval] = useState(saved.reviewsRequireApproval !== false)
+  return (
+    <SettingsGroup group="catalog" title="Catalog" toValues={() => ({ values: { reviewsRequireApproval: requireApproval } })} setErrors={() => {}}>
+      <label className="checkbox">
+        <input type="checkbox" checked={requireApproval} aria-describedby="catalog-approval-hint" onChange={(event) => setRequireApproval(event.target.checked)} />
+        New reviews wait for approval
+      </label>
+      <p id="catalog-approval-hint" className="field__hint">
+        When on, a shopper's review appears in the store only after someone approves it under Catalog → Reviews. When off, new reviews are shown right away.
+      </p>
     </SettingsGroup>
   )
 }

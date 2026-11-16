@@ -68,8 +68,10 @@ class OrderResource extends JsonResource
     {
         return $order->items->map(fn ($item) => [
             'product_id' => $item->product_id,
+            'variant_id' => $item->variant_id,
             'sku' => $item->sku,
             'name' => $item->name,
+            'variant_label' => $item->variant_label,
             'thumbnail_url' => $item->thumbnail_url,
             'price' => $item->unit_price,
             'discount_percent' => (float) $item->discount_percent,

@@ -2,6 +2,8 @@ import { json, pick, readBody, upstream } from './http.js'
 import { accounts } from './accounts/index.js'
 import { laravelAdminData } from './shop/admin.js'
 import { SYSTEM_ROUTES, isReportName } from './adminSystemApi.js'
+import { CATALOG_ROUTES, NAMED_ACTIONS, PRODUCT_PARTS } from './adminCatalogApi.js'
+import { laravelCatalogData } from './shop/adminCatalog.js'
 import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 
 /*
@@ -64,6 +66,11 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  * With roles, `GET me` also has `role: { id, name }` and `permissions`, and
  * the API answers 403 { code: "permission_denied", permission } to anything
  * the role can't do: passed on unchanged.
+ *
+ * Phase 5 (Laravel only; adminCatalogApi.js): the category tree, product
+ * images (multipart upload), options and variants, mass actions, CSV export
+ * and import, and review moderation. With real data, GET categories is the
+ * tree as a flat list in tree order (parentId, depth, isActive, …).
  */
 
 const PRODUCT_LIST_FIELDS = ['id', 'title', 'category', 'brand', 'price', 'discountPercentage', 'stock', 'rating', 'thumbnail', 'availabilityStatus']
@@ -350,7 +357,7 @@ const ROUTES = {
   },
 
   async 'GET categories'(ctx) {
-    if (realData()) return fromLaravel(await laravelAdminData.categories(ctx.token, ctx.request))
+    if (realData()) return fromLaravel(await laravelCatalogData.categories(ctx.token, ctx.request))
     const result = await upstream('/products/categories')
     if (result.status !== 200) return passThrough(result)
     return json(result.data.map((category) => pick(category, ['slug', 'name'])))
@@ -531,6 +538,7 @@ const ROUTES = {
     return result.ok ? json(result.data) : json(result.body, result.status)
   },
   ...SYSTEM_ROUTES,
+  ...CATALOG_ROUTES,
 }
 
 /**
@@ -540,6 +548,9 @@ const ROUTES = {
  */
 function matchRoute(method, segments) {
   const [resource, id, document, ...rest] = segments
+  // Phase 5: actions on a list (products/bulk) and a product's parts (products/1/images/2).
+  if (document === undefined && NAMED_ACTIONS.includes(`${resource}/${id}`)) return { route: ROUTES[`${method} ${resource}/${id}`] }
+  if (resource === 'products' && document !== undefined) return matchProductPart(method, id, document, rest)
   if (rest.length > 0) return null
   if (id === undefined) return { route: ROUTES[`${method} ${resource}`] }
   if (!(ID_FORMATS[resource] ?? isId)(id)) return null
@@ -548,6 +559,15 @@ function matchRoute(method, segments) {
   // Documents belong to an order, addressed by its number.
   if (resource !== 'orders' || !isOrderNumber(id) || !ORDER_DOCUMENTS.includes(document)) return null
   return { route: ROUTES[`${method} orders/:id/${document}`], id }
+}
+
+/** products/:id/images[/reorder | /:imageId], products/:id/options, products/:id/variants[/generate | /:variantId]. */
+function matchProductPart(method, id, part, rest) {
+  if (!isId(id) || !PRODUCT_PARTS[part] || rest.length > 1) return null
+  if (rest.length === 0) return { route: ROUTES[`${method} products/:id/${part}`], id }
+  const [sub] = rest
+  if (PRODUCT_PARTS[part].includes(sub)) return { route: ROUTES[`${method} products/:id/${part}/${sub}`], id }
+  return isId(sub) ? { route: ROUTES[`${method} products/:id/${part}/:sub`], id, sub } : null
 }
 
 /** The admin session routes: no permission check (they create or end the session). */
@@ -591,5 +611,5 @@ export async function handleAdminRequest(request, segments, cookies) {
   const session = await accounts().admin.me(token, request)
   if (!session.ok) return json(session.body, session.status, session.status === 403 ? clearedCookies(ADMIN) : [])
 
-  return match.route({ request, url: new URL(request.url), id: match.id, admin: session.profile, token })
+  return match.route({ request, url: new URL(request.url), id: match.id, sub: match.sub, admin: session.profile, token })
 }

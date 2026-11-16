@@ -85,7 +85,20 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
           )}
         </p>
 
-        {onAddToCart && (
+        {/* A product with options (size, color) is bought on its page, where a variant is chosen. */}
+        {onAddToCart && product.hasVariants && (
+          <Button
+            to={productUrl}
+            variant="outline"
+            size="sm"
+            fullWidth={layout === 'grid'}
+            className="product-card__action"
+            aria-label={`Choose options for ${title}`}
+          >
+            Choose options
+          </Button>
+        )}
+        {onAddToCart && !product.hasVariants && (
           <Button
             variant={canBuy ? 'primary' : 'outline'}
             size="sm"

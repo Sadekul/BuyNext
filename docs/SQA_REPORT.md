@@ -141,6 +141,22 @@ Built by three agents in parallel (backend; admin app with the sign-in service; 
 
 Checks: backend 162 feature tests; frontend 233 unit tests; admin 37; browser checks with the new `system.mjs`.
 
+## Backend phase 5 (Magento-style catalog) — 2026-11-16
+
+Built by three agents in parallel (backend; storefront with the sign-in service and `/media`; admin app with its sign-in service routes) against [backend/PHASE5_CONTRACT.md](backend/PHASE5_CONTRACT.md), then integrated and verified with the new `catalog.mjs` browser suite. Security points checked: uploads are accepted only when the file's contents really are JPEG, PNG, or WebP (a `.jpg` holding PHP or SVG is refused) and are stored under random names; `/media` serves only names the API creates; CSV exports guard against formula injection and imports are all-or-nothing; review text is plain text, one review per customer per product, rate-limited; every new admin route names a permission, and a Viewer is refused by the API (not only by hidden buttons).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| S1 | Medium | The admin order page, refund form, credit memos, and invoices didn't show which variant was ordered: two sizes of one shirt looked identical when refunding | The variant label is shown everywhere in the admin, and the refund field names it |
+| S2 | Low | Two variants of one product on an order gave duplicate React keys (console errors) on the admin order page | Keys include the SKU and line position |
+| S3 | Low | Alt text written for a product photo in the admin never reached the store's gallery | Kept by the store's adapter and used by the gallery |
+| S4 | Low | The admin's shared error text was 4.4:1 contrast, just under AA | Darkened to 4.5:1 for every admin error message |
+| S5 | Low | In development, the server read any request body into memory with no size limit (production functions already capped it) | The dev and preview server refuse bodies over 61 MB |
+| S6 | Test | The browser suites timed out when run back to back: the development API ran one PHP worker, and every test used one admin account, so requests queued and hit the 240-per-minute limit | `./dev.sh` starts the API with 4 workers; the API and review limits are settings (`BUYNEST_API_PER_MINUTE`, `BUYNEST_REVIEWS_PER_HOUR`, unchanged in production, relaxed in the local `.env`); the stock helper waits and retries when asked to slow down |
+| S7 | Test | An admin-user test searched for "old", which a random test name sometimes also contains | The search term is now unique |
+
+Checks: backend 212 feature tests; frontend 294 unit tests; admin 57; browser checks 450 on the dev server and 443 on the production build (new `catalog.mjs`: 116).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
@@ -148,4 +164,4 @@ Checks: backend 162 feature tests; frontend 233 unit tests; admin 37; browser ch
 - Changing the account email isn't offered yet: a new address must be confirmed by code first (planned with the address book).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
 - The local database keeps a few records from the agents' and browser checks' verification: test orders and invoices, deactivated test admins (for example "Verify Viewer" and "Smoke Sales"), and disabled test coupons.
-- Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database.
+- Products deleted in the admin are soft-deleted (kept for past orders); the browser checks leave their own deleted Draft test products behind in the local database (the catalog suite parks them in Home decoration before deleting them, because a deleted product still keeps its category).

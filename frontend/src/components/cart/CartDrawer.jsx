@@ -7,6 +7,7 @@ import FreeShippingProgress from './FreeShippingProgress'
 import { useCart } from '../../hooks/useCart'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice } from '../../utils/formatters'
+import { cartLineKey } from '../../reducers/cartReducer'
 import './CartDrawer.css'
 
 /** Slide-out mini cart. Opens automatically when an item is added. */
@@ -57,7 +58,7 @@ function CartDrawer() {
           <FreeShippingProgress amountRemaining={totals.amountToFreeShipping} threshold={totals.freeShippingThreshold} />
           <ul className="cart-drawer__list">
             {items.map((item) => (
-              <li key={item.productId}>
+              <li key={cartLineKey(item)}>
                 <CartLineItem
                   item={item}
                   compact

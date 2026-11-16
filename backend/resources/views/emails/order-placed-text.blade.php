@@ -5,7 +5,7 @@ Hi {{ $name }},
 We received your order {{ $order->number }}.
 
 @foreach ($order->items as $item)
-{{ $item->name }} x {{ $item->quantity }}: ${{ $item->line_total }}
+{{ $item->displayName() }} x {{ $item->quantity }}: ${{ $item->line_total }}
 @endforeach
 
 Subtotal: ${{ $order->subtotal }}

@@ -16,7 +16,14 @@ class ReviewFactory extends Factory
             'author_name' => fake()->name(),
             'rating' => fake()->numberBetween(1, 5),
             'comment' => fake()->sentence(),
+            'status' => 'approved',
+            'verified_purchase' => false,
             'created_at' => now(),
         ];
+    }
+
+    public function pending(): static
+    {
+        return $this->state(['status' => 'pending']);
     }
 }

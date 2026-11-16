@@ -7,8 +7,8 @@ use App\Http\Resources\AdminOrderResource;
 use App\Mail\OrderStatusMail;
 use App\Models\Coupon;
 use App\Models\Order;
-use App\Models\Product;
 use App\Services\Audit;
+use App\Services\Inventory;
 use App\Services\OrderDocuments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -160,16 +160,13 @@ class OrderController extends Controller
         return new AdminOrderResource($this->find($order->number));
     }
 
-    /** Puts every item back in stock (also for products deleted since). */
+    /** Puts every item back in stock (its variant for variant lines; also for products deleted since). */
     private function restock(Order $order): void
     {
         $order->load('items');
-        $ids = $order->items->pluck('product_id')->filter()->sort()->values();
-        $products = Product::withTrashed()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-
-        foreach ($order->items as $item) {
-            $products->get($item->product_id)?->increment('stock_quantity', $item->quantity);
-        }
+        app(Inventory::class)->restock($order->items->map(fn ($item) => [
+            'product_id' => $item->product_id, 'variant_id' => $item->variant_id, 'quantity' => $item->quantity,
+        ])->all(), withTrashed: true);
     }
 
     private function autoNote(string $from, string $to): ?string

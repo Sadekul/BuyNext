@@ -191,3 +191,14 @@
     align-items: start;
   }
 }
+
+/* Configurable products: before every option is chosen. */
+.product-details__price-from {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.product-details__stock--choose {
+  color: var(--color-text-muted);
+}

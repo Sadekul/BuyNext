@@ -18,7 +18,7 @@ describe('Laravel catalog through /api/catalog', () => {
     const page = await getProducts({ limit: 12, sortBy: 'price', order: 'desc' })
     expect(page.items[0]).toMatchObject({ id: 1, title: 'Mascara', price: 9.99, category: 'beauty' })
     expect(await getProductById(1)).toMatchObject({ title: 'Mascara' })
-    expect(await getCategories()).toEqual([{ slug: 'beauty', name: 'Beauty' }])
+    expect(await getCategories()).toEqual([{ slug: 'beauty', name: 'Beauty', parentSlug: null, depth: 0 }])
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url.origin).toBe(window.location.origin)

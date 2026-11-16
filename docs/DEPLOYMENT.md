@@ -59,6 +59,10 @@ Variables without the `VITE_` prefix are only read by the server functions (`fro
 
 With Laravel accounts the browser never calls the API: only the server functions do, so the API needs no CORS settings for the storefront. Deploy the API itself with the [production checklist](../backend/README.md#production-checklist) (`APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer, the scheduler running).
 
+## Product photos (`/media`)
+
+Photos uploaded in the admin are stored by the Laravel API. Shoppers load them from the store's own address, `/media/products/{id}/{file}`: a server function (`frontend/server/mediaApi.js`; `api/media` on Vercel, `netlify/functions/media.mjs` on Netlify) fetches them from `BUYNEST_LARAVEL_URL/storage/...` and sends them with a one-year cache header. Only file names the API creates are accepted; anything else is a 404. Because the photos come from the store's own address, the Content-Security-Policy needs no change. On the API server, keep `storage/app/public` on persistent disk (see the [production checklist](../backend/README.md#production-checklist)).
+
 ## Release checklist
 - [ ] `npm run lint` passes, `npm test` passes
 - [ ] No `console.log` / `debugger` left (`grep -rn "console.log\|debugger" src`)

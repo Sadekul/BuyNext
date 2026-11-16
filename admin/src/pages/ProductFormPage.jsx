@@ -15,10 +15,18 @@ import { EMPTY_PRODUCT, productSchema } from '../utils/productSchema'
 import { formatMoney } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
+import ProductImages from '../components/ProductImages'
+import ProductVariants from '../components/ProductVariants'
+import { withPaths } from '../utils/categories'
 
-/** /products/new and /products/:id: one form for adding and editing. */
+/**
+ * /products/new and /products/:id: one form for adding and editing. With real
+ * data, a saved product also has Images and Options and variants (phase 5),
+ * each saved on its own.
+ */
 function ProductFormPage() {
   const { productId } = useParams()
+  const { can } = useAdminAuth()
   const isNew = productId === undefined
   const product = useQuery({
     queryKey: adminKeys.product(productId),
@@ -27,7 +35,8 @@ function ProductFormPage() {
   })
   const categories = useQuery({ queryKey: adminKeys.categories, queryFn: ({ signal }) => getCategories({ signal }), staleTime: Infinity })
 
-  if (!isNew && product.isPending) return <Loading label="Loading the product…" />
+  // The category list first too: the form's category select keeps its value only if the option exists.
+  if ((!isNew && product.isPending) || categories.isPending) return <Loading label="Loading the product…" />
   if (!isNew && product.error) return <ErrorState error={product.error} onRetry={product.refetch} />
 
   const initial = isNew
@@ -43,14 +52,25 @@ function ProductFormPage() {
       <PageHeader title={isNew ? 'Add product' : product.data.title} description={isNew ? undefined : `Product #${productId}`} />
       {!LIVE_DATA && <DemoNotice />}
       {/* key: a fresh form (and default values) per product */}
-      <ProductForm key={productId ?? 'new'} productId={productId} initial={initial} categories={categories.data ?? []} />
+      <ProductForm key={productId ?? 'new'} productId={productId} initial={initial} categories={categories.data ?? []} hasVariants={!isNew && product.data.hasVariants === true} />
+      {LIVE_DATA && !isNew && product.data.live && (
+        <>
+          <ProductImages productId={productId} images={product.data.imageList ?? []} editable={can('products.edit')} />
+          <ProductVariants
+            key={`variants-${productId}`}
+            productId={productId}
+            product={{ price: product.data.price, options: product.data.options ?? [], variants: product.data.variants ?? [] }}
+            editable={can('products.edit')}
+          />
+        </>
+      )}
     </>
   )
 }
 
 const FIELDS_FROM_SERVER = Object.keys(EMPTY_PRODUCT)
 
-function ProductForm({ productId, initial, categories }) {
+function ProductForm({ productId, initial, categories, hasVariants }) {
   const isNew = productId === undefined
   const navigate = useNavigate()
   const { can } = useAdminAuth()
@@ -125,9 +145,9 @@ function ProductForm({ productId, initial, categories }) {
           {(a11y) => (
           <select {...a11y} {...register('category')}>
             <option value="">Choose…</option>
-            {categories.map((category) => (
+            {withPaths(categories).map((category) => (
               <option key={category.slug} value={category.slug}>
-                {category.name}
+                {category.path}
               </option>
             ))}
           </select>
@@ -141,7 +161,11 @@ function ProductForm({ productId, initial, categories }) {
             <input {...a11y} type="number" inputMode="decimal" step="0.01" min="0" max="90" {...register('discountPercentage', { valueAsNumber: true })} />
           )}
         </Field>
-        <Field label="Units in stock" error={errors.stock?.message} hint={isNew ? null : <StockHint stock={initial.stock} />}>
+        <Field
+          label="Units in stock"
+          error={errors.stock?.message}
+          hint={hasVariants ? 'This product sells through its variants: their stock counts, set below.' : isNew ? null : <StockHint stock={initial.stock} />}
+        >
           {(a11y) => <input {...a11y} type="number" inputMode="numeric" step="1" min="0" {...register('stock', { valueAsNumber: true })} />}
         </Field>
         {LIVE_DATA && (

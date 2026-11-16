@@ -31,7 +31,7 @@ function OrderRow({ order }) {
     <li className="orders__item">
       <div className="orders__thumbs" aria-hidden="true">
         {order.items.slice(0, 3).map((item, index) => (
-          <img key={item.productId ?? index} src={item.thumbnail} alt="" width="48" height="48" loading="lazy" />
+          <img key={`${item.productId ?? ''}-${item.variantId ?? ''}-${index}`} src={item.thumbnail} alt="" width="48" height="48" loading="lazy" />
         ))}
       </div>
       <div className="orders__info">

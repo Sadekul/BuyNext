@@ -7,16 +7,19 @@ import './ProductGallery.css'
  * the details page gives this component a `key` per product, so the
  * selection resets when you navigate to a different product.
  */
-function ProductGallery({ images, title }) {
+function ProductGallery({ images, title, alts }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const selectedImage = images[selectedIndex]
+  // The shop's own description of the image (BuyNest's API) when it has one.
+  const position = `image ${selectedIndex + 1} of ${images.length}`
+  const alt = alts?.[selectedIndex] ? (images.length > 1 ? `${alts[selectedIndex]} (${position})` : alts[selectedIndex]) : `${title}, ${position}`
 
   return (
     <div className="gallery">
       <div className="gallery__main">
         <img
           src={selectedImage}
-          alt={`${title}, image ${selectedIndex + 1} of ${images.length}`}
+          alt={alt}
           width="600"
           height="600"
           fetchPriority="high"

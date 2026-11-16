@@ -138,6 +138,7 @@ function InvoicePage() {
               <tr key={`${item.sku}-${index}`}>
                 <td>
                   {item.title}
+                  {item.variantLabel && <span className="invoice__muted"> ({item.variantLabel})</span>}
                   {item.sku && <span className="invoice__muted"> · {item.sku}</span>}
                 </td>
                 <td className="invoice__num">{item.quantity}</td>

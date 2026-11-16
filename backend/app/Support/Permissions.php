@@ -19,6 +19,9 @@ final class Permissions
             'products.edit' => 'Create and edit products',
             'products.delete' => 'Delete products',
             'categories.edit' => 'Edit categories',
+            'products.import' => 'Import and export products (CSV)',
+            'reviews.view' => 'View product reviews',
+            'reviews.moderate' => 'Approve, reject, and delete reviews',
         ]],
         'sales' => ['label' => 'Sales', 'permissions' => [
             'orders.view' => 'View orders, invoices, and refunds',
@@ -87,7 +90,7 @@ final class Permissions
             ['name' => 'Sales staff', 'description' => 'Orders, invoices, shipments, refunds; can look up customers.', 'is_system' => false,
                 'permissions' => ['orders.view', 'orders.edit', 'invoices.create', 'shipments.create', 'credit_memos.create', 'customers.view']],
             ['name' => 'Catalog manager', 'description' => 'Products and categories.', 'is_system' => false,
-                'permissions' => ['products.view', 'products.edit', 'products.delete', 'categories.edit']],
+                'permissions' => ['products.view', 'products.edit', 'products.delete', 'categories.edit', 'products.import', 'reviews.view', 'reviews.moderate']],
             ['name' => 'Marketing', 'description' => 'Coupons and content.', 'is_system' => false,
                 'permissions' => ['coupons.view', 'coupons.edit', 'content.view', 'content.edit']],
             ['name' => 'Viewer', 'description' => 'Can look at everything, change nothing.', 'is_system' => false, 'permissions' => $views],

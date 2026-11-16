@@ -1,5 +1,6 @@
 import { laravel } from '../http.js'
 import { camelPath, fromAddress, fromLine, fromOrder, fromShipment, fromTotals } from './laravel.js'
+import { productParts } from './adminCatalog.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -63,6 +64,8 @@ export function adminProduct(raw) {
     tags: raw.tags ?? [],
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
+    // Phase 5: images with their ids and alt text, options, and variants.
+    ...productParts(raw),
   }
 }
 
@@ -113,6 +116,7 @@ function adminOrderDetail(raw) {
       id: item.product_id,
       sku: item.sku,
       title: item.name,
+      variantLabel: item.variant_label ?? null,
       thumbnail: item.thumbnail_url ?? null,
       price: money(item.sale_price),
       listPrice: money(item.price),
@@ -174,7 +178,7 @@ export function adminCreditMemo(raw) {
   return {
     number: raw.number,
     orderNumber: raw.order_number ?? null,
-    items: (raw.items ?? []).map((item) => ({ name: item.name, sku: item.sku ?? null, quantity: item.quantity, amount: money(item.amount) })),
+    items: (raw.items ?? []).map((item) => ({ name: item.name, variantLabel: item.variant_label ?? null, sku: item.sku ?? null, quantity: item.quantity, amount: money(item.amount) })),
     subtotal: money(raw.subtotal),
     shippingRefund: money(raw.shipping_refund) ?? 0,
     adjustment: money(raw.adjustment) ?? 0,
@@ -192,6 +196,7 @@ function refundLimits(raw) {
     items: (raw.items ?? []).map((item) => ({
       orderItemId: item.order_item_id,
       name: item.name,
+      variantLabel: item.variant_label ?? null,
       sku: item.sku ?? null,
       ordered: item.ordered,
       refunded: item.refunded,
@@ -317,11 +322,6 @@ export const laravelAdminData = {
   async deleteProduct(token, id, request) {
     const result = await laravel(`/api/admin/v1/products/${id}`, { method: 'DELETE', token, request })
     return answer(result, [200, 204], () => ({ id: Number(id), deleted: true, live: true }))
-  },
-
-  async categories(token, request) {
-    const result = await laravel('/api/admin/v1/categories', { token, request })
-    return answer(result, [200], (data) => data.data.map((category) => ({ id: category.id, slug: category.slug, name: category.name, productCount: category.product_count })))
   },
 
   async listOrders(token, { q, status, paymentStatus, limit, skip }, request) {

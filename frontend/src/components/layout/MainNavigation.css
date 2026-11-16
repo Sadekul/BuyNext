@@ -46,6 +46,91 @@
   color: var(--color-sale);
 }
 
+/* Category with subcategories: the link, then a small toggle button for its menu. */
+.main-nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.main-nav__item > .main-nav__link {
+  padding-right: var(--space-1);
+}
+
+.main-nav__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.main-nav__toggle.main-nav__link {
+  padding-inline: var(--space-4);
+}
+
+.main-nav__toggle:hover,
+.main-nav__toggle[aria-expanded='true'] {
+  color: var(--color-primary);
+}
+
+.main-nav__toggle svg {
+  transition: transform var(--transition-fast);
+}
+
+.main-nav__toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.main-nav__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 14rem;
+  max-height: 70vh;
+  padding: var(--space-2);
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.main-nav__menu[hidden] {
+  display: none;
+}
+
+.main-nav__submenu {
+  padding-left: var(--space-3);
+}
+
+.main-nav__menu-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+}
+
+.main-nav__menu > li > .main-nav__menu-link {
+  font-weight: 600;
+}
+
+.main-nav__menu-link:hover,
+.main-nav__menu-link--active {
+  color: var(--color-primary);
+  background: var(--color-bg-muted);
+}
+
 @media (min-width: 1024px) {
   .main-nav {
     display: block;

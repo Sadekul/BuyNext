@@ -48,7 +48,7 @@ The agreement: [docs/backend/PHASE4_CONTRACT.md](../docs/backend/PHASE4_CONTRACT
 
 | Area | What it does |
 | --- | --- |
-| Roles and permissions | Every admin has a role; a role is a list of permission keys (`App\Support\Permissions`). **Every** admin route checks one with `can.admin:<key>` (a test fails if a route forgets). Missing → 403 `{ message: "Your role doesn't allow this.", code: "permission_denied", permission }`. Seeded: **Owner** (built in: every key, can't be edited or deleted), Sales staff, Catalog manager, Marketing, Viewer (every `*.view`). Existing admins became Owners. |
+| Roles and permissions | Every admin has a role; a role is a list of permission keys (`App\Support\Permissions`). **Every** admin route checks one with `can.admin:<key>` (a test fails if a route forgets). Missing → 403 `{ message: "Your role doesn't allow this.", code: "permission_denied", permission }`. Seeded: **Owner** (built in: every key, can't be edited or deleted), Sales staff, Catalog manager (since phase 5 also import/export and reviews), Marketing, Viewer (every `*.view`). Existing admins became Owners. |
 | Admin users | Create (password: 12+ characters, letters and numbers), edit, deactivate, reset password. You can't deactivate or change the role of your own account; only an Owner can give the Owner role or change an Owner; there is always an active Owner. Deactivating or resetting a password signs that admin out everywhere. Admins are never deleted. |
 | Audit log | Who did what: products, orders (status, notes), invoices, shipments, credit memos, customers (block/unblock), coupons, pages, home content, settings, admins, roles, sign-ins, and failed sign-ins (no admin; the email tried is in the summary). `changes` holds only the changed fields, `{ before, after }`; passwords and tokens never. |
 | Content | Pages (`about`, `shipping-and-returns`, `privacy`, `terms`, `contact` seeded). The body is HTML **sanitized on save** with `symfony/html-sanitizer` and an allow-list (no scripts, styles, iframes, event attributes, or `javascript:` links; links get `rel="noopener"`). Home page content (hero, banners, featured products), seeded from the storefront's old `homeContent.js`. |
@@ -56,12 +56,27 @@ The agreement: [docs/backend/PHASE4_CONTRACT.md](../docs/backend/PHASE4_CONTRACT
 | Settings | General, shipping, tax, checkout, inventory, kept in the `settings` table, read through the cache (cleared on save). Cart pricing and checkout follow them: shipping prices and threshold, which shipping and payment methods are on, countries, guest checkout, tax. |
 | Tax | Off by default. When on: the shipping country's rate × (merchandise after the discount + shipping), rounded to the cent. `cart/validate` takes an optional `country` (without it tax is 0 and `tax_estimated` is false). With `prices_include_tax` the tax is shown but already inside the prices. Refunds: tax added on top is shared over the lines and shipping like the coupon, so a unit's refund includes its tax and a full refund is exactly the grand total. |
 
+## What's here (phase 5: Magento-style catalog management)
+
+The agreement: [docs/backend/PHASE5_CONTRACT.md](../docs/backend/PHASE5_CONTRACT.md) (its "Implementation notes" list every shape the contract left open). Modeled on Magento's Catalog → Categories / Products, Data transfer, and Marketing → Reviews.
+
+| Area | What it does |
+| --- | --- |
+| Category tree | `parent_id`, at most 3 levels, no cycles (422), unique lower-case slugs. Description, active flag, meta title/description. A category is visible when it and all its ancestors are active; products in a hidden category are left out of the store (listing, search, product page, cart). `?category=` includes subcategories. Deleting is refused while a category has subcategories or products (the message gives the count). |
+| Image uploads | JPEG, PNG, WebP only, **judged by the bytes** (finfo and getimagesize must agree), at most 5 MB and 6000×6000 px, 10 per upload, 12 per product. Stored on the `public` disk as `products/{id}/{32 random hex}.{ext}` (never the uploaded name); the url is `/media/products/{id}/{name}`, which the sign-in service streams from `/storage/...`. No GD/Imagick is needed: files aren't re-encoded. The thumbnail follows the first image. |
+| Options and variants | Up to 3 options × 20 values; variants per combination with their own SKU (unique across products and variants), stock, optional price, active flag (max 200 per product). A product with options sells only through an active variant; its stock is the sum of its active variants' stock. Checkout locks the product and the variant rows; order items remember `variant_id` and `variant_label`; refunds and cancellations restock the variant. |
+| Mass actions | `POST /products/bulk`: enable, disable, archive, delete, set category, adjust price (percent or fixed), set stock. One transaction, one audit entry per product. |
+| Import / export | CSV with `sku,name,category_slug,brand,price,discount_percent,stock_quantity,status,description,tags,image_urls`. Import checks every row first (dry run by default); any error saves nothing. Export cells that could run as formulas get a `'`. |
+| Reviews | Customers write one review per product (plain text, 10 per hour); `verified_purchase` when they have a non-cancelled order with it. Staff approve/reject/delete; only approved reviews are public and `rating_average` / `review_count` follow them. Settings → Catalog → `reviews_require_approval` (default on). |
+
+Uploads need the public storage link once: `php artisan storage:link` (creates `public/storage`, git-ignored; uploaded files in `storage/app/public` are git-ignored too).
+
 ### Permissions
 
 | Area | Keys |
 | --- | --- |
 | Dashboard | `dashboard.view` |
-| Catalog | `products.view` (also the category list), `products.edit`, `products.delete`, `categories.edit` (reserved: there are no category write endpoints yet) |
+| Catalog | `products.view` (also the category tree), `products.edit` (also images, options, variants, mass actions), `products.delete` (also the bulk `delete`), `categories.edit`, `products.import` (CSV import and export), `reviews.view`, `reviews.moderate` |
 | Sales | `orders.view` (orders, invoices, credit memo lists, refundable amounts), `orders.edit`, `invoices.create`, `shipments.create`, `credit_memos.create` |
 | Customers | `customers.view`, `customers.edit` |
 | Marketing | `coupons.view`, `coupons.edit` |
@@ -87,13 +102,14 @@ Storefront (customers), `/api/v1`:
 | POST | `/auth/reset-password` | `email, code, password, password_confirmation` |
 | POST | `/auth/logout` | access token → this device signed out |
 | GET / PATCH | `/me` | profile; PATCH changes `first_name, last_name, phone` (not the email) |
-| GET | `/products` | public; `search, category, brand[], min_price, max_price` (sale price), `min_rating, available=1, sort` (`price, rating, discount, name, newest`), `direction, page, per_page` (12, max 100) |
-| GET | `/products/{id}` | public; with `images` and `reviews`; drafts, archived, deleted → 404 `Product not found.` |
-| GET | `/categories` | public; categories with active products |
+| GET | `/products` | public; `search, category` (with its subcategories), `brand[], min_price, max_price` (sale price), `min_rating, available=1, sort` (`price, rating, discount, name, newest`), `direction, page, per_page` (12, max 100); items have `has_variants`, `review_count` |
+| GET | `/products/{id}` | public; with `images`, approved `reviews`, `options` and active `variants`; drafts, archived, deleted, or in a hidden category → 404 `Product not found.` |
+| POST | `/products/{id}/reviews` | customer; `rating, title?, comment` → 201 (`pending` unless approval is off); second review → 422 `already_reviewed`; 10 per hour |
+| GET | `/categories` | public; the visible tree (`children`), branches with something to buy |
 | GET | `/home` | public; `{ hero, banners (active, by position), featured_products [products] }` |
 | GET | `/pages/{slug}` | public; published pages only, else 404 |
 | GET | `/store` | public; store name, support contacts, enabled shipping methods with prices, free-shipping threshold, countries, payment methods, guest checkout, tax on/off |
-| POST | `/cart/validate` | public; `items[{product_id, quantity}], coupon_code, shipping_method, email?, country?` → lines, problems, coupon, shipping options, totals, `tax_estimated`. Optional customer Bearer token (per-customer coupon limits; a bad token → 401) |
+| POST | `/cart/validate` | public; `items[{product_id, variant_id?, quantity}], coupon_code, shipping_method, email?, country?` → lines, problems, coupon, shipping options, totals, `tax_estimated`. Optional customer Bearer token (per-customer coupon limits; a bad token → 401) |
 | POST | `/orders` | guest, or customer Bearer token (any other token → 401/403); `items, coupon_code, shipping_method, payment_method, email, phone, shipping_address, billing_address, expected_total` → 201; 422 with `problems` for stock, or for a shipping/payment method or country that is off; 409 when `expected_total` differs; 403 `guest_checkout_disabled` for guests when guest checkout is off. 10 per minute per visitor |
 | GET | `/orders` | customer; their orders, newest first |
 | GET | `/orders/{number}` | customer; someone else's → 404. Includes `invoices`, `shipments`, `credit_memos` |
@@ -110,7 +126,21 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/overview` | products, orders (revenue excludes cancelled), customers, low stock products, latest orders |
 | GET / POST | `/products` | list every status (`search, category, status, sort, direction, page, per_page`); create → 201 |
 | GET / PATCH / DELETE | `/products/{id}` | detail with images; partial update; soft delete → 204 |
-| GET | `/categories` | with `product_count` |
+| GET | `/categories` | the tree with `product_count` (direct products) |
+| POST / PATCH / DELETE | `/categories`, `/categories/{id}` | [categories.edit] tree rules above; DELETE 422 while it has subcategories or products |
+| POST | `/categories/reorder` | [categories.edit] `parent_id, ids` → positions 0, 1, 2… |
+| POST | `/products/{id}/images` | [products.edit] multipart `images[]` → 201 `[{ id, url, alt, position, is_upload }]` |
+| PATCH / DELETE | `/products/{id}/images/{image}` | [products.edit] `alt`; DELETE also removes the file |
+| POST | `/products/{id}/images/reorder` | [products.edit] `ids` (every image, in order) |
+| PUT | `/products/{id}/options` | [products.edit] `options: [{ name, values }]` (replaces; `[]` = simple product) |
+| POST | `/products/{id}/variants/generate` | [products.edit] creates missing combinations (inactive, stock 0); `meta.created` |
+| PATCH | `/products/{id}/variants/{variant}` | [products.edit] `sku, price, stock_quantity, is_active` |
+| POST | `/products/bulk` | [products.edit; `delete` also products.delete] `ids, action, value` → `{ updated, skipped }` |
+| GET | `/products/export.csv` | [products.import] the product list filters |
+| POST | `/products/import` | [products.import] multipart `file`, `dry_run` (default true) → `{ dry_run, rows, created, updated, unchanged, errors }` |
+| GET | `/reviews` | [reviews.view] `status, product_id, rating, search, page, per_page`; `meta.counts` per status |
+| PATCH / DELETE | `/reviews/{id}` | [reviews.moderate] `status` |
+| POST | `/reviews/bulk` | [reviews.moderate] `ids, status` → `{ updated }` |
 | GET | `/orders` | `search` (number, email, name), `status, payment_status, page, per_page` |
 | GET / PATCH | `/orders/{number}` | detail with history and documents; PATCH `status, payment_status: "paid", note, notify_customer` (cancel refused once invoiced) |
 | POST | `/orders/{number}/invoices` | `note, notify_customer` → 201 InvoiceResource |
@@ -134,7 +164,7 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/reports/sales`, `/reports/sales.csv` | [reports.view] `from, to, group_by` (`day, week, month`) |
 | GET | `/reports/products`, `/reports/products.csv` | [reports.view] best sellers; `from, to, limit` (10, max 100) |
 | GET | `/reports/customers`, `/reports/coupons`, `/reports/low-stock` | [reports.view] |
-| GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
+| GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory, catalog }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
 
 The older routes need: `/overview` dashboard.view; `/customers` customers.view, PATCH customers.edit; `/categories`, GET `/products…` products.view; POST/PATCH `/products` products.edit, DELETE products.delete; GET `/orders…`, `/invoices…`, `/credit-memos…`, `/refundable` orders.view; PATCH `/orders/{number}` orders.edit; POST invoices/shipments/credit-memos their `*.create`; `/coupons` coupons.view / coupons.edit.
 
@@ -149,6 +179,7 @@ composer install
 cp .env.example .env && php artisan key:generate
 # set DB_* in .env, and BFF_SHARED_KEY (openssl rand -hex 32; the same value goes in frontend/.env.local as BUYNEST_BFF_KEY)
 php artisan migrate --seed       # tables, roles, pages, home content, settings + local demo accounts + the demo catalog (downloaded once)
+php artisan storage:link         # once: uploaded product images (storage/app/public) become /storage/...
 php artisan serve --port=8000
 ```
 
@@ -175,7 +206,7 @@ For real email, change only the settings: `MAIL_MAILER=smtp` with `MAIL_HOST`, `
 ## Tests
 
 ```bash
-php artisan test     # 162 feature tests, against the buynest_test database (no network: products come from factories)
+php artisan test     # 212 feature tests, against the buynest_test database (no network: products come from factories)
 vendor/bin/pint      # code style
 ```
 
@@ -185,3 +216,5 @@ vendor/bin/pint      # code style
 - A strong `BFF_SHARED_KEY`, shared only with the storefront's server functions.
 - Don't expose this API publicly if you don't need to: only the storefront's server calls it.
 - Run the scheduler (`php artisan schedule:run` every minute) so unconfirmed sign-ups are cleaned up.
+- Product photos: run `php artisan storage:link` once, keep `storage/app/public` on persistent disk (not a throwaway container filesystem) and include it in backups. The web server must serve `/storage/...` to the storefront's server functions, which pass photos to shoppers at `/media/...`.
+- Uploads: allow request bodies up to 60 MB in the web server and PHP (`upload_max_filesize=5M`, `max_file_uploads=10`, `post_max_size=60M`).

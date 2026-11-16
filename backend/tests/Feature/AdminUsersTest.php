@@ -147,11 +147,11 @@ class AdminUsersTest extends TestCase
     public function test_listing_and_filtering_admins(): void
     {
         Admin::factory()->role('Viewer')->create(['name' => 'Vera Viewer']);
-        Admin::factory()->role('Viewer')->create(['name' => 'Old Hand'])->forceFill(['is_active' => false])->save();
+        Admin::factory()->role('Viewer')->create(['name' => 'Qzx Old Hand'])->forceFill(['is_active' => false])->save();
 
         $this->asAdmin($this->headers, 'GET', '/api/admin/v1/admins?role_id='.$this->role('Viewer')->id.'&status=active')
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Vera Viewer');
-        $this->asAdmin($this->headers, 'GET', '/api/admin/v1/admins?search=old')->assertJsonPath('data.0.is_active', false);
+        $this->asAdmin($this->headers, 'GET', '/api/admin/v1/admins?search=qzx')->assertJsonPath('data.0.is_active', false);
         $this->asAdmin($this->headers, 'GET', '/api/admin/v1/admins/999')->assertNotFound();
     }
 

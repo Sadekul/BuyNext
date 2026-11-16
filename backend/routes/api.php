@@ -12,8 +12,13 @@ use App\Http\Controllers\Api\Admin\InvoiceController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\OverviewController;
 use App\Http\Controllers\Api\Admin\PageController as AdminPageController;
+use App\Http\Controllers\Api\Admin\ProductBulkController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\ProductImageController;
+use App\Http\Controllers\Api\Admin\ProductTransferController;
+use App\Http\Controllers\Api\Admin\ProductVariantController;
 use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\ShipmentController;
@@ -23,6 +28,7 @@ use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +57,10 @@ Route::prefix('v1')->group(function () {
         Route::get('orders/{number}', [OrderController::class, 'show']);
         Route::get('orders/{number}/invoices/{invoice}', [OrderController::class, 'invoice']);
     });
+
+    // Phase 5: customers write reviews (10 per hour per customer; staff approve them unless Settings → Catalog says otherwise).
+    Route::post('products/{id}/reviews', [ReviewController::class, 'store'])->whereNumber('id')
+        ->middleware(['auth:sanctum', 'token.kind:customer', 'throttle:reviews']);
 
     // Public: the catalog and cart pricing (no sign-in).
     Route::middleware('throttle:api')->group(function () {
@@ -94,11 +104,38 @@ Route::prefix('admin/v1')->group(function () {
 
         // Categories are listed for the product form, so products.view is enough.
         Route::get('categories', [AdminCategoryController::class, 'index'])->middleware('can.admin:products.view');
+        // Phase 5: the category tree.
+        Route::post('categories', [AdminCategoryController::class, 'store'])->middleware('can.admin:categories.edit');
+        Route::post('categories/reorder', [AdminCategoryController::class, 'reorder'])->middleware('can.admin:categories.edit');
+        Route::patch('categories/{id}', [AdminCategoryController::class, 'update'])->whereNumber('id')->middleware('can.admin:categories.edit');
+        Route::delete('categories/{id}', [AdminCategoryController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:categories.edit');
+
         Route::get('products', [AdminProductController::class, 'index'])->middleware('can.admin:products.view');
+        // Phase 5: CSV import/export, mass actions (delete also checks products.delete).
+        Route::get('products/export.csv', [ProductTransferController::class, 'export'])->middleware('can.admin:products.import');
+        Route::post('products/import', [ProductTransferController::class, 'import'])->middleware('can.admin:products.import');
+        Route::post('products/bulk', ProductBulkController::class)->middleware('can.admin:products.edit');
         Route::post('products', [AdminProductController::class, 'store'])->middleware('can.admin:products.edit');
         Route::get('products/{id}', [AdminProductController::class, 'show'])->whereNumber('id')->middleware('can.admin:products.view');
         Route::patch('products/{id}', [AdminProductController::class, 'update'])->whereNumber('id')->middleware('can.admin:products.edit');
         Route::delete('products/{id}', [AdminProductController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:products.delete');
+
+        // Phase 5: uploaded images, options and variants.
+        Route::middleware('can.admin:products.edit')->whereNumber(['id', 'image', 'variant'])->group(function () {
+            Route::post('products/{id}/images', [ProductImageController::class, 'store']);
+            Route::post('products/{id}/images/reorder', [ProductImageController::class, 'reorder']);
+            Route::patch('products/{id}/images/{image}', [ProductImageController::class, 'update']);
+            Route::delete('products/{id}/images/{image}', [ProductImageController::class, 'destroy']);
+            Route::put('products/{id}/options', [ProductVariantController::class, 'options']);
+            Route::post('products/{id}/variants/generate', [ProductVariantController::class, 'generate']);
+            Route::patch('products/{id}/variants/{variant}', [ProductVariantController::class, 'update']);
+        });
+
+        // Phase 5: review moderation.
+        Route::get('reviews', [AdminReviewController::class, 'index'])->middleware('can.admin:reviews.view');
+        Route::post('reviews/bulk', [AdminReviewController::class, 'bulk'])->middleware('can.admin:reviews.moderate');
+        Route::patch('reviews/{id}', [AdminReviewController::class, 'update'])->whereNumber('id')->middleware('can.admin:reviews.moderate');
+        Route::delete('reviews/{id}', [AdminReviewController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:reviews.moderate');
 
         Route::get('orders', [AdminOrderController::class, 'index'])->middleware('can.admin:orders.view');
         Route::get('orders/{number}', [AdminOrderController::class, 'show'])->middleware('can.admin:orders.view');

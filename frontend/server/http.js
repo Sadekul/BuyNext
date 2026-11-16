@@ -99,6 +99,64 @@ export async function laravelFile(path, { token, request } = {}) {
   }
 }
 
+/**
+ * A multipart/form-data request's Content-Type, if it is one with a sane
+ * boundary (forwarded to the API unchanged, so it can find the parts).
+ */
+export function multipartType(request) {
+  const type = request.headers.get('content-type') ?? ''
+  return /^multipart\/form-data;\s*boundary=("?)[A-Za-z0-9'()+_,./:=?-][A-Za-z0-9'()+_,./:=? -]{0,69}\1$/i.test(type) ? type : null
+}
+
+/**
+ * The request body as bytes, but never more than `maxBytes`: a larger
+ * Content-Length is refused before reading, and a body without one stops
+ * being read as soon as it passes the cap. Resolves to { bytes } or { tooLarge: true }.
+ */
+export async function readLimitedBody(request, maxBytes) {
+  const declared = Number(request.headers.get('content-length'))
+  if (Number.isFinite(declared) && declared > maxBytes) return { tooLarge: true }
+  if (!request.body) return { bytes: new Uint8Array(0) }
+  const reader = request.body.getReader()
+  const chunks = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {})
+      return { tooLarge: true }
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return { bytes }
+}
+
+/**
+ * Sends an already-read multipart body to the Laravel API as it came (same
+ * Content-Type and boundary). Resolves to { status, data } like laravel().
+ */
+export async function laravelMultipart(path, { token, request, contentType, bytes, timeout = 60_000 }) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': contentType, ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      body: bytes,
+      signal: AbortSignal.timeout(timeout),
+    })
+    return { status: response.status, data: await response.json().catch(() => ({})) }
+  } catch {
+    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+  }
+}
+
 /** Copies only the listed keys that exist: the allow-list pattern for anything sent to the browser. */
 export function pick(source, keys) {
   return Object.fromEntries(keys.filter((key) => source?.[key] !== undefined).map((key) => [key, source[key]]))

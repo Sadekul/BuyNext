@@ -11,7 +11,7 @@
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px">
         @foreach ($order->items as $item)
           <tr>
-            <td style="padding:6px 0;border-bottom:1px solid #e7e5e4">{{ $item->name }} &times; {{ $item->quantity }}</td>
+            <td style="padding:6px 0;border-bottom:1px solid #e7e5e4">{{ $item->displayName() }} &times; {{ $item->quantity }}</td>
             <td style="padding:6px 0;border-bottom:1px solid #e7e5e4;text-align:right">${{ $item->line_total }}</td>
           </tr>
         @endforeach

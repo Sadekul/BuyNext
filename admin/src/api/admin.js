@@ -32,6 +32,7 @@ export const adminKeys = {
   home: ['home'],
   report: (name, params) => ['report', name, params],
   settings: ['settings'],
+  reviews: (params) => ['reviews', params],
 }
 
 export const getOverview = ({ signal } = {}) => api.get('/api/admin/overview', { signal })
@@ -113,3 +114,61 @@ export function reportCsvUrl(name, params) {
 /** settings.view / settings.edit: { general, shipping, tax, checkout, inventory }; PATCH one or more groups. */
 export const getSettings = ({ signal } = {}) => api.get('/api/admin/settings', { signal })
 export const updateSettings = (changes) => api.patch('/api/admin/settings', changes)
+
+/*
+ * Phase 5 (docs/backend/PHASE5_CONTRACT.md), BuyNest's backend only:
+ * Magento-style catalog management. Permissions: products.view to read,
+ * categories.edit, products.edit, products.delete, products.import,
+ * reviews.view, reviews.moderate to change.
+ */
+const UPLOAD_TIMEOUT = 120_000
+/** categories.edit: { name, slug, parentId?, isActive?, description?, metaTitle?, metaDescription?, imageUrl? } → { category }. */
+export const createCategory = (values) => api.post('/api/admin/categories', values)
+export const updateCategory = (id, values) => api.patch(`/api/admin/categories/${id}`, values)
+/** 422 with the server's message when it still has subcategories or products. */
+export const deleteCategory = (id) => api.delete(`/api/admin/categories/${id}`)
+/** Siblings in their new order: { parentId (null = top level), ids }. */
+export const reorderCategories = (parentId, ids) => api.post('/api/admin/categories/reorder', { parentId, ids })
+
+/** products.edit: uploads 1–10 files (JPEG, PNG, WebP; 5 MB each) → { images: [{ id, url, alt, position }] }. */
+export function uploadProductImages(productId, files) {
+  const form = new FormData()
+  for (const file of files) form.append('images[]', file)
+  return api.post(`/api/admin/products/${productId}/images`, form, { timeout: UPLOAD_TIMEOUT })
+}
+export const updateProductImage = (productId, imageId, alt) => api.patch(`/api/admin/products/${productId}/images/${imageId}`, { alt })
+export const deleteProductImage = (productId, imageId) => api.delete(`/api/admin/products/${productId}/images/${imageId}`)
+export const reorderProductImages = (productId, ids) => api.post(`/api/admin/products/${productId}/images/reorder`, { ids })
+/** { options: [{ name, values: [text] }] } replaces the options; variants without their values are deactivated. */
+export const saveProductOptions = (productId, options) => api.put(`/api/admin/products/${productId}/options`, { options })
+/** Creates the missing combinations (inactive, stock 0). */
+export const generateVariants = (productId) => api.post(`/api/admin/products/${productId}/variants/generate`, {})
+/** { sku?, price? (null = the product's price), stock?, isActive? } → { variant }. */
+export const updateVariant = (productId, variantId, values) => api.patch(`/api/admin/products/${productId}/variants/${variantId}`, values)
+
+/**
+ * Mass action on up to 200 products, all or nothing: { ids, action, value? } →
+ * { updated, skipped: [{ id, reason }] }. Actions: enable, disable, archive,
+ * delete (products.delete), set_category (category id), adjust_price
+ * ({ mode: 'percent' | 'fixed', amount }), set_stock (units).
+ */
+export const bulkProducts = (ids, action, value) => api.post('/api/admin/products/bulk', { ids, action, ...(value !== undefined && { value }) })
+
+/** products.import: the CSV download's address, with the product list's filters. */
+export function productsCsvUrl({ q, category, status } = {}) {
+  const query = new URLSearchParams(Object.entries({ q, category, status }).filter(([, value]) => value))
+  return `/api/admin/products/export.csv${query.size > 0 ? `?${query}` : ''}`
+}
+/** Checks (dryRun) or imports a CSV → { dryRun, rows, created, updated, unchanged, errors: [{ row, column, message }] }. */
+export function importProducts(file, { dryRun }) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/api/admin/products/import?dryRun=${dryRun ? 'true' : 'false'}`, form, { timeout: UPLOAD_TIMEOUT })
+}
+
+/** reviews.view: ?status&productId&rating&q&limit&skip → { reviews, total }. */
+export const getReviews = (params, { signal } = {}) => api.get('/api/admin/reviews', { params, signal })
+/** reviews.moderate: status = approved | rejected | pending. */
+export const updateReview = (id, status) => api.patch(`/api/admin/reviews/${id}`, { status })
+export const bulkReviews = (ids, status) => api.post('/api/admin/reviews/bulk', { ids, status })
+export const deleteReview = (id) => api.delete(`/api/admin/reviews/${id}`)

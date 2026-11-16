@@ -91,10 +91,17 @@ function WishlistItem({ item, onMoveToCart, onRemove }) {
         {item.addedAt && <p className="wishlist-item__date">Saved {formatDate(new Date(item.addedAt).toISOString())}</p>}
 
         <div className="wishlist-item__actions">
-          <Button size="sm" onClick={() => onMoveToCart(item)} disabled={!isAvailable}>
-            <LuShoppingBag aria-hidden="true" />
-            Move to cart
-          </Button>
+          {item.hasVariants && !item.isUnavailable ? (
+            // Options (size, color) are chosen on the product page.
+            <Button size="sm" to={ROUTES.productDetails(item.productId)} aria-label={`Choose options for ${item.title}`}>
+              Choose options
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => onMoveToCart(item)} disabled={!isAvailable}>
+              <LuShoppingBag aria-hidden="true" />
+              Move to cart
+            </Button>
+          )}
           <button
             type="button"
             className="wishlist-item__remove"

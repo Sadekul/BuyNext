@@ -682,7 +682,7 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
     })
 
     it('shows refund limits and creates a credit memo with money as strings', async () => {
-      const limits = { items: [{ order_item_id: 11, name: 'Mascara', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unit_refund: '8.04' }], shipping_refundable: '4.99', max_total: '21.08' }
+      const limits = { items: [{ order_item_id: 11, name: 'Mascara', variant_label: 'Shade: Black', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unit_refund: '8.04' }], shipping_refundable: '4.99', max_total: '21.08' }
       const memo = { number: 'CM-100001', order_number: 'BN-100001', items: [{ name: 'Mascara', sku: 'BEA-1', quantity: 1, amount: '8.04' }], subtotal: '8.04', shipping_refund: '4.99', adjustment: '-1.00', total: '12.03', restocked: true, created_at: 'T', admin_name: 'Store Admin', note: null }
       const calls = fakeUpstream({
         ...ADMIN_ME,
@@ -690,7 +690,7 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
         'POST /api/admin/v1/orders/BN-100001/credit-memos': { status: 201, body: { data: memo } },
       })
       expect(await (await admin('orders/BN-100001/refundable')).json()).toEqual({
-        items: [{ orderItemId: 11, name: 'Mascara', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unitRefund: 8.04 }],
+        items: [{ orderItemId: 11, name: 'Mascara', variantLabel: 'Shade: Black', sku: 'BEA-1', ordered: 2, refunded: 0, refundable: 2, unitRefund: 8.04 }],
         shippingRefundable: 4.99,
         maxTotal: 21.08,
       })
