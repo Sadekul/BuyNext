@@ -68,6 +68,8 @@ export const createInvoice = (number, values) => api.post(`/api/admin/orders/${n
 export const createShipment = (number, values) => api.post(`/api/admin/orders/${number}/shipments`, values)
 /** { items: [{ orderItemId, quantity }], shippingRefund, adjustment, restock, note?, notifyCustomer } → { creditMemo }. */
 export const createCreditMemo = (number, values) => api.post(`/api/admin/orders/${number}/credit-memos`, values)
+/** Phase 8: the Stripe payment link of an unpaid card order (the open one, or a new one) → { payment: { url, expiresAt, error? }, order }. */
+export const createPaymentLink = (number) => api.post(`/api/admin/orders/${number}/payment-link`, {})
 /** What can still be refunded: { items: [{ orderItemId, name, sku, ordered, refunded, refundable, unitRefund }], shippingRefundable, maxTotal }. */
 export const getRefundable = (number, { signal } = {}) => api.get(`/api/admin/orders/${number}/refundable`, { signal })
 export const getInvoices = (params, { signal } = {}) => api.get('/api/admin/invoices', { params, signal })

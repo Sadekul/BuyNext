@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Order;
+use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\Returns;
 use Illuminate\Http\Request;
@@ -18,6 +19,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class OrderResource extends JsonResource
 {
+    /** Phase 8: the answer of a just-opened payment page (may carry an `error`), shown instead of the summary. */
+    private ?array $paymentAttempt = null;
+
+    public function withPayment(?array $payment): static
+    {
+        $this->paymentAttempt = $payment;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         return [
@@ -36,6 +47,8 @@ class OrderResource extends JsonResource
             'items' => self::itemsOf($this->resource),
             'totals' => self::totalsOf($this->resource),
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
+            // Phase 8: { provider, paid_at, url, expires_at, can_pay } (+ error after a failed attempt; staff: reference, dashboard_url).
+            'payment' => $this->payment(),
             'history' => $this->whenLoaded('history', fn () => $this->history->map(fn ($entry) => $this->historyEntry($entry))->values()),
             // Phase 3 documents (Order::DOCUMENTS eager-loads them).
             ...$this->documents($request),
@@ -74,6 +87,16 @@ class OrderResource extends JsonResource
     protected function forCustomer(): bool
     {
         return true;
+    }
+
+    private function payment(): array
+    {
+        $summary = app(StripePayments::class)->summary($this->resource, ! $this->forCustomer());
+        if ($this->paymentAttempt) {
+            $summary = [...$summary, ...$this->paymentAttempt];
+        }
+
+        return $summary;
     }
 
     /** The item snapshots (also on invoices). */

@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A refund (Magento's credit memo): some items, some shipping, and an
  * adjustment (negative = a fee the shop keeps). total = items + shipping +
- * adjustment. "CM-100001". No payment provider is connected yet: the memo
- * records that staff returned the money by the original method.
+ * adjustment. "CM-100001". Phase 8: on an order paid through Stripe the
+ * money goes back to the card (refund_reference = the Stripe refund id);
+ * otherwise the memo records that staff returned it by the original method.
  */
-#[Fillable(['order_id', 'return_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'restocked', 'admin_id', 'note', 'customer_notified'])]
+#[Fillable(['order_id', 'return_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'refund_reference', 'restocked', 'admin_id', 'note', 'customer_notified'])]
 class CreditMemo extends Model
 {
     public const UPDATED_AT = null;

@@ -8,6 +8,7 @@ import OrderTotals from './OrderTotals'
 import { PAYMENT_METHODS } from '../../constants/store'
 import { paymentNote } from '../../constants/orders'
 import { formatDate, formatPrice } from '../../utils/formatters'
+import { useStoreSettings } from '../../hooks/useStoreSettings'
 import './OrderDetailsView.css'
 
 function AddressBlock({ address }) {
@@ -114,10 +115,13 @@ function Refunds({ creditMemos }) {
  * `history`, `paymentStatus`) and with demo orders saved in this browser
  * (`id`, `contact`, `isSimulated`). Real orders also list their shipments,
  * invoices, and refunds; `invoiceLink(number)` (customers only) links each
- * invoice to its printable page.
+ * invoice to its printable page. `payAction` (phase 8): the "Pay now" button
+ * of an unpaid card order, shown with the payment.
  */
-function OrderDetailsView({ order, invoiceLink }) {
+function OrderDetailsView({ order, invoiceLink, payAction = null }) {
   const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod)
+  // Phase 8: whether card orders are paid through Stripe (cached store settings only: no extra request).
+  const { settings } = useStoreSettings({ enabled: false })
   const contact = order.contact ?? { email: order.email, phone: order.phone }
   const isReal = !order.isSimulated
 
@@ -160,7 +164,8 @@ function OrderDetailsView({ order, invoiceLink }) {
                 <strong>{payment?.label ?? order.paymentMethod}</strong>
                 <OrderStatusBadge status={order.paymentStatus} payment />
               </p>
-              <p className="order-view__muted">{paymentNote(order)}</p>
+              <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe' })}</p>
+              {payAction && <div className="order-view__pay">{payAction}</div>}
             </>
           ) : (
             <p>

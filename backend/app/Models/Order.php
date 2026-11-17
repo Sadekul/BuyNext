@@ -65,6 +65,9 @@ class Order extends Model
             'applied_rules' => 'array', // phase 7: the cart price rules applied (CartRules::summary())
             'billing_address' => 'array',
             'placed_at' => 'datetime',
+            // Phase 8: Stripe Checkout (see App\Services\Payments\StripePayments).
+            'payment_expires_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 

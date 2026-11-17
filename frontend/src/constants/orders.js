@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/formatters'
 import { LuBan, LuCircleCheck, LuCircleX, LuClock, LuLock, LuPackage, LuPackageCheck, LuPackageOpen, LuUndo2, LuTruck } from 'react-icons/lu'
 
 /*
@@ -42,14 +43,21 @@ export const orderStatus = (status) => ORDER_STATUSES[status] ?? { label: status
 export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: status, icon: LuClock }
 
 /**
- * What happens about payment, honestly: no payment provider is connected yet,
- * so card and PayPal orders wait for payment (nothing was charged).
+ * What happens about payment, honestly. With Stripe (phase 8) card orders are
+ * paid on Stripe's secure page ("Pay now"); without it, card and PayPal
+ * orders wait until the store records the payment (nothing was charged).
+ * `stripe`: the store takes card payments through Stripe (store settings).
  */
-export function paymentNote(order) {
+export function paymentNote(order, { stripe = false } = {}) {
+  const byStripe = order.paymentMethod === 'card' && (order.paymentProvider === 'stripe' || stripe)
   if (order.paymentStatus === 'refunded') return 'Your payment was refunded in full, by the same method you paid with.'
   if (order.paymentStatus === 'partially_refunded') return 'Part of your payment was refunded, by the same method you paid with. See the refunds below.'
+  if (order.paymentStatus === 'paid' && order.paymentMethod === 'card' && order.paymentProvider === 'stripe') {
+    return order.paidAt ? `Paid by card on ${formatDate(order.paidAt)}. Thank you.` : 'Paid by card. Thank you.'
+  }
   if (order.paymentStatus === 'paid') return 'Payment received. Thank you.'
   if (order.status === 'cancelled') return 'This order was cancelled, so nothing will be charged.'
   if (order.paymentMethod === 'cod') return 'Pay the courier when your order arrives.'
+  if (byStripe) return "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released."
   return "Nothing has been charged. Card and PayPal payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
 }

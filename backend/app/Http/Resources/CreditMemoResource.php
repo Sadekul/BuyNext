@@ -32,6 +32,7 @@ class CreditMemoResource extends JsonResource
             'shipping_refund' => $this->shipping_refund,
             'adjustment' => $this->adjustment,
             'total' => $this->total,
+            'refund_reference' => $this->refund_reference, // phase 8: the Stripe refund id (null: refunded by hand)
             'restocked' => $this->restocked,
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'admin_name' => $this->admin?->name,

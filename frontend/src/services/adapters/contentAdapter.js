@@ -115,5 +115,7 @@ export function normalizeStoreSettings(raw) {
     ),
     guestCheckout: data.guest_checkout !== false,
     taxEnabled: data.tax_enabled === true,
+    // Phase 8: "stripe" when card orders are paid on Stripe's page right away, "manual" otherwise.
+    cardPayments: data.card_payments === 'stripe' ? 'stripe' : 'manual',
   }
 }

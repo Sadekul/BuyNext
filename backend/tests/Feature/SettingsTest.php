@@ -76,6 +76,7 @@ class SettingsTest extends TestCase
             'returns_enabled' => true,
             'return_window_days' => 30,
             'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
+            'card_payments' => 'manual',
         ]]);
     }
 

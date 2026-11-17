@@ -1,5 +1,5 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
-import { getInvoice, getOrder, getOrders, validateCart } from '../services/shopService'
+import { getInvoice, getOrder, getOrders, lookupOrder, validateCart } from '../services/shopService'
 
 /*
  * The signed-in customer's orders from BuyNest's API (REAL_SHOP). The user id
@@ -11,6 +11,8 @@ export const orderKeys = {
   list: (userId, page) => ['orders', userId, 'list', page],
   detail: (userId, number) => ['orders', userId, 'detail', number],
   invoice: (userId, number, invoice) => ['orders', userId, 'invoice', number, invoice],
+  // A guest's order, found with its number and email (the key holds no email).
+  guest: (number) => ['orders', 'guest', number],
 }
 
 /** One page of orders, newest first. `authorizedRequest` (useAuth) renews the session on 401. */
@@ -27,6 +29,15 @@ export const orderQuery = (userId, number, authorizedRequest) =>
     queryKey: orderKeys.detail(userId, number),
     queryFn: ({ signal }) => authorizedRequest(() => getOrder(number, { signal })),
     staleTime: 30_000,
+  })
+
+/** A guest's order by number and email (POST /api/shop/orders/lookup): back from Stripe's payment page. */
+export const guestOrderQuery = (number, email) =>
+  queryOptions({
+    queryKey: orderKeys.guest(number),
+    queryFn: ({ signal }) => lookupOrder({ number, email }, { signal }),
+    staleTime: 30_000,
+    retry: false,
   })
 
 export const invoiceQuery = (userId, number, invoice, authorizedRequest) =>

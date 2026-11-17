@@ -8,7 +8,8 @@ use Illuminate\Support\Carbon;
 
 /**
  * Phase 7: creates entries for the admin notification bell (low stock, new
- * return requests, reviews waiting, failed newsletter batches).
+ * return requests, reviews waiting, failed newsletter batches, and since
+ * phase 8 Stripe payments that don't match their order).
  *
  * No duplicates: a notification of the same type for the same subject
  * ("product:12") isn't created again while no admin has read the previous
@@ -23,6 +24,8 @@ class AdminNotifications
         'return_requested' => ['info', 'returns.view'],
         'review_pending' => ['info', 'reviews.view'],
         'newsletter_failed' => ['critical', 'newsletter.send'],
+        // Phase 8: a Stripe payment that doesn't match its order (amount, already paid, cancelled).
+        'payment_problem' => ['critical', 'orders.view'],
     ];
 
     /** Returns the new notification, or null when an unread one for the same subject exists. */

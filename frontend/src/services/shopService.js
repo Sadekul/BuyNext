@@ -94,6 +94,17 @@ export function lookupOrder({ number, email }, { signal } = {}) {
 }
 
 /**
+ * POST /api/shop/orders/:number/pay { email? } → { provider, url, expiresAt }:
+ * a new Stripe payment page for an unpaid card order (phase 8). Signed-in
+ * customers are recognised by the session cookie; a guest proves the order
+ * is theirs with its email, like the order lookup. ApiError 422 when the
+ * order can't be paid any more (paid, cancelled, or not a card order).
+ */
+export function payOrder(number, { email } = {}) {
+  return apiClient.post(`/api/shop/orders/${encodeURIComponent(number)}/pay`, email ? { email: email.trim() } : {}, SHOP)
+}
+
+/**
  * GET /api/shop/me/cart → { items, itemCount, updatedAt }: the signed-in
  * customer's saved cart (phase 7), as priced cart lines ({ productId,
  * variantId?, variantLabel?, title, thumbnail, price, salePrice,

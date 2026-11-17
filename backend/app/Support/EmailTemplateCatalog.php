@@ -147,6 +147,27 @@ final class EmailTemplateCatalog
                     .'{{ note }}'
                     .self::QUESTIONS,
             ],
+            'payment_not_completed' => [
+                'name' => 'Payment not completed',
+                'description' => 'Sent when a card order is cancelled because the secure payment page (Stripe) expired before it was paid.',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                    'order_number' => ['Order number', 'text'],
+                    'order_total' => ['Order total ($)', 'text'],
+                    'shop_url' => ['Link to the store', 'url'],
+                    'button' => ['"Shop again" button', 'block'],
+                ],
+                'required' => [['order_number']],
+                'subject' => 'Payment not completed for order {{ order_number }}',
+                'body' => '<h2>Payment not completed</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>We didn’t receive the card payment for order <strong>{{ order_number }}</strong> in time, so the order was cancelled '
+                    .'and the items were released. Nothing was charged to your card.</p>'
+                    .'<blockquote>Order <strong>{{ order_number }}</strong> · ${{ order_total }}</blockquote>'
+                    .'<p>Still want these items? You’re welcome to place the order again.</p>'
+                    .'{{ button }}'
+                    .self::QUESTIONS,
+            ],
             'invoice' => [
                 'name' => 'Invoice (payment received)',
                 'description' => 'Sent when staff invoice an order (record the payment) and choose to notify the customer.',
@@ -295,6 +316,11 @@ final class EmailTemplateCatalog
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96', 'status' => 'shipped',
                 'status_heading' => 'Your order is on its way', 'status_message' => 'Good news: your order has left our warehouse.',
                 'note' => $note,
+            ],
+            'payment_not_completed' => [
+                'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96',
+                'shop_url' => config('buynest.storefront_url'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url'), 'Shop again'),
             ],
             'invoice' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'invoice_number' => 'INV-100001',

@@ -185,10 +185,23 @@ Built by five agents in parallel (two backend; storefront with its sign-in servi
 
 Checks: backend 305 feature tests; frontend 408 unit tests; admin 107; browser checks 798 on the dev server and 791 on the production build (new `marketing.mjs`: 187).
 
+## Phase 8 (Stripe payments, real email, Railway hosting) — 2026-11-16
+
+Built by three agents in parallel (backend; storefront, admin, and sign-in service; Docker, Railway, and email guides) against [backend/PHASE8_CONTRACT.md](backend/PHASE8_CONTRACT.md), then verified with the new `payments.mjs` browser suite, which starts a stand-in Stripe server and its own API and store, so nothing calls Stripe and no settings file changes. Security points checked: card details never reach BuyNest (Stripe's hosted page); a webhook is accepted only with a valid Stripe signature from the last 5 minutes, and each event is handled once; the paid amount and currency must equal the order's; refunds go to Stripe first and nothing is saved if Stripe refuses; only `https` payment links reach the browser; the store forwards webhooks byte for byte and never passes on a key header from the browser.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| P1 | Medium | The API needs a public address on Railway (the store's server functions run on Vercel), so anyone who found it could call it directly | With `BUYNEST_REQUIRE_BFF_KEY=true` (set in the Railway guide) every `/api` request without the store's shared key gets 403; `/up` and photos stay open. The store now sends the key on every call. Tests added; checked against the dev servers |
+| P2 | Low | An order cancelled because its payment page expired still said "Your order is confirmed" on its confirmation page | It shows "Order cancelled", that the items were released, and "Nothing was charged" |
+| P3 | Low | PHP-FPM in the new image wouldn't start with fewer than 4 workers configured | Minimum lowered to 2 (found by running the web server setup locally) |
+| P4 | Test | The marketing suite counted 11 email templates; phase 8 adds a 12th ("Payment not completed") | Count updated |
+
+Checks: backend 332 feature tests; frontend 432 unit tests; admin 111; browser checks 880 on the dev server and 874 on the production build, all passing after the count update (new `payments.mjs`: 83). The Docker image itself wasn't built (Docker isn't installed here); its web server setup was checked with the local nginx and PHP-FPM.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
-- With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. No payment provider is connected yet: card and PayPal orders wait as "Awaiting payment" until an admin creates the invoice, and refunds record money the shop returns by the original method. Tax is 0 until phase 4.
+- With `VITE_API_PROVIDER=laravel` and `VITE_ACCOUNTS_BACKEND=laravel` accounts, catalog, and orders are real. Card payments go through Stripe once `STRIPE_SECRET_KEY` is set (until then card orders wait as "Awaiting payment" for an admin to invoice them); PayPal orders still wait for an admin, and their refunds record money the shop returns by hand. Tax is 0 until phase 4.
 - Customers can't change their own email in the store yet (an admin can, and the customer then confirms it by code at the next sign-in).
 - The Vercel and Netlify function wrappers (sign-in and admin API) are verified locally only; confirm sign-in and `/admin/` once after the first deploy (see `docs/DEPLOYMENT.md`).
 - The local database keeps a few records from the agents' and browser checks' verification: test orders and invoices, deactivated test admins (for example "Verify Viewer" and "Smoke Sales"), and disabled test coupons.

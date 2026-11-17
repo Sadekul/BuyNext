@@ -3,8 +3,11 @@ import { useMutation } from '@tanstack/react-query'
 import { LuSearch } from 'react-icons/lu'
 import FormField from '../components/forms/FormField'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
+import PayNowButton from '../components/orders/PayNowButton'
 import Button from '../components/ui/Button'
 import { lookupOrder } from '../services/shopService'
+import { useStoreSettings } from '../hooks/useStoreSettings'
+import { canPayOrder } from '../utils/payment'
 import { SITE } from '../constants/site'
 import { validateEmail } from '../utils/validation'
 import './OrderPages.css'
@@ -22,6 +25,7 @@ function TrackOrderPage() {
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const resultRef = useRef(null)
   const lookup = useMutation({ mutationFn: lookupOrder })
+  const { settings } = useStoreSettings({ enabled: false }) // cached only: the order says itself whether it can be paid (canPay)
   const errors = hasSubmitted ? { number: validateNumber(values.number), email: validateEmail(values.email) } : {}
   const order = lookup.data
 
@@ -73,7 +77,8 @@ function TrackOrderPage() {
           <h2 id="track-result-title" ref={resultRef} tabIndex={-1}>
             Order {order.number}
           </h2>
-          <OrderDetailsView order={order} />
+          {/* Phase 8: an unpaid card order can be paid here; the email that found it proves it is theirs. */}
+          <OrderDetailsView order={order} payAction={canPayOrder(order, settings.cardPayments) ? <PayNowButton order={order} email={lookup.variables?.email} /> : null} />
         </section>
       )}
     </div>

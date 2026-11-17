@@ -7,6 +7,7 @@ use App\Models\Coupon;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Shipment;
+use App\Services\Payments\StripePayments;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,8 +29,10 @@ class OrderDocuments
      * gives the coupon use back, and writes the history and audit entries.
      * Refused once the order has an invoice (refund it instead), and for
      * statuses that can't move to cancelled. The caller sends the email.
+     * Phase 8: $admin is null when Stripe's payment page expired (webhook);
+     * an open Stripe payment page is closed, so it can't be paid any more.
      */
-    public function cancel(Order $order, Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): void
+    public function cancel(Order $order, ?Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): void
     {
         $from = $order->status;
         if (! $order->canMoveTo('cancelled')) {
@@ -46,20 +49,25 @@ class OrderDocuments
         ])->all(), withTrashed: true);
         Coupon::releaseFor($order);
         $order->forceFill(['status' => 'cancelled'])->save();
+        // Resolved here, not injected: StripePayments uses this class too.
+        app(StripePayments::class)->expireOpenSession($order);
 
         $order->history()->create([
             'status' => 'cancelled',
             'payment_status' => $order->payment_status,
             'note' => $note ?? 'Order cancelled; items returned to stock.',
-            'admin_id' => $admin->id,
+            'admin_id' => $admin?->id,
             'customer_notified' => $notify,
         ]);
         $this->audit->record('order.status_changed', "Order {$order->number}: {$from} → cancelled.", 'order', $order->id,
             Audit::diff(['status' => $from, 'note' => null], ['status' => 'cancelled', 'note' => $note]), $admin);
     }
 
-    /** Records the payment of the full grand total: paid, and pending_payment → processing. */
-    public function invoice(Order $order, Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): Invoice
+    /**
+     * Records the payment of the full grand total: paid, and pending_payment → processing.
+     * Phase 8: $admin is null when Stripe reported the payment (webhook).
+     */
+    public function invoice(Order $order, ?Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): Invoice
     {
         if ($order->status === 'cancelled') {
             throw ValidationException::withMessages([$errorKey => 'A cancelled order can\'t be invoiced.']);
@@ -71,7 +79,7 @@ class OrderDocuments
 
         $invoice = $order->invoices()->create([
             'amount' => $order->grand_total,
-            'admin_id' => $admin->id,
+            'admin_id' => $admin?->id,
             'note' => $note,
             'customer_notified' => $notify,
         ]);
@@ -86,8 +94,9 @@ class OrderDocuments
         $order->history()->create([
             'status' => $order->status,
             'payment_status' => 'paid',
-            'note' => "Invoice {$invoice->number} created; payment of \${$invoice->amount} recorded.",
-            'admin_id' => $admin->id,
+            'note' => "Invoice {$invoice->number} created; payment of \${$invoice->amount} recorded."
+                .($admin ? '' : ' Paid by card through Stripe.'),
+            'admin_id' => $admin?->id,
             'customer_notified' => $notify,
         ]);
         $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} (\${$invoice->amount}).",

@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Services\Checkout;
 use App\Services\OneTimeCodes;
+use App\Services\Payments\StripePayments;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,7 +61,7 @@ class OrderCreateController extends Controller
     }
 
     /** POST /api/admin/v1/orders → 201 { data: AdminOrderResource } (source "admin"). */
-    public function store(Request $request, Checkout $checkout): JsonResponse
+    public function store(Request $request, Checkout $checkout, StripePayments $payments): JsonResponse
     {
         $data = $this->validated($request, quote: false);
         $customer = $this->customer($data);
@@ -80,9 +81,12 @@ class OrderCreateController extends Controller
             'note' => $data['note'] ?? null,
         ], $customer, $request->user(), notify: (bool) ($data['notify_customer'] ?? true));
 
+        // Phase 8: a card order (Stripe on) gets a payment link for staff to send (data.payment.url, open 24 hours).
+        $payment = $payments->usesStripe($order) ? $payments->startCheckout($order, forAdmin: true) : null;
+
         $order = Order::with(['items', 'customer', 'createdBy', 'history.admin', ...Order::DOCUMENTS])->find($order->id);
 
-        return (new AdminOrderResource($order))->response()->setStatusCode(201);
+        return (new AdminOrderResource($order))->withPayment($payment)->response()->setStatusCode(201);
     }
 
     private function validated(Request $request, bool $quote): array

@@ -61,6 +61,8 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  *   POST   /api/admin/orders/:number/shipments     { carrier, trackingNumber?, note?, notifyCustomer? } → 201 { shipment }
  *   POST   /api/admin/orders/:number/credit-memos  { items: [{ orderItemId, quantity }], shippingRefund, adjustment,
  *                                                   restock, note?, notifyCustomer? } → 201 { creditMemo }
+ *   POST   /api/admin/orders/:number/payment-link  → { payment: { provider, url, expiresAt, error?, … }, order } (phase 8:
+ *                                                   a Stripe payment link for an unpaid card order; 422 errors.order otherwise)
  *   GET    /api/admin/orders/:number/refundable    → { items: [{ orderItemId, name, sku, ordered, refunded, refundable, unitRefund }],
  *                                                     shippingRefundable, maxTotal }
  *   GET    /api/admin/invoices?q&limit&skip        → { invoices, total, limit, skip }
@@ -133,7 +135,8 @@ const ID_FORMATS = {
   shipments: isShipmentNumber,
   returns: isReturnNumber,
 }
-const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable', 'packing-slip', 'returns']
+// Phase 8: + payment-link (a Stripe payment link for an unpaid card order).
+const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable', 'packing-slip', 'returns', 'payment-link']
 const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
 // Phase 7 (marketing): + buy_x_get_y.
 const COUPON_TYPES = ['percent', 'fixed', 'free_shipping', 'buy_x_get_y']
@@ -495,6 +498,12 @@ const ROUTES = {
     const { values, errors } = validateCreditMemo(await readBody(ctx.request))
     if (errors) return invalid(errors)
     return fromLaravel(await laravelAdminData.createCreditMemo(ctx.token, ctx.id, values, ctx.request), 201)
+  },
+
+  // Phase 8: the order's Stripe payment link (the open one, or a new one, open 24 hours) → { payment, order }.
+  async 'POST orders/:id/payment-link'(ctx) {
+    if (!realData()) return liveOnly()
+    return fromLaravel(await laravelAdminData.paymentLink(ctx.token, ctx.id, ctx.request))
   },
 
   async 'GET orders/:id/refundable'(ctx) {

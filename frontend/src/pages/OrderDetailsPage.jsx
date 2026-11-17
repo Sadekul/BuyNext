@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { LuArrowLeft, LuPackageX } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
 import ReturnRequestForm from '../components/orders/ReturnRequestForm'
+import PayNowButton from '../components/orders/PayNowButton'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
@@ -10,6 +11,8 @@ import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useOrders } from '../hooks/useOrders'
 import { orderQuery } from '../queries/orderQueries'
+import { useStoreSettings } from '../hooks/useStoreSettings'
+import { canPayOrder } from '../utils/payment'
 import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
@@ -23,7 +26,7 @@ function NotFound() {
   )
 }
 
-function OrderSection({ order, invoiceLink, children }) {
+function OrderSection({ order, invoiceLink, payAction, children }) {
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
@@ -34,7 +37,7 @@ function OrderSection({ order, invoiceLink, children }) {
       <h2 id="order-details-title" className="orders__title">
         Order {id}
       </h2>
-      <OrderDetailsView order={order} invoiceLink={invoiceLink} />
+      <OrderDetailsView order={order} invoiceLink={invoiceLink} payAction={payAction} />
       {children}
     </section>
   )
@@ -52,13 +55,19 @@ function ServerOrderDetailsPage() {
   const { orderId } = useParams()
   const { user, authorizedRequest } = useAuth()
   const request = useQuery(orderQuery(user.id, orderId, authorizedRequest))
+  const { settings } = useStoreSettings({ enabled: false }) // cached only: the order says itself whether it can be paid (canPay)
 
   if (request.isPending) return <Loader label="Loading the order…" />
   if (request.error?.status === 404) return <NotFound />
   if (request.error) return <ErrorMessage title="We couldn't load this order" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
   // The customer's own order: its invoices open as printable pages, and items can be returned (phase 6).
   return (
-    <OrderSection order={request.data} invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)}>
+    <OrderSection
+      order={request.data}
+      invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)}
+      // Phase 8: an unpaid card order can be paid on Stripe's page.
+      payAction={canPayOrder(request.data, settings.cardPayments) ? <PayNowButton order={request.data} /> : null}
+    >
       <ReturnRequestForm order={request.data} />
     </OrderSection>
   )

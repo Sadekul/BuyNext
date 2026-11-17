@@ -34,9 +34,33 @@ return [
     // on the visitor's real IP address, which rate limits then use.
     'bff_key' => env('BFF_SHARED_KEY'),
 
+    // Production: refuse every /api request that doesn't carry the shared key (see RequireBffKey).
+    'require_bff_key' => (bool) env('BUYNEST_REQUIRE_BFF_KEY', false),
+
     // Phase 7: the storefront's address, for links in emails (newsletter
     // confirm/unsubscribe, cart reminders) and the sitemap.
     'storefront_url' => rtrim((string) env('STOREFRONT_URL', 'http://localhost:5173'), '/'),
+
+    /*
+     * Phase 8: card payments through Stripe Checkout (Stripe's hosted payment
+     * page). Stripe is on only when the secret key is set; without it card
+     * orders wait for an admin to invoice them, as before. Never logged.
+     */
+    'stripe' => [
+        'secret_key' => env('STRIPE_SECRET_KEY') ?: null,
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET') ?: null,
+        'currency' => strtolower((string) (env('STRIPE_CURRENCY') ?: 'usd')),
+        // How long a storefront payment page stays open. Stripe allows 30 minutes to 24 hours.
+        'checkout_minutes' => min(1440, max(30, (int) (env('STRIPE_CHECKOUT_MINUTES') ?: 30))),
+        // Payment links staff send for orders created in the admin stay open for Stripe's maximum (24 hours).
+        'admin_link_minutes' => 1440,
+        // Only changed for local browser checks against a stand-in server (e2e/payments.mjs).
+        'api_url' => env('STRIPE_API_URL', 'https://api.stripe.com/v1'),
+        'timeout_seconds' => 15,
+        // A webhook whose signed timestamp is older (or newer) than this is refused (replay protection).
+        'webhook_tolerance_seconds' => 300,
+        'webhooks_per_minute' => (int) env('BUYNEST_STRIPE_WEBHOOKS_PER_MINUTE', 300),
+    ],
 
     // Phase 7: newsletter sign-ups per visitor per minute, and per email per hour.
     'newsletter_per_minute' => (int) env('BUYNEST_NEWSLETTER_PER_MINUTE', 10),

@@ -1,0 +1,91 @@
+# BuyNest API web server. docker/start.sh copies this file to /tmp/nginx.conf
+# and replaces __LISTEN__ with Railway's $PORT (nginx can't read variables).
+# Runs as www-data, so everything it writes lives in /tmp.
+
+worker_processes auto;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Railway's proxy sends the visitor's address in X-Forwarded-For.
+    log_format buynest '$http_x_forwarded_for - [$time_local] "$request" $status $body_bytes_sent $request_time';
+    access_log /dev/stdout buynest;
+
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    server_tokens off;
+
+    # Photo uploads: 10 files x 5 MB (matches post_max_size in docker/php/buynest.ini).
+    client_max_body_size 60m;
+
+    client_body_temp_path /tmp/nginx/client_body;
+    proxy_temp_path /tmp/nginx/proxy;
+    fastcgi_temp_path /tmp/nginx/fastcgi;
+    uwsgi_temp_path /tmp/nginx/uwsgi;
+    scgi_temp_path /tmp/nginx/scgi;
+
+    gzip on;
+    gzip_types application/json text/plain text/css text/csv application/javascript image/svg+xml;
+    gzip_min_length 1024;
+
+    # Railway ends HTTPS at its proxy and forwards plain HTTP with
+    # X-Forwarded-Proto: https. Passing HTTPS=on to PHP makes Laravel build
+    # https:// links without trusting every proxy header.
+    map $http_x_forwarded_proto $buynest_https {
+        default "";
+        https on;
+    }
+
+    server {
+        __LISTEN__
+
+        root /var/www/html/public;
+        index index.php;
+        charset utf-8;
+
+        add_header X-Content-Type-Options nosniff always;
+
+        # Product photos: public/storage is a link to storage/app/public (the
+        # Railway volume). Static files only; nothing in there is ever run as PHP.
+        location ^~ /storage/ {
+            location ~ \.php$ { return 404; }
+            try_files $uri =404;
+            expires 30d;
+            add_header Cache-Control "public";
+            add_header X-Content-Type-Options nosniff always;
+            access_log off;
+        }
+
+        location = /favicon.ico { access_log off; log_not_found off; }
+        location = /robots.txt  { access_log off; log_not_found off; }
+
+        # Everything else goes to Laravel.
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+
+        location = /index.php {
+            fastcgi_pass 127.0.0.1:9000;
+            include /etc/nginx/fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+            fastcgi_param DOCUMENT_ROOT $realpath_root;
+            fastcgi_param HTTPS $buynest_https if_not_empty;
+            fastcgi_hide_header X-Powered-By;
+            fastcgi_read_timeout 65s;
+            fastcgi_buffer_size 32k;
+            fastcgi_buffers 16 16k;
+        }
+
+        # No other PHP file may be called directly, and no dotfiles are served.
+        location ~ \.php$ { return 404; }
+        location ~ /\.(?!well-known) { deny all; }
+    }
+}

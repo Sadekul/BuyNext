@@ -8,6 +8,7 @@ use App\Mail\OrderStatusMail;
 use App\Models\Order;
 use App\Services\Audit;
 use App\Services\OrderDocuments;
+use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\Settings;
 use App\Support\Csv;
@@ -211,6 +212,28 @@ class OrderController extends Controller
         }
 
         return new AdminOrderResource($this->find($order->number));
+    }
+
+    /**
+     * POST /api/admin/v1/orders/{number}/payment-link → 200 { data: AdminOrderResource }
+     * Phase 8: the Stripe payment link for an unpaid card order, to copy and
+     * send to the customer: the one still open, or a new one (open 24 hours).
+     * data.payment.url is the link; url null + error when Stripe can't be
+     * reached. 422 { errors: { order } } when the order can't be paid online.
+     */
+    public function paymentLink(Request $request, string $number, StripePayments $payments): AdminOrderResource|JsonResponse
+    {
+        $order = Order::where('number', strtoupper($number))->first();
+        if (! $order) {
+            return $this->notFound();
+        }
+        if ($problem = $payments->payProblem($order)) {
+            throw ValidationException::withMessages(['order' => $problem]);
+        }
+        $payment = $payments->startCheckout($order, forAdmin: true);
+        $payments->recordLink($order, $request->user(), $payment);
+
+        return (new AdminOrderResource($this->find($order->number)))->withPayment($payment);
     }
 
     private function transitionError(string $from, string $to): string

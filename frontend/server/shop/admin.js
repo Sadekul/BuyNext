@@ -149,6 +149,8 @@ function adminOrderDetail(raw) {
     createdByAdmin: typeof raw.created_by_admin?.name === 'string' ? raw.created_by_admin.name : null,
     returns: (Array.isArray(raw.returns) ? raw.returns : []).map((entry) => ({ number: entry.number, status: entry.status, itemCount: entry.items_count ?? null, createdAt: entry.created_at ?? null })),
     returnEligibility: returnEligibility(raw.return_eligibility),
+    // Phase 8: Stripe provider, reference, paid at, and the payment link.
+    payment: adminPayment(raw.payment),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -158,6 +160,38 @@ function adminOrderDetail(raw) {
       createdAt: entry.created_at,
     })),
     live: true,
+  }
+}
+
+// A Stripe id (PaymentIntent pi_…, refund re_…): letters, digits, underscores only, so it is safe in a URL path.
+const stripeId = (value) => (typeof value === 'string' && /^[A-Za-z0-9_]{3,255}$/.test(value) ? value : null)
+const httpsUrl = (value) => (typeof value === 'string' && /^https:\/\/[^\s]+$/.test(value) ? value : null)
+
+// Stripe's dashboard, the only place a payment's link may point to.
+const STRIPE_DASHBOARD = /^https:\/\/dashboard\.stripe\.com\/(test\/)?payments\/[A-Za-z0-9_]+$/
+
+/**
+ * Phase 8: the order's card payment through Stripe (the API's `payment`
+ * summary, staff view): provider, PaymentIntent reference with its Stripe
+ * dashboard link, paid at, and the open payment page (`url`) to copy and send.
+ * The API builds the dashboard link (test or live, from its key); without
+ * one, the test dashboard is assumed (BuyNest runs on test keys first).
+ */
+export function adminPayment(raw) {
+  const payment = raw && typeof raw === 'object' ? raw : {}
+  const reference = stripeId(payment.reference)
+  const given = typeof payment.dashboard_url === 'string' && STRIPE_DASHBOARD.test(payment.dashboard_url) ? payment.dashboard_url : null
+  const dashboardUrl = given ?? (reference ? `https://dashboard.stripe.com/test/payments/${reference}` : null)
+  return {
+    provider: typeof payment.provider === 'string' ? payment.provider : null,
+    reference,
+    dashboardUrl,
+    mode: dashboardUrl?.includes('/test/') ? 'test' : dashboardUrl ? 'live' : null,
+    paidAt: typeof payment.paid_at === 'string' ? payment.paid_at : null,
+    url: httpsUrl(payment.url),
+    expiresAt: typeof payment.expires_at === 'string' ? payment.expires_at : null,
+    canPay: payment.can_pay === true,
+    ...(typeof payment.error === 'string' && payment.error && { error: payment.error.slice(0, 300) }),
   }
 }
 
@@ -224,6 +258,8 @@ export function adminCreditMemo(raw) {
     total: money(raw.total),
     restocked: raw.restocked === true,
     returnNumber: typeof raw.return_number === 'string' ? raw.return_number : null,
+    // Phase 8: Stripe's refund id when the money went back to the card through Stripe.
+    refundReference: stripeId(raw.refund_reference),
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
@@ -482,6 +518,15 @@ export const laravelAdminData = {
     return answer(result, [200, 204], (data) =>
       result.status === 200 && data?.data ? { id: Number(id), disabled: true, coupon: adminCoupon(data.data), live: true } : { id: Number(id), deleted: true, live: true },
     )
+  },
+
+  /** Phase 8: a Stripe payment link for an unpaid card order → { payment, order } (url null + error when Stripe can't be reached). */
+  async paymentLink(token, number, request) {
+    const result = await laravel(`/api/admin/v1/orders/${number}/payment-link`, { method: 'POST', token, request })
+    return answer(result, [200, 201], (data) => {
+      const order = adminOrderDetail(data.data)
+      return { payment: order.payment, order, live: true }
+    })
   },
 
   /** { status?, paymentStatus?, note?, notifyCustomer? } → the updated order. */

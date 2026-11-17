@@ -65,15 +65,19 @@ export function clientIp(request) {
 
 /**
  * Calls BuyNest's Laravel API (server to server). Resolves to { status, data }.
- * With the shared key (BUYNEST_BFF_KEY = the backend's BFF_SHARED_KEY) it
- * passes on the visitor's IP, so the API's rate limits count each visitor
- * separately instead of everyone together.
+ * Every call carries the shared key (BUYNEST_BFF_KEY = the backend's
+ * BFF_SHARED_KEY) when it is set: in production the API only answers calls
+ * that carry it. With the key it also passes on the visitor's IP, so the
+ * API's rate limits count each visitor separately instead of everyone
+ * together. The key always comes from this server's environment, never from
+ * a header the browser (or Stripe) sent.
  */
 const laravelBase = () => (process.env.BUYNEST_LARAVEL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 function bffHeaders(request) {
   const key = process.env.BUYNEST_BFF_KEY
+  if (!key) return {}
   const ip = clientIp(request)
-  return key && ip ? { 'X-BuyNest-Bff': key, 'X-Client-IP': ip } : {}
+  return { 'X-BuyNest-Bff': key, ...(ip && { 'X-Client-IP': ip }) }
 }
 
 export function laravel(path, { request, ...options } = {}) {
@@ -148,6 +152,26 @@ export async function laravelMultipart(path, { token, request, contentType, byte
     const response = await fetch(`${laravelBase()}${path}`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': contentType, ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      body: bytes,
+      signal: AbortSignal.timeout(timeout),
+    })
+    return { status: response.status, data: await response.json().catch(() => ({})) }
+  } catch {
+    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+  }
+}
+
+/**
+ * Sends a body to the Laravel API exactly as it came (the bytes are never
+ * parsed or re-serialized), with only the listed extra headers. For the
+ * Stripe webhook, whose signature covers the raw body. Resolves to
+ * { status, data } like laravel(); network failures become a 502.
+ */
+export async function laravelRaw(path, { request, bytes, contentType, headers = {}, timeout = 15_000 }) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': contentType, ...headers, ...bffHeaders(request) },
       body: bytes,
       signal: AbortSignal.timeout(timeout),
     })

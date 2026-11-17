@@ -33,7 +33,11 @@
         <env name="BUYNEST_ORDERS_PER_MINUTE" value="10"/>
         <env name="BUYNEST_REVIEWS_PER_HOUR" value="10"/>
         <env name="BUYNEST_API_PER_MINUTE" value="240"/>
+        <env name="BUYNEST_REQUIRE_BFF_KEY" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- Stripe off unless a test turns it on (tests fake Stripe with Http::fake, never the real API) -->
+        <env name="STRIPE_SECRET_KEY" value=""/>
+        <env name="STRIPE_WEBHOOK_SECRET" value=""/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

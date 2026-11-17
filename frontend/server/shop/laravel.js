@@ -193,6 +193,33 @@ export const fromReturnEligibility = (raw) =>
       }
     : null
 
+/**
+ * Phase 8: the order's card payment through Stripe, as the API's `payment`
+ * summary gives it on every order ({ provider, paid_at, url, expires_at,
+ * can_pay }, plus `error` when a payment page couldn't be opened). `url` is
+ * Stripe's payment page: only https addresses get through, since the browser
+ * navigates to it. Staff-only keys (reference, dashboard link) never reach
+ * the storefront.
+ */
+export const fromPayment = (raw) =>
+  raw && typeof raw === 'object'
+    ? {
+        provider: str(raw.provider) ?? null,
+        url: httpsUrl(raw.url),
+        expiresAt: str(raw.expires_at) ?? null,
+        paidAt: str(raw.paid_at) ?? null,
+        canPay: raw.can_pay === true,
+        ...(str(raw.error) && { error: raw.error.slice(0, 300) }),
+      }
+    : null
+
+/** Phase 8: the payment's top-level fields on the storefront's order (provider, paid at, Pay now). */
+function fromOrderPayment(raw) {
+  const payment = fromPayment(raw.payment)
+  if (!payment) return {}
+  return { paymentProvider: payment.provider, paidAt: payment.paidAt, paymentExpiresAt: payment.expiresAt, canPay: payment.canPay, payment }
+}
+
 const fromReturnSummary = (raw) => ({ number: raw.number, status: raw.status, createdAt: raw.created_at ?? null })
 
 const fromHistory = (raw) => ({
@@ -228,6 +255,8 @@ export function fromOrder(raw) {
     ...(typeof raw.customer_group === 'string' && { customerGroup: raw.customer_group }),
     ...(Array.isArray(raw.returns) && { returns: raw.returns.map(fromReturnSummary) }),
     ...(raw.return_eligibility && { returnEligibility: fromReturnEligibility(raw.return_eligibility) }),
+    // Phase 8: the card payment (Stripe): provider, paid at, whether Pay now works, the payment page.
+    ...fromOrderPayment(raw),
   }
 }
 
@@ -349,6 +378,18 @@ export const laravelShop = {
       body: { rating: Number.isInteger(rating) ? rating : null, title: title || null, comment: comment ?? '' },
     })
     return answer(result, [200, 201], (data) => fromReview(data.data))
+  },
+
+  /**
+   * Phase 8: a new payment page for an unpaid card order. The customer's
+   * token proves the order is theirs; a guest proves it with the order's
+   * email (the same proof as the order lookup). 422 when it can't be paid.
+   */
+  async payOrder(token, number, body, request) {
+    const email = str(body.email)?.trim().slice(0, 254)
+    const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/pay`, { method: 'POST', token, request, body: email ? { email } : {} })
+    // The answer is the order with its new payment page: only the payment goes to the browser.
+    return answer(result, [200, 201], (data) => fromPayment(data.data?.payment) ?? { provider: null, url: null, expiresAt: null, paidAt: null, canPay: false })
   },
 
   async lookupOrder(body, request) {

@@ -97,6 +97,17 @@ The agreement: [docs/backend/PHASE7_CONTRACT.md](../docs/backend/PHASE7_CONTRACT
 | Saved and abandoned carts | `POST /cart/validate` with a customer token saves the cart; an order marks it converted. `GET /me/cart` and `POST /me/cart/merge` restore it on another device. Reports → Abandoned carts (idle ≥ 1 hour) and a reminder email (once per 72 hours, active customers only). `App\Services\CustomerCarts`. |
 | Dashboard and notifications | `/overview` blocks depend on the admin's `*.view` keys. The bell (`/notifications`) gets low stock / out of stock, customer return requests, reviews waiting, failed newsletter batches (model events in `App\Providers\MarketingServiceProvider`), filtered by permission, one unread per subject. `/preferences/{key}` keeps each admin's grid columns, page size, and saved filters. |
 
+## What's here (phase 8: Stripe card payments, real email)
+
+The agreement: [docs/backend/PHASE8_CONTRACT.md](../docs/backend/PHASE8_CONTRACT.md) ("Implementation notes — backend" has every shape).
+
+| Area | What it does |
+| --- | --- |
+| Card payments | With `STRIPE_SECRET_KEY` set, a card order gets a **Stripe Checkout** page for its grand total (`data.payment.url` on the order answer); card details never reach BuyNest. `POST /api/v1/orders/{number}/pay` opens a new page (Pay now). Staff get a payment link for card orders they create (`POST /api/admin/v1/orders/{number}/payment-link`). Without the key everything works as before (staff invoice card orders by hand). No Stripe SDK: `App\Services\Payments\StripeGateway` uses Laravel's HTTP client. |
+| Webhook | `POST /api/v1/payments/stripe/webhook`, signed with `STRIPE_WEBHOOK_SECRET` (checked: HMAC, 5-minute window). Paid → the invoice is created (and emailed) like a staff invoice; page expired unpaid → the order is cancelled (stock and coupon back, "Payment not completed" email); amounts that don't match → order left unpaid + a critical admin notification. Each event is handled once (`stripe_events`). `App\Services\Payments\StripePayments`. |
+| Refunds | A credit memo on a Stripe-paid order refunds the card first (`refund_reference`); Stripe refusing → 422 and nothing saved. |
+| Email | `php artisan buynest:mail-test you@example.com` sends a test email through the configured mailer. |
+
 ### Permissions
 
 | Area | Keys |
@@ -145,6 +156,8 @@ Storefront (customers), `/api/v1`:
 | GET | `/orders/{number}` | customer; someone else's → 404. Includes `invoices`, `shipments`, `credit_memos`, `returns`, `return_eligibility` |
 | GET | `/orders/{number}/invoices/{invoice}` | customer; the printable invoice (own orders only, else 404) |
 | POST | `/orders/lookup` | guest; `number, email` → the order, or the same 404 whichever is wrong (limited like sign-in) |
+| POST | `/orders/{number}/pay` | Phase 8: the order's customer (token) or `{ email }` (the lookup's proof) → `data.payment` `{ provider, url, expires_at, can_pay, paid_at }` (the open Stripe page, or a new one); 422 when it can't be paid online |
+| POST | `/payments/stripe/webhook` | Stripe only (signed `Stripe-Signature`, raw body); 400 bad signature, else 200 `{ received, result }` |
 
 Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403), and the permission in brackets ([Permissions](#permissions)):
 
@@ -222,6 +235,7 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/reports/products`, `/reports/products.csv` | [reports.view] best sellers; `from, to, limit` (10, max 100) |
 | GET | `/reports/customers`, `/reports/coupons`, `/reports/low-stock` | [reports.view] |
 | GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory, catalog, returns }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
+| POST | `/orders/{number}/payment-link` | [orders.edit] Phase 8: the Stripe payment link (open, or a new one for 24 hours) for an unpaid card order → `data.payment.url` |
 
 The older routes need: `/overview` dashboard.view; `/categories`, GET `/products…` products.view; POST/PATCH `/products` products.edit, DELETE products.delete; GET `/orders…`, `/invoices…`, `/credit-memos…`, `/refundable` orders.view; PATCH `/orders/{number}` orders.edit; POST invoices/shipments/credit-memos their `*.create`; `/coupons` coupons.view / coupons.edit.
 
@@ -260,17 +274,42 @@ In development (`APP_ENV=local`, `MAIL_MAILER=log`, `DEV_MAILBOX=true`) every em
 
 For real email, change only the settings: `MAIL_MAILER=smtp` with `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (or a provider such as Mailgun, Postmark, or SES), and `DEV_MAILBOX=false`.
 
+Brevo: `MAIL_MAILER=smtp`, `MAIL_HOST=smtp-relay.brevo.com`, `MAIL_PORT=587`, `MAIL_USERNAME` = your Brevo login, `MAIL_PASSWORD` = an SMTP key. Mailgun: `MAIL_HOST=smtp.mailgun.org`, `MAIL_PORT=587`, `MAIL_USERNAME=postmaster@your-domain`, `MAIL_PASSWORD` = its SMTP password. `MAIL_FROM_ADDRESS` must be on a domain verified with the provider (SPF, DKIM, and DMARC DNS records). Then check it:
+
+```bash
+php artisan buynest:mail-test you@example.com   # one test email; prints "Sent." or the error (without the login or password)
+```
+
+In production emails and newsletter batches go through the queue: `QUEUE_CONNECTION=database` and a worker (`php artisan queue:work --tries=3`).
+
+## Card payments (Stripe, test mode)
+
+Without Stripe keys, card orders wait for staff to invoice them (Sales → Orders → Invoice). To take test payments:
+
+1. Create a free Stripe account and stay in **test mode**. Developers → API keys: copy the **secret key** (`sk_test_…`) into `.env` as `STRIPE_SECRET_KEY`.
+2. Install the [Stripe CLI](https://docs.stripe.com/stripe-cli), run `stripe login`, then forward webhooks to the storefront's sign-in service (which passes them to this API unchanged):
+   ```bash
+   stripe listen --forward-to http://localhost:5173/api/payments/stripe/webhook
+   ```
+   It prints a signing secret (`whsec_…`): put it in `.env` as `STRIPE_WEBHOOK_SECRET`, then `php artisan config:clear` (if config is cached) and restart `php artisan serve`. Keep `stripe listen` running while you test.
+3. Place an order with "Credit or debit card": you're sent to Stripe's page. Pay with the test card **4242 4242 4242 4242**, any future expiry date, any CVC, any postcode. Back on the confirmation page the order becomes paid within a few seconds (the webhook created the invoice). Other test cards: `4000 0000 0000 9995` (declined), `4000 0025 0000 3155` (asks for 3-D Secure).
+4. Refund it in the admin (Credit memo): the money goes back to the test card; the memo shows the Stripe refund id.
+
+`STRIPE_CURRENCY` (default `usd`) must match the store's prices; `STRIPE_CHECKOUT_MINUTES` (default 30, Stripe's minimum; at most 1440) is how long the payment page stays open; when it expires unpaid the order is cancelled and its stock released. Live mode: the same steps with `sk_live_…` and a webhook endpoint registered in the Stripe dashboard (`https://<store>/api/payments/stripe/webhook`, events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`). Tests never call Stripe (`Http::fake`).
+
 ## Tests
 
 ```bash
-php artisan test     # 303 feature tests, against the buynest_test database (no network: products come from factories)
+php artisan test     # 329 feature tests, against the buynest_test database (no network: products come from factories)
 vendor/bin/pint      # code style
 ```
 
 ## Production checklist
 
 - `APP_ENV=production`, `APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer.
+- Stripe: live keys only in production's environment (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` from the dashboard's webhook endpoint), never committed.
 - A strong `BFF_SHARED_KEY`, shared only with the storefront's server functions.
+- `BUYNEST_REQUIRE_BFF_KEY=true`: every `/api` request without that key gets 403, so only the storefront can use the API (the health check `/up` and photos under `/storage` stay open).
 - Don't expose this API publicly if you don't need to: only the storefront's server calls it.
 - Run the scheduler (`php artisan schedule:run` every minute) so unconfirmed sign-ups are cleaned up and catalog price rules start and end on time (`buynest:refresh-price-rules`; reads also check the time).
 - Product photos: run `php artisan storage:link` once, keep `storage/app/public` on persistent disk (not a throwaway container filesystem) and include it in backups. The web server must serve `/storage/...` to the storefront's server functions, which pass photos to shoppers at `/media/...`.

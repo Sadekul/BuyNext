@@ -15,6 +15,8 @@ import { formatCount, formatDate, formatDateTime, formatMoney } from '../utils/f
  */
 
 const LIMIT = 20
+// Phase 8: invoices no admin created were recorded by Stripe's webhook ("Paid by card through Stripe.").
+const invoiceAuthor = (invoice) => invoice.adminName ?? (/Stripe/.test(invoice.note ?? '') ? 'Stripe' : 'System')
 
 function useListParams() {
   const [params, setParams] = useSearchParams()
@@ -89,7 +91,7 @@ export function InvoicesPage() {
                   </td>
                   <td>{invoice.orderNumber && <Link to={`/orders/${invoice.orderNumber}`}>{invoice.orderNumber}</Link>}</td>
                   <td>{formatDate(invoice.createdAt)}</td>
-                  <td className="muted">{invoice.adminName ?? '—'}</td>
+                  <td className="muted">{invoiceAuthor(invoice)}</td>
                   <td className="num">{formatMoney(invoice.amount)}</td>
                 </tr>
               ))}
@@ -137,7 +139,7 @@ export function InvoiceDetailPage() {
       </Link>
       <PageHeader
         title={`Invoice ${data.number}`}
-        description={`${formatMoney(data.amount)} · ${formatDateTime(data.createdAt)}${data.adminName ? ` · by ${data.adminName}` : ''}`}
+        description={`${formatMoney(data.amount)} · ${formatDateTime(data.createdAt)} · by ${invoiceAuthor(data)}`}
         actions={
           data.orderNumber && (
             <Link to={`/orders/${data.orderNumber}`} className="btn btn--outline">

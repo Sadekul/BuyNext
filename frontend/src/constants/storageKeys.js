@@ -24,3 +24,12 @@ export const ACCOUNT_STORES = [STORAGE_KEYS.cart, STORAGE_KEYS.wishlist, STORAGE
  * tokens; the sign-out signal was used while the admin shared this session).
  */
 export const LEGACY_KEYS = ['buynest.session.v1', 'buynest.signal.signout']
+
+/*
+ * sessionStorage (this tab only, gone when it closes). Phase 8: the order a
+ * guest is paying for on Stripe's page ({ number, email }), so the
+ * confirmation page can find it again when Stripe sends them back.
+ */
+export const SESSION_KEYS = {
+  pendingPayment: 'buynest.pendingPayment.v1',
+}

@@ -5,6 +5,7 @@ import { LuArrowLeft, LuExternalLink, LuPrinter } from 'react-icons/lu'
 import { adminKeys, getOrder } from '../api/admin'
 import { LIVE_DATA } from '../api/mode'
 import { CreateReturnDialog, InvoiceDialog, RefundDialog, ShipDialog, StatusDialog } from '../components/OrderActionDialogs'
+import OrderPayment from '../components/OrderPayment'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
@@ -152,7 +153,8 @@ function Documents({ order }) {
             {invoices.map((invoice) => (
               <li key={invoice.number}>
                 <Link to={`/invoices/${invoice.number}`}>{invoice.number}</Link> · {formatMoney(invoice.amount)} · {formatDate(invoice.createdAt)}
-                {invoice.adminName && <span className="muted"> · by {invoice.adminName}</span>}
+                {/* Phase 8: an invoice no admin created was recorded by Stripe's webhook. */}
+                <span className="muted"> · by {invoice.adminName ?? (order.payment?.provider === 'stripe' ? 'Stripe' : 'System')}</span>
               </li>
             ))}
           </ul>
@@ -211,6 +213,9 @@ function Documents({ order }) {
     </div>
   )
 }
+
+// Phase 8: history entries written by Stripe's webhook (payment recorded, payment page expired) have no admin.
+const byStripe = (entry) => /through Stripe|secure payment page expired/i.test(entry.note ?? '')
 
 const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog, return: CreateReturnDialog }
 
@@ -448,9 +453,15 @@ function LiveOrderDetailPage() {
                     </button>
                   )}
                 </div>
-                {data.status === 'pending_payment' && (
-                  <p className="field__hint">No payment provider is connected yet: invoice the order once the money has arrived. It then moves to Processing and can be shipped.</p>
-                )}
+                {data.status === 'pending_payment' &&
+                  (data.payment?.canPay ? (
+                    <p className="field__hint">
+                      The customer pays by card on Stripe's page: the order moves to Processing by itself once Stripe confirms the payment. Send them the payment link
+                      under Delivery and payment if they need it.
+                    </p>
+                  ) : (
+                    <p className="field__hint">No payment provider is connected yet: invoice the order once the money has arrived. It then moves to Processing and can be shipped.</p>
+                  ))}
                 {actions.refund && !actions.cancel && ['pending_payment', 'processing'].includes(data.status) && (
                   <p className="field__hint">This order is paid, so it can't be cancelled: refund it instead.</p>
                 )}
@@ -526,6 +537,8 @@ function LiveOrderDetailPage() {
             </dd>
             <dt>Payment</dt>
             <dd>{PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}</dd>
+            {/* Phase 8: Stripe provider, reference, paid at, and the payment link of an unpaid card order. */}
+            <OrderPayment order={data} canEdit={can('orders.edit')} />
             <dt>Bill to</dt>
             <dd>
               <Address address={data.billingAddress} />
@@ -546,7 +559,7 @@ function LiveOrderDetailPage() {
                 </div>
                 <p className="muted">
                   <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
-                  {entry.adminName && ` · by ${entry.adminName}`}
+                  {entry.adminName ? ` · by ${entry.adminName}` : byStripe(entry) ? ' · by Stripe' : ''}
                   {entry.customerNotified && ' · customer emailed'}
                 </p>
                 {entry.note && <p>{entry.note}</p>}

@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\CreditMemo;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\Payments\StripePayments;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,7 +29,7 @@ use Illuminate\Validation\ValidationException;
  */
 class Refunds
 {
-    public function __construct(private Audit $audit, private Inventory $inventory) {}
+    public function __construct(private Audit $audit, private Inventory $inventory, private StripePayments $stripe) {}
 
     /**
      * The limits for the admin's refund form (GET .../refundable), in cents:
@@ -156,12 +157,16 @@ class Refunds
         }
 
         $restock = (bool) ($data['restock'] ?? false) && $lines !== [];
+        // Phase 8: an order paid through Stripe gets the money back on the card, BEFORE the memo is
+        // saved: Stripe refusing throws a 422 and the transaction keeps nothing. Others: refunded by hand.
+        $refundReference = $this->stripe->refund($order, $total, $order->creditMemos->count() + 1);
         $memo = $order->creditMemos()->create([
             'return_id' => $data['return_id'] ?? null, // phase 6: the return this refund settles
             'subtotal' => Pricing::format($subtotal),
             'shipping_refund' => Pricing::format($shipping),
             'adjustment' => Pricing::format($adjustment),
             'total' => Pricing::format($total),
+            'refund_reference' => $refundReference,
             'restocked' => $restock,
             'admin_id' => $admin->id,
             'note' => $data['note'] ?? null,
@@ -188,7 +193,8 @@ class Refunds
         $order->history()->create([
             'status' => $order->status,
             'payment_status' => $order->payment_status,
-            'note' => "Credit memo {$memo->number} created; \${$memo->total} refunded.".($restock ? ' Items returned to stock.' : ''),
+            'note' => "Credit memo {$memo->number} created; \${$memo->total} refunded"
+                .($refundReference ? ' to the card through Stripe.' : '.').($restock ? ' Items returned to stock.' : ''),
             'admin_id' => $admin->id,
             'customer_notified' => $notify,
         ]);
@@ -197,6 +203,7 @@ class Refunds
             'credit_memo', $memo->id, ['before' => [], 'after' => [
                 'order' => $order->number, 'subtotal' => $memo->subtotal, 'shipping_refund' => $memo->shipping_refund,
                 'adjustment' => $memo->adjustment, 'total' => $memo->total, 'restocked' => $restock, 'payment_status' => $order->payment_status,
+                ...($refundReference ? ['refund_reference' => $refundReference] : []),
             ]], $admin);
 
         return $memo;

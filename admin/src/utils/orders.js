@@ -56,6 +56,9 @@ export function orderActions(order) {
   }
 }
 
+/** Phase 8: paid by card through Stripe, so refunds go back to the card through Stripe. */
+export const paidThroughStripe = (order) => order.payment?.provider === 'stripe' && Boolean(order.payment.reference || order.payment.paidAt)
+
 export const CARRIERS = { dhl: 'DHL', fedex: 'FedEx', ups: 'UPS', usps: 'USPS', other: 'Other carrier' }
 
 export const COUPON_TYPES = { percent: 'Percent off', fixed: 'Fixed amount off', free_shipping: 'Free shipping' }

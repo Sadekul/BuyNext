@@ -6,7 +6,7 @@ import Field from './Field'
 import FormDialog from './FormDialog'
 import { ErrorState, Loading } from './States'
 import { formatMoney } from '../utils/format'
-import { CARRIERS } from '../utils/orders'
+import { CARRIERS, paidThroughStripe } from '../utils/orders'
 
 /*
  * The actions on a real order, each in its own dialog with its own note and
@@ -55,7 +55,11 @@ export function InvoiceDialog({ order, onDone, onCancel }) {
     <FormDialog
       isOpen
       title={`Invoice order ${order.number}`}
-      description={`Records a payment of ${formatMoney(order.totals.total)}, the order total. No payment provider is connected yet: invoice once the money has arrived.`}
+      description={
+        order.payment?.canPay
+          ? `Records a payment of ${formatMoney(order.totals.total)}, the order total. Card payments through Stripe are recorded by themselves when Stripe confirms them: invoice by hand only if the customer paid another way.`
+          : `Records a payment of ${formatMoney(order.totals.total)}, the order total. No payment provider is connected yet: invoice once the money has arrived.`
+      }
       submitLabel="Create invoice"
       busy={create.isPending}
       error={formError(create.error, ['note'])}
@@ -154,6 +158,10 @@ const amount = (text) => (text.trim() === '' ? 0 : Number(text))
 const hasCents = (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
 
 const REFUND_DESCRIPTION = 'Records a refund (credit memo). No payment provider is connected yet: return the money yourself by the original payment method.'
+// Phase 8: paid by card through Stripe, the API refunds the card itself before saving the memo.
+const STRIPE_REFUND_DESCRIPTION = "Records a refund (credit memo). The refund goes back to the customer's card through Stripe; if Stripe refuses it, nothing is saved."
+
+const refundDescription = (order) => (paidThroughStripe(order) ? STRIPE_REFUND_DESCRIPTION : REFUND_DESCRIPTION)
 
 /**
  * Credit memo: per-item quantities (bounded by what is still refundable),
@@ -164,7 +172,7 @@ export function RefundDialog({ order, prefill, onDone, onCancel }) {
   const limits = useQuery({ queryKey: adminKeys.refundable(order.number), queryFn: ({ signal }) => getRefundable(order.number, { signal }), staleTime: 0 })
   if (limits.data) return <RefundForm order={order} limits={limits.data} prefill={prefill} onDone={onDone} onCancel={onCancel} />
   return (
-    <FormDialog isOpen wide title={`Refund order ${order.number}`} description={REFUND_DESCRIPTION} submitLabel="Refund" busy onSubmit={() => {}} onCancel={onCancel}>
+    <FormDialog isOpen wide title={`Refund order ${order.number}`} description={refundDescription(order)} submitLabel="Refund" busy onSubmit={() => {}} onCancel={onCancel}>
       {limits.isPending ? <Loading label="Loading what can be refunded…" /> : <ErrorState error={limits.error} onRetry={limits.refetch} />}
     </FormDialog>
   )
@@ -198,12 +206,13 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
     (Number.isFinite(shippingValue) ? toCents(shippingValue) : 0) +
     (Number.isFinite(adjustmentValue) ? toCents(adjustmentValue) : 0)
 
+  const stripe = paidThroughStripe(order)
   const create = useMutation({
     mutationFn: (values) => createCreditMemo(order.number, values),
     onSuccess: ({ creditMemo }) => {
       const full = toCents(creditMemo.total) >= toCents(limits.maxTotal)
       onDone(
-        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''} Return the money by the original payment method.`,
+        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''}${creditMemo.refundReference || stripe ? " Stripe is returning the money to the customer's card." : ' Return the money by the original payment method.'}`,
       )
     },
     onError: (error, sent) => {
@@ -252,7 +261,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
       isOpen
       wide
       title={prefill?.returnNumber ? `Refund return ${prefill.returnNumber}` : `Refund order ${order.number}`}
-      description={prefill?.returnNumber ? `${REFUND_DESCRIPTION} Filled in with the returned items of order ${order.number}.` : REFUND_DESCRIPTION}
+      description={prefill?.returnNumber ? `${refundDescription(order)} Filled in with the returned items of order ${order.number}.` : refundDescription(order)}
       submitLabel={`Refund ${formatMoney(Math.max(totalCents, 0) / 100)}`}
       busy={create.isPending}
       error={formError(create.error, ['items', 'shippingRefund', 'adjustment', 'restock', 'note', 'total'])}

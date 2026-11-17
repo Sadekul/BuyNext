@@ -34,6 +34,7 @@ import { formatPrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
 import { cartLineKey } from '../reducers/cartReducer'
 import { MAX_SAVED_ADDRESSES, defaultAddress, isSameAddress, toOrderAddress } from '../utils/addresses'
+import { rememberGuestPayment } from '../utils/payment'
 import SavedAddressPicker from '../components/checkout/SavedAddressPicker'
 import GroupDiscountNote from '../components/cart/GroupDiscountNote'
 import './CheckoutPage.css'
@@ -57,9 +58,12 @@ const GUEST_CHECKOUT_OFF = "Please sign in to place your order: guest checkout i
 
 const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
 
-// What the shopper is told about paying, per method (REAL_SHOP). No payment provider is connected yet.
+// What the shopper is told about paying, per method (REAL_SHOP). `stripe`: card
+// payments through Stripe Checkout (phase 8); `online`: no provider for this method.
 const PAYMENT_NOTES = {
   cod: 'Your order is confirmed straight away. Pay the courier when it arrives.',
+  stripe:
+    "Next you'll pay on Stripe's secure payment page (it also offers Apple Pay and Google Pay where available). BuyNest never sees your card number. Your order is saved first, so you can pay later from your order page if you leave.",
   online:
     "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers.",
 }
@@ -305,6 +309,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const isPricing = REAL_SHOP && (pricing.isPending || pricing.isFetching)
   const isBusy = isSubmitting || isCheckingPrices || isPricing
   const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0)
+  // Phase 8: a card order is paid on Stripe's page right after it is created.
+  const payByStripe = REAL_SHOP && settings.cardPayments === 'stripe' && paymentMethod === 'card'
 
   async function placeDemoOrder(values) {
     // 1. The server prices the cart; stop if anything changed since it was added.
@@ -335,8 +341,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
     queryClient.invalidateQueries({ queryKey: orderKeys.all })
     if (saveAddress) queryClient.invalidateQueries({ queryKey: customerKeys.addresses(user.id) })
+    // Phase 8, card through Stripe: the order exists now (stock reserved), so
+    // the cart is emptied exactly as for any other order. The confirmation page
+    // then leaves for Stripe's page (`payNow`), or shows why it couldn't with
+    // "Pay now" to retry. A guest's number and email are kept in this tab for
+    // the way back from Stripe.
+    const payNow = order.payment?.provider === 'stripe' && order.paymentStatus !== 'paid' ? true : undefined
+    if (payNow && !isAuthenticated) rememberGuestPayment(order.number, order.email)
     // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
-    navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order } })
+    navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order, ...(payNow && { payNow }) } })
     cart.removeOrderedItems(cart.items.filter((item) => !item.isUnavailable).map(cartLineKey))
   }
 
@@ -379,8 +392,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     }
   }
 
-  const placeLabel = isBusy ? 'Checking prices…' : `Place order · ${formatPrice(totals.total)}`
-  const paymentNote = REAL_SHOP ? (paymentMethod === 'cod' ? PAYMENT_NOTES.cod : PAYMENT_NOTES.online) : null
+  const placeLabel = isBusy ? 'Checking prices…' : payByStripe ? 'Continue to secure payment' : `Place order · ${formatPrice(totals.total)}`
+  const paymentNote = REAL_SHOP ? (paymentMethod === 'cod' ? PAYMENT_NOTES.cod : payByStripe ? PAYMENT_NOTES.stripe : PAYMENT_NOTES.online) : null
 
   return (
     <div className="checkout section container">

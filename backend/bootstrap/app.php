@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureTokenKind;
 use App\Http\Middleware\OptionalCustomer;
+use App\Http\Middleware\RequireBffKey;
 use App\Http\Middleware\TrustBffClientIp;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Runs first, so rate limits see the visitor's address (see the class).
-        $middleware->api(prepend: [TrustBffClientIp::class]);
+        $middleware->api(prepend: [RequireBffKey::class, TrustBffClientIp::class]);
         $middleware->alias([
             'token.kind' => EnsureTokenKind::class,
             'customer.optional' => OptionalCustomer::class,

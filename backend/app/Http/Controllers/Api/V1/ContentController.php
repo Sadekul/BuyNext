@@ -7,6 +7,7 @@ use App\Http\Resources\PageResource;
 use App\Http\Resources\ProductResource;
 use App\Models\Page;
 use App\Services\HomeContent;
+use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +37,7 @@ class ContentController extends Controller
      * storefront shows the same ones (shipping prices, countries, payment
      * methods, guest checkout, whether tax is charged).
      */
-    public function store(Settings $settings): JsonResponse
+    public function store(Settings $settings, StripePayments $payments): JsonResponse
     {
         return response()->json(['data' => [
             'store_name' => $settings->get('store_name'),
@@ -57,6 +58,8 @@ class ContentController extends Controller
             'returns_enabled' => (bool) $settings->get('returns_enabled'),
             'return_window_days' => (int) $settings->get('return_window_days'),
             'return_reasons' => array_values($settings->get('return_reasons', [])),
+            // Phase 8: "stripe" = card orders are paid online on Stripe's page; "manual" = staff invoice them.
+            'card_payments' => $payments->cardPayments(),
         ]]);
     }
 }

@@ -1,5 +1,5 @@
 import { laravel } from '../http.js'
-import { camelPath, fromAddress, fromCart, fromLine, fromShipment, fromTotals } from './laravel.js'
+import { camelPath, fromAddress, fromCart, fromLine, fromPayment, fromShipment, fromTotals } from './laravel.js'
 import { failed } from './adminSystem.js'
 
 /*
@@ -366,7 +366,7 @@ export const laravelSalesData = {
     const result = await call('/orders', token, request, { method: 'POST', body: toOrderBody(values) })
     if ([200, 201].includes(result.status)) {
       const order = result.data?.data ?? {}
-      return { ok: true, status: 201, data: { order: { number: order.number, status: order.status, paymentStatus: order.payment_status ?? null, source: order.source ?? 'admin', totals: fromTotals(order.totals), items: (order.items ?? []).map(fromLine) }, live: true } }
+      return { ok: true, status: 201, data: { order: { number: order.number, status: order.status, paymentStatus: order.payment_status ?? null, source: order.source ?? 'admin', totals: fromTotals(order.totals), items: (order.items ?? []).map(fromLine), ...(order.payment && { payment: fromPayment(order.payment) }) }, live: true } }
     }
     const failure = fail(result)
     // Lines the server refused (out of stock, variant needed…), like the storefront's checkout.

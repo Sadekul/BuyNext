@@ -603,7 +603,8 @@ try {
   await part('email templates', async () => {
     await admin.goto(`${BASE}/admin/email-templates`, { waitUntil: 'networkidle' })
     log(await visible(admin.getByRole('heading', { name: 'Email templates' })), 'Content → Email templates opens')
-    log((await admin.locator('tbody tr').count()) === 11, `every email the store sends is listed (${await admin.locator('tbody tr').count()})`)
+    log((await admin.locator('tbody tr').count()) === 12, // 11 from phase 7 + "Payment not completed" (phase 8)
+    `every email the store sends is listed (${await admin.locator('tbody tr').count()})`)
     await axe(admin, 'email templates')
     await admin.getByRole('link', { name: 'Email verification code' }).first().click()
     await admin.waitForURL(/\/admin\/email-templates\/email_verification$/)

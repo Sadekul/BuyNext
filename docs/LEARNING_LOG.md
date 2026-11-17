@@ -218,3 +218,14 @@
 - Syncing state across devices without double counting: merging a saved cart exactly once per sign-in, with a per-device record and a cross-tab lock
 - Admin UX patterns: a notifications bell (polling paused in hidden tabs, popover focus management), saved grid views, previewing user HTML in a sandboxed iframe
 - Coordination lesson: two agents sharing one test database must not run tests at the same time
+
+## Phase 8: Card payments, real email, hosting
+
+- Hosted payment pages: why card numbers should never touch your own servers (PCI), and how Stripe Checkout hands the shopper back with success and cancel URLs
+- Webhooks: verifying a signature over the raw body (HMAC-SHA256, constant-time compare, a time window against replays), handling each event once, and never trusting the browser's "success" page as proof of payment
+- Idempotency keys so a retried request never charges or refunds twice
+- Calling a third-party API inside a database transaction: ask the provider first, save only if it agreed
+- Testing payments without the provider: a stand-in server, separate test copies of the API and store with their own settings, and webhooks signed by the test itself
+- Email delivery: SMTP providers, SPF, DKIM, and DMARC, and sending a test email from the command line
+- Containers for PHP: nginx + PHP-FPM, running as a non-root user, a startup script per role (web, queue worker, scheduler), persistent volumes for uploads
+- Locking an API to its own front end with a shared key, while health checks and public files stay open

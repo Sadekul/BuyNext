@@ -2,6 +2,8 @@
 
 BuyNest is a **static single-page app**: `npm run build` produces HTML, CSS, and JS in `frontend/dist/` that any static host can serve.
 
+> **Deploying the whole shop (API + database + store)?** Follow [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md): the Laravel API, its queue worker and scheduler, and MySQL on Railway, the store and admin on Vercel, Stripe's webhook, and an after-deploy checklist. Email setup (Brevo or Mailgun, DNS records, testing) is in [EMAIL.md](EMAIL.md). This page covers the frontend build and static hosting in general.
+
 ## Production build
 ```bash
 cd frontend
@@ -37,7 +39,7 @@ Both configs also set long-term caching for `/assets/*` and basic security heade
 ## Vercel
 1. Import the GitHub repository.
 2. **Root directory:** `frontend`. Framework preset: Vite (build `npm run build`, output `dist`; also set in `vercel.json`, whose `installCommand` also installs `../admin`). Keep "Include source files outside of the Root Directory" enabled (the default): the build needs `../admin`.
-3. Environment variables: `VITE_API_BASE_URL=https://dummyjson.com` (and later `VITE_API_PROVIDER=laravel` + your API URL).
+3. Environment variables: `VITE_API_BASE_URL=https://dummyjson.com` for the DummyJSON demo. With the Laravel API, use the full list in [DEPLOY_RAILWAY.md → Vercel](DEPLOY_RAILWAY.md#9-vercel-the-store-and-the-admin) (`VITE_API_PROVIDER`, `VITE_ACCOUNTS_BACKEND`, `VITE_API_BASE_URL`, `BUYNEST_LARAVEL_URL`, `BUYNEST_BFF_KEY`).
 4. Deploy. Every pull request gets a preview URL.
 
 ## Netlify
@@ -57,11 +59,11 @@ Both configs also set long-term caching for `/assets/*` and basic security heade
 
 Variables without the `VITE_` prefix are only read by the server functions (`frontend/server/`), never bundled into browser code: set them in the host's environment settings (Vercel/Netlify), not in a committed file.
 
-With Laravel accounts the browser never calls the API: only the server functions do, so the API needs no CORS settings for the storefront. Deploy the API itself with the [production checklist](../backend/README.md#production-checklist) (`APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer, the scheduler running).
+With Laravel accounts the browser never calls the API: only the server functions do, so the API needs no CORS settings for the storefront. Deploy the API itself with the [production checklist](../backend/README.md#production-checklist) (`APP_DEBUG=false`, `DEV_MAILBOX=false`, a real mailer, the scheduler running); on Railway, [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) does all of that step by step (Docker image in `backend/Dockerfile`), and [EMAIL.md](EMAIL.md) sets up the mailer. When the server functions run on Vercel or Netlify, the API needs a public address (they can't reach a private network); the shared key and what it protects are explained in [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md#why-the-api-is-public-and-what-the-shared-key-does).
 
 ## Product photos (`/media`)
 
-Photos uploaded in the admin are stored by the Laravel API. Shoppers load them from the store's own address, `/media/products/{id}/{file}`: a server function (`frontend/server/mediaApi.js`; `api/media` on Vercel, `netlify/functions/media.mjs` on Netlify) fetches them from `BUYNEST_LARAVEL_URL/storage/...` and sends them with a one-year cache header. Only file names the API creates are accepted; anything else is a 404. Because the photos come from the store's own address, the Content-Security-Policy needs no change. On the API server, keep `storage/app/public` on persistent disk (see the [production checklist](../backend/README.md#production-checklist)).
+Photos uploaded in the admin are stored by the Laravel API. Shoppers load them from the store's own address, `/media/products/{id}/{file}`: a server function (`frontend/server/mediaApi.js`; `api/media` on Vercel, `netlify/functions/media.mjs` on Netlify) fetches them from `BUYNEST_LARAVEL_URL/storage/...` and sends them with a one-year cache header. Only file names the API creates are accepted; anything else is a 404. Because the photos come from the store's own address, the Content-Security-Policy needs no change. On the API server, keep `storage/app/public` on persistent disk (see the [production checklist](../backend/README.md#production-checklist)); on Railway that's the volume in [DEPLOY_RAILWAY.md step 5](DEPLOY_RAILWAY.md#5-the-photo-volume).
 
 ## Release checklist
 - [ ] `npm run lint` passes, `npm test` passes

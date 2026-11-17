@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SeoController;
+use App\Http\Controllers\Api\V1\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -122,6 +123,11 @@ Route::prefix('v1')->group(function () {
     Route::post('orders', [OrderController::class, 'store'])->middleware(['customer.optional', 'throttle:orders']);
     // Guest order lookup: limited like sign-in, so order numbers can't be guessed quickly.
     Route::post('orders/lookup', [OrderController::class, 'lookup'])->middleware('throttle:auth');
+
+    // Phase 8: Stripe card payments. Pay now: the order's customer, or the order's email (the lookup's proof), limited like the lookup.
+    Route::post('orders/{number}/pay', [OrderController::class, 'pay'])->middleware(['customer.optional', 'throttle:auth']);
+    // Stripe's webhook: no sign-in (the signature is the proof), its own rate limit.
+    Route::post('payments/stripe/webhook', StripeWebhookController::class)->middleware('throttle:stripe-webhooks');
 });
 
 /*
@@ -205,6 +211,8 @@ Route::prefix('admin/v1')->group(function () {
         Route::post('orders', [OrderCreateController::class, 'store'])->middleware('can.admin:orders.create');
         Route::get('orders/{number}/packing-slip', [AdminOrderController::class, 'packingSlip'])->middleware('can.admin:orders.view');
         Route::get('orders/{number}', [AdminOrderController::class, 'show'])->middleware('can.admin:orders.view');
+        // Phase 8: a (new) Stripe payment link for an unpaid card order, to copy and send.
+        Route::post('orders/{number}/payment-link', [AdminOrderController::class, 'paymentLink'])->middleware('can.admin:orders.edit');
         Route::patch('orders/{number}', [AdminOrderController::class, 'update'])->middleware('can.admin:orders.edit');
 
         // Phase 3: order documents (invoice = payment, shipment = tracking, credit memo = refund).

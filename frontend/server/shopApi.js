@@ -23,6 +23,9 @@ import { CUSTOMER, notSignedIn } from './session.js'
  *   GET  /api/shop/orders?page     → { orders, total, page, perPage, lastPage } (customer session)
  *   GET  /api/shop/orders/:number  → order (customer session; someone else's → 404)
  *   POST /api/shop/orders/lookup   { number, email } → order (guests)
+ *   POST /api/shop/orders/:number/pay { email? } → { provider, url, expiresAt } (phase 8: a new Stripe
+ *                                  Checkout page for an unpaid card order; customer session, or a guest's
+ *                                  order email; 422 when the order can't be paid)
  *   GET  /api/shop/orders/:number/invoices/:invoice → printable invoice (customer session; own orders only)
  *   POST /api/shop/products/:id/reviews { rating, title?, comment } → 201 review (customer session; phase 5)
  *                                  422 { code: 'already_reviewed' } for a second review of the same product
@@ -45,6 +48,11 @@ import { CUSTOMER, notSignedIn } from './session.js'
  *   POST /api/shop/newsletter/unsubscribe  { token } → { message, email, status }   (the link in every newsletter)
  *   GET  /api/shop/me/cart                 → { items, itemCount, updatedAt } (customer session: the saved cart, priced lines)
  *   POST /api/shop/me/cart/merge           { items: [{ productId, variantId?, quantity }] } → the same, after adding these lines
+ *
+ * Phase 8 (Stripe): POST /api/shop/orders answers with `payment: { provider,
+ * url, expiresAt }` for card orders when the store takes card payments (url
+ * null + `error` when Stripe couldn't be reached: the order exists and "Pay
+ * now" retries). Orders carry paymentProvider, paidAt, paymentExpiresAt.
  *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
@@ -86,6 +94,11 @@ const ROUTES = {
   async 'POST products/:id/reviews'({ request, cookies, param }) {
     if (!cookies[CUSTOMER.access]) return notSignedIn()
     return reply(await laravelShop.submitReview(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
+  },
+
+  // Phase 8: a new Stripe payment page for an unpaid card order (customer session, or a guest with the order's email).
+  async 'POST orders/:number/pay'({ request, cookies, param }) {
+    return reply(await laravelShop.payOrder(cookies[CUSTOMER.access], param, await readBody(request), request))
   },
 
   async 'POST orders/lookup'({ request }) {
@@ -163,6 +176,9 @@ function matchRoute(method, segments) {
   }
   if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'addresses' && isAddressId(segments[2])) {
     return { route: ROUTES[`${method} me/addresses/:id`], param: segments[2] }
+  }
+  if (segments.length === 3 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'pay') {
+    return { route: ROUTES[`${method} orders/:number/pay`], param: segments[1] }
   }
   if (segments.length === 3 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'returns') {
     return { route: ROUTES[`${method} orders/:number/returns`], param: segments[1] }

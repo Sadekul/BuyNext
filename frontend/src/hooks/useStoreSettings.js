@@ -21,6 +21,8 @@ export const DEFAULT_STORE_SETTINGS = {
   paymentMethods: PAYMENT_METHODS,
   guestCheckout: true,
   taxEnabled: false,
+  // Phase 8: no payment provider in the demo (or while the real settings load).
+  cardPayments: 'manual',
 }
 
 /**

@@ -185,3 +185,16 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Phase 8: the way back from Stripe's payment page. */
+.order-page__hero--waiting {
+  background: var(--color-warning-soft);
+}
+
+.order-page__hero--waiting .order-page__check {
+  color: var(--color-warning);
+}
+
+.order-page__hero .pay-now {
+  margin-top: var(--space-3);
+}
