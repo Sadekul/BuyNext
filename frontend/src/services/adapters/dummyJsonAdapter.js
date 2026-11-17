@@ -93,5 +93,7 @@ export function normalizeUser(raw) {
     group: raw.group && typeof raw.group.name === 'string' ? { name: raw.group.name, discountPercent: Number(raw.group.discountPercent) || 0 } : null,
     // BuyNest accounts (phase 7): whether they get the newsletter. Left out when unknown (DummyJSON).
     ...(typeof raw.newsletter === 'boolean' && { newsletter: raw.newsletter }),
+    // BuyNest accounts (phase 9): a new email waiting for its confirmation code.
+    ...(typeof raw.pendingEmail === 'string' && raw.pendingEmail && { pendingEmail: raw.pendingEmail }),
   }
 }

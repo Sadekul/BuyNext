@@ -109,9 +109,19 @@ const toBody = (values, fields) => Object.fromEntries(Object.entries(values).fil
 
 // ---- products: images, options, variants ----
 
-/** { id, url, alt, position, isUpload } (isUpload false: an imported external address). */
+/*
+ * Phase 9 §2: resized copies, { "320": url, "960": url } (maximum widths;
+ * {} when there are none). Only the two known widths and site paths or http(s)
+ * addresses are kept.
+ */
+export function imageVariants(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  return Object.fromEntries(['320', '960'].filter((width) => typeof raw[width] === 'string' && /^(\/(?!\/)|https?:\/\/)\S+$/.test(raw[width])).map((width) => [width, raw[width]]))
+}
+
+/** { id, url, alt, position, isUpload, variants? } (isUpload false: an imported external address; variants: phase 9 answers). */
 export function adminImage(raw) {
-  return { id: raw.id ?? null, url: text(raw.url), alt: text(raw.alt), position: raw.position ?? 0, isUpload: raw.is_upload !== false }
+  return { id: raw.id ?? null, url: text(raw.url), alt: text(raw.alt), position: raw.position ?? 0, isUpload: raw.is_upload !== false, ...(raw.variants !== undefined && { variants: imageVariants(raw.variants) }) }
 }
 const images = (raw) => list(raw).map(adminImage).sort((a, b) => a.position - b.position)
 

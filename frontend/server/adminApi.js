@@ -19,6 +19,8 @@ import {
   updateCustomerInLaravel,
 } from './adminSalesApi.js'
 import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
+// Phase 9: two-step sign-in, backups, stock alerts (adminSecurityApi.js).
+import { TWO_STEP_SESSION_ROUTES, matchSecurityRoute } from './adminSecurityApi.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -96,6 +98,12 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
  * packing slips, the shipments list, and returns (RMA). With Laravel
  * accounts, GET customers takes the new filters and rows carry the group, and
  * PATCH customers/:id edits the whole account (not only isActive).
+ *
+ * Phase 9 (BuyNest accounts; adminSecurityApi.js): two-step sign-in (the
+ * sign-in's second step at POST /api/admin/auth/two-factor, enrolment under
+ * /api/admin/me/two-factor, the Owner's reset), backups, and the stock-alerts
+ * report. Tokens stay in the HttpOnly cookies; only the short-lived sign-in
+ * challenge reaches the browser.
  */
 
 const PRODUCT_LIST_FIELDS = ['id', 'title', 'category', 'brand', 'price', 'discountPercentage', 'stock', 'rating', 'thumbnail', 'availabilityStatus']
@@ -605,6 +613,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 9: me/two-factor[/…], admins/:id/two-factor/reset, backups[/…], reports/stock-alerts.
+  const security = matchSecurityRoute(method, segments)
+  if (security !== undefined) return security
   // Phase 7 (marketing): catalog-rules, newsletter, search-terms, reports/abandoned-carts, reports/search-terms.
   const marketing = matchMarketingRoute(method, segments)
   if (marketing !== undefined) return marketing
@@ -645,6 +656,8 @@ function matchCustomerPart(method, id, part, rest) {
 /** The admin session routes: no permission check (they create or end the session). */
 const SESSION_ROUTES = {
   async 'POST login'(request) {
+    // Phase 9: BuyNest accounts may answer with a second step (two-step sign-in) or a limited setup session.
+    if (laravelAccounts()) return TWO_STEP_SESSION_ROUTES['POST login'](request)
     const body = await readBody(request)
     const remember = body.remember === true
     const result = await accounts().admin.login(body, remember, request)
@@ -666,6 +679,9 @@ const SESSION_ROUTES = {
     await accounts().admin.logout(cookies[ADMIN.access], request)
     return json({ ok: true }, 200, clearedCookies(ADMIN))
   },
+
+  // Phase 9: the sign-in's second step { challenge, code | recoveryCode, remember } → the admin (cookies set).
+  'POST two-factor': TWO_STEP_SESSION_ROUTES['POST two-factor'],
 }
 
 export async function handleAdminRequest(request, segments, cookies) {

@@ -1,16 +1,17 @@
 import { Link, useParams } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuArrowLeft, LuPackageX } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
 import ReturnRequestForm from '../components/orders/ReturnRequestForm'
 import PayNowButton from '../components/orders/PayNowButton'
+import CancelOrderButton from '../components/orders/CancelOrderButton'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useOrders } from '../hooks/useOrders'
-import { orderQuery } from '../queries/orderQueries'
+import { orderKeys, orderQuery } from '../queries/orderQueries'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { canPayOrder } from '../utils/payment'
 import { REAL_SHOP } from '../constants/shop'
@@ -26,7 +27,7 @@ function NotFound() {
   )
 }
 
-function OrderSection({ order, invoiceLink, payAction, children }) {
+function OrderSection({ order, invoiceLink, payAction, actions = null, children }) {
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
@@ -37,6 +38,7 @@ function OrderSection({ order, invoiceLink, payAction, children }) {
       <h2 id="order-details-title" className="orders__title">
         Order {id}
       </h2>
+      {actions}
       <OrderDetailsView order={order} invoiceLink={invoiceLink} payAction={payAction} />
       {children}
     </section>
@@ -56,6 +58,13 @@ function ServerOrderDetailsPage() {
   const { user, authorizedRequest } = useAuth()
   const request = useQuery(orderQuery(user.id, orderId, authorizedRequest))
   const { settings } = useStoreSettings({ enabled: false }) // cached only: the order says itself whether it can be paid (canPay)
+  const queryClient = useQueryClient()
+
+  // Phase 9: the cancelled order replaces this one; the list is fetched again when next shown.
+  function handleCancelled(cancelled) {
+    queryClient.setQueryData(orderKeys.detail(user.id, orderId), cancelled)
+    queryClient.invalidateQueries({ queryKey: ['orders', user.id, 'list'] })
+  }
 
   if (request.isPending) return <Loader label="Loading the order…" />
   if (request.error?.status === 404) return <NotFound />
@@ -67,6 +76,8 @@ function ServerOrderDetailsPage() {
       invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)}
       // Phase 8: an unpaid card order can be paid on Stripe's page.
       payAction={canPayOrder(request.data, settings.cardPayments) ? <PayNowButton order={request.data} /> : null}
+      // Phase 9: an unpaid order with nothing shipped can be cancelled here.
+      actions={<CancelOrderButton order={request.data} onCancelled={handleCancelled} />}
     >
       <ReturnRequestForm order={request.data} />
     </OrderSection>

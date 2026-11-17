@@ -198,6 +198,19 @@ Built by three agents in parallel (backend; storefront, admin, and sign-in servi
 
 Checks: backend 332 feature tests; frontend 432 unit tests; admin 111; browser checks 880 on the dev server and 874 on the production build, all passing after the count update (new `payments.mjs`: 83). The Docker image itself wasn't built (Docker isn't installed here); its web server setup was checked with the local nginx and PHP-FPM.
 
+## Phase 9 (launch readiness and self-service) — 2026-11-17
+
+Built by four agents in parallel (two backend; storefront with its sign-in service routes; admin) against [backend/PHASE9_CONTRACT.md](backend/PHASE9_CONTRACT.md), then verified with the new `launch.mjs` browser suite (158 checks). Security points checked: two-step codes follow RFC 6238 (checked against the RFC's test values), can't be replayed, and a sign-in challenge expires after 5 minutes or 5 wrong codes; secrets are encrypted and recovery codes hashed; while two-step is required, a half-signed-in admin can only reach the setup pages; session cookies stay HttpOnly; an email change only happens after the new address proves itself, and the old address is told; data export contains only the customer's own data; account deletion keeps orders for the accounts without the person; error reports are scrubbed (path only, no query strings, emails and card-like numbers masked) and need the store's key; backup downloads use short-lived signed links and are Owner-only; the database password never appears on a command line. New packages (`sentry/sentry-laravel`, `league/flysystem-aws-s3-v3`, `bacon/bacon-qr-code`): `composer audit` and `npm audit` found no known vulnerabilities.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| L1 | Medium | On Vercel, the address book's edit and delete would have failed: the store's `/api/shop` function only accepted GET and POST (phase 6, only visible once hosted) | PATCH and DELETE added to the function |
+| L2 | Low | If loading the admin's account failed right after setting up two-step (a network blip), the admin was signed out and had to sign in again with a code | Retries a few times, then offers "Try again"; signs out only when the session itself is gone; unit test added |
+| L3 | Low | On the Reports page at phone width, the Best sellers, Customers, Coupons, and Low stock tables scroll sideways but couldn't be reached with the keyboard (axe `scrollable-region-focusable`) | Those panels can take focus, so arrow keys scroll them |
+| L4 | Test | Phase 9 changed three behaviours older browser checks relied on: 17 email templates, sold-out options can be chosen (to ask for an alert), and test admins named "… Staff" matched a loose audit-log check; two unit tests checked focus one animation frame too early, and one long two-step flow exceeded 5 s under load | Checks updated; focus checks wait; longer limit for the long flow |
+
+Checks: backend 400 feature tests; frontend 501 unit tests; admin 130; browser checks 1,039 on the dev server and 1,032 on the production build, all passing (new `launch.mjs`: 158).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

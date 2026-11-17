@@ -2,6 +2,7 @@ import { Component } from 'react'
 import { LuTriangleAlert } from 'react-icons/lu'
 import Button from '../ui/Button'
 import { ROUTES } from '../../constants/routes'
+import { reportError } from '../../utils/errorReporting'
 
 /**
  * Catches errors thrown while RENDERING its children and shows a fallback
@@ -21,8 +22,10 @@ class ErrorBoundary extends Component {
     return { error }
   }
 
-  // Commit phase: the place to report the error (Sentry, LogRocket, …).
+  // Commit phase: the place to report the error. Phase 9: BuyNest's own
+  // reporter (utils/errorReporting.js) sends it to the server, once.
   componentDidCatch(error, info) {
+    reportError(error, info)
     this.props.onError?.(error, info)
   }
 

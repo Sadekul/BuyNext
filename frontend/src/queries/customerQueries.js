@@ -1,5 +1,6 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { getAddresses, getReturn, getReturns } from '../services/customerService'
+import { getStockAlerts } from '../services/accountService'
 
 /*
  * The signed-in customer's address book and returns (REAL_SHOP). Like
@@ -11,6 +12,7 @@ export const customerKeys = {
   returns: (userId) => ['account', userId, 'returns'],
   returnList: (userId, page) => ['account', userId, 'returns', 'list', page],
   returnDetail: (userId, number) => ['account', userId, 'returns', 'detail', number],
+  stockAlerts: (userId) => ['account', userId, 'stock-alerts'],
 }
 
 /** The address book; `authorizedRequest` (useAuth) renews the session on 401. */
@@ -33,5 +35,13 @@ export const returnQuery = (userId, number, authorizedRequest) =>
   queryOptions({
     queryKey: customerKeys.returnDetail(userId, number),
     queryFn: ({ signal }) => authorizedRequest(() => getReturn(number, { signal })),
+    staleTime: 30_000,
+  })
+
+/** Phase 9: the customer's "email me when it's back" alerts. */
+export const stockAlertsQuery = (userId, authorizedRequest) =>
+  queryOptions({
+    queryKey: customerKeys.stockAlerts(userId),
+    queryFn: async ({ signal }) => (await authorizedRequest(() => getStockAlerts({ signal }))).alerts,
     staleTime: 30_000,
   })

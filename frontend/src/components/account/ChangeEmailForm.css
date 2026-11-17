@@ -1,0 +1,35 @@
+/* Account → Profile → Change email (phase 9). */
+.change-email {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.change-email__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 28rem;
+}
+
+.change-email__hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.change-email__error {
+  font-size: var(--text-sm);
+  color: var(--color-sale);
+}
+
+.change-email__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

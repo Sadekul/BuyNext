@@ -2494,3 +2494,141 @@ code.path {
 .payment-link p:empty {
   display: none;
 }
+
+/* ---------- Phase 9: two-step sign-in, backups, stock alerts ---------- */
+.code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-lg);
+  letter-spacing: 0.2em;
+  max-width: 12rem;
+}
+
+.gate--wide .gate__card {
+  width: min(40rem, 100%);
+}
+
+.two-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.two-step h2:focus,
+.recovery-codes h2:focus,
+.gate__card h1:focus {
+  outline: none;
+}
+
+.two-step__pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+
+.two-step__qr {
+  flex-shrink: 0;
+  width: 200px;
+  height: 200px;
+  padding: var(--space-2);
+  background: #fff; /* QR codes need a light quiet zone to scan */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.two-step__key {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.two-step__secret {
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  word-break: break-all;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.recovery-codes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.recovery-codes__warning {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-warning-soft);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+}
+
+.recovery-codes__warning svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-warning);
+}
+
+.recovery-codes__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-8);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--color-text);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.recovery-codes__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.stock-alerts-notice svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-primary);
+}
+
+.stock-alerts__summary {
+  margin-bottom: var(--space-3);
+}
+
+.stock-alerts__variants {
+  margin-top: var(--space-1);
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+  list-style: disc;
+}
+
+.backups__note {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.table .table__number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.two-step__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

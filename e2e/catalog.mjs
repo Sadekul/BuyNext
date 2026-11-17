@@ -290,7 +290,14 @@ try {
   log((await addButton.isDisabled()) && (await visible(shop.getByText('Choose size and color to add this to your cart'))), 'add to cart disabled until size and color are chosen')
   log(/From\s*\$20\.00/.test(await price.innerText()), `before a choice: "${(await price.innerText()).trim()}"`)
   await sizes.getByText('M', { exact: true }).click()
-  log(await colors.getByRole('radio', { name: /^Blue/ }).isDisabled(), 'M / Blue (sold out) cannot be chosen')
+  // Phase 9: a sold-out combination can be chosen (to ask for a back-in-stock email) but not added to the cart.
+  // Its label reads "Blue (sold out)" for screen readers, so match the start.
+  await colors.locator('label').filter({ hasText: /^Blue/ }).click()
+  log(
+    (await visible(details.getByRole('button', { name: "Email me when it's back" }))) &&
+      ((await addButton.count()) === 0 || (await addButton.isDisabled())),
+    "M / Blue (sold out): can't be added to the cart, offers \"Email me when it's back\"",
+  )
   await colors.getByText('Red', { exact: true }).click()
   log(!(await addButton.isDisabled()), 'M / Red: add to cart enabled')
   await sizes.getByText('S', { exact: true }).click()

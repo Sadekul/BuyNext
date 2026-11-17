@@ -85,3 +85,14 @@
   background: var(--color-bg-muted);
   border-style: dashed;
 }
+
+/* Phase 9: sold out, but selectable (to ask for a back-in-stock email). */
+.variant-selector__label--sold-out {
+  cursor: pointer;
+}
+
+.variant-selector__input:checked + .variant-selector__label--sold-out {
+  color: var(--color-text);
+  background: var(--color-bg-muted);
+  border: 2px dashed var(--color-primary);
+}

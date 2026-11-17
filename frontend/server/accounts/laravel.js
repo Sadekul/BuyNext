@@ -1,4 +1,6 @@
 import { laravel } from '../http.js'
+// Phase 9 admin two-step: the admin profile's two-step fields.
+import { twoFactorState } from '../shop/adminTwoFactor.js'
 
 /*
  * Accounts from BuyNest's Laravel API (backend/, docs/backend/API_CONTRACT.md).
@@ -52,6 +54,8 @@ export const customerProfile = (customer) => ({
   ...(customerGroup(customer.group) && { group: customerGroup(customer.group) }),
   // Phase 7: whether the customer gets the newsletter (left out by an older API).
   ...(typeof customer.newsletter === 'boolean' && { newsletter: customer.newsletter }),
+  // Phase 9: a new email waiting for its code (the account keeps the old one until then).
+  ...(typeof customer.pending_email === 'string' && customer.pending_email && { pendingEmail: customer.pending_email }),
 })
 /*
  * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin
@@ -59,7 +63,8 @@ export const customerProfile = (customer) => ({
  * them (an older API, or a sign-in answer) `permissions` is left out and the
  * app shows everything.
  */
-const adminProfile = (admin) => ({
+// Phase 9 admin two-step: exported for the two-step sign-in routes (adminSecurityApi.js).
+export const adminProfile = (admin) => ({
   id: admin.id,
   name: admin.name,
   firstName: admin.name,
@@ -67,6 +72,8 @@ const adminProfile = (admin) => ({
   email: admin.email,
   role: admin.role && typeof admin.role === 'object' ? { id: admin.role.id, name: admin.role.name } : 'admin',
   ...(Array.isArray(admin.permissions) && { permissions: admin.permissions.filter((key) => typeof key === 'string') }),
+  // Phase 9 admin two-step: twoFactorEnabled, twoFactorRequiredByStore, twoFactorSetupRequired (shop/adminTwoFactor.js).
+  ...twoFactorState(admin),
 })
 const tokensOf = (tokens) => ({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token })
 const str = (value) => (typeof value === 'string' ? value : undefined)

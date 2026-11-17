@@ -1,0 +1,26 @@
+/* /account/stock-alerts (phase 9). The list reuses the orders list styles. */
+.stock-alerts__note,
+.stock-alerts__status {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.stock-alerts__thumb {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 479px) {
+  /* Phones: the remove button goes under the product. */
+  .stock-alerts__item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .stock-alerts__item > :last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

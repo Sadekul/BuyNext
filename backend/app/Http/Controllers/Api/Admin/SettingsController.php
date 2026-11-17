@@ -48,6 +48,10 @@ class SettingsController extends Controller
         if ($input === []) {
             throw ValidationException::withMessages(['settings' => 'Send at least one setting to change.']);
         }
+        // Phase 9 (part A): Settings → Security is the Owner's alone.
+        if (array_key_exists('security', $input) && ! $request->user()->isOwner()) {
+            return response()->json(['message' => 'Only an Owner can change security settings.', 'code' => 'owner_only'], 403);
+        }
 
         // Only the rules of the keys that were sent (a PATCH): a key that is
         // sent must be valid; one that isn't sent keeps its value.
@@ -67,6 +71,10 @@ class SettingsController extends Controller
             foreach ($values as $key => $value) {
                 $changes[$key] = $this->settings->normalize($key, $value);
             }
+        }
+        // Phase 9 (part A): the Owner turning the rule on must not lock themselves out of the admin.
+        if (($changes['require_admin_two_factor'] ?? false) && ! $request->user()->hasTwoFactor()) {
+            throw ValidationException::withMessages(['security.require_admin_two_factor' => 'Turn on two-step sign-in for your own account first.']);
         }
 
         DB::transaction(function () use ($changes) {

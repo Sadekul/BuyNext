@@ -10,6 +10,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'token.kind' => EnsureTokenKind::class,
             'customer.optional' => OptionalCustomer::class,
             'can.admin' => EnsureAdminPermission::class,
+            // Phase 9 (part B): routes only the store's sign-in service may call, even in development.
+            'bff.key' => RequireBffKey::class,
         ]);
         // Check the token kind before route-model binding, so a customer token
         // gets 403 on /api/admin/v1/customers/{id} whether or not that id exists.
@@ -37,4 +40,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+        // Phase 9 (part B): report exceptions to Sentry (does nothing while SENTRY_LARAVEL_DSN is empty).
+        Integration::handles($exceptions);
     })->create();

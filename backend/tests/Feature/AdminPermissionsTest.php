@@ -19,7 +19,10 @@ class AdminPermissionsTest extends TestCase
     private const OPEN = ['POST api/admin/v1/auth/login', 'POST api/admin/v1/auth/refresh', 'POST api/admin/v1/auth/logout', 'GET api/admin/v1/me',
         // Phase 7: filtered by each notification's permission / only the admin's own preferences.
         'GET api/admin/v1/notifications', 'POST api/admin/v1/notifications/read-all', 'POST api/admin/v1/notifications/{id}/read',
-        'GET api/admin/v1/preferences/{key}', 'PUT api/admin/v1/preferences/{key}'];
+        'GET api/admin/v1/preferences/{key}', 'PUT api/admin/v1/preferences/{key}',
+        // Phase 9 (part A): the second sign-in step and the admin's own two-step sign-in.
+        'POST api/admin/v1/auth/two-factor', 'POST api/admin/v1/me/two-factor', 'POST api/admin/v1/me/two-factor/confirm',
+        'POST api/admin/v1/me/two-factor/recovery-codes', 'DELETE api/admin/v1/me/two-factor'];
 
     /** @return list<RoutingRoute> */
     private function adminRoutes(): array

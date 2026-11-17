@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuKeyRound, LuPencil, LuPlus, LuSearch } from 'react-icons/lu'
+import { LuKeyRound, LuPencil, LuPlus, LuSearch, LuShieldOff } from 'react-icons/lu'
 import { adminKeys, createAdmin, getAdmins, getRoles, resetAdminPassword, updateAdmin } from '../api/admin'
 import { useAdminAuth } from '../auth/useAdminAuth'
+// Phase 9: the Owner resets another admin's two-step sign-in.
+import { resetAdminTwoFactor } from '../api/security'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Field from '../components/Field'
 import FormDialog from '../components/FormDialog'
@@ -21,13 +23,14 @@ const fieldError = (errors, field) => errors?.[field]?.[0]
 /** Admin users (System → Admin users): list, add, edit, deactivate, reset a password. Needs admins.manage. */
 function AdminUsersPage() {
   const queryClient = useQueryClient()
-  const { user } = useAdminAuth()
+  const { user, isOwner } = useAdminAuth()
   const [skip, setSkip] = useState(0)
   const [q, setQ] = useState('')
   const [draft, setDraft] = useState('')
   const [status, setStatus] = useState('')
   const [dialog, setDialog] = useState(null) // { type: 'create' | 'edit' | 'password', admin? }
   const [confirming, setConfirming] = useState(null) // { admin, isActive }
+  const [resetting, setResetting] = useState(null) // phase 9: the admin whose two-step is being reset
   const [notice, setNotice] = useState(null)
   const noticeRef = useRef(null)
   const opener = useRef(null)
@@ -39,6 +42,7 @@ function AdminUsersPage() {
   function done(text, tone = 'success') {
     setDialog(null)
     setConfirming(null)
+    setResetting(null)
     setNotice({ text, tone })
     queryClient.invalidateQueries({ queryKey: ['admins'] })
     // Focus the message so keyboard and screen-reader users hear the outcome.
@@ -60,7 +64,16 @@ function AdminUsersPage() {
     onError: (error) => done(error.fieldErrors ? Object.values(error.fieldErrors)[0][0] : error.message, 'error'),
   })
 
+  // Phase 9: Owner only (the API checks it too), for someone else whose two-step is on.
+  const resetTwoFactor = useMutation({
+    mutationFn: (admin) => resetAdminTwoFactor(admin.id),
+    onSuccess: (_, admin) => done(`Two-step sign-in was turned off for ${admin.name}, and they were signed out everywhere. They can set it up again after signing in.`),
+    onError: (error) => done(error.fieldErrors ? Object.values(error.fieldErrors)[0][0] : error.message, 'error'),
+  })
+
   const isSelf = (admin) => admin.id === user?.id
+  // Shown only when the API says whether two-step is on (phase 9).
+  const showsTwoFactor = admins.data?.admins.some((admin) => typeof admin.twoFactorEnabled === 'boolean')
 
   return (
     <>
@@ -129,6 +142,7 @@ function AdminUsersPage() {
                 <th scope="col">Email</th>
                 <th scope="col">Role</th>
                 <th scope="col">Status</th>
+                {showsTwoFactor && <th scope="col">Two-step</th>}
                 <th scope="col">Last sign-in</th>
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
@@ -149,6 +163,7 @@ function AdminUsersPage() {
                   <td>
                     <StatusBadge tone={admin.isActive ? 'success' : 'neutral'} label={admin.isActive ? 'Active' : 'Deactivated'} />
                   </td>
+                  {showsTwoFactor && <td>{admin.twoFactorEnabled ? <StatusBadge tone="success" label="On" /> : <span className="muted">Off</span>}</td>}
                   <td>{formatDate(admin.lastLoginAt, 'Never')}</td>
                   <td className="table__actions">
                     <button type="button" className="icon-button" aria-label={`Edit ${admin.name}`} onClick={(event) => open({ type: 'edit', admin }, event)}>
@@ -157,6 +172,21 @@ function AdminUsersPage() {
                     <button type="button" className="icon-button" aria-label={`Set a new password for ${admin.name}`} onClick={(event) => open({ type: 'password', admin }, event)}>
                       <LuKeyRound aria-hidden="true" />
                     </button>
+                    {isOwner && admin.twoFactorEnabled && !isSelf(admin) && (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Reset two-step sign-in for ${admin.name}`}
+                        title="Reset two-step sign-in"
+                        onClick={(event) => {
+                          opener.current = event.currentTarget
+                          setNotice(null)
+                          setResetting(admin)
+                        }}
+                      >
+                        <LuShieldOff aria-hidden="true" />
+                      </button>
+                    )}
                     {/* You can't deactivate yourself (the server refuses too). */}
                     {!isSelf(admin) && (
                       <button
@@ -189,6 +219,18 @@ function AdminUsersPage() {
         busy={setActive.isPending}
         onConfirm={() => setActive.mutate(confirming)}
         onCancel={() => setConfirming(null)}
+      />
+      <ConfirmDialog
+        isOpen={resetting !== null}
+        title={`Reset two-step sign-in for ${resetting?.name}?`}
+        message="Use this when they lost their phone and their recovery codes. Two-step sign-in is turned off for them and they are signed out everywhere. If the store requires two-step sign-in, they must set it up again the next time they sign in."
+        confirmLabel="Reset two-step"
+        busy={resetTwoFactor.isPending}
+        onConfirm={() => resetTwoFactor.mutate(resetting)}
+        onCancel={() => {
+          setResetting(null)
+          opener.current?.focus()
+        }}
       />
     </>
   )

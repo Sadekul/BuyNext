@@ -27,6 +27,8 @@ import {
   LuUndo2,
   LuUserCog,
   LuUsers,
+  // Phase 9.
+  LuDatabaseBackup,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -73,6 +75,8 @@ export const PERMISSION_LABELS = {
   'price_rules.manage': 'Create, edit, and delete catalog price rules',
   'newsletter.view': 'View newsletter subscribers and campaigns',
   'newsletter.send': 'Write and send newsletters, unsubscribe people, and send cart reminders',
+  // Phase 9.
+  'backups.view': 'View and download database backups, and start one',
 }
 export const permissionLabel = (key) => PERMISSION_LABELS[key] ?? key
 
@@ -144,6 +148,8 @@ const LIVE_NAV = [
       { to: '/admins', label: 'Admin users', icon: LuUserCog, permission: 'admins.manage' },
       { to: '/roles', label: 'Roles', icon: LuShieldCheck, permission: 'admins.manage' },
       { to: '/audit', label: 'Audit log', icon: LuScrollText, permission: 'audit.view' },
+      // Phase 9.
+      { to: '/backups', label: 'Backups', icon: LuDatabaseBackup, permission: 'backups.view' },
     ],
   },
 ]

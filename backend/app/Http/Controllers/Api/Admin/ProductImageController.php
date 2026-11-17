@@ -7,6 +7,7 @@ use App\Http\Resources\AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Services\Audit;
+use App\Services\ImageResizer;
 use App\Support\ImageSniffer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  * The product's thumbnail follows the first image.
  *
  * Every answer is { data: [image items] } in gallery order:
- * { id, url, alt, position, is_upload }.
+ * { id, url, alt, position, is_upload, variants }.
+ * Phase 9 (part B): with GD installed, uploads also get resized copies
+ * (App\Services\ImageResizer), listed in `variants`.
  */
 class ProductImageController extends Controller
 {
@@ -31,7 +34,7 @@ class ProductImageController extends Controller
 
     public const MAX_KILOBYTES = 5120;
 
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private ImageResizer $resizer) {}
 
     /** POST /api/admin/v1/products/{id}/images (multipart, images[]) → 201 */
     public function store(Request $request, int $id): JsonResponse
@@ -87,12 +90,23 @@ class ProductImageController extends Controller
                         throw new \RuntimeException('The image could not be saved.');
                     }
                     $stored[] = $path;
-                    $product->images()->create([
+                    $image = $product->images()->create([
                         'url' => "/media/products/{$product->id}/{$name}",
                         'path' => $path,
                         'alt' => $product->name,
                         'position' => $position++,
                     ]);
+                    // Phase 9 (part B): resized copies (when GD is installed). A failure here
+                    // never refuses the upload: the original works on its own.
+                    try {
+                        $variants = $this->resizer->make($image);
+                        if ($variants) {
+                            $stored = [...$stored, ...array_map(fn ($url) => substr($url, strlen('/media/')), array_values($variants))];
+                            $image->update(['variants' => $variants]);
+                        }
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
                 }
                 $product->syncThumbnail();
                 $this->audit->record('product.images_added', count($files).' '.str('image')->plural(count($files))." added to product {$product->sku}.",

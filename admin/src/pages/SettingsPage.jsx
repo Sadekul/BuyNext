@@ -30,6 +30,8 @@ const isMoneyText = (text) => text.trim() !== '' && Number.isFinite(Number(text)
  * every cart and order. Needs settings.view; saving settings.edit.
  */
 function SettingsPage() {
+  // Phase 9: Settings → Security is the Owner's (the API refuses anyone else).
+  const { isOwner } = useAdminAuth()
   const settings = useQuery({ queryKey: adminKeys.settings, queryFn: ({ signal }) => getSettings({ signal }) })
   return (
     <>
@@ -46,6 +48,7 @@ function SettingsPage() {
           <InventoryForm saved={settings.data.inventory} />
           <CatalogForm saved={settings.data.catalog ?? {}} />
           {settings.data.returns && <ReturnsForm saved={settings.data.returns} />}
+          {isOwner && settings.data.security && <SecurityForm saved={settings.data.security} />}
         </div>
       )}
     </>
@@ -431,6 +434,37 @@ function CatalogForm({ saved }) {
       <p id="catalog-approval-hint" className="field__hint">
         When on, a shopper's review appears in the store only after someone approves it under Catalog → Reviews. When off, new reviews are shown right away.
       </p>
+    </SettingsGroup>
+  )
+}
+
+/**
+ * Security (phase 9 §1, Owner only): require two-step sign-in for every
+ * admin. Admins without it then see only the setup screen until it's on. The
+ * Owner's own account needs it first (the server says so otherwise).
+ */
+function SecurityForm({ saved }) {
+  const { user } = useAdminAuth()
+  const [required, setRequired] = useState(saved.requireAdminTwoFactor === true)
+  const [errors, setErrors] = useState({})
+  const ownOff = user?.twoFactorEnabled === false
+  return (
+    <SettingsGroup group="security" title="Security" toValues={() => ({ values: { requireAdminTwoFactor: required } })} setErrors={setErrors}>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={required}
+          aria-describedby="security-two-step-hint"
+          aria-invalid={errors.requireAdminTwoFactor ? true : undefined}
+          onChange={(event) => setRequired(event.target.checked)}
+        />
+        Require two-step sign-in for every admin
+      </label>
+      <p id="security-two-step-hint" className="field__hint">
+        When on, admins who haven't set up two-step sign-in must do it right after their password, before they can use anything else.
+        {ownOff && ' Turn it on for your own account first, under Two-step sign-in.'}
+      </p>
+      {err(errors, 'requireAdminTwoFactor') && <span className="field__error">{err(errors, 'requireAdminTwoFactor')}</span>}
     </SettingsGroup>
   )
 }

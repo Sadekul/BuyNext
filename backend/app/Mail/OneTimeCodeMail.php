@@ -16,12 +16,15 @@ class OneTimeCodeMail extends Mailable
     use RendersEmailTemplate;
 
     /** $setPassword (phase 6): the same reset code, worded for an account staff created or a reset staff sent. */
-    public function __construct(public string $code, public string $purpose, public string $firstName, public bool $setPassword = false) {}
+    /** $email (phase 9): the address the code goes to (the new address of an email change). */
+    public function __construct(public string $code, public string $purpose, public string $firstName, public bool $setPassword = false,
+        public ?string $email = null) {}
 
     protected function templateKey(): string
     {
         return match (true) {
             $this->setPassword => 'set_password',
+            $this->purpose === OneTimeCode::EMAIL_CHANGE => 'email_change_code', // phase 9 (part A)
             $this->purpose === OneTimeCode::RESET_PASSWORD => 'password_reset',
             default => 'email_verification',
         };
@@ -33,6 +36,7 @@ class OneTimeCodeMail extends Mailable
             'customer_first_name' => $this->firstName,
             'code' => $this->code,
             'expires_minutes' => (string) config('buynest.codes.ttl_minutes'),
+            ...($this->purpose === OneTimeCode::EMAIL_CHANGE ? ['new_email' => (string) $this->email] : []),
         ];
     }
 }

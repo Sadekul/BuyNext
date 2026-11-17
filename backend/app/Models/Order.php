@@ -132,6 +132,19 @@ class Order extends Model
         return 'BN-'.(100000 + $id);
     }
 
+    /**
+     * Phase 9 (part A): the customer (or a guest with the order's email) may
+     * cancel it themselves: not paid, nothing invoiced or shipped yet.
+     * Refunds stay with staff.
+     */
+    public function customerCanCancel(): bool
+    {
+        return in_array($this->status, ['pending_payment', 'processing'], true)
+            && $this->payment_status === 'unpaid'
+            && $this->invoices->isEmpty()
+            && $this->shipments->isEmpty();
+    }
+
     public function canMoveTo(string $status): bool
     {
         return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);

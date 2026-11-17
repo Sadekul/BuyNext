@@ -1,5 +1,8 @@
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
-import { LuExternalLink, LuLogOut } from 'react-icons/lu'
+import { LuExternalLink, LuLogOut, LuShieldCheck } from 'react-icons/lu'
+import { REAL_ACCOUNTS } from '../auth/accounts'
+// Phase 9: two-step sign-in that the store requires before anything else.
+import TwoFactorGate from '../components/TwoFactorGate'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { Loading } from '../components/States'
 import AccessDenied from '../pages/AccessDenied'
@@ -47,6 +50,10 @@ function AdminLayout() {
     )
   }
 
+  // Phase 9: the store requires two-step sign-in and this admin hasn't set it up yet.
+  // Nothing else of the admin shows (the API refuses everything but enrolment too).
+  if (user?.twoFactorSetupRequired === true) return <TwoFactorGate />
+
   return (
     <div className="admin">
       <a href="#admin-main" className="skip-link">
@@ -82,6 +89,11 @@ function AdminLayout() {
             {typeof user?.role === 'object' && user.role?.name && <small className="admin__role"> · {user.role.name}</small>}
           </p>
           {/* The storefront is a different app: a normal link, not router navigation. */}
+          {REAL_ACCOUNTS && (
+            <NavLink to="/account/two-factor" className="admin__account-link">
+              <LuShieldCheck aria-hidden="true" /> Two-step sign-in
+            </NavLink>
+          )}
           <a href="/" className="admin__account-link">
             <LuExternalLink aria-hidden="true" /> View store
           </a>

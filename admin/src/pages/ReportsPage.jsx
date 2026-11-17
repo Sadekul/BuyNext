@@ -7,7 +7,8 @@ import StatTile from '../components/StatTile'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
-import { formatCount, formatMoney, formatMoneyCompact } from '../utils/format'
+import { formatCount, formatDate, formatMoney, formatMoneyCompact } from '../utils/format'
+import Pagination from '../components/Pagination'
 
 const GROUPS = [
   { value: 'day', label: 'Day' },
@@ -98,6 +99,8 @@ function ReportsPage() {
         <CouponsReport range={range} />
         <LowStockReport />
       </div>
+      {/* Phase 9 §7. */}
+      <StockAlertsReport />
     </>
   )
 }
@@ -239,7 +242,7 @@ function NetChart({ series, groupBy }) {
 function BestSellers({ range }) {
   const report = useReport('products', { from: range.from, to: range.to, limit: 10 })
   return (
-    <section className="panel" aria-labelledby="best-title">
+    <section className="panel" aria-labelledby="best-title" tabIndex={0}>
       <header className="panel__header">
         <h2 id="best-title">Best sellers</h2>
         <CsvLink name="products" range={{ from: range.from, to: range.to }} label="Download CSV" />
@@ -282,7 +285,7 @@ function BestSellers({ range }) {
 function CustomersReport({ range }) {
   const report = useReport('customers', { from: range.from, to: range.to })
   return (
-    <section className="panel" aria-labelledby="customers-report-title">
+    <section className="panel" aria-labelledby="customers-report-title" tabIndex={0}>
       <header className="panel__header">
         <h2 id="customers-report-title">Customers</h2>
       </header>
@@ -334,7 +337,7 @@ function CustomersReport({ range }) {
 function CouponsReport({ range }) {
   const report = useReport('coupons', { from: range.from, to: range.to })
   return (
-    <section className="panel" aria-labelledby="coupons-report-title">
+    <section className="panel" aria-labelledby="coupons-report-title" tabIndex={0}>
       <header className="panel__header">
         <h2 id="coupons-report-title">Coupons used</h2>
       </header>
@@ -383,7 +386,7 @@ function CouponsReport({ range }) {
 function LowStockReport() {
   const report = useReport('low-stock', {})
   return (
-    <section className="panel" aria-labelledby="low-stock-title">
+    <section className="panel" aria-labelledby="low-stock-title" tabIndex={0}>
       <header className="panel__header">
         <h2 id="low-stock-title">Low stock now</h2>
       </header>
@@ -414,6 +417,80 @@ function LowStockReport() {
             ))}
           </tbody>
         </table>
+      )}
+    </section>
+  )
+}
+
+const ALERTS_PAGE = 10
+
+/**
+ * Stock alerts (phase 9 §7): sold-out products that shoppers asked to be
+ * emailed about, most waiting first. Not tied to the date range. Each alert
+ * is emailed once, automatically, when the product can be ordered again.
+ */
+function StockAlertsReport() {
+  const [skip, setSkip] = useState(0)
+  const report = useReport('stock-alerts', { limit: ALERTS_PAGE, skip })
+  const data = report.data
+  // An API without stock alerts (before phase 9): no panel.
+  if (report.error?.status === 404) return null
+  return (
+    <section id="stock-alerts" className="panel panel--spaced" aria-labelledby="stock-alerts-title" aria-busy={report.isFetching}>
+      <header className="panel__header">
+        <h2 id="stock-alerts-title">Stock alerts</h2>
+      </header>
+      {report.isPending && <Loading label="Loading stock alerts…" />}
+      {report.error && <ErrorState error={report.error} onRetry={report.refetch} />}
+      {data && (
+        <p className="muted stock-alerts__summary">
+          {formatCount(data.waitingTotal)} {data.waitingTotal === 1 ? 'shopper is' : 'shoppers are'} waiting for a back-in-stock email
+          {data.total > 0 && ` on ${formatCount(data.total)} ${data.total === 1 ? 'product' : 'products'}`}. {formatCount(data.notifiedLast30Days)} emailed in the
+          last 30 days.
+        </p>
+      )}
+      {data && data.products.length === 0 && <Empty>Nobody is waiting for a sold-out product.</Empty>}
+      {data && data.products.length > 0 && (
+        <div className="table-wrap">
+          <table className="table">
+            <caption className="visually-hidden">Products with shoppers waiting for a back-in-stock email, most waiting first</caption>
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Stock</th>
+                <th scope="col" className="table__number">
+                  Waiting
+                </th>
+                <th scope="col">First asked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.products.map((row) => (
+                <tr key={row.productId}>
+                  <th scope="row">
+                    <Link to={`/products/${row.productId}`}>{row.name}</Link>
+                    {row.sku && <small className="muted"> · {row.sku}</small>}
+                    {row.variants.length > 0 && (
+                      <ul className="stock-alerts__variants">
+                        {row.variants.map((variant) => (
+                          <li key={variant.id}>
+                            {variant.label || variant.sku}: {formatCount(variant.waiting)} waiting, {formatCount(variant.stock)} in stock
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </th>
+                  <td>
+                    <StatusBadge stock={row.stock} />
+                  </td>
+                  <td className="table__number">{formatCount(row.waiting)}</td>
+                  <td>{formatDate(row.oldestAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination total={data.total} limit={ALERTS_PAGE} skip={skip} onChange={setSkip} />
+        </div>
       )}
     </section>
   )

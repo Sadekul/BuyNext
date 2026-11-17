@@ -48,6 +48,20 @@ class AppServiceProvider extends ServiceProvider
             $request->user() ? $request->user()->getMorphClass().':'.$request->user()->getKey() : 'ip:'.$request->ip(),
         ));
 
+        // Phase 9 (part A): the admin's second sign-in step (per visitor, and per challenge on top of its 5-try limit);
+        // a customer's email-change codes and account deletion (per account, like sign-up codes per email);
+        // "Download my data" (3 per hour per account).
+        RateLimiter::for('two-factor', fn (Request $request) => [
+            Limit::perMinute(config('buynest.auth_per_minute'))->by('ip:'.$request->ip()),
+            Limit::perMinute(config('buynest.auth_per_email_per_minute'))->by('challenge:'.hash('sha256', (string) $request->input('challenge'))),
+        ]);
+        RateLimiter::for('account-codes', fn (Request $request) => [
+            Limit::perMinute(config('buynest.auth_per_minute'))->by('ip:'.$request->ip()),
+            Limit::perMinute(config('buynest.auth_per_email_per_minute'))->by('account:'.$request->path().'|'.$request->user()?->getKey()),
+        ]);
+        RateLimiter::for('data-export', fn (Request $request) => Limit::perHour(3)->by('export:'.($request->user()?->getKey() ?? $request->ip())));
+        // End of phase 9 part A limits.
+
         // Local test inbox: keep a copy of every email sent (see DevMailboxController).
         if ($this->app->environment('local') && config('buynest.dev_mailbox')) {
             Event::listen(function (MessageSent $event) {

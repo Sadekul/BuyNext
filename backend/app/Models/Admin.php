@@ -15,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
  * What they may do comes from their role (AdminRole). No role = no permissions.
  */
 #[Fillable(['name', 'email', 'password', 'role_id'])]
-#[Hidden(['password'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class Admin extends Authenticatable
 {
     /** @use HasFactory<AdminFactory> */
@@ -27,7 +27,18 @@ class Admin extends Authenticatable
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'password' => 'hashed',
+            // Phase 9 (part A): the authenticator key is encrypted with APP_KEY; recovery codes are stored as hashes.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_recovery_codes' => 'array',
+            'two_factor_last_step' => 'integer',
         ];
+    }
+
+    /** Phase 9 (part A): two-step sign-in is on (enrolled and confirmed). */
+    public function hasTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
     }
 
     public function role(): BelongsTo

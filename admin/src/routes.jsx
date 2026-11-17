@@ -39,6 +39,10 @@ import { CatalogRuleFormPage, CatalogRulesPage } from './pages/CatalogRulesPages
 import { CampaignEditorPage, CampaignsPage, SubscribersPage } from './pages/NewsletterPages'
 import AbandonedCartsPage from './pages/AbandonedCartsPage'
 import SearchTermsPage from './pages/SearchTermsPage'
+// Phase 9: two-step sign-in (BuyNest accounts) and backups.
+import { REAL_ACCOUNTS } from './auth/accounts'
+import TwoFactorPage from './pages/TwoFactorPage'
+import BackupsPage from './pages/BackupsPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -65,6 +69,8 @@ export function AdminRoutes() {
         <Route path="orders" element={guarded('orders.view', <OrdersPage />)} />
         <Route path="orders/:orderId" element={guarded('orders.view', <OrderDetailPage />)} />
         <Route path="customers" element={guarded('customers.view', <CustomersPage />)} />
+        {/* Phase 9: Account → Two-step sign-in, for every admin (no permission). */}
+        {REAL_ACCOUNTS && <Route path="account/two-factor" element={<TwoFactorPage />} />}
         {/* Sales documents, coupons, and everything of phases 4 and 5 exist only with BuyNest's backend. */}
         {LIVE_DATA && (
           <>
@@ -111,6 +117,10 @@ export function AdminRoutes() {
             <Route path="newsletter/campaigns/:campaignId" element={guarded('newsletter.view', <CampaignEditorPage />)} />
             <Route path="abandoned-carts" element={guarded('reports.view', <AbandonedCartsPage />)} />
             <Route path="search-terms" element={guarded('reports.view', <SearchTermsPage />)} />
+            {/* Phase 9: System → Backups (Owner only by default). */}
+            <Route path="backups" element={guarded('backups.view', <BackupsPage />)} />
+            {/* The backup_failed notification links here. */}
+            <Route path="system/backups" element={<Navigate to="/backups" replace />} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

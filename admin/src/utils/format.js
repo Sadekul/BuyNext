@@ -20,3 +20,17 @@ export const formatDate = (iso, fallback = '—') => (iso ? dateFormat.format(ne
 const dateTimeFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 /** ISO date → "Nov 10, 2026, 9:41 AM". */
 export const formatDateTime = (iso, fallback = '—') => (iso ? dateTimeFormat.format(new Date(iso)) : fallback)
+
+/** Phase 9 (backups): 1536 → "1.5 KB"; 3_400_000 → "3.2 MB". */
+export function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`
+}

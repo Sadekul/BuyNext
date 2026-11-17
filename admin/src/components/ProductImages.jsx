@@ -126,12 +126,24 @@ function ProductImages({ productId, images, editable }) {
             const altId = `${inputId}-alt-${image.id}`
             return (
               <li key={image.id} className="image-item">
-                <img src={image.url} alt={image.alt} width="96" height="96" loading="lazy" />
+                {/* Phase 9 §2: the 320 px copy is plenty for this 96 px preview; the original when there's none. */}
+                <img src={image.variants?.['320'] ?? image.url} alt={image.alt} width="96" height="96" loading="lazy" />
                 <div className="image-item__body">
                   <p className="image-item__title">
                     Image {index + 1}
                     {index === 0 && <span className="status status--info">Main image</span>}
                   </p>
+                  {image.variants && (
+                    <p className="field__hint">
+                      {Object.keys(image.variants).length > 0
+                        ? `Resized copies for faster pages: ${Object.keys(image.variants)
+                            .map((width) => `${width} px`)
+                            .join(', ')}.`
+                        : image.isUpload
+                          ? 'No resized copies: the original is used everywhere.'
+                          : 'External address: shown as it is.'}
+                    </p>
+                  )}
                   {editable ? (
                     <form
                       className="image-item__alt"

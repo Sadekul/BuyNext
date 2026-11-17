@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Emailed 6-digit codes: sign-up verification and password reset.
+ * Emailed 6-digit codes: sign-up verification, password reset, and (phase 9)
+ * the new address of an email change.
  *
  * - Only an HMAC of the code is stored (keyed with APP_KEY), never the code.
  * - A new code replaces any earlier unused one for the same email and purpose.
@@ -43,7 +44,7 @@ class OneTimeCodes
             ]);
         });
 
-        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName, $setPassword));
+        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName, $setPassword, $email));
 
         return config('buynest.codes.resend_cooldown_seconds');
     }

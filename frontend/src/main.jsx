@@ -6,6 +6,14 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import RootErrorFallback from './components/common/RootErrorFallback'
+import { installErrorReporting } from './utils/errorReporting'
+
+// Phase 9: report crashes to BuyNest's server (POST /api/client-errors), which
+// passes them to the API's error tracking. Only with BuyNest's own API behind
+// the store: the DummyJSON demo has nowhere to send them.
+if (import.meta.env.VITE_API_PROVIDER === 'laravel' || import.meta.env.VITE_ACCOUNTS_BACKEND === 'laravel') {
+  installErrorReporting({ app: 'store', release: import.meta.env.VITE_RELEASE })
+}
 
 // Entry point: find <div id="root"> in index.html and let React own it.
 // BrowserRouter enables client-side routing for everything inside <App />.

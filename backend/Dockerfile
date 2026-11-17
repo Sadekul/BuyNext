@@ -14,18 +14,24 @@ FROM php:8.4-fpm-trixie
 
 # --- System packages and PHP extensions --------------------------------------
 # nginx: the web server. gosu: drops from root to www-data after fixing the
-# volume's permissions (see docker/start.sh).
+# volume's permissions (see docker/start.sh). mariadb-client (phase 9):
+# mysqldump for `php artisan buynest:backup` and the mysql client for
+# restoring (works with Railway's MySQL; see docs/DEPLOY_RAILWAY.md).
 # Extensions the app needs beyond the base image: pdo_mysql (MySQL), bcmath,
-# intl, zip, exif, pcntl (graceful stop for queue:work), opcache (speed).
+# intl, zip, exif, pcntl (graceful stop for queue:work), opcache (speed), and
+# since phase 9 gd with JPEG, PNG and WebP (resized product photos).
 # The -dev packages are only needed to compile; they are removed afterwards
 # while the libraries the extensions link against are kept (the same trick
-# the official PHP images use).
+# the official PHP images use). The last lines check GD's formats and make
+# sure `mysqldump` and `mysql` exist (newer MariaDB packages may only ship
+# mariadb-dump and mariadb).
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates gosu nginx unzip; \
+    apt-get install -y --no-install-recommends ca-certificates gosu nginx unzip mariadb-client; \
     savedAptMark="$(apt-mark showmanual)"; \
-    apt-get install -y --no-install-recommends libicu-dev libzip-dev; \
-    docker-php-ext-install -j"$(nproc)" bcmath exif intl opcache pcntl pdo_mysql zip; \
+    apt-get install -y --no-install-recommends libicu-dev libzip-dev libjpeg62-turbo-dev libpng-dev libwebp-dev; \
+    docker-php-ext-configure gd --with-jpeg --with-webp; \
+    docker-php-ext-install -j"$(nproc)" bcmath exif gd intl opcache pcntl pdo_mysql zip; \
     apt-mark auto '.*' > /dev/null; \
     apt-mark manual $savedAptMark > /dev/null; \
     find /usr/local -type f -executable -exec ldd '{}' ';' 2>/dev/null \
@@ -33,7 +39,11 @@ RUN set -eux; \
         | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u | xargs -r apt-mark manual; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /etc/nginx/conf.d; \
-    php -m | grep -qi pdo_mysql
+    php -m | grep -qi pdo_mysql; \
+    php -r '$gd = gd_info(); exit($gd["JPEG Support"] && $gd["PNG Support"] && $gd["WebP Support"] && function_exists("imagewebp") && function_exists("gzopen") ? 0 : 1);'; \
+    command -v mysqldump || ln -s "$(command -v mariadb-dump)" /usr/local/bin/mysqldump; \
+    command -v mysql || ln -s "$(command -v mariadb)" /usr/local/bin/mysql; \
+    mysqldump --version
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

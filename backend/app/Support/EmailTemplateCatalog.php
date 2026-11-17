@@ -168,6 +168,71 @@ final class EmailTemplateCatalog
                     .'{{ button }}'
                     .self::QUESTIONS,
             ],
+            // Phase 9 (part A): changing the account email, a customer cancelling their order, deleting the account.
+            'email_change_code' => [
+                'name' => 'Email change code',
+                'description' => 'Sent to the new address when a customer changes their email, with the code that confirms it.',
+                'variables' => [...self::CODE_VARIABLES, 'new_email' => ['The new email address', 'text']],
+                'required' => [['code']],
+                'subject' => 'Confirm your new email for {{ store_name }}',
+                'body' => '<h2>Confirm your new email</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>You asked to use {{ new_email }} for your {{ store_name }} account. Enter this code to confirm it.</p>'
+                    .'<p>Your code:</p><blockquote><h3>{{ code }}</h3></blockquote>'
+                    .'<p>The code expires in {{ expires_minutes }} minutes and works once. Until you enter it, your account keeps its current email.</p>'
+                    .'<p>Didn’t ask for this? You can ignore this email. Never share this code: {{ store_name }} staff will never ask for it.</p>',
+            ],
+            'email_changed' => [
+                'name' => 'Email changed notice',
+                'description' => 'Sent to the old address after a customer changed their account email, in case it wasn’t them.',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                    'old_email' => ['The old email address', 'text'],
+                    'new_email' => ['The new email address', 'text'],
+                ],
+                'required' => [],
+                'subject' => 'Your {{ store_name }} email was changed',
+                'body' => '<h2>Your email was changed</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>The email address of your {{ store_name }} account was changed from {{ old_email }} to <strong>{{ new_email }}</strong>. '
+                    .'From now on, sign in and receive emails with the new address.</p>'
+                    .'<p>Wasn’t you? Contact us right away at {{ support_email }} and we’ll help you get your account back.</p>',
+            ],
+            'order_cancelled_by_customer' => [
+                'name' => 'Order cancelled by the customer',
+                'description' => 'Sent when a customer cancels their own unpaid order from their account or the order tracking page.',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                    'order_number' => ['Order number', 'text'],
+                    'order_total' => ['Order total ($)', 'text'],
+                    'reason' => ['The reason the customer gave, empty without one', 'block'],
+                ],
+                'required' => [['order_number']],
+                'subject' => 'Your order was cancelled ({{ order_number }})',
+                'body' => '<h2>Your order was cancelled</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>As you asked, we cancelled order <strong>{{ order_number }}</strong>. Nothing was charged, and the items were released.</p>'
+                    .'<blockquote>Order <strong>{{ order_number }}</strong> · ${{ order_total }}</blockquote>'
+                    .'{{ reason }}'
+                    .'<p>Changed your mind? You’re welcome to place the order again.</p>'
+                    .self::QUESTIONS,
+            ],
+            'account_deleted' => [
+                'name' => 'Account deleted',
+                'description' => 'Sent to the customer after they deleted their own account.',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                ],
+                'required' => [],
+                'subject' => 'Your {{ store_name }} account was deleted',
+                'body' => '<h2>Your account was deleted</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>As you asked, we deleted your {{ store_name }} account, your saved addresses, and your saved cart, and took you off our newsletter. '
+                    .'We keep the records of past orders that the law requires, without a link to an account.</p>'
+                    .'<p>Thanks for shopping with us. You’re always welcome back.</p>'
+                    .'<p>Didn’t do this? Contact us right away at {{ support_email }}.</p>',
+            ],
+            // End of phase 9 part A templates.
             'invoice' => [
                 'name' => 'Invoice (payment received)',
                 'description' => 'Sent when staff invoice an order (record the payment) and choose to notify the customer.',
@@ -287,6 +352,25 @@ final class EmailTemplateCatalog
                     .'{{ button }}'
                     .'<p>Questions? Just reply to this email.</p>',
             ],
+            // Phase 9 (part B): "Email me when it's back in stock" (one email per alert; the footer has "Stop these alerts").
+            'back_in_stock' => [
+                'name' => 'Back in stock',
+                'description' => 'Sent once to everyone who asked to be told when a sold-out product (or option) is available again.',
+                'variables' => [
+                    'product_name' => ['Product name', 'text'],
+                    'variant_label' => ['Chosen options in brackets, e.g. "(Size: M)"; empty for the whole product', 'text'],
+                    'product_url' => ['Link to the product', 'url'],
+                    'unsubscribe_url' => ['Link that stops these alerts', 'url'],
+                    'button' => ['"Shop now" button', 'block'],
+                ],
+                'required' => [['button', 'product_url']],
+                'subject' => '{{ product_name }} is back in stock',
+                'body' => '<h2>It’s back in stock</h2>'
+                    .'<p>Good news: <strong>{{ product_name }}</strong> {{ variant_label }} is available again at {{ store_name }}.</p>'
+                    .'<p>Stock is limited and items aren’t reserved, so it may sell out again.</p>'
+                    .'{{ button }}'
+                    .'<p>This is the only email you’ll get about this item.</p>',
+            ],
         ];
     }
 
@@ -322,6 +406,18 @@ final class EmailTemplateCatalog
                 'shop_url' => config('buynest.storefront_url'),
                 'button' => EmailBlocks::button(config('buynest.storefront_url'), 'Shop again'),
             ],
+            // Phase 9 (part A).
+            'email_change_code' => [
+                'customer_first_name' => 'Ava', 'code' => '123456', 'expires_minutes' => '10', 'new_email' => 'ava.new@example.com',
+            ],
+            'email_changed' => [
+                'customer_first_name' => 'Ava', 'old_email' => 'ava@example.com', 'new_email' => 'ava.new@example.com',
+            ],
+            'order_cancelled_by_customer' => [
+                'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96',
+                'reason' => EmailBlocks::paragraph('Your reason: Ordered the wrong size.'),
+            ],
+            'account_deleted' => ['customer_first_name' => 'Ava'],
             'invoice' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'invoice_number' => 'INV-100001',
                 'invoice_amount' => '124.96', 'note' => $note,
@@ -354,6 +450,13 @@ final class EmailTemplateCatalog
                 'customer_first_name' => 'Ava', 'cart_subtotal' => '119.97', 'cart_url' => config('buynest.storefront_url').'/cart',
                 'items_table' => EmailBlocks::itemsTable(array_map(fn ($i) => ["{$i[0]} × {$i[1]}", '$'.$i[2]], $items), [['Subtotal', '$119.97', true]]),
                 'button' => EmailBlocks::button(config('buynest.storefront_url').'/cart', 'Back to your cart'),
+            ],
+            // Phase 9 (part B).
+            'back_in_stock' => [
+                'product_name' => 'Cotton Tee', 'variant_label' => '(Size: M / Color: Navy)',
+                'product_url' => config('buynest.storefront_url').'/products/1',
+                'unsubscribe_url' => config('buynest.storefront_url').'/stock-alerts/unsubscribe?token=sample',
+                'button' => EmailBlocks::button(config('buynest.storefront_url').'/products/1', 'Shop now'),
             ],
         };
 

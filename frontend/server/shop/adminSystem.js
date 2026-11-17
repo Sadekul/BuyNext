@@ -58,6 +58,8 @@ export function adminUser(raw) {
     lastLoginAt: raw.last_login_at ?? null,
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
+    // Phase 9: whether two-step sign-in is on (left out by an older API).
+    ...(typeof raw.two_factor_enabled === 'boolean' && { twoFactorEnabled: raw.two_factor_enabled }),
   }
 }
 
@@ -290,6 +292,8 @@ const SETTINGS = {
   catalog: { reviews_require_approval: 'reviewsRequireApproval' },
   // Phase 6: returns (RMA).
   returns: { returns_enabled: 'returnsEnabled', return_window_days: 'returnWindowDays', return_reasons: 'returnReasons' },
+  // Phase 9: two-step sign-in for every admin (only the Owner may change it; the API checks).
+  security: { require_admin_two_factor: 'requireAdminTwoFactor' },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']

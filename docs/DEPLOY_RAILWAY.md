@@ -11,6 +11,8 @@ This guide takes you from a GitHub repository to a live shop, one click at a tim
 | Scheduler | Railway, service **scheduler** | the same image, runs the every-minute jobs (price rules, clean-ups) |
 | Database | Railway, **MySQL** | managed MySQL with its own volume |
 | Product photos | Railway **volume** on the api service | `/var/www/html/storage/app/public` |
+| Database backups (phase 9) | an S3-compatible **bucket** (Railway bucket, Cloudflare R2, Backblaze B2, AWS S3) | daily `mysqldump` at 03:00 by the scheduler, kept 14 days; see [step 15](#15-database-backups-and-restoring) |
+| Error alerts (phase 9) | [Sentry](https://sentry.io) (optional) | server errors and browser errors, without personal data; see [step 14](#14-error-alerts-sentry) |
 | Store + admin + server functions | Vercel (`frontend/`) | static pages plus the sign-in service, admin API, media and payment functions |
 | Card payments | Stripe Checkout | Stripe's hosted page; Stripe tells BuyNest the result through a webhook |
 | Email | Brevo or Mailgun over SMTP | see [EMAIL.md](EMAIL.md) |
@@ -122,6 +124,20 @@ BUYNEST_NEWSLETTER_PER_MINUTE=10
 BUYNEST_NEWSLETTER_PER_EMAIL_PER_HOUR=3
 BUYNEST_STRIPE_WEBHOOKS_PER_MINUTE=300
 BUYNEST_CODE_TTL_MINUTES=10
+BUYNEST_CLIENT_ERRORS_PER_MINUTE=10
+BUYNEST_STOCK_ALERTS_PER_MINUTE=10
+BUYNEST_STOCK_ALERTS_PER_EMAIL_PER_HOUR=5
+
+SENTRY_LARAVEL_DSN=<https://…@….ingest.sentry.io/… — leave empty to send nothing (step 14)>
+SENTRY_ENVIRONMENT=production
+
+BACKUP_DISK=s3
+BACKUP_KEEP_DAYS=14
+BACKUP_S3_BUCKET=<bucket name (step 15)>
+BACKUP_S3_ENDPOINT=<https://… the bucket's S3 endpoint>
+BACKUP_S3_REGION=auto
+BACKUP_S3_KEY=<access key id>
+BACKUP_S3_SECRET=<secret access key>
 
 PHP_FPM_MAX_CHILDREN=10
 ```
@@ -144,6 +160,8 @@ What each group means:
 | `MAIL_*` | Your email provider: exact values in [EMAIL.md](EMAIL.md). |
 | `STRIPE_*` | Card payments. Stripe is switched on only when `STRIPE_SECRET_KEY` is set; without it card orders wait for an admin to invoice them. `STRIPE_CHECKOUT_MINUTES` is how long the payment page stays open (30 minimum). |
 | `BUYNEST_*` | Rate limits (requests per visitor per minute or hour) and how long emailed codes last. The values above are the defaults from `backend/.env.example`; raise them only if real shoppers get "Too many attempts". |
+| `SENTRY_*` | Error alerts (step 14). Empty DSN = nothing is ever sent. |
+| `BACKUP_*` | Database backups (step 15): where they go, how long they are kept. The scheduler makes them, the api lists and downloads them, so both need the same values. |
 | `PHP_FPM_MAX_CHILDREN` | How many requests PHP handles at the same moment (each uses about 30–60 MB of memory). 10 suits a small Railway instance; minimum 2. |
 
 ## 5. The photo volume
@@ -291,6 +309,74 @@ Tick each one, in order:
 - [ ] **Refund:** in the admin, create a credit memo for the paid order → Stripe's dashboard shows the refund on that payment.
 - [ ] **Newsletter (worker):** subscribe in the store's newsletter form with your own address and confirm the email; then send a campaign from the admin's newsletter campaigns page while you're the only subscriber. The worker's log shows the batch job, and the email arrives. (A campaign's **Send test** goes straight to you without the queue, so it doesn't prove the worker runs.)
 - [ ] **Backups** are on for the MySQL volume and the photo volume.
+- [ ] **Database backup (phase 9):** admin → System → **Backups** → **Back up now** → a `buynest-….sql.gz` appears; **Download** it and check it opens (`gunzip -t buynest-….sql.gz` prints nothing on success). The next morning the scheduler's 03:00 backup is listed too.
+- [ ] **Error alerts (phase 9):** with `SENTRY_LARAVEL_DSN` set, step 14's test event shows up in Sentry.
+- [ ] **Photo sizes (phase 9):** upload a photo larger than 960 px wide; the product's image in the admin lists `320` and `960` copies. For photos uploaded before phase 9 run `artisan buynest:images:resize` once on the **api** service.
+
+## 14. Error alerts (Sentry)
+
+Optional but recommended: without it you only learn about errors from the logs (or from customers).
+
+1. Create a free account at [sentry.io](https://sentry.io) → **Create project** → platform **Laravel** → name it `buynest-api`.
+2. Copy the **DSN** it shows (Project → Settings → Client Keys).
+3. Railway → **api**, **worker** and **scheduler** → Variables: `SENTRY_LARAVEL_DSN=<the DSN>` and `SENTRY_ENVIRONMENT=production` (Shared Variables make this one change). Each service redeploys.
+4. Test it: `railway ssh --service api`, then `artisan sentry:test`. The test event appears in Sentry within a minute.
+
+What is sent, and what isn't:
+- Server errors (exceptions) from the API, the worker and the scheduler, with the code location and the request's method and path.
+- **Never:** request bodies (passwords, addresses), cookies, the `Authorization` header or the shared key, query strings (unsubscribe tokens, download signatures), SQL values. Email addresses and `token=`/`code=`/`password=` values in messages are replaced with `[scrubbed]`. A signed-in user is only `{ id, kind: customer|admin }`. (`backend/app/Support/SentryScrubber.php`.)
+- **Browser errors** from the store and the admin go to the store's own server function (`/api/client-errors`, no third-party script, the CSP is unchanged), which forwards them with the shared key; they show up in Sentry tagged `source: client` and `app: store|admin`. The same error is sent at most once per 10 minutes, and each visitor at most 10 per minute.
+- Performance tracing is off unless you set `SENTRY_TRACES_SAMPLE_RATE` (for example `0.1`).
+
+Leave `SENTRY_LARAVEL_DSN` empty and nothing is sent anywhere (browser errors then go to the api's log at warning level).
+
+## 15. Database backups and restoring
+
+Two layers:
+1. **Railway's volume backups** of the MySQL service (step 3): whole-disk snapshots, restored with one click in Railway. Keep them on.
+2. **BuyNest's own daily backup** (phase 9): a `mysqldump` of the database, gzipped, saved **outside Railway** in an S3-compatible bucket, so you still have your data if the Railway project is deleted or the volume is damaged. It also lets you download a copy and restore it anywhere.
+
+### Set up the bucket
+
+Any S3-compatible storage works. For example **Cloudflare R2** (10 GB free): R2 → **Create bucket** `buynest-backups` → **Manage R2 API tokens** → create a token with *Object Read & Write* on that bucket. You get an access key id, a secret, and the endpoint `https://<account id>.r2.cloudflarestorage.com`. (Railway's own buckets, Backblaze B2 and AWS S3 work the same way; for AWS leave `BACKUP_S3_ENDPOINT` empty and set `BACKUP_S3_REGION`, e.g. `eu-west-1`. Some providers need `BACKUP_S3_PATH_STYLE=true`.)
+
+Set the same variables on **api** and **scheduler** (Shared Variables are easiest):
+
+| Variable | Value |
+| --- | --- |
+| `BACKUP_DISK` | `s3` |
+| `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_KEY`, `BACKUP_S3_SECRET` | from the provider (`BACKUP_S3_REGION=auto` for R2) |
+| `BACKUP_S3_PREFIX` | folder inside the bucket, default `backups` |
+| `BACKUP_KEEP_DAYS` | how many days of backups to keep, default `14` (older ones are deleted after each backup; the newest is never deleted) |
+| `BACKUP_TIME`, `BACKUP_TIMEZONE` | when the daily backup runs, default `03:00` in the app's time zone (UTC) |
+| `BACKUP_SCHEDULE` | `false` turns the daily backup off (manual ones still work) |
+
+Why a bucket and not a volume: a Railway volume belongs to one service. The daily backup runs in the **scheduler** service, and the admin's list and downloads are served by **api**; a bucket is reachable from both. (`BACKUP_DISK=local`, the default, writes to `storage/app/backups` (or `BACKUP_LOCAL_PATH`) and suits a single server or development, where the scheduler and the API share one disk.)
+
+How it works: `artisan buynest:backup` runs `mysqldump --single-transaction` (a consistent copy without locking the shop), gzips it and uploads `buynest-YYYYMMDD-HHMMSS.sql.gz` (UTC time). The database password is handed to mysqldump in a temporary file only the app can read, deleted right after, never on a command line. `artisan buynest:backup --list` prints the backups. A failed backup shows a red notification to Owners in the admin's bell and is sent to Sentry.
+
+In the admin: **System → Backups** (Owners only; another role can be given the "View, make, and download database backups" permission): the backups with size and time, **Back up now**, and **Download** (a link valid for 5 minutes; every download is in the audit log). Restoring is deliberately not a button.
+
+### Restore a backup
+
+Restoring **replaces** the database's contents with the backup's. Practise it once on a copy (step 6 below) before you ever need it.
+
+1. **Get the file:** admin → System → Backups → **Download**, or from the bucket in your provider's dashboard. Check it: `gunzip -t buynest-….sql.gz` (no output = fine).
+2. **Stop changes:** `railway ssh --service api`, then `artisan down` (the store shows "temporarily unavailable" for API calls). In Railway, open **worker** and **scheduler** → the active deployment → ⋮ → **Remove** (you redeploy them at the end).
+3. **Reach the database from your computer:** Railway → **MySQL** → Settings → Networking → **TCP Proxy** → enable; note the host and port. The password is MySQL → Variables → `MYSQLPASSWORD`, the database name `MYSQLDATABASE` (usually `railway`).
+4. **Restore** (you need the `mysql` command: macOS `brew install mysql-client`, Debian/Ubuntu `sudo apt install mariadb-client`):
+
+   ```bash
+   gunzip -c buynest-20261117-030000.sql.gz \
+     | sed '1{/999999/d}' \
+     | mysql -h <proxy host> -P <proxy port> -u root -p --default-character-set=utf8mb4 railway
+   ```
+
+   It asks for the password (typed, not on the command line). `sed '1{/999999/d}'` drops the one line MariaDB's dump tool puts first ("sandbox mode"), which MySQL's own client doesn't understand; it changes nothing else. The dump drops and re-creates every table, so you don't need to empty the database first.
+5. **Start again:** in the api shell `artisan migrate --force` (a backup from before a newer release gets its newer tables back), then `artisan up`. Redeploy **worker** and **scheduler**. Turn the MySQL **TCP Proxy off** again.
+6. **Practise on a copy** (no downtime): in step 4 restore into a new database instead: `mysql -h … -P … -u root -p -e 'CREATE DATABASE restore_check'`, then the same command with `restore_check` instead of `railway`; compare a few counts (`SELECT COUNT(*) FROM orders;` in both), then `DROP DATABASE restore_check;`. This procedure was tested on the development database: a backup made with `buynest:backup` was restored with the command above into an empty MySQL 8.4 server; all 52 tables came back, and their row counts matched the live database except for tables that changed after the backup's moment (sessions, cache, audit log, new sign-ups).
+
+Photos are not in the database backup: they live on the api volume, covered by Railway's volume backups (step 5).
 
 ## Everyday operations
 
@@ -300,12 +386,14 @@ Tick each one, in order:
 | Change a variable | Edit it in Railway → the service redeploys (configuration is cached at start-up, so a redeploy is how it takes effect). On Vercel, redeploy after changing a `VITE_*` value. |
 | See errors | Railway → service → **Logs** (Laravel logs to stderr). Vercel → project → **Logs** for the server functions. |
 | Run an artisan command | `railway ssh --service api`, then `artisan <command>`. |
+| Back up the database now | Admin → System → Backups → **Back up now**, or `artisan buynest:backup` (list them with `--list`). Restore: [step 15](#restore-a-backup). |
+| Resized photos for old uploads | `artisan buynest:images:resize` on the **api** service (`--force` makes all copies again). |
 | Roll back | Railway → Deployments → an older deployment → **Redeploy**. Migrations don't roll back by themselves; a release that changed tables may need `artisan migrate:rollback` first (check before you do it on live data). |
 | Busier shop | Raise the api service's resources in Railway, then `PHP_FPM_MAX_CHILDREN` (about 1 per 60 MB of memory you give it). Keep one replica: the photo volume can only be attached to one container. |
 
 ## How the image works (for the curious)
 
-- **`backend/Dockerfile`**: the official `php:8.4-fpm` image (Debian 13) with the extensions BuyNest uses (`pdo_mysql`, `bcmath`, `intl`, `zip`, `exif`, `pcntl`, `opcache`), nginx, and `composer install --no-dev --optimize-autoloader`. PHP settings in `backend/docker/php/` (uploads up to 10 × 5 MB per request, 60 MB per request; OPcache on).
+- **`backend/Dockerfile`**: the official `php:8.4-fpm` image (Debian 13) with the extensions BuyNest uses (`pdo_mysql`, `bcmath`, `intl`, `zip`, `exif`, `pcntl`, `opcache`, and since phase 9 `gd` with JPEG, PNG and WebP for resized photos), the MariaDB client (`mysqldump` for backups, `mysql` for restoring), nginx, and `composer install --no-dev --optimize-autoloader`. PHP settings in `backend/docker/php/` (uploads up to 10 × 5 MB per request, 60 MB per request; OPcache on).
 - **Why nginx + PHP-FPM:** it's the standard, battle-tested way to run Laravel. nginx serves photos under `/storage/...` straight from disk and hands everything else to PHP-FPM, which keeps a pool of PHP workers. `php artisan serve` is a single-process development server and isn't meant for production. The two programs run side by side in one container under a small supervisor written in the start script (`backend/docker/start.sh`): if either stops, the container exits and Railway restarts it.
 - **`backend/docker/start.sh`**: fixes the volume's owner, switches to `www-data`, caches config, routes and views, and then, depending on `CONTAINER_ROLE`: `web` runs `migrate --force`, `storage:link`, writes nginx's config with `$PORT` and starts serving; `worker` runs `queue:work`; `scheduler` runs `schedule:work`.
 - **HTTPS:** Railway handles the certificate. nginx tells Laravel the original request was HTTPS (from Railway's `X-Forwarded-Proto` header), so generated links use `https://`.

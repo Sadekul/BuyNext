@@ -38,23 +38,28 @@ export function findVariant(product, selection) {
  * options count, so the shopper can never get stuck: the first option is
  * always open, and changing it clears later choices that no longer fit
  * (see chooseValue).
+ * `{ soldOut: true }` (phase 9) also counts variants that are sold out, so a
+ * shopper can pick one and ask to be emailed when it's back.
  */
-export function isValueAvailable(product, selection, optionId, valueId) {
+export function isValueAvailable(product, selection, optionId, valueId, { soldOut = false } = {}) {
   const index = product.options.findIndex((option) => option.id === optionId)
   const others = product.options
     .slice(0, Math.max(index, 0))
     .filter((option) => selection[option.id] !== undefined)
     .map((option) => selection[option.id])
   return product.variants.some(
-    (variant) => variant.inStock && variant.optionValueIds.includes(valueId) && others.every((other) => variant.optionValueIds.includes(other)),
+    (variant) => (soldOut || variant.inStock) && variant.optionValueIds.includes(valueId) && others.every((other) => variant.optionValueIds.includes(other)),
   )
 }
 
-/** The selection after choosing a value: later choices that no longer fit are cleared. */
-export function chooseValue(product, selection, optionId, valueId) {
+/**
+ * The selection after choosing a value: later choices that no longer fit are
+ * cleared. `{ soldOut: true }`: sold-out variants count as fitting (phase 9).
+ */
+export function chooseValue(product, selection, optionId, valueId, { soldOut = false } = {}) {
   const next = { ...selection, [optionId]: valueId }
   for (const option of product.options) {
-    if (next[option.id] !== undefined && !isValueAvailable(product, next, option.id, next[option.id])) delete next[option.id]
+    if (next[option.id] !== undefined && !isValueAvailable(product, next, option.id, next[option.id], { soldOut })) delete next[option.id]
   }
   return next
 }

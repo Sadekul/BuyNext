@@ -110,7 +110,7 @@ class CatalogTest extends TestCase
 
         $this->getJson('/api/v1/products/1')->assertOk()
             ->assertJsonPath('data.sale_price', '8.94')
-            ->assertJsonPath('data.images.0', ['url' => 'https://cdn.example.com/1.webp', 'alt' => 'Mascara'])
+            ->assertJsonPath('data.images.0', ['url' => 'https://cdn.example.com/1.webp', 'alt' => 'Mascara', 'variants' => []])
             ->assertJsonPath('data.reviews.0.author_name', 'Eleanor Collins')
             ->assertJsonPath('data.reviews.0.rating', 3)
             ->assertJsonStructure(['data' => ['description', 'tags', 'warranty', 'shipping_info', 'return_policy', 'weight', 'min_order_quantity']]);

@@ -229,3 +229,13 @@
 - Email delivery: SMTP providers, SPF, DKIM, and DMARC, and sending a test email from the command line
 - Containers for PHP: nginx + PHP-FPM, running as a non-root user, a startup script per role (web, queue worker, scheduler), persistent volumes for uploads
 - Locking an API to its own front end with a shared key, while health checks and public files stay open
+
+## Phase 9: Launch readiness and customer self-service
+
+- Two-step sign-in (TOTP, RFC 6238): shared secrets, 30-second steps, a ±1 step window, replay guards, recovery codes stored as hashes, a short-lived challenge between the password and the code, and a limited "set it up first" session when the store requires two-step
+- Image processing on upload: resizing without upscaling, re-encoding to strip metadata, `srcset`/`sizes` so phones download small files
+- Observability: reporting server and browser errors (scrubbing personal data first), sendBeacon for errors on a closing page
+- Backups you can trust: consistent dumps (`--single-transaction`), keeping passwords off the command line, retention, alerts on failure, and actually testing a restore
+- Privacy by design: changing an email only after the new address proves itself, telling the old address, data export, and account deletion that keeps the shop's accounting records without the person
+- Event-driven notifications: one model hook for "back in stock" instead of a call in every place stock changes
+- Testing lessons: waiting for focus that moves on the next animation frame; longer limits for long flows when the whole suite runs in parallel

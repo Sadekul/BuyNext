@@ -120,13 +120,16 @@ function AuthProvider({ children }) {
   // - without "Remember me", delete the account's saved cart, wishlist, and
   //   orders from this device. This runs after the stores have switched to the
   //   guest copies, so nothing writes the account's data back.
+  // (A deleted account's data goes even when it was remembered: forgetRef, set by logout.)
   const previousSessionRef = useRef(session)
+  const forgetRef = useRef(false)
   useEffect(() => {
     const previous = previousSessionRef.current
     previousSessionRef.current = session
     if (session.status !== 'anonymous') return
     queryClient.removeQueries({ queryKey: userKeys.all })
-    if (previous.user && !previous.remember) removeAccountData(previous.user.id)
+    if (previous.user && (!previous.remember || forgetRef.current)) removeAccountData(previous.user.id)
+    forgetRef.current = false
   }, [session, queryClient])
 
   // Keep every tab on the same account. Cookies are shared by all tabs; the
@@ -177,13 +180,16 @@ function AuthProvider({ children }) {
     return user
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(({ forgetDevice = false } = {}) => {
     // 1. Delete the readable hint now: even if the page reloads before the
     //    request below finishes, the app starts signed out.
     // 2. The service deletes the HttpOnly session cookies (a keepalive request,
     //    so closing the tab doesn't cancel it).
+    // forgetDevice (phase 9, a deleted account): also delete its saved cart and
+    // wishlist on this device, even with "Remember me".
     document.cookie = `${SESSION_HINT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Strict`
     authService.logout().catch(() => {})
+    forgetRef.current = forgetDevice === true
     setSession(ANONYMOUS)
   }, [])
 

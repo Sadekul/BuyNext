@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Admin\AbandonedCartController;
 use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\AuditController;
+use App\Http\Controllers\Api\Admin\BackupController;
 use App\Http\Controllers\Api\Admin\CatalogRuleController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CouponController;
@@ -36,19 +37,24 @@ use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SearchTermController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\ShipmentController;
+use App\Http\Controllers\Api\Admin\StockAlertReportController;
+use App\Http\Controllers\Api\Admin\TwoFactorController;
 use App\Http\Controllers\Api\Admin\UrlRedirectController;
 use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\ClientErrorController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
 use App\Http\Controllers\Api\V1\CustomerCartController;
+use App\Http\Controllers\Api\V1\MyAccountController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SeoController;
+use App\Http\Controllers\Api\V1\StockAlertController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -88,6 +94,16 @@ Route::prefix('v1')->group(function () {
         // Phase 7: newsletter, templates, SEO, carts, dashboard, notifications (part B) - the saved cart.
         Route::get('me/cart', [CustomerCartController::class, 'show']);
         Route::post('me/cart/merge', [CustomerCartController::class, 'merge']);
+        // Phase 9 (part A): change email (code to the new address), download my data, delete my account.
+        Route::post('me/email', [MyAccountController::class, 'requestEmailChange'])->middleware('throttle:account-codes');
+        Route::post('me/email/confirm', [MyAccountController::class, 'confirmEmailChange'])->middleware('throttle:account-codes');
+        Route::get('me/export', [MyAccountController::class, 'export'])->middleware('throttle:data-export');
+        Route::post('me/delete', [MyAccountController::class, 'destroy'])->middleware('throttle:account-codes');
+        // End of phase 9 part A store routes (signed in).
+        // Phase 9 (part B): the account's "back in stock" alerts.
+        Route::get('me/stock-alerts', [StockAlertController::class, 'index']);
+        Route::delete('me/stock-alerts/{id}', [StockAlertController::class, 'destroy'])->whereNumber('id');
+        // End of phase 9 part B store routes (signed in).
     });
 
     // Phase 7: newsletter, templates, SEO, carts, dashboard, notifications (part B) - public store routes.
@@ -126,8 +142,18 @@ Route::prefix('v1')->group(function () {
 
     // Phase 8: Stripe card payments. Pay now: the order's customer, or the order's email (the lookup's proof), limited like the lookup.
     Route::post('orders/{number}/pay', [OrderController::class, 'pay'])->middleware(['customer.optional', 'throttle:auth']);
+    // Phase 9 (part A): customers (and guests with the order's email) cancel an unpaid, unshipped order.
+    Route::post('orders/{number}/cancel', [OrderController::class, 'cancel'])->middleware(['customer.optional', 'throttle:auth']);
     // Stripe's webhook: no sign-in (the signature is the proof), its own rate limit.
     Route::post('payments/stripe/webhook', StripeWebhookController::class)->middleware('throttle:stripe-webhooks');
+
+    // Phase 9 (part B): "email me when it's back" (guests and customers), its "stop these alerts" link,
+    // and browser error reports (only from the sign-in service: the shared key is always required).
+    Route::post('products/{id}/stock-alerts', [StockAlertController::class, 'store'])->whereNumber('id')
+        ->middleware(['customer.optional', 'throttle:stock-alerts']);
+    Route::post('stock-alerts/unsubscribe', [StockAlertController::class, 'unsubscribe'])->middleware('throttle:stock-alerts');
+    Route::post('client-errors', ClientErrorController::class)->middleware(['bff.key:always', 'throttle:client-errors']);
+    // End of phase 9 part B public store routes.
 });
 
 /*
@@ -141,9 +167,22 @@ Route::prefix('admin/v1')->group(function () {
         Route::post('refresh', 'refresh');
     });
 
-    Route::middleware(['auth:sanctum', 'token.kind:admin', 'throttle:api'])->group(function () {
+    // Phase 9 (part A): two-step sign-in. The second step needs no token (the challenge is the proof).
+    Route::post('auth/two-factor', [AdminAuthController::class, 'twoFactor'])->middleware('throttle:two-factor');
+    // These also accept the limited setup token (token.kind:admin,setup), so an admin who must set up
+    // two-step sign-in can do it; nothing else does (EnsureTokenKind, tests/Feature/AdminTwoFactorTest).
+    Route::middleware(['auth:sanctum', 'token.kind:admin,setup', 'throttle:api'])->group(function () {
         Route::post('auth/logout', [AdminAuthController::class, 'logout']);
         Route::get('me', [AdminAuthController::class, 'me']);
+        Route::post('me/two-factor', [TwoFactorController::class, 'begin']);
+        Route::post('me/two-factor/confirm', [TwoFactorController::class, 'confirm']);
+    });
+    // End of phase 9 part A setup routes.
+
+    Route::middleware(['auth:sanctum', 'token.kind:admin', 'throttle:api'])->group(function () {
+        // Phase 9 (part A): the signed-in admin's own two-step sign-in (no permission key).
+        Route::post('me/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes']);
+        Route::delete('me/two-factor', [TwoFactorController::class, 'disable']);
 
         Route::get('overview', OverviewController::class)->middleware('can.admin:dashboard.view');
 
@@ -300,6 +339,8 @@ Route::prefix('admin/v1')->group(function () {
             Route::get('admins/{id}', [AdminUserController::class, 'show'])->whereNumber('id');
             Route::patch('admins/{id}', [AdminUserController::class, 'update'])->whereNumber('id');
             Route::post('admins/{id}/reset-password', [AdminUserController::class, 'resetPassword'])->whereNumber('id');
+            // Phase 9 (part A): Owner only (checked in the controller).
+            Route::post('admins/{id}/two-factor/reset', [TwoFactorController::class, 'reset'])->whereNumber('id');
             Route::get('roles', [RoleController::class, 'index']);
             Route::post('roles', [RoleController::class, 'store']);
             Route::patch('roles/{id}', [RoleController::class, 'update'])->whereNumber('id');
@@ -329,5 +370,16 @@ Route::prefix('admin/v1')->group(function () {
 
         Route::get('settings', [SettingsController::class, 'show'])->middleware('can.admin:settings.view');
         Route::patch('settings', [SettingsController::class, 'update'])->middleware('can.admin:settings.edit');
+
+        // Phase 9 (part B): Reports → Stock alerts, and System → Backups (Owner only by default).
+        Route::get('reports/stock-alerts', StockAlertReportController::class)->middleware('can.admin:reports.view');
+        // {name}: only buynest-YYYYMMDD-HHMMSS.sql.gz files of the backups disk (checked in the controller).
+        Route::middleware('can.admin:backups.view')->controller(BackupController::class)->group(function () {
+            Route::get('backups', 'index');
+            Route::post('backups', 'store');
+            Route::post('backups/{name}/link', 'link');
+            Route::get('backups/{name}/download', 'download')->name('admin.backups.download');
+        });
+        // End of phase 9 part B admin routes.
     });
 });

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { LuCircleCheck, LuClock, LuPackageX, LuTriangleAlert } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
 import PayNowButton from '../components/orders/PayNowButton'
+import CancelOrderButton from '../components/orders/CancelOrderButton'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import Loader from '../components/ui/Loader'
@@ -151,7 +152,9 @@ function ServerOrderConfirmation() {
   const customerRequest = useQuery({ ...orderQuery(user?.id, orderId, authorizedRequest), enabled: mustFetch && Boolean(user), refetchInterval })
   const guestRequest = useQuery({ ...guestOrderQuery(orderId, guestEmail), enabled: mustFetch && !user && Boolean(guestEmail), refetchInterval })
   const request = user ? customerRequest : guestRequest
-  const order = (mustFetch ? request.data : null) ?? placed
+  // Phase 9: the order once the shopper cancelled it on this page.
+  const [cancelled, setCancelled] = useState(null)
+  const order = cancelled ?? (mustFetch ? request.data : null) ?? placed
 
   // ?payment=success: give up waiting after CONFIRM_FOR_MS (then "We're confirming your payment").
   useEffect(() => {
@@ -253,6 +256,8 @@ function ServerOrderConfirmation() {
       </div>
       {/* Outside the live region, so the button isn't re-announced with every message. */}
       {!leaving && canPay && (payment ? payment.pay : awaitingPayment) && <PayNowButton order={order} email={isAuthenticated ? undefined : (guestEmail ?? order.email)} size="lg" />}
+      {/* Phase 9: changed their mind? An unpaid order with nothing shipped can be cancelled. */}
+      {!leaving && <CancelOrderButton order={order} email={isAuthenticated ? undefined : (guestEmail ?? order.email)} onCancelled={setCancelled} />}
 
       <OrderDetailsView order={order} />
 

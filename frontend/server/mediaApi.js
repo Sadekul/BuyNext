@@ -8,8 +8,10 @@
  * needs no API address and the browser never learns where the API lives.
  *
  * Only names the API itself gives uploads are allowed (an allow-list:
- * `products/<id>/<32 hex>.<jpg|png|webp>`); anything else is a 404, so this
- * can't be used to read other files from the API's storage. The type comes
+ * `products/<id>/<32 hex>.<jpg|png|webp>`, and since phase 9 the resized
+ * copies the API makes next to it, `<32 hex>-320.webp` and `<32 hex>-960.webp`);
+ * anything else is a 404, so this can't be used to read other files from the
+ * API's storage. The type comes
  * from the extension, never from the upstream answer. File names are random
  * and never reused, so the browser and the CDN may keep them for a year.
  *
@@ -18,7 +20,7 @@
  * Netlify function (netlify/functions/media.mjs).
  */
 
-const MEDIA_PATH = /^products\/\d{1,9}\/[a-f0-9]{32}\.(jpg|png|webp)$/
+const MEDIA_PATH = /^products\/\d{1,9}\/[a-f0-9]{32}(-(320|960))?\.(jpg|png|webp)$/
 const TYPES = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
 const CACHE = 'public, max-age=31536000, immutable'
 const MAX_BYTES = 10 * 1024 * 1024 // uploads are at most 5 MB

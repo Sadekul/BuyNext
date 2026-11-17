@@ -257,6 +257,8 @@ export function fromOrder(raw) {
     ...(raw.return_eligibility && { returnEligibility: fromReturnEligibility(raw.return_eligibility) }),
     // Phase 8: the card payment (Stripe): provider, paid at, whether Pay now works, the payment page.
     ...fromOrderPayment(raw),
+    // Phase 9: whether the shopper may cancel it themselves (unpaid, nothing invoiced or shipped).
+    ...(typeof raw.can_cancel === 'boolean' && { canCancel: raw.can_cancel }),
   }
 }
 
@@ -390,6 +392,24 @@ export const laravelShop = {
     const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/pay`, { method: 'POST', token, request, body: email ? { email } : {} })
     // The answer is the order with its new payment page: only the payment goes to the browser.
     return answer(result, [200, 201], (data) => fromPayment(data.data?.payment) ?? { provider: null, url: null, expiresAt: null, paidAt: null, canPay: false })
+  },
+
+  /**
+   * Phase 9: the shopper cancels their own order. The customer's token proves
+   * it is theirs; a guest proves it with the order's email (like the lookup).
+   * The API refuses (422, "Contact us to cancel") once it is paid, invoiced,
+   * or shipped. → the cancelled order.
+   */
+  async cancelOrder(token, number, body, request) {
+    const email = token ? undefined : str(body.email)?.trim().slice(0, 254)
+    const reason = str(body.reason)?.trim().slice(0, 500)
+    const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/cancel`, {
+      method: 'POST',
+      token,
+      request,
+      body: { ...(email && { email }), ...(reason && { reason }) },
+    })
+    return answer(result, [200], (data) => fromOrder(data.data))
   },
 
   async lookupOrder(body, request) {

@@ -14,12 +14,16 @@ use Symfony\Component\HttpFoundation\Response;
  * anything else gets 403 before routing. The health check (/up) and product
  * photos (/storage) aren't API routes and stay open. Off in local development,
  * where the browser checks call the API directly.
+ *
+ * Phase 9 (part B): as route middleware `bff.key:always` it checks the key
+ * whatever BUYNEST_REQUIRE_BFF_KEY says (browser error reports: only the
+ * sign-in service may forward them), and refuses when no key is configured.
  */
 class RequireBffKey
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, ?string $mode = null): Response
     {
-        if (! config('buynest.require_bff_key')) {
+        if ($mode !== 'always' && ! config('buynest.require_bff_key')) {
             return $next($request);
         }
 

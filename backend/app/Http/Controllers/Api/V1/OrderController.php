@@ -6,14 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PlaceOrderRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\OrderResource;
+use App\Mail\OrderCancelledByCustomerMail;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Services\Checkout;
+use App\Services\OrderDocuments;
 use App\Services\Payments\StripePayments;
+use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 /** Placing orders (guests and customers), order history, and the guest lookup. */
@@ -61,6 +66,50 @@ class OrderController extends Controller
         $payment = $payments->startCheckout($order);
 
         return (new OrderResource($order->refresh()->load(['items', 'history', ...Order::DOCUMENTS])))->withPayment($payment);
+    }
+
+    /**
+     * POST /api/v1/orders/{number}/cancel { reason?, email? } → 200 { data: OrderResource }.
+     * Phase 9 (part A). Who may: as for Pay now (the owner's token, or the
+     * order's email). Only unpaid orders that are pending payment or
+     * processing, with nothing invoiced or shipped (Order::customerCanCancel);
+     * refunds stay with staff. Uses the staff cancel: stock back, coupon uses
+     * given back, open Stripe page closed.
+     */
+    public function cancel(Request $request, string $number, OrderDocuments $documents, Settings $settings): OrderResource|JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+            'email' => ['nullable', 'string', 'email', 'max:190'],
+        ]);
+        $customer = $request->user() instanceof Customer ? $request->user() : null;
+
+        $order = Order::where('number', strtoupper(trim($number)))->first();
+        $owner = $order && $customer && $order->customer_id === $customer->id;
+        $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
+        if (! $owner && ! $emailMatches) {
+            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+        }
+        $reason = filled($data['reason'] ?? null) ? trim($data['reason']) : null;
+
+        // Locked, like the staff cancel: two clicks (or a webhook) at once can't both cancel and restock twice.
+        $order = DB::transaction(function () use ($order, $documents, $settings, $reason) {
+            $order = Order::whereKey($order->id)->lockForUpdate()->first();
+            if ($order->status === 'cancelled') {
+                throw ValidationException::withMessages(['order' => 'This order is already cancelled.']);
+            }
+            if (! $order->customerCanCancel()) {
+                $support = $settings->get('support_email');
+                throw ValidationException::withMessages(['order' => 'This order has been paid or shipped, so it can\'t be cancelled online. Contact us to cancel it'
+                    .($support ? ": {$support}." : '.')]);
+            }
+            $documents->cancel($order, null, 'Cancelled by the customer.'.($reason ? " Reason: {$reason}" : ''), true);
+
+            return $order;
+        });
+        Mail::to($order->email)->send(new OrderCancelledByCustomerMail($order, $reason));
+
+        return new OrderResource($order->refresh()->load(['items', 'history', 'returns.items', ...Order::DOCUMENTS]));
     }
 
     /** GET /api/v1/orders - the signed-in customer's orders, newest first. */

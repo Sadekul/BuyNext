@@ -124,6 +124,27 @@ The agreement: [docs/backend/PHASE8_CONTRACT.md](../docs/backend/PHASE8_CONTRACT
 
 Signing in, refreshing, signing out, and `GET /me` need no permission; nor do `/notifications…` (filtered by each notification's permission) and `/preferences/{key}` (the admin's own).
 
+## What's here (phase 9, part A: two-step sign-in, customer self-service)
+
+The agreement: [docs/backend/PHASE9_CONTRACT.md](../docs/backend/PHASE9_CONTRACT.md) ("Implementation notes — part A" has every shape).
+
+| Area | What it does |
+| --- | --- |
+| Two-step sign-in (admins) | Authenticator-app codes (TOTP, RFC 6238, written in `App\Services\TwoFactor`, tested against the RFC's vectors). Secret encrypted at rest, 10 hashed one-time recovery codes, replay guard, a 5-minute challenge that burns after 5 wrong codes. QR code drawn on the server as SVG (`bacon/bacon-qr-code`). Account → Two-step sign-in: `POST/DELETE /me/two-factor`, `/me/two-factor/confirm`, `/me/two-factor/recovery-codes`. |
+| Required for every admin | Settings → Security `require_admin_two_factor` (Owner only, and only once the Owner uses it). Admins without it get a limited token that reaches only `GET /me`, logout and the setup (`token.kind:admin,setup`); everything else answers 403 `two_factor_setup_required`. The Owner can reset someone's two-step sign-in (`POST /admins/{id}/two-factor/reset`), which signs them out everywhere. |
+| Change email | `POST /api/v1/me/email` sends a code to the new address; `/me/email/confirm` switches it, signs out other devices, and tells the old address. |
+| Cancel my order | `POST /api/v1/orders/{number}/cancel` (owner, or a guest with the order's email) while it's unpaid and not shipped; uses the staff cancel. Orders answer `can_cancel`. |
+| My data | `GET /api/v1/me/export` (a JSON file, 3 per hour), `POST /api/v1/me/delete` (`password`, `confirm: "DELETE"`; same rules as staff deletion, `App\Services\CustomerAccounts`). |
+| Emails | New templates `email_change_code`, `email_changed`, `order_cancelled_by_customer`, `account_deleted`. |
+
+## What's here (phase 9, part B: photo sizes, error alerts, backups, stock alerts)
+
+- **Resized photos:** uploads get 320 and 960 px wide WebP copies when GD is installed (`app/Services/ImageResizer.php`, rules in `app/Support/ImageVariants.php`); image items and products gain `variants` / `thumbnail_variants` for `srcset`. `php artisan buynest:images:resize [--force]` for older uploads.
+- **Error alerts:** Sentry (`sentry/sentry-laravel`) only when `SENTRY_LARAVEL_DSN` is set; `app/Support/SentryScrubber.php` keeps personal data out. Browser errors arrive at `POST /api/v1/client-errors` from the sign-in service (shared key always required).
+- **Backups:** `php artisan buynest:backup [--list]` (gzipped `mysqldump`, password in a temporary 0600 file, never on the command line) to the `backups` disk (`BACKUP_DISK=local|s3`), daily at 03:00, `BACKUP_KEEP_DAYS` kept; admin System → Backups (`backups.view`, Owner only) with signed 5-minute downloads. Restore: `docs/DEPLOY_RAILWAY.md` step 15.
+- **Back in stock:** `POST /api/v1/products/{id}/stock-alerts` (always 202), queued `back_in_stock` emails whenever stock returns (one model-event hook in `app/Providers/LaunchServiceProvider.php`), a signed "stop these alerts" link, Account → Stock alerts, and Reports → Stock alerts.
+- Shapes: `docs/backend/PHASE9_CONTRACT.md`, "Implementation notes — part B".
+
 ## Endpoints
 
 Storefront (customers), `/api/v1`:
@@ -157,6 +178,10 @@ Storefront (customers), `/api/v1`:
 | GET | `/orders/{number}/invoices/{invoice}` | customer; the printable invoice (own orders only, else 404) |
 | POST | `/orders/lookup` | guest; `number, email` → the order, or the same 404 whichever is wrong (limited like sign-in) |
 | POST | `/orders/{number}/pay` | Phase 8: the order's customer (token) or `{ email }` (the lookup's proof) → `data.payment` `{ provider, url, expires_at, can_pay, paid_at }` (the open Stripe page, or a new one); 422 when it can't be paid online |
+| POST | `/orders/{number}/cancel` | Phase 9: owner's token or `{ email }`, `reason?` → the order, cancelled; 422 once paid, invoiced, or shipped |
+| POST | `/me/email`, `/me/email/confirm` | Phase 9: `email, password` → code to the new address; then `code` → switched |
+| GET | `/me/export` | Phase 9: `buynest-my-data-YYYY-MM-DD.json` (3 per hour) |
+| POST | `/me/delete` | Phase 9: `password, confirm: "DELETE"` → deleted (422 while an order is open) |
 | POST | `/payments/stripe/webhook` | Stripe only (signed `Stripe-Signature`, raw body); 400 bad signature, else 200 `{ received, result }` |
 
 Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403), and the permission in brackets ([Permissions](#permissions)):
@@ -236,6 +261,10 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | GET | `/reports/customers`, `/reports/coupons`, `/reports/low-stock` | [reports.view] |
 | GET / PATCH | `/settings` | [settings.view / settings.edit] `{ general, shipping, tax, checkout, inventory, catalog, returns }`; PATCH `{ group: { key: value } }`, errors as `group.key` |
 | POST | `/orders/{number}/payment-link` | [orders.edit] Phase 8: the Stripe payment link (open, or a new one for 24 hours) for an unpaid card order → `data.payment.url` |
+| POST | `/auth/two-factor` | Phase 9: `challenge`, `code` or `recovery_code`, `remember` → `{ admin, tokens }` (after a login answered `two_factor_required`) |
+| POST / DELETE | `/me/two-factor` | Phase 9: start setup → `{ secret, otpauth_url, qr_svg }`; turn off with `password, code` |
+| POST | `/me/two-factor/confirm`, `/me/two-factor/recovery-codes` | Phase 9: `code` → on + 10 recovery codes; `password` → a new set |
+| POST | `/admins/{id}/two-factor/reset` | [admins.manage] Phase 9, Owner only: turns it off and signs them out |
 
 The older routes need: `/overview` dashboard.view; `/categories`, GET `/products…` products.view; POST/PATCH `/products` products.edit, DELETE products.delete; GET `/orders…`, `/invoices…`, `/credit-memos…`, `/refundable` orders.view; PATCH `/orders/{number}` orders.edit; POST invoices/shipments/credit-memos their `*.create`; `/coupons` coupons.view / coupons.edit.
 
@@ -314,3 +343,4 @@ vendor/bin/pint      # code style
 - Run the scheduler (`php artisan schedule:run` every minute) so unconfirmed sign-ups are cleaned up and catalog price rules start and end on time (`buynest:refresh-price-rules`; reads also check the time).
 - Product photos: run `php artisan storage:link` once, keep `storage/app/public` on persistent disk (not a throwaway container filesystem) and include it in backups. The web server must serve `/storage/...` to the storefront's server functions, which pass photos to shoppers at `/media/...`.
 - Uploads: allow request bodies up to 60 MB in the web server and PHP (`upload_max_filesize=5M`, `max_file_uploads=10`, `post_max_size=60M`).
+- Phase 9 (part B): PHP's GD with JPEG, PNG and WebP (resized photos), the `mysqldump` client and a `BACKUP_DISK` both the scheduler and the API can reach (a bucket on multi-container hosts), and optionally `SENTRY_LARAVEL_DSN`.

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AdminAuthContext } from './adminAuthContext'
-import { ADMIN_SIGNAL, checkAdminSession, endSession, startSession } from './session'
+import { api } from '../api/client'
+import { ADMIN_SIGNAL, checkAdminSession, endSession, finishTwoFactor, startSession } from './session'
 
 /*
  * Admin sign-in state for the whole dashboard.
@@ -39,10 +40,29 @@ function AdminAuthProvider({ children }) {
     }
   }, [])
 
-  /** Signs in with an admin account. The server refuses customer accounts. */
+  /**
+   * Signs in with an admin account. The server refuses customer accounts.
+   * Resolves to null when signed in, or (phase 9, two-step on) to
+   * { twoFactorRequired, challenge, expiresAt } for the second step.
+   */
   const signIn = useCallback(async (credentials) => {
-    const user = await startSession(credentials)
+    const result = await startSession(credentials)
+    if (result?.twoFactorRequired === true) return result
+    setSession({ status: 'admin', user: result })
+    return null
+  }, [])
+
+  /** Phase 9: the second sign-in step (a code from the app, or a recovery code). */
+  const verifyTwoFactor = useCallback(async (body) => {
+    const user = await finishTwoFactor(body)
     setSession({ status: 'admin', user })
+  }, [])
+
+  /** Phase 9: loads the profile again (after turning two-step on or off). */
+  const reloadUser = useCallback(async () => {
+    const user = await api.get('/api/admin/me')
+    setSession((current) => ({ ...current, status: 'admin', user }))
+    return user
   }, [])
 
   const signOut = useCallback(() => {
@@ -56,7 +76,13 @@ function AdminAuthProvider({ children }) {
   const permissions = session.user?.permissions
   const can = useCallback((key) => !Array.isArray(permissions) || permissions.includes(key), [permissions])
 
-  const value = useMemo(() => ({ ...session, signIn, signOut, can }), [session, signIn, signOut, can])
+  // Phase 9: the Owner (two-step settings and resets). The API checks it too.
+  const isOwner = session.user?.isOwner ?? (typeof session.user?.role === 'object' && session.user.role?.name === 'Owner')
+
+  const value = useMemo(
+    () => ({ ...session, signIn, signOut, can, isOwner, verifyTwoFactor, reloadUser }),
+    [session, signIn, signOut, can, isOwner, verifyTwoFactor, reloadUser],
+  )
   return <AdminAuthContext value={value}>{children}</AdminAuthContext>
 }
 

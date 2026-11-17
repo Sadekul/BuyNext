@@ -78,6 +78,29 @@ return [
     // Product reviews a customer may post per hour (spam guard).
     'reviews_per_hour' => (int) env('BUYNEST_REVIEWS_PER_HOUR', 10),
 
+    // Phase 9 (part B): browser error reports and "email me when it's back in stock".
+    'client_errors_per_minute' => (int) env('BUYNEST_CLIENT_ERRORS_PER_MINUTE', 10),
+    'stock_alerts_per_minute' => (int) env('BUYNEST_STOCK_ALERTS_PER_MINUTE', 10),
+    'stock_alerts_per_email_per_hour' => (int) env('BUYNEST_STOCK_ALERTS_PER_EMAIL_PER_HOUR', 5),
+
+    /*
+     * Phase 9 (part B): database backups (php artisan buynest:backup).
+     * The file goes to the "backups" disk (config/filesystems.php):
+     * BACKUP_DISK=local (BACKUP_LOCAL_PATH) or s3 (any S3-compatible bucket).
+     * The database password is never put on a command line: mysqldump reads
+     * it from a temporary file only this process can read, deleted afterwards.
+     */
+    'backups' => [
+        'disk' => env('BACKUP_DISK', 'local') === 's3' ? 's3' : 'local',
+        'keep_days' => max(1, (int) env('BACKUP_KEEP_DAYS', 14)),
+        'dump_binary' => env('BACKUP_DUMP_BINARY', 'mysqldump'),
+        'timeout_seconds' => (int) env('BACKUP_TIMEOUT_SECONDS', 900),
+        // Daily at this time in BACKUP_TIMEZONE (the store's time zone: the app's, UTC, unless set).
+        'schedule' => (bool) env('BACKUP_SCHEDULE', true),
+        'time' => env('BACKUP_TIME', '03:00'),
+        'timezone' => env('BACKUP_TIMEZONE') ?: env('APP_TIMEZONE', 'UTC'),
+    ],
+
     /*
      * Store rules that are code, not settings: the ids and wording of the
      * shipping and payment methods. Everything shop staff can change (prices,

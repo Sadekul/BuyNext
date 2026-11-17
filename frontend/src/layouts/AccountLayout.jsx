@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import { LuHeart, LuLogOut, LuMapPin, LuPackage, LuUndo2, LuUser } from 'react-icons/lu'
+import { LuBell, LuHeart, LuLogOut, LuMapPin, LuPackage, LuShieldCheck, LuUndo2, LuUser } from 'react-icons/lu'
 import { useAuth } from '../hooks/useAuth'
 import { ROUTES } from '../constants/routes'
 import { REAL_SHOP } from '../constants/shop'
 import { cn } from '../utils/classNames'
 import './AccountLayout.css'
 
-// The address book and returns need BuyNest's API (REAL_SHOP); the demo has neither.
+// The address book, returns, stock alerts, and privacy need BuyNest's API (REAL_SHOP); the demo has none.
 const ACCOUNT_LINKS = [
   { label: 'Profile', to: ROUTES.account, icon: LuUser, end: true },
   { label: 'Orders', to: ROUTES.orders, icon: LuPackage },
@@ -14,9 +14,11 @@ const ACCOUNT_LINKS = [
     ? [
         { label: 'Address book', to: ROUTES.addresses, icon: LuMapPin },
         { label: 'Returns', to: ROUTES.returns, icon: LuUndo2 },
+        { label: 'Stock alerts', to: ROUTES.stockAlerts, icon: LuBell },
       ]
     : []),
   { label: 'Wishlist', to: ROUTES.wishlist, icon: LuHeart },
+  ...(REAL_SHOP ? [{ label: 'Privacy', to: ROUTES.privacy, icon: LuShieldCheck }] : []),
 ]
 
 /** Shell for /account pages: greeting, account navigation, and sign-out. */

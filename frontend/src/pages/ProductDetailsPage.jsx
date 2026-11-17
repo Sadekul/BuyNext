@@ -12,6 +12,7 @@ import ProductReviews from '../components/product/ProductReviews'
 import QuantitySelector from '../components/product/QuantitySelector'
 import ReviewForm from '../components/product/ReviewForm'
 import VariantSelector from '../components/product/VariantSelector'
+import StockAlertForm from '../components/product/StockAlertForm'
 import RatingStars from '../components/product/RatingStars'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -111,6 +112,9 @@ function ProductDetails({ product }) {
   const limits = getPurchaseLimits(purchasable)
   const { min: minQuantity } = limits
   const canBuy = !needsChoice && limits.canBuy
+  // Phase 9: sold out (none left, or fewer than the minimum order) → "Email me when it's back".
+  const isSoldOut =
+    !needsChoice && (variant ? !variant.inStock || (variant.stock !== null && variant.stock < minQuantity) : purchasable.stock !== null && purchasable.stock < minQuantity)
   const [quantity, setQuantity] = useState(minQuantity)
   // A newly chosen variant may have less stock than the quantity picked before.
   const shownQuantity = canBuy ? clampQuantity(quantity, limits) : quantity
@@ -152,7 +156,8 @@ function ProductDetails({ product }) {
   }
 
   function handleOptionChange(optionId, valueId) {
-    setSelection((current) => chooseValue(product, current, optionId, valueId))
+    // With BuyNest's API a sold-out variant can be chosen too, to ask for a stock alert.
+    setSelection((current) => chooseValue(product, current, optionId, valueId, { soldOut: REAL_SHOP }))
   }
 
   return (
@@ -176,7 +181,12 @@ function ProductDetails({ product }) {
       </div>
 
       <div className="product-details__main">
-        <ProductGallery images={images} title={product.title} alts={product.images.length > 0 ? product.imageAlts : undefined} />
+        <ProductGallery
+          images={images}
+          title={product.title}
+          alts={product.images.length > 0 ? product.imageAlts : undefined}
+          variants={product.images.length > 0 ? product.imageVariants : [product.thumbnailVariants ?? null]}
+        />
 
         <div className="product-details__info">
           {product.brand && <p className="product-details__brand">{product.brand}</p>}
@@ -220,7 +230,7 @@ function ProductDetails({ product }) {
 
           {product.description && <p className="product-details__description">{product.description}</p>}
 
-          {isConfigurable && <VariantSelector product={product} selection={selection} onChange={handleOptionChange} />}
+          {isConfigurable && <VariantSelector product={product} selection={selection} onChange={handleOptionChange} allowSoldOut={REAL_SHOP} />}
 
           <div className="product-details__purchase">
             {canBuy && (
@@ -240,6 +250,10 @@ function ProductDetails({ product }) {
           </div>
           {canBuy && minQuantity > 1 && (
             <p className="product-details__note">Minimum order quantity: {minQuantity}</p>
+          )}
+          {/* key: a new form (and message) for each variant. */}
+          {REAL_SHOP && isSoldOut && (
+            <StockAlertForm key={variant?.id ?? 'product'} productId={product.id} variantId={variant?.id ?? null} variantLabel={variant ? purchasable.variantLabel : null} />
           )}
 
           <ul className="product-details__perks">

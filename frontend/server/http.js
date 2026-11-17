@@ -197,3 +197,28 @@ export function safeProfile(user) {
     ...(user?.address && { address: pick(user.address, ['address', 'city', 'state', 'postalCode', 'country']) }),
   }
 }
+
+/**
+ * Phase 9: a GET to the Laravel API whose answer is a file to download (the
+ * customer's data export: JSON sent as an attachment). Unlike laravelFile(),
+ * a JSON answer counts as the file when the API marks it as an attachment
+ * (Content-Disposition), so errors (JSON without it) still come back as
+ * { status, data }. Success → { status, contentType, disposition, bytes }.
+ */
+export async function laravelDownload(path, { token, request, maxBytes = 20 * 1024 * 1024 } = {}) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      headers: { Accept: 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      signal: AbortSignal.timeout(60_000),
+    })
+    const disposition = response.headers.get('content-disposition') ?? ''
+    if (!response.ok || !/^attachment\b/i.test(disposition)) {
+      return { status: response.ok ? 502 : response.status, data: await response.json().catch(() => ({})) }
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > maxBytes) return { status: 502, data: { message: 'The file is too large to download here.' } }
+    return { status: response.status, contentType: response.headers.get('content-type') ?? 'application/octet-stream', disposition, bytes }
+  } catch {
+    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+  }
+}

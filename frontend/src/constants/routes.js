@@ -17,6 +17,10 @@ export const ROUTES = {
   addresses: '/account/addresses', // address book (REAL_SHOP)
   returns: '/account/returns', // returns (REAL_SHOP)
   returnDetails: (returnNumber) => `/account/returns/${returnNumber}`,
+  stockAlerts: '/account/stock-alerts', // "email me when it's back" (REAL_SHOP)
+  privacy: '/account/privacy', // download my data, delete my account (REAL_SHOP)
+  accountDeleted: '/goodbye', // after deleting the account (REAL_SHOP)
+  stockAlertsUnsubscribe: '/stock-alerts/unsubscribe', // the link in back-in-stock emails (REAL_SHOP)
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',

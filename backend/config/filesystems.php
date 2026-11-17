@@ -60,6 +60,33 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Phase 9 (part B): database backups (php artisan buynest:backup).
+         * BACKUP_DISK=local: a folder (BACKUP_LOCAL_PATH, default
+         * storage/app/backups; put it on a volume). BACKUP_DISK=s3: any
+         * S3-compatible bucket (AWS, Cloudflare R2, Backblaze B2, Railway
+         * buckets...). Never served to the web: downloads go through a signed
+         * admin route.
+         */
+        'backups' => env('BACKUP_DISK', 'local') === 's3' ? [
+            'driver' => 's3',
+            'key' => env('BACKUP_S3_KEY'),
+            'secret' => env('BACKUP_S3_SECRET'),
+            'region' => env('BACKUP_S3_REGION', 'auto'),
+            'bucket' => env('BACKUP_S3_BUCKET'),
+            'endpoint' => env('BACKUP_S3_ENDPOINT'),
+            'use_path_style_endpoint' => (bool) env('BACKUP_S3_PATH_STYLE', false),
+            'root' => env('BACKUP_S3_PREFIX', 'backups'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ] : [
+            'driver' => 'local',
+            'root' => env('BACKUP_LOCAL_PATH') ?: storage_path('app/backups'),
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

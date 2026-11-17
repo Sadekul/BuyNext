@@ -7,6 +7,7 @@ use App\Models\ProductVariant;
 use App\Models\Review;
 use App\Services\CatalogRules;
 use App\Services\Pricing;
+use App\Support\ImageVariants;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -65,8 +66,10 @@ class ProductResource extends JsonResource
             'min_order_quantity' => $this->min_order_quantity,
             'has_variants' => $this->has_variants,
             'thumbnail_url' => $this->thumbnail_url,
+            // Phase 9 (part B): resized copies for srcset ({} when there are none).
+            'thumbnail_variants' => ImageVariants::forApi($this->thumbnail_variants),
             'images' => $this->when($this->detail && $this->relationLoaded('images'), fn () => $this->images
-                ->map(fn ($image) => ['url' => $image->url, 'alt' => $image->alt])->values()),
+                ->map(fn ($image) => ['url' => $image->url, 'alt' => $image->alt, 'variants' => ImageVariants::forApi($image->variants)])->values()),
             'tags' => $this->tags ?? [],
             'warranty' => $this->warranty,
             'shipping_info' => $this->shipping_info,

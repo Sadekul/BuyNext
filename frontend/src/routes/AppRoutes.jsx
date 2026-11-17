@@ -33,6 +33,10 @@ const ReturnsPage = lazy(() => import('../pages/ReturnsPage'))
 const ReturnDetailsPage = lazy(() => import('../pages/ReturnDetailsPage'))
 const CmsPage = lazy(() => import('../pages/CmsPage'))
 const NewsletterPage = lazy(() => import('../pages/NewsletterPage'))
+const StockAlertsPage = lazy(() => import('../pages/StockAlertsPage'))
+const PrivacyPage = lazy(() => import('../pages/PrivacyPage'))
+const AccountDeletedPage = lazy(() => import('../pages/AccountDeletedPage'))
+const StockAlertUnsubscribePage = lazy(() => import('../pages/StockAlertUnsubscribePage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -78,6 +82,10 @@ function AppRoutes() {
         {/* The links in newsletter emails (phase 7): no sign-in needed. */}
         {REAL_SHOP && <Route path="newsletter/confirm" element={<NewsletterPage action="confirm" />} />}
         {REAL_SHOP && <Route path="newsletter/unsubscribe" element={<NewsletterPage action="unsubscribe" />} />}
+        {/* Phase 9: shown once the account is deleted, so outside the signed-in pages. */}
+        {REAL_SHOP && <Route path="goodbye" element={<AccountDeletedPage />} />}
+        {/* The "stop these alerts" link in back-in-stock emails (phase 9): no sign-in needed. */}
+        {REAL_SHOP && <Route path="stock-alerts/unsubscribe" element={<StockAlertUnsubscribePage />} />}
 
         {/* Signed-in customers only (UX guard; the API enforces real access). */}
         <Route element={<ProtectedRoute />}>
@@ -90,6 +98,9 @@ function AppRoutes() {
             {REAL_SHOP && <Route path="addresses" element={<AddressBookPage />} />}
             {REAL_SHOP && <Route path="returns" element={<ReturnsPage />} />}
             {REAL_SHOP && <Route path="returns/:returnNumber" element={<ReturnDetailsPage />} />}
+            {/* Phase 9: back-in-stock alerts, and the privacy page (my data, delete my account). */}
+            {REAL_SHOP && <Route path="stock-alerts" element={<StockAlertsPage />} />}
+            {REAL_SHOP && <Route path="privacy" element={<PrivacyPage />} />}
           </Route>
           {/* Outside the account layout: the invoice prints on its own. */}
           {REAL_SHOP && <Route path="account/orders/:orderId/invoices/:invoiceNumber" element={<InvoicePage />} />}

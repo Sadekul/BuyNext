@@ -49,6 +49,8 @@ class OrderResource extends JsonResource
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
             // Phase 8: { provider, paid_at, url, expires_at, can_pay } (+ error after a failed attempt; staff: reference, dashboard_url).
             'payment' => $this->payment(),
+            // Phase 9 (part A): show "Cancel order" (POST /orders/{number}/cancel).
+            'can_cancel' => $this->resource->customerCanCancel(),
             'history' => $this->whenLoaded('history', fn () => $this->history->map(fn ($entry) => $this->historyEntry($entry))->values()),
             // Phase 3 documents (Order::DOCUMENTS eager-loads them).
             ...$this->documents($request),

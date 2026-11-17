@@ -26,6 +26,8 @@ class AdminNotifications
         'newsletter_failed' => ['critical', 'newsletter.send'],
         // Phase 8: a Stripe payment that doesn't match its order (amount, already paid, cancelled).
         'payment_problem' => ['critical', 'orders.view'],
+        // Phase 9 (part B): the daily (or a manual) database backup failed.
+        'backup_failed' => ['critical', 'backups.view'],
     ];
 
     /** Returns the new notification, or null when an unread one for the same subject exists. */

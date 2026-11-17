@@ -35,7 +35,8 @@ class EmailTemplateTest extends TestCase
     public function test_every_email_has_a_template_and_the_list_shows_them(): void
     {
         $this->asAdmin($this->headers, 'GET', '/api/admin/v1/email-templates')->assertOk()
-            ->assertJsonCount(12, 'data')->assertJsonPath('data.0.key', 'email_verification')->assertJsonPath('data.0.is_customized', false);
+            // Phase 9: counted from the catalog, which grows.
+            ->assertJsonCount(count(EmailTemplateCatalog::keys()), 'data')->assertJsonPath('data.0.key', 'email_verification')->assertJsonPath('data.0.is_customized', false);
         $this->asAdmin($this->headers, 'GET', '/api/admin/v1/email-templates/email_verification')->assertOk()
             ->assertJsonPath('data.required', [['code']])
             ->assertJsonFragment(['name' => 'code', 'label' => 'The 6-digit code', 'kind' => 'text', 'required' => true]);

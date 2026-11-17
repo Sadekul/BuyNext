@@ -38,13 +38,28 @@ export async function checkAdminSession({ signal } = {}) {
   }
 }
 
-/** POST /api/admin/auth/login → the admin. Customer accounts are refused by the server. */
-export async function startSession(credentials) {
-  const user = await api.post('/api/admin/auth/login', credentials)
+/** After a sign-in answer that set the session: tell other tabs, and load the role and permissions. */
+async function signedIn(user) {
   notifyOtherTabs()
   // The sign-in answer has no role or permissions; /me has them (BuyNest accounts).
   if (REAL_ACCOUNTS && !user?.permissions) return api.get('/api/admin/me').catch(() => user)
   return user
+}
+
+/**
+ * POST /api/admin/auth/login → the admin. Customer accounts are refused by the server.
+ * Phase 9: with two-step sign-in on, the answer is { twoFactorRequired, challenge, expiresAt }
+ * instead (no session yet): returned as it is, for the second step.
+ */
+export async function startSession(credentials) {
+  const answer = await api.post('/api/admin/auth/login', credentials)
+  if (answer?.twoFactorRequired === true) return answer
+  return signedIn(answer)
+}
+
+/** Phase 9: the second step, { challenge, code | recoveryCode, remember } → the admin (session cookies set). */
+export async function finishTwoFactor(body) {
+  return signedIn(await api.post('/api/admin/auth/two-factor', body))
 }
 
 /** Ends the admin session: cookies and tokens (server), the hint (here), other admin tabs (signal). */

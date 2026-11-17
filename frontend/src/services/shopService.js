@@ -124,3 +124,15 @@ export function mergeSavedCart(items, { signal } = {}) {
   const lines = items.map((item) => ({ productId: item.productId, ...(item.variantId && { variantId: item.variantId }), quantity: item.quantity }))
   return apiClient.post('/api/shop/me/cart/merge', { items: lines }, { ...SHOP, signal })
 }
+
+/**
+ * POST /api/shop/orders/:number/cancel { reason?, email? } → the cancelled
+ * order (phase 9). Signed-in customers are recognised by the session; a
+ * guest proves the order is theirs with its email. Only unpaid orders with
+ * nothing invoiced or shipped (`order.canCancel`): otherwise ApiError 422
+ * whose message says to contact the store.
+ */
+export function cancelOrder(number, { reason, email } = {}) {
+  const body = { ...(reason?.trim() && { reason: reason.trim() }), ...(email && { email: email.trim() }) }
+  return apiClient.post(`/api/shop/orders/${encodeURIComponent(number)}/cancel`, body, SHOP)
+}

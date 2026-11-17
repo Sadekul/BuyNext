@@ -66,6 +66,8 @@ final class Permissions
         'system' => ['label' => 'System', 'permissions' => [
             'admins.manage' => 'Manage admin users and roles',
             'audit.view' => 'View the audit log',
+            // Phase 9 (part B): database backups (Owner only by default: a backup holds every customer's data).
+            'backups.view' => 'View, make, and download database backups',
         ]],
     ];
 
@@ -97,7 +99,8 @@ final class Permissions
      */
     public static function seededRoles(): array
     {
-        $views = array_values(array_filter(self::all(), fn ($key) => str_ends_with($key, '.view')));
+        // Phase 9 (part B): backups.view stays Owner only (a backup is a copy of every customer's data).
+        $views = array_values(array_filter(self::all(), fn ($key) => str_ends_with($key, '.view') && $key !== 'backups.view'));
 
         return [
             ['name' => 'Owner', 'description' => 'Everything, including admin users and roles.', 'is_system' => true, 'permissions' => self::all()],

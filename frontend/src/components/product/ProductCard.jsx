@@ -11,6 +11,7 @@ import { cn } from '../../utils/classNames'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
+import { IMAGE_SIZES, responsiveImageProps } from '../../utils/images'
 import './ProductCard.css'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
@@ -33,7 +34,15 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
     <article className={cn('product-card', `product-card--${layout}`)}>
       {/* Decorative: the title link (stretched over the card) names the product. */}
       <div className="product-card__media">
-        <img src={thumbnail} alt="" loading="lazy" width="300" height="300" />
+        {/* Phase 9: the resized copies (srcset) when the API made them; the original otherwise. */}
+        <img
+          {...responsiveImageProps(thumbnail, product.thumbnailVariants, layout === 'list' ? IMAGE_SIZES.listCard : IMAGE_SIZES.card)}
+          src={thumbnail}
+          alt=""
+          loading="lazy"
+          width="300"
+          height="300"
+        />
         {onQuickView && (
           <button
             type="button"

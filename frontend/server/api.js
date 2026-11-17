@@ -4,6 +4,7 @@ import { handleAdminRequest } from './adminApi.js'
 import { handleCatalogRequest } from './catalogApi.js'
 import { handleShopRequest } from './shopApi.js'
 import { handlePaymentsRequest } from './paymentsApi.js'
+import { handleClientErrorRequest } from './clientErrorsApi.js'
 
 /*
  * Entry point for BuyNest's server-side services, on the storefront's own
@@ -15,6 +16,7 @@ import { handlePaymentsRequest } from './paymentsApi.js'
  *   /api/catalog/*  public product catalog, read-only (catalogApi.js)
  *   /api/shop/*     cart pricing and orders, guests too (shopApi.js)
  *   /api/payments/* payment provider webhooks, server to server (paymentsApi.js)
+ *   /api/client-errors  browser error reports from the store and the admin (clientErrorsApi.js)
  */
 export async function handleApiRequest(request) {
   const url = new URL(request.url)
@@ -40,5 +42,6 @@ export async function handleApiRequest(request) {
   }
   if (segments[0] === 'api' && segments[1] === 'catalog') return handleCatalogRequest(request, segments.slice(2))
   if (segments[0] === 'api' && segments[1] === 'shop') return handleShopRequest(request, segments.slice(2), cookies)
+  if (segments[0] === 'api' && segments[1] === 'client-errors' && segments.length === 2) return handleClientErrorRequest(request)
   return json({ message: 'Not found.' }, 404)
 }

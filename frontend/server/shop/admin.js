@@ -74,6 +74,8 @@ export function adminProduct(raw) {
     updatedAt: raw.updated_at ?? null,
     // Phase 5: images with their ids and alt text, options, and variants.
     ...productParts(raw),
+    // Phase 9: shoppers waiting for a back-in-stock email (product detail only).
+    ...(Number.isInteger(raw.stock_alerts_waiting) && { stockAlertsWaiting: raw.stock_alerts_waiting }),
   }
 }
 

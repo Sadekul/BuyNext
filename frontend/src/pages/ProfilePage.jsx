@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuPencil } from 'react-icons/lu'
 import EditNameForm from '../components/forms/EditNameForm'
+import ChangeEmailForm from '../components/account/ChangeEmailForm'
 import { CheckboxField } from '../components/forms/FormField'
 import { profileQuery, userKeys } from '../queries/userQueries'
 import { updateProfile } from '../services/authService'
@@ -140,11 +141,19 @@ function ProfilePage() {
         </section>
       )}
 
-      <p className="profile__note">
-        {REAL_ACCOUNTS
-          ? 'To use a different email address, contact BuyNest support: a new address has to be confirmed first.'
-          : "Profile editing needs a real backend (DummyJSON doesn't save changes). It arrives with the BuyNest API."}
-      </p>
+      {/* Phase 9: a new address is confirmed with a code sent to it. */}
+      {REAL_ACCOUNTS ? (
+        <ChangeEmailForm
+          currentEmail={profile.email}
+          pendingEmail={profile.pendingEmail ?? null}
+          onChanged={(updated) => {
+            queryClient.setQueryData(profileKey, (current) => ({ ...current, ...updated }))
+            updateUser({ ...user, email: updated.email })
+          }}
+        />
+      ) : (
+        <p className="profile__note">Profile editing needs a real backend (DummyJSON doesn't save changes). It arrives with the BuyNest API.</p>
+      )}
     </section>
   )
 }

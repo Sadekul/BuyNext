@@ -110,7 +110,8 @@ describe('email templates', () => {
     await user.click(screen.getByRole('button', { name: 'Insert code (required)' }))
     expect(body).toHaveValue('<p>Hi {{ code }}</p>')
     await user.click(screen.getByRole('button', { name: 'Save template' }))
-    expect(await screen.findByText('Template saved. New emails use it now.')).toHaveFocus()
+    const saved = await screen.findByText('Template saved. New emails use it now.')
+    await waitFor(() => expect(saved).toHaveFocus())
     expect(sentTo(fetchMock, 'PUT', '/api/admin/email-templates/email_verification')).toEqual({ subject: 'Welcome', body: '<p>Hi {{ code }}</p>' })
 
     await user.click(screen.getByRole('button', { name: 'Send test to me' }))
@@ -164,7 +165,9 @@ describe('URL redirects', () => {
     await user.selectOptions(within(dialog).getByLabelText('Type'), '302')
     await user.click(within(dialog).getByRole('button', { name: 'Add redirect' }))
     // The announced result takes focus (its box, around the text).
-    expect((await screen.findByText('Redirect added: /summer goes to /categories/beauty.')).parentElement).toHaveFocus()
+    // (focus moves on the next animation frame, so wait for it)
+    const added = await screen.findByText('Redirect added: /summer goes to /categories/beauty.')
+    await waitFor(() => expect(added.parentElement).toHaveFocus())
     expect(sentTo(fetchMock, 'POST', '/api/admin/redirects')).toEqual({ fromPath: '/summer', toPath: '/categories/beauty', statusCode: 302 })
 
     await user.click(screen.getByRole('button', { name: 'Edit redirect from /old-sale' }))

@@ -32,7 +32,7 @@ import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from
  *   PUT    /api/admin/home                          { hero, banners, featuredProductIds } → { home }
  *   GET    /api/admin/reports/sales|products|customers|coupons|low-stock?from&to&groupBy&limit
  *   GET    /api/admin/reports/sales.csv|products.csv  → the CSV file, with the API's Content-Type and Content-Disposition
- *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog, returns }
+ *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog, returns, security (phase 9) }
  *   PATCH  /api/admin/settings                      { group: { key: value } } → all settings
  */
 
@@ -232,6 +232,10 @@ const SETTING_RULES = {
       Array.isArray(value) && value.length >= 1 && value.length <= 20 && value.every((reason) => isText(reason, { min: 1, max: 60 })) && new Set(value.map((reason) => reason.trim().toLowerCase())).size === value.length
         ? null
         : 'Keep 1 to 20 different reasons, each up to 60 characters.',
+  },
+  // Phase 9: Owner only (the API answers 403 owner_only to anyone else).
+  security: {
+    requireAdminTwoFactor: isBoolean('Choose whether every admin must use two-step sign-in.'),
   },
 }
 

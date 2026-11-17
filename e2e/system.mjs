@@ -96,7 +96,8 @@ try {
 
   // ---------- Audit log ----------
   await admin.goto(`${BASE}/admin/audit`, { waitUntil: 'networkidle' })
-  log(await visible(admin.getByText(/admin\.created|Created admin|staff/i).first()), 'Audit log records the new admin')
+  // In the table (the Admin filter's options also list names such as "UI Staff").
+  log(await visible(admin.locator('tbody').getByText(staffEmail).first()), 'Audit log records the new admin')
   const audit = (await api('/api/admin/v1/audit?action=admin', { token: owner })).body.data
   log(audit.some((entry) => entry.action === 'admin.created') && audit.some((entry) => entry.action === 'admin.signed_in'), 'audit has admin.created and admin.signed_in')
   log(!JSON.stringify(audit).includes(staffPassword), 'the audit log never contains the password')

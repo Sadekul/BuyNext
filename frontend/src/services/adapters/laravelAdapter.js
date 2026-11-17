@@ -9,6 +9,7 @@
 
 import { effectiveDiscountPercent } from '../../utils/pricing'
 import { safeRedirectTarget } from '../../utils/safeRedirect'
+import { normalizeImageVariants } from '../../utils/images'
 
 const AVAILABILITY = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }
 
@@ -33,6 +34,10 @@ export function normalizeProduct(raw) {
     availabilityStatus: AVAILABILITY[raw.availability] ?? null,
     thumbnail: raw.thumbnail_url ?? raw.images?.[0]?.url ?? null,
     images: (raw.images ?? []).map((image) => image.url),
+    // Phase 9: the resized copies of each image ({ 320: url, 960: url }, or null), in the same order,
+    // and of the thumbnail (its own `thumbnail_variants`, or those of the image it is).
+    imageVariants: (raw.images ?? []).map((image) => normalizeImageVariants(image.variants)),
+    thumbnailVariants: thumbnailVariants(raw),
     // The admin's alt text per image (phase 5), in the same order; null when none was written.
     imageAlts: (raw.images ?? []).map((image) => (typeof image.alt === 'string' && image.alt.trim() ? image.alt.trim() : null)),
     sku: raw.sku ?? null,
@@ -51,6 +56,14 @@ export function normalizeProduct(raw) {
     ...(raw.options !== undefined && { options: normalizeOptions(raw.options) }),
     ...(raw.variants !== undefined && { variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant, raw)) }),
   }
+}
+
+function thumbnailVariants(raw) {
+  const own = normalizeImageVariants(raw.thumbnail_variants)
+  if (own) return own
+  const thumbnail = raw.thumbnail_url ?? raw.images?.[0]?.url
+  const image = (raw.images ?? []).find((candidate) => candidate.url === thumbnail)
+  return normalizeImageVariants(image?.variants)
 }
 
 /** ReviewResource → a review. Only approved reviews reach the storefront. */

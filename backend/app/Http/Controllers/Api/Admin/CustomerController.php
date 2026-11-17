@@ -11,6 +11,7 @@ use App\Models\OneTimeCode;
 use App\Models\Order;
 use App\Services\AddressBook;
 use App\Services\Audit;
+use App\Services\CustomerAccounts;
 use App\Services\OneTimeCodes;
 use App\Services\Pricing;
 use App\Services\TokenPairs;
@@ -185,25 +186,24 @@ class CustomerController extends Controller
      * DELETE /api/admin/v1/customers/{id} → 204. Deletes the account, its
      * addresses, notes, sign-ins and codes. Orders and reviews stay (for the
      * accounts) without the link. Refused while an order is still open.
+     * Phase 9: the work is App\Services\CustomerAccounts (shared with self-deletion).
      */
-    public function destroy(int $id): Response|JsonResponse
+    public function destroy(int $id, CustomerAccounts $accounts): Response|JsonResponse
     {
         $customer = Customer::find($id);
         if (! $customer) {
             return $this->notFound();
         }
-        $open = $customer->orders()->whereIn('status', Order::OPEN_STATUSES)->count();
+        $open = $accounts->openOrderCount($customer);
         if ($open > 0) {
             throw ValidationException::withMessages(['customer' => "This customer has {$open} open ".Str::plural('order', $open)
                 .' (pending payment, processing, or shipped). Complete or cancel '.($open === 1 ? 'it' : 'them').' first.']);
         }
 
-        DB::transaction(function () use ($customer) {
+        DB::transaction(function () use ($customer, $accounts) {
             $before = Audit::fieldsOf($customer, ['first_name', 'last_name', 'email', 'phone', 'group_id', 'is_active']);
-            $this->tokens->revokeAll($customer);
-            OneTimeCode::where('email', $customer->email)->delete();
-            // Addresses and notes cascade; orders, reviews, coupon uses, and returns keep their rows with customer_id null.
-            $customer->delete();
+            // Phase 9: shared with the customer's own "Delete my account" (also unsubscribes the newsletter).
+            $accounts->delete($customer);
             $this->audit->record('customer.deleted', "Customer {$customer->email} deleted.", 'customer', $customer->id, Audit::deleted($before));
         });
 

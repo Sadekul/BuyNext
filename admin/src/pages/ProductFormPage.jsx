@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuArrowLeft } from 'react-icons/lu'
+import { LuArrowLeft, LuBellRing } from 'react-icons/lu'
 import { adminKeys, createProduct, getCategories, getProduct, updateProduct } from '../api/admin'
 import DemoNotice from '../components/DemoNotice'
 import Field from '../components/Field'
@@ -12,7 +12,7 @@ import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { EMPTY_PRODUCT, LIVE_ONLY_FIELDS, productSchema } from '../utils/productSchema'
-import { formatMoney } from '../utils/format'
+import { formatCount, formatMoney } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
 import ProductImages from '../components/ProductImages'
@@ -51,6 +51,8 @@ function ProductFormPage() {
       </Link>
       <PageHeader title={isNew ? 'Add product' : product.data.title} description={isNew ? undefined : `Product #${productId}`} />
       {!LIVE_DATA && <DemoNotice />}
+      {/* Phase 9 §7: shoppers who asked to be emailed when it's back in stock. */}
+      {!isNew && product.data.stockAlertsWaiting > 0 && <StockAlertsNotice count={product.data.stockAlertsWaiting} />}
       {/* key: a fresh form (and default values) per product */}
       <ProductForm key={productId ?? 'new'} productId={productId} initial={initial} categories={categories.data ?? []} hasVariants={!isNew && product.data.hasVariants === true} />
       {LIVE_DATA && !isNew && product.data.live && (
@@ -213,6 +215,18 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
         {!isNew && <span className="muted">Current price {formatMoney(initial.price)}</span>}
       </div>
     </form>
+  )
+}
+
+function StockAlertsNotice({ count }) {
+  return (
+    <p className="notice stock-alerts-notice">
+      <LuBellRing aria-hidden="true" />
+      <span>
+        <strong>{count === 1 ? '1 shopper is' : `${formatCount(count)} shoppers are`} waiting</strong> for a back-in-stock email. They are emailed once,
+        automatically, as soon as it can be ordered again. <Link to="/reports#stock-alerts">See all stock alerts</Link>
+      </span>
+    </p>
   )
 }
 

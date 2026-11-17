@@ -10,6 +10,9 @@ class OneTimeCode extends Model
 
     public const RESET_PASSWORD = 'reset_password';
 
+    /** Phase 9 (part A): sent to the NEW address when a customer changes their email. */
+    public const EMAIL_CHANGE = 'email_change';
+
     protected $guarded = [];
 
     protected function casts(): array

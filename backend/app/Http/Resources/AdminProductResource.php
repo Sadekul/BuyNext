@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use App\Models\ProductVariant;
 use App\Services\Pricing;
+use App\Services\StockAlerts;
+use App\Support\ImageVariants;
 use Illuminate\Http\Request;
 
 /**
@@ -20,6 +22,8 @@ class AdminProductResource extends ProductResource
         $base['category'] = ['id' => $this->category->id, 'slug' => $this->category->slug, 'name' => $this->category->name];
 
         if ($this->detail) {
+            // Phase 9 (part B): people waiting for "back in stock" emails.
+            $base['stock_alerts_waiting'] = app(StockAlerts::class)->waitingCount($this->id);
             $base['images'] = $this->when($this->relationLoaded('images'), fn () => $this->images->map(fn ($image) => self::image($image))->values());
             $base['options'] = $this->when($this->relationLoaded('options'), fn () => $this->options->map(fn ($option) => [
                 'id' => $option->id,
@@ -63,7 +67,7 @@ class AdminProductResource extends ProductResource
         ];
     }
 
-    /** An image item: { id, url, alt, position, is_upload }. */
+    /** An image item: { id, url, alt, position, is_upload, variants } (phase 9 part B: variants = resized copies, {} if none). */
     public static function image($image): array
     {
         return [
@@ -72,6 +76,7 @@ class AdminProductResource extends ProductResource
             'alt' => $image->alt,
             'position' => $image->position,
             'is_upload' => $image->path !== null,
+            'variants' => ImageVariants::forApi($image->variants),
         ];
     }
 }

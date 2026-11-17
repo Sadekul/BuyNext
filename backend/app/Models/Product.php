@@ -56,7 +56,26 @@ class Product extends Model
             'tags' => 'array',
             'has_variants' => 'boolean',
             'review_count' => 'integer',
+            // Phase 9 (part B): the thumbnail's resized copies ({ "320": url, "960": url }).
+            'thumbnail_variants' => 'array',
         ];
+    }
+
+    /**
+     * Phase 9 (part B): thumbnail_variants follows thumbnail_url. When the
+     * thumbnail changes (the product form, imports), it takes the copies of
+     * this product's image with that address, or none.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product) {
+            if ($product->isDirty('thumbnail_url') && ! $product->isDirty('thumbnail_variants')) {
+                $variants = $product->exists && $product->thumbnail_url
+                    ? ProductImage::where('product_id', $product->id)->where('url', $product->thumbnail_url)->whereNotNull('variants')->value('variants')
+                    : null;
+                $product->thumbnail_variants = is_string($variants) ? json_decode($variants, true) : $variants;
+            }
+        });
     }
 
     /** The image limit per product (uploads and URLs together). */
@@ -156,8 +175,9 @@ class Product extends Model
     public function syncThumbnail(): void
     {
         $first = $this->images()->first();
-        if ($first && $this->thumbnail_url !== $first->url) {
-            $this->forceFill(['thumbnail_url' => $first->url])->save();
+        // Phase 9 (part B): the resized copies follow too (they may be made after the image).
+        if ($first && ($this->thumbnail_url !== $first->url || $this->thumbnail_variants !== $first->variants)) {
+            $this->forceFill(['thumbnail_url' => $first->url, 'thumbnail_variants' => $first->variants])->save();
         }
     }
 

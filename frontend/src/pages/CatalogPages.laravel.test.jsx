@@ -75,7 +75,8 @@ describe('product options and variants', () => {
     const size = screen.getByRole('group', { name: 'Size' })
     const color = screen.getByRole('group', { name: 'Color' })
     await user.click(within(size).getByRole('radio', { name: 'M' }))
-    expect(within(color).getByRole('radio', { name: /Red/ })).toBeDisabled() // M / Red is sold out
+    // M / Red is sold out: still selectable (phase 9), to ask for a back-in-stock email.
+    expect(within(color).getByRole('radio', { name: /Red.*sold out/ })).toBeEnabled()
     await user.click(within(color).getByRole('radio', { name: 'Blue' }))
 
     expect(add).toBeEnabled()
