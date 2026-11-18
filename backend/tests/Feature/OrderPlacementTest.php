@@ -49,12 +49,14 @@ class OrderPlacementTest extends TestCase
             ->assertJsonPath('data.email', 'guest@example.com')
             ->assertJsonPath('data.shipping_method', ['id' => 'standard', 'label' => 'Standard', 'eta' => '3–5 business days'])
             ->assertJsonPath('data.coupon_code', 'NEST10')
-            ->assertJsonPath('data.totals', ['item_count' => 2, 'subtotal' => '17.88', 'discount' => '1.79', 'shipping' => '4.99', 'tax' => '0.00', 'total' => '21.08', 'paid' => '0.00', 'refunded' => '0.00'])
+            ->assertJsonPath('data.totals', ['item_count' => 2, 'subtotal' => '17.88', 'discount' => '1.79', 'shipping' => '4.99', 'tax' => '0.00', 'total' => '21.08',
+                'gift_card' => '0.00', 'amount_due' => '21.08', 'paid' => '0.00', 'refunded' => '0.00'])
             ->assertJsonPath('data.items.0', [
                 'product_id' => $this->mascara->id, 'variant_id' => null, 'sku' => $this->mascara->sku, 'name' => $this->mascara->name, 'variant_label' => null,
                 'thumbnail_url' => $this->mascara->thumbnail_url,
                 'price' => '9.99', 'discount_percent' => 10.48, 'group_discount_percent' => 0, 'sale_price' => '8.94', 'quantity' => 2, 'line_total' => '17.88',
                 'discount' => '1.79', 'price_label' => null, // phase 7: the line's share of the coupon, the catalog rule label
+                'gift_card' => null, // phase 10 (part B)
             ])
             ->assertJsonPath('data.history.0.status', 'processing')
             ->assertJsonPath('data.history.0.note', 'Order placed.');

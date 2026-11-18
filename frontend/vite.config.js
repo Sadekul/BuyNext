@@ -143,25 +143,47 @@ function apiServices() {
  * scripts and a WebSocket for hot reload.
  * (frame-ancestors can't be set in a <meta> tag; X-Frame-Options in
  * vercel.json / public/_headers blocks framing instead.)
+ *
+ * Phase 10: VITE_ANALYTICS=ga4 builds a store that MAY load Google Analytics
+ * 4 (only after the visitor accepts the cookie banner, and only when the
+ * admin set a measurement id): the policy then also allows Google's tag
+ * script and the endpoints it sends to. Without it the policy is unchanged,
+ * and the store never shows the banner (src/utils/analytics.js).
+ * PayPal needs nothing here: the shopper is sent to PayPal's site (a redirect),
+ * no PayPal script runs on this page.
  */
-function contentSecurityPolicy(mode) {
-  const env = loadEnv(mode, import.meta.dirname, 'VITE_')
-  const apiOrigin = env.VITE_API_BASE_URL ? new URL(env.VITE_API_BASE_URL).origin : ''
-  const policy = [
+export const GA4_CSP = {
+  script: ['https://www.googletagmanager.com'],
+  connect: ['https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'],
+  img: ['https://*.google-analytics.com', 'https://www.googletagmanager.com'],
+}
+
+export function buildContentSecurityPolicy({ apiOrigin = '', analytics = '' } = {}) {
+  const ga4 = analytics === 'ga4'
+  const extra = (list) => (ga4 ? list.join(' ') : '')
+  return [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src 'self' ${extra(GA4_CSP.script)}`,
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     // Product photos: the catalog imported into Laravel keeps DummyJSON's CDN addresses;
     // photos uploaded in the admin come from this site's own /media/* (server/mediaApi.js), covered by 'self'.
-    `img-src 'self' data: https://cdn.dummyjson.com ${apiOrigin}`,
-    `connect-src 'self' ${apiOrigin}`, // 'self' covers the services at /api (sign-in, catalog, shop)
+    `img-src 'self' data: https://cdn.dummyjson.com ${apiOrigin} ${extra(GA4_CSP.img)}`,
+    `connect-src 'self' ${apiOrigin} ${extra(GA4_CSP.connect)}`, // 'self' covers the services at /api (sign-in, catalog, shop)
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
   ]
-    .map((directive) => directive.trim())
+    .map((directive) => directive.replace(/\s+/g, ' ').trim())
     .join('; ')
+}
+
+function contentSecurityPolicy(mode) {
+  const env = loadEnv(mode, import.meta.dirname, 'VITE_')
+  const policy = buildContentSecurityPolicy({
+    apiOrigin: env.VITE_API_BASE_URL ? new URL(env.VITE_API_BASE_URL).origin : '',
+    analytics: env.VITE_ANALYTICS,
+  })
 
   return {
     name: 'buynest-csp',
@@ -187,6 +209,9 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom', // a simulated browser DOM
       setupFiles: ['./src/test/setup.js'],
+      // Many page tests type whole forms (checkout, addresses) key by key; with ~50 files running in
+      // parallel that can pass the 5 s default on a busy machine, so they get 15 s.
+      testTimeout: 15_000,
       css: false,
       // A fake API URL: no test can reach the real (changing) DummyJSON API.
       // Unit tests run against the DummyJSON demo accounts whatever .env.local says;

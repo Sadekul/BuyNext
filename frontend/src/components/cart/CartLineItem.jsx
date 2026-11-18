@@ -7,6 +7,7 @@ import { formatPrice } from '../../utils/formatters'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { getProductPricing } from '../../utils/pricing'
 import { cartLineKey } from '../../reducers/cartReducer'
+import { recipientLabel } from '../../utils/giftCards'
 import './CartLineItem.css'
 
 /**
@@ -23,7 +24,8 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, pricedLine
   const limits = getPurchaseLimits(item)
   const lineTotal = server ? server.lineTotal : salePrice * item.quantity
   const key = cartLineKey(item)
-  const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title
+  // Phase 10: a gift card line names who receives it (two cards for two people are two lines).
+  const name = item.giftCard ? `${item.title} for ${item.giftCard.recipientName}` : item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title
 
   return (
     <article className={cn('cart-line', compact && 'cart-line--compact', item.isUnavailable && 'cart-line--unavailable')}>
@@ -36,6 +38,8 @@ function CartLineItem({ item, onQuantityChange, onRemove, onNavigate, pricedLine
           </Link>
         </h3>
         {item.variantLabel && <p className="cart-line__variant">{item.variantLabel}</p>}
+        {item.giftCard && <p className="cart-line__variant cart-line__recipient">{recipientLabel(item.giftCard)}</p>}
+        {item.giftCard?.message && !compact && <p className="cart-line__brand">“{item.giftCard.message}”</p>}
         {!compact && item.brand && <p className="cart-line__brand">{item.brand}</p>}
         <p className="cart-line__unit-price">
           {formatPrice(salePrice)}

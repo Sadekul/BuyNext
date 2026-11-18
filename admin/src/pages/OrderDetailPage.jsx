@@ -10,7 +10,10 @@ import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
-import { PAYMENT_METHODS, orderActions, orderSource, orderStatus, paymentStatus, returnStatus } from '../utils/orders'
+import { PAYMENT_METHODS, orderActions, orderSource, orderStatus, paymentStatus, providerName, returnStatus } from '../utils/orders'
+// Phase 10 §2 and §5: PDFs of the documents, gift card lines.
+import { creditMemoPdfUrl, invoicePdfUrl } from '../api/phase10'
+import { PdfLink } from './SalesDocumentsPages'
 import { useAdminAuth } from '../auth/useAdminAuth'
 
 /** Demo: a DummyJSON cart shown as an order. */
@@ -153,8 +156,8 @@ function Documents({ order }) {
             {invoices.map((invoice) => (
               <li key={invoice.number}>
                 <Link to={`/invoices/${invoice.number}`}>{invoice.number}</Link> · {formatMoney(invoice.amount)} · {formatDate(invoice.createdAt)}
-                {/* Phase 8: an invoice no admin created was recorded by Stripe's webhook. */}
-                <span className="muted"> · by {invoice.adminName ?? (order.payment?.provider === 'stripe' ? 'Stripe' : 'System')}</span>
+                {/* Phase 8: an invoice no admin created was recorded by Stripe's webhook (phase 10: or PayPal's capture). */}
+                <span className="muted"> · by {invoice.adminName ?? (['stripe', 'paypal', 'gift_card'].includes(order.payment?.provider) ? providerName(order.payment.provider) : 'System')}</span>
               </li>
             ))}
           </ul>
@@ -204,7 +207,11 @@ function Documents({ order }) {
           <ul>
             {creditMemos.map((memo) => (
               <li key={memo.number}>
-                <Link to={`/credit-memos/${memo.number}`}>{memo.number}</Link> · {formatMoney(memo.total)} · {formatDate(memo.createdAt)}
+                <Link to={`/credit-memos/${memo.number}`}>{memo.number}</Link> · {formatMoney(memo.total)} · {formatDate(memo.createdAt)} ·{' '}
+                {/* Phase 10 §2. */}
+                <a href={creditMemoPdfUrl(memo.number)} download>
+                  PDF <span className="visually-hidden">of credit memo {memo.number}</span>
+                </a>
               </li>
             ))}
           </ul>
@@ -214,8 +221,51 @@ function Documents({ order }) {
   )
 }
 
+/** Phase 10 §5: the cards the order issued for this line's recipient (the API lists them per order). */
+const cardsFor = (order, giftCard) =>
+  (order.giftCardsIssued ?? []).filter((card) => card.recipientEmail && card.recipientEmail.toLowerCase() === giftCard.recipientEmail?.toLowerCase())
+
+/**
+ * Phase 10 §5: a gift card line's recipient and message, and the cards made
+ * from it once the order was paid (linked to Marketing → Gift cards).
+ */
+function GiftCardLine({ giftCard, cards, canView }) {
+  return (
+    <div className="gift-card-line">
+      <p>
+        For {giftCard.recipientName || 'the recipient'}
+        {giftCard.recipientEmail && (
+          <>
+            {' '}
+            &lt;<a href={`mailto:${giftCard.recipientEmail}`}>{giftCard.recipientEmail}</a>&gt;
+          </>
+        )}
+      </p>
+      {giftCard.message && <p className="muted">“{giftCard.message}”</p>}
+      {cards.length > 0 ? (
+        <p className="muted">
+          {cards.length === 1 ? 'Card ' : 'Cards '}
+          {cards.map((card, index) => (
+            <span key={card.id ?? index}>
+              {index > 0 && ', '}
+              {canView && card.id ? <Link to={`/gift-cards/${card.id}`}>ending {card.last4}</Link> : `ending ${card.last4}`}
+            </span>
+          ))}{' '}
+          sent to the recipient.
+        </p>
+      ) : (
+        <p className="muted">The card is made and emailed when the order is paid.</p>
+      )}
+    </div>
+  )
+}
+
 // Phase 8: history entries written by Stripe's webhook (payment recorded, payment page expired) have no admin.
-const byStripe = (entry) => /through Stripe|secure payment page expired/i.test(entry.note ?? '')
+// Phase 10: PayPal's capture and webhooks write the same kind of entries.
+const byProvider = (entry) => {
+  if (/through PayPal|PayPal/i.test(entry.note ?? '')) return 'PayPal'
+  return /through Stripe|secure payment page expired/i.test(entry.note ?? '') ? 'Stripe' : null
+}
 
 const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog, return: CreateReturnDialog }
 
@@ -348,6 +398,8 @@ function LiveOrderDetailPage() {
                         </span>
                       </span>
                     )}
+                    {/* Phase 10 §5: a gift card bought for someone: who receives it, and the cards made once paid. */}
+                    {line.giftCard && <GiftCardLine giftCard={line.giftCard} cards={cardsFor(data, line.giftCard)} canView={can('gift_cards.view')} />}
                   </td>
                   <td className="num">{formatMoney(line.price)}</td>
                   <td className="num">{formatCount(line.quantity)}</td>
@@ -390,6 +442,23 @@ function LiveOrderDetailPage() {
                   <strong>{formatMoney(data.totals.total)}</strong>
                 </td>
               </tr>
+              {/* Phase 10 §5: the part a gift card paid; the rest was paid by the order's payment method. */}
+              {data.giftCardPayment?.amount > 0 && (
+                <>
+                  <tr>
+                    <th scope="row" colSpan={3}>
+                      Paid by gift card{data.giftCardPayment.last4 && ` (ending ${data.giftCardPayment.last4})`}
+                    </th>
+                    <td className="num">−{formatMoney(data.giftCardPayment.amount)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row" colSpan={3}>
+                      {data.paymentMethod === 'gift_card' ? 'Left to pay' : `Paid by ${PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}`}
+                    </th>
+                    <td className="num">{formatMoney(Math.max(Math.round((data.totals.total - data.giftCardPayment.amount) * 100), 0) / 100)}</td>
+                  </tr>
+                </>
+              )}
               {data.totals.paid !== undefined && (
                 <tr>
                   <th scope="row" colSpan={3}>
@@ -454,7 +523,12 @@ function LiveOrderDetailPage() {
                   )}
                 </div>
                 {data.status === 'pending_payment' &&
-                  (data.payment?.canPay ? (
+                  (data.payment?.canPay && data.payment.provider === 'paypal' ? (
+                    <p className="field__hint">
+                      The customer pays on PayPal's page: the order moves to Processing by itself once PayPal confirms the payment. Send them the payment link under
+                      Delivery and payment if they need it.
+                    </p>
+                  ) : data.payment?.canPay ? (
                     <p className="field__hint">
                       The customer pays by card on Stripe's page: the order moves to Processing by itself once Stripe confirms the payment. Send them the payment link
                       under Delivery and payment if they need it.
@@ -484,6 +558,10 @@ function LiveOrderDetailPage() {
                 <LuPrinter aria-hidden="true" /> Print invoice
               </Link>
             )}
+            {/* Phase 10 §2: each invoice's PDF (an order usually has one). */}
+            {data.invoices?.map((invoice) => (
+              <PdfLink key={invoice.number} small href={invoicePdfUrl(invoice.number)} name={`invoice ${invoice.number}`} />
+            ))}
           </p>
         </section>
 
@@ -559,7 +637,7 @@ function LiveOrderDetailPage() {
                 </div>
                 <p className="muted">
                   <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
-                  {entry.adminName ? ` · by ${entry.adminName}` : byStripe(entry) ? ' · by Stripe' : ''}
+                  {entry.adminName ? ` · by ${entry.adminName}` : byProvider(entry) ? ` · by ${byProvider(entry)}` : ''}
                   {entry.customerNotified && ' · customer emailed'}
                 </p>
                 {entry.note && <p>{entry.note}</p>}

@@ -2,8 +2,11 @@ import { useId } from 'react'
 import { SORT_OPTIONS } from '../../constants/catalog'
 import './SortSelect.css'
 
-/** Controlled <select>: the parent owns the value and decides what a change means. */
-function SortSelect({ value, onChange }) {
+/**
+ * Controlled <select>: the parent owns the value and decides what a change means.
+ * `labels` renames options for the page ("Featured" is "Best match" for a search).
+ */
+function SortSelect({ value, onChange, labels }) {
   const selectId = useId()
 
   return (
@@ -12,7 +15,7 @@ function SortSelect({ value, onChange }) {
       <select id={selectId} value={value} onChange={(event) => onChange(event.target.value)}>
         {SORT_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {labels?.[option.value] ?? option.label}
           </option>
         ))}
       </select>

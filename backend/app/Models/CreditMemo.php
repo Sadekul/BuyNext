@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * money goes back to the card (refund_reference = the Stripe refund id);
  * otherwise the memo records that staff returned it by the original method.
  */
-#[Fillable(['order_id', 'return_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'refund_reference', 'restocked', 'admin_id', 'note', 'customer_notified'])]
+#[Fillable(['order_id', 'return_id', 'subtotal', 'shipping_refund', 'adjustment', 'total', 'gift_card_refund', 'refund_reference', 'restocked', 'admin_id', 'note', 'customer_notified'])]
 class CreditMemo extends Model
 {
     public const UPDATED_AT = null;
@@ -26,6 +26,7 @@ class CreditMemo extends Model
             'shipping_refund' => 'decimal:2',
             'adjustment' => 'decimal:2',
             'total' => 'decimal:2',
+            'gift_card_refund' => 'decimal:2', // phase 10 (part B): returned to the redeemed gift card first
             'restocked' => 'boolean',
             'customer_notified' => 'boolean',
         ];

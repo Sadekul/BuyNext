@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuCircleCheck, LuClock, LuPackageX, LuTriangleAlert } from 'react-icons/lu'
 import OrderDetailsView from '../components/orders/OrderDetailsView'
 import PayNowButton from '../components/orders/PayNowButton'
@@ -10,7 +10,9 @@ import EmptyState from '../components/ui/EmptyState'
 import Loader from '../components/ui/Loader'
 import { useAuth } from '../hooks/useAuth'
 import { useOrders } from '../hooks/useOrders'
-import { guestOrderQuery, orderQuery } from '../queries/orderQueries'
+import { guestOrderQuery, orderKeys, orderQuery } from '../queries/orderQueries'
+import { capturePaypal } from '../services/shopService'
+import { trackPurchase } from '../utils/analytics'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { canPayOrder, guestPaymentEmail, isPaymentUrl, paymentPage } from '../utils/payment'
 import { paymentNote } from '../constants/orders'
@@ -68,8 +70,10 @@ const CONFIRM_FOR_MS = 20_000
 const POLL_CUSTOMER_MS = 2_000
 const POLL_GUEST_MS = 3_000
 
+const PROVIDER_NAMES = { stripe: 'Stripe', paypal: 'PayPal' }
+
 /**
- * Phase 8: what the page says about a card payment through Stripe, as
+ * Phase 8: what the page says about a card payment through Stripe (phase 10: or PayPal), as
  * { tone, title, lines[], pay } (pay: show "Pay now"), or null for the usual
  * "Thank you" message.
  *   leaving     the order was just placed: on the way to Stripe's page
@@ -79,9 +83,11 @@ const POLL_GUEST_MS = 3_000
  *   cancelled   (any visit) the order was cancelled since, e.g. its payment page expired unpaid:
  *               never "is confirmed"
  */
-function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startError }) {
+function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startError, provider = 'stripe', captureError = null }) {
   const paid = order.paymentStatus === 'paid'
+  const name = PROVIDER_NAMES[provider] ?? 'Our payment partner'
   if (leaving) {
+    if (provider === 'paypal') return { tone: 'waiting', title: 'Taking you to PayPal…', lines: [`Your order ${order.number} is saved. You'll approve the payment on PayPal's site, then come back here.`] }
     return { tone: 'waiting', title: 'Taking you to secure payment…', lines: [`Your order ${order.number} is saved. You'll pay on Stripe's secure page; BuyNest never sees your card number.`] }
   }
   if (order.status === 'cancelled') {
@@ -93,11 +99,21 @@ function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startEr
   }
   if (paymentReturn === 'success') {
     if (paid) return { tone: 'done', title: 'Payment received — thank you', lines: [`Your order ${order.number} is paid and confirmed. We've emailed a receipt to ${order.email}.`] }
-    if (!gaveUp) return { tone: 'waiting', title: 'Confirming your payment…', lines: ['Stripe is letting us know about your payment. This usually takes a few seconds.'] }
+    // Phase 10: PayPal refused the capture (e.g. the funding source was declined): nothing was taken.
+    if (captureError) {
+      return {
+        tone: 'waiting',
+        title: "PayPal didn't complete the payment",
+        lines: [`${captureError} Nothing was charged. Your order ${order.number} is saved, and you can try again.`],
+        pay: canPay,
+        alert: true,
+      }
+    }
+    if (!gaveUp) return { tone: 'waiting', title: 'Confirming your payment…', lines: [`${name} is letting us know about your payment. This usually takes a few seconds.`] }
     return {
       tone: 'waiting',
       title: "We're confirming your payment",
-      lines: [`Stripe hasn't confirmed your payment to us yet. There's no need to pay again: we'll email ${order.email} as soon as it's confirmed, and your order page will show it.`],
+      lines: [`${name} hasn't confirmed your payment to us yet. There's no need to pay again: we'll email ${order.email} as soon as it's confirmed, and your order page will show it.`],
     }
   }
   if (paymentReturn === 'cancelled' && !paid && order.status !== 'cancelled') {
@@ -141,12 +157,31 @@ function ServerOrderConfirmation() {
   const { settings } = useStoreSettings({ enabled: false }) // cached only: orders say themselves whether they can be paid
   const placed = location.state?.order?.number === orderId ? location.state.order : null
   const paymentReturn = ['success', 'cancelled'].includes(searchParams.get('payment')) ? searchParams.get('payment') : null
-  const confirming = paymentReturn === 'success'
+  // Phase 10: PayPal sends the shopper back with ?provider=paypal&token=<its order id>; the API captures with it.
+  const returnProvider = searchParams.get('provider') === 'paypal' ? 'paypal' : paymentReturn ? 'stripe' : null
+  const paypalToken = returnProvider === 'paypal' && paymentReturn === 'success' ? (searchParams.get('token') ?? '') : null
   const [gaveUp, setGaveUp] = useState(false)
+  const queryClient = useQueryClient()
 
   // Back from Stripe the placed order is gone (a new page load) or out of date: ask the server.
   const mustFetch = !placed || paymentReturn !== null
   const guestEmail = status === 'anonymous' ? (placed?.email ?? guestPaymentEmail(orderId)) : null
+
+  // Phase 10, back from PayPal: capture the approved payment (once), then poll like Stripe until the order is paid.
+  const capture = useMutation({
+    mutationFn: () => (user ? authorizedRequest(() => capturePaypal(orderId, { token: paypalToken })) : capturePaypal(orderId, { token: paypalToken, email: guestEmail })),
+    onSuccess: (captured) => queryClient.setQueryData(user ? orderKeys.detail(user.id, orderId) : orderKeys.guest(orderId), captured),
+  })
+  const captureStarted = useRef(false)
+  const canCapture = paypalToken !== null && status !== 'checking' && (Boolean(user) || Boolean(guestEmail))
+  const runCapture = capture.mutate
+  useEffect(() => {
+    if (!canCapture || captureStarted.current) return
+    captureStarted.current = true
+    runCapture()
+  }, [canCapture, runCapture])
+  // Polling waits for the capture's answer (it may already say "paid"); a refused capture stops it.
+  const confirming = paymentReturn === 'success' && (paypalToken === null || capture.isSuccess)
   const pollEvery = user ? POLL_CUSTOMER_MS : POLL_GUEST_MS
   const refetchInterval = (query) => (confirming && !gaveUp && !query.state.error && query.state.data?.paymentStatus !== 'paid' ? pollEvery : false)
   const customerRequest = useQuery({ ...orderQuery(user?.id, orderId, authorizedRequest), enabled: mustFetch && Boolean(user), refetchInterval })
@@ -183,6 +218,12 @@ function ServerOrderConfirmation() {
     return () => window.removeEventListener('pageshow', reset)
   }, [])
 
+  // Phase 10 statistics: the purchase, once the order is confirmed (paid, or cash on delivery), once per order.
+  const confirmedOrder = order && order.status !== 'cancelled' && (order.paymentStatus === 'paid' || order.status !== 'pending_payment') ? order : null
+  useEffect(() => {
+    if (confirmedOrder) trackPurchase(confirmedOrder)
+  }, [confirmedOrder])
+
   const waitingForSession = status === 'checking' && !order
   if (!order && (request.isLoading || waitingForSession)) {
     return (
@@ -211,14 +252,18 @@ function ServerOrderConfirmation() {
   }
 
   // Stripe is on when the store says so, or when this order was sent to Stripe (the settings may still be loading).
-  const sentToStripe = placed?.payment?.provider === 'stripe'
-  const stripeOn = settings.cardPayments === 'stripe' || sentToStripe || order.paymentProvider === 'stripe'
-  const canPay = canPayOrder(order, stripeOn ? 'stripe' : settings.cardPayments)
-  // The order was placed but Stripe's page couldn't be opened (no url in the answer).
-  const startError = !paymentReturn && sentToStripe && !isPaymentUrl(placed.payment.url) ? (placed.payment.error ?? "Our payment partner couldn't be reached.") : null
-  const payment = paymentMessage({ order, paymentReturn, leaving: leaving || Boolean(payNowUrl), gaveUp, canPay, startError })
+  // Phase 10: the same for PayPal.
+  const sentTo = ['stripe', 'paypal'].includes(placed?.payment?.provider) ? placed.payment.provider : null
+  const stripeOn = settings.cardPayments === 'stripe' || sentTo === 'stripe' || order.paymentProvider === 'stripe'
+  const paypalOn = settings.paypalPayments === 'paypal' || sentTo === 'paypal' || order.paymentProvider === 'paypal'
+  const canPay = canPayOrder(order, stripeOn ? 'stripe' : settings.cardPayments, paypalOn ? 'paypal' : settings.paypalPayments)
+  // The order was placed but the payment page couldn't be opened (no url in the answer).
+  const startError = !paymentReturn && sentTo && !isPaymentUrl(placed.payment.url) ? (placed.payment.error ?? "Our payment partner couldn't be reached.") : null
+  const provider = returnProvider ?? sentTo ?? order.paymentProvider ?? (order.paymentMethod === 'paypal' ? 'paypal' : 'stripe')
+  const captureError = paypalToken !== null && capture.isError && order.paymentStatus !== 'paid' ? capture.error.message : null
+  const payment = paymentMessage({ order, paymentReturn, leaving: leaving || Boolean(payNowUrl), gaveUp, canPay, startError, provider, captureError })
   const awaitingPayment = order.status === 'pending_payment'
-  const firstName = user?.firstName || order.shippingAddress?.firstName
+  const firstName = user?.firstName || order.shippingAddress?.firstName || order.billingAddress?.firstName
   const HeroIcon = payment ? (payment.tone === 'done' ? LuCircleCheck : payment.tone === 'cancelled' ? LuPackageX : payment.alert ? LuTriangleAlert : LuClock) : awaitingPayment ? LuClock : LuCircleCheck
   const waiting = payment ? payment.tone === 'waiting' : false
 
@@ -243,7 +288,7 @@ function ServerOrderConfirmation() {
                 Your order <strong>{order.number}</strong> {awaitingPayment ? 'is saved and awaiting payment.' : 'is confirmed.'} We've emailed a
                 confirmation to <strong>{order.email}</strong>.
               </p>
-              {awaitingPayment && <p>{paymentNote(order, { stripe: stripeOn })}</p>}
+              {awaitingPayment && <p>{paymentNote(order, { stripe: stripeOn, paypal: paypalOn })}</p>}
             </>
           )}
           {!isAuthenticated && <p>Keep your order number: with your email, it lets you track this order.</p>}
@@ -259,7 +304,7 @@ function ServerOrderConfirmation() {
       {/* Phase 9: changed their mind? An unpaid order with nothing shipped can be cancelled. */}
       {!leaving && <CancelOrderButton order={order} email={isAuthenticated ? undefined : (guestEmail ?? order.email)} onCancelled={setCancelled} />}
 
-      <OrderDetailsView order={order} />
+      <OrderDetailsView order={order} invoicePdf={{ orderNumber: order.number, email: isAuthenticated ? undefined : (guestEmail ?? order.email) }} />
 
       <div className="order-page__actions">
         {isAuthenticated ? (

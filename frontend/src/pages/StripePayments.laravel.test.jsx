@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import CheckoutPage from './CheckoutPage'
@@ -51,6 +51,10 @@ async function fillGuestCheckout(user) {
   await screen.findByLabelText('Email')
   const fields = { Email: 'ava@example.com', Phone: '+1 555 010 0100', 'First name': 'Ava', 'Last name': 'Guest', 'Street address': '12 Market Street', City: 'Springfield', 'State / region': 'Oregon', 'Postal code': '29112' }
   for (const [label, value] of Object.entries(fields)) await user.type(screen.getByLabelText(label), value)
+  // The guest's email starts a fresh price check 600 ms after typing stops (per-customer coupon limits);
+  // the button reads "Checking prices…" and is disabled meanwhile. Let that run before clicking.
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  await waitFor(() => expect(screen.queryByText('Checking prices…')).toBeNull())
 }
 
 const signIn = () => {
@@ -99,8 +103,10 @@ describe('checkout with Stripe', () => {
     await fillGuestCheckout(user)
     await user.click(screen.getByRole('button', { name: 'Continue to secure payment' }))
 
-    const alert = await screen.findByRole('alert')
-    expect(within(alert).getByRole('heading', { name: "We couldn't open the payment page" })).toBeInTheDocument()
+    // Wait for this alert by its heading: under load another alert (e.g. a pricing notice) can show first.
+    const heading = await screen.findByRole('heading', { name: "We couldn't open the payment page" })
+    const alert = heading.closest('[role="alert"]')
+    expect(alert).not.toBeNull()
     expect(alert).toHaveTextContent('Stripe is having trouble right now.')
     expect(open).not.toHaveBeenCalled()
 

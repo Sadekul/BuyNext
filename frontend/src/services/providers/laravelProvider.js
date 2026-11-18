@@ -12,6 +12,9 @@ const MAX_PER_PAGE = 100
 // BuyNest sort fields → the API's `sort` names.
 const SORT_FIELDS = { price: 'price', rating: 'rating', discountPercentage: 'discount', title: 'name' }
 
+// Phase 10: "Search instead for <what was typed>": the API searches the words as typed, without correcting typos.
+// (the API's `correct=0`; the storefront's own address says ?exact=1).
+
 const pageParams = ({ all, limit = 12, skip = 0, sortBy, order }) => {
   const perPage = all ? MAX_PER_PAGE : limit
   return {
@@ -34,7 +37,10 @@ export const laravelProvider = {
   request: { credentials: 'omit', sameOrigin: true },
   catalog: {
     listProducts: (options) => ({ path: '/api/catalog/products', params: pageParams(options) }),
-    searchProducts: (query, options) => ({ path: '/api/catalog/products', params: { search: query, ...pageParams(options) } }),
+    searchProducts: (query, options) => ({
+      path: '/api/catalog/products',
+      params: { search: query, ...pageParams(options), ...(options.exact && { correct: 0 }) },
+    }),
     productsByCategory: (slug, options) => ({ path: '/api/catalog/products', params: { category: slug, ...pageParams(options) } }),
     productDetail: (id) => ({ path: `/api/catalog/products/${encodeURIComponent(id)}` }),
     suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit, suggest: 1 } }),

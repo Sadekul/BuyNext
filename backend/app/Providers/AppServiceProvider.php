@@ -43,6 +43,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('reviews', fn (Request $request) => Limit::perHour(config('buynest.reviews_per_hour'))->by('customer:'.($request->user()?->getKey() ?? $request->ip())));
         // Phase 8: Stripe's webhook (per sending address).
         RateLimiter::for('stripe-webhooks', fn (Request $request) => Limit::perMinute(config('buynest.stripe.webhooks_per_minute'))->by('stripe:'.$request->ip()));
+        // Phase 10 (part B): PayPal's webhook, and gift card balance checks (per visitor, so codes can't be guessed quickly).
+        RateLimiter::for('paypal-webhooks', fn (Request $request) => Limit::perMinute(config('buynest.paypal.webhooks_per_minute'))->by('paypal:'.$request->ip()));
+        RateLimiter::for('gift-card-check', fn (Request $request) => Limit::perMinute(config('buynest.gift_card_checks_per_minute'))->by('gift-card:'.$request->ip()));
         RateLimiter::for('orders', fn (Request $request) => Limit::perMinute(config('buynest.orders_per_minute'))->by('ip:'.$request->ip()));
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('buynest.api_per_minute'))->by(
             $request->user() ? $request->user()->getMorphClass().':'.$request->user()->getKey() : 'ip:'.$request->ip(),

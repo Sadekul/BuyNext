@@ -3,7 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Order;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
 use App\Services\Pricing;
 use App\Services\Returns;
 use Illuminate\Http\Request;
@@ -46,6 +46,8 @@ class OrderResource extends JsonResource
             'applied_rules' => $this->applied_rules ?? [], // phase 7: the cart price rules applied ([] before)
             'items' => self::itemsOf($this->resource),
             'totals' => self::totalsOf($this->resource),
+            // Phase 10 (part B): the gift card that paid part (or all) of the order.
+            'gift_card' => self::giftCardOf($this->resource),
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
             // Phase 8: { provider, paid_at, url, expires_at, can_pay } (+ error after a failed attempt; staff: reference, dashboard_url).
             'payment' => $this->payment(),
@@ -93,7 +95,8 @@ class OrderResource extends JsonResource
 
     private function payment(): array
     {
-        $summary = app(StripePayments::class)->summary($this->resource, ! $this->forCustomer());
+        // Phase 10 (part B): Stripe for card orders, PayPal for PayPal orders.
+        $summary = app(OnlinePayments::class)->summary($this->resource, ! $this->forCustomer());
         if ($this->paymentAttempt) {
             $summary = [...$summary, ...$this->paymentAttempt];
         }
@@ -120,6 +123,8 @@ class OrderResource extends JsonResource
             // Phase 7: the line's share of the cart rules (null before phase 7) and its catalog price rule label.
             'discount' => $item->discount_amount,
             'price_label' => $item->price_label,
+            // Phase 10 (part B): a gift card line's { amount, recipient_name, recipient_email, message } (null otherwise).
+            'gift_card' => $item->gift_card,
         ])->values()->all();
     }
 
@@ -133,9 +138,20 @@ class OrderResource extends JsonResource
             'shipping' => $order->shipping_total,
             'tax' => $order->tax_total,
             'total' => $order->grand_total,
+            // Phase 10 (part B): paid with a gift card, and what is left for the other payment method.
+            'gift_card' => Pricing::format(Pricing::toCents($order->gift_card_amount ?? 0)),
+            'amount_due' => Pricing::format($order->dueCents()),
             'paid' => Pricing::format($order->paidCents()),
             'refunded' => Pricing::format($order->refundedCents()),
         ];
+    }
+
+    /** Phase 10 (part B): { last4, amount } of the redeemed gift card, or null. */
+    public static function giftCardOf(Order $order): ?array
+    {
+        return $order->gift_card_id && Pricing::toCents($order->gift_card_amount ?? 0) > 0
+            ? ['last4' => $order->giftCard?->last4, 'amount' => Pricing::format(Pricing::toCents($order->gift_card_amount))]
+            : null;
     }
 
     protected function historyEntry($entry): array

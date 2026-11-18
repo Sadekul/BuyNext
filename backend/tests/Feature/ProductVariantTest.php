@@ -64,8 +64,8 @@ class ProductVariantTest extends TestCase
         $generated = $this->asAdmin($this->admin, 'POST', "/api/admin/v1/products/{$this->shirt->id}/variants/generate")->assertOk()
             ->assertJsonPath('meta.created', 4)->json('data.variants');
         $this->assertSame(['TEE-1-S-RED', 'TEE-1-S-BLUE', 'TEE-1-M-RED', 'TEE-1-M-BLUE'], array_column($generated, 'sku'));
-        $this->assertSame(['id', 'sku', 'option_value_ids', 'label', 'price', 'effective_price', 'final_price', 'stock_quantity', 'is_active', 'is_current',
-            'created_at', 'updated_at'], array_keys($generated[0]));
+        $this->assertSame(['id', 'sku', 'option_value_ids', 'label', 'price', 'effective_price', 'final_price', 'stock_quantity', 'weight', 'is_active', 'is_current',
+            'created_at', 'updated_at'], array_keys($generated[0])); // phase 10 (part B): weight
         $this->assertSame('Size: S / Color: Red', $generated[0]['label']);
         $this->assertSame([null, '20.00', '18.00', 0, false], [$generated[0]['price'], $generated[0]['effective_price'], $generated[0]['final_price'],
             $generated[0]['stock_quantity'], $generated[0]['is_active']]);

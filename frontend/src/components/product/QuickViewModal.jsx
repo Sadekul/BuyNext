@@ -10,6 +10,7 @@ import { ROUTES } from '../../constants/routes'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
+import { isGiftCardProduct } from '../../utils/giftCards'
 import './QuickViewModal.css'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
@@ -76,9 +77,9 @@ function QuickViewContent({ product, onAddToCart }) {
         {details.description && <p className="quick-view__description">{details.description}</p>}
 
         <div className="quick-view__actions">
-          {details.hasVariants ? (
-            // Options (size, color) are chosen on the product page.
-            <Button to={ROUTES.productDetails(details.id)}>Choose options</Button>
+          {details.hasVariants || isGiftCardProduct(details) ? (
+            // Options (size, color), or a gift card's amount and recipient, are chosen on the product page.
+            <Button to={ROUTES.productDetails(details.id)}>{isGiftCardProduct(details) ? 'Choose amount' : 'Choose options'}</Button>
           ) : (
             <>
               <Button onClick={() => onAddToCart(details)} disabled={!canBuy}>

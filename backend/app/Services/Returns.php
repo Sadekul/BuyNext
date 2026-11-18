@@ -92,7 +92,9 @@ class Returns
             }
         }
 
-        return $order->items->mapWithKeys(fn ($item) => [$item->id => $shipped ? max(0, $item->quantity - ($used[$item->id] ?? 0)) : 0])->all();
+        // Phase 10 (part B): gift cards aren't returned by post (a credit memo takes back unused ones).
+        return $order->items->mapWithKeys(fn ($item) => [$item->id => $shipped && ! $item->isGiftCard()
+            ? max(0, $item->quantity - ($used[$item->id] ?? 0)) : 0])->all();
     }
 
     /** The last day of the return window, or null when the order hasn't shipped. */

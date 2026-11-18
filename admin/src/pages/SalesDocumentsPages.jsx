@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { LuArrowLeft, LuSearch } from 'react-icons/lu'
+import { LuArrowLeft, LuFileDown, LuSearch } from 'react-icons/lu'
 import { adminKeys, getCreditMemo, getCreditMemos, getInvoice, getInvoices } from '../api/admin'
+// Phase 10 §2: the PDF of each document.
+import { creditMemoPdfUrl, invoicePdfUrl } from '../api/phase10'
 import PageHeader from '../components/PageHeader'
 import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
@@ -16,6 +18,18 @@ import { formatCount, formatDate, formatDateTime, formatMoney } from '../utils/f
 
 const LIMIT = 20
 // Phase 8: invoices no admin created were recorded by Stripe's webhook ("Paid by card through Stripe.").
+/**
+ * Phase 10 §2: "Download PDF", the document as the server renders it (a
+ * plain download link: the browser sends the admin session cookie).
+ */
+export function PdfLink({ href, name, small = false }) {
+  return (
+    <a href={href} className={`btn btn--outline${small ? ' btn--sm' : ''}`} download>
+      <LuFileDown aria-hidden="true" /> Download PDF <span className="visually-hidden">of {name}</span>
+    </a>
+  )
+}
+
 const invoiceAuthor = (invoice) => invoice.adminName ?? (/Stripe/.test(invoice.note ?? '') ? 'Stripe' : 'System')
 
 function useListParams() {
@@ -141,11 +155,14 @@ export function InvoiceDetailPage() {
         title={`Invoice ${data.number}`}
         description={`${formatMoney(data.amount)} · ${formatDateTime(data.createdAt)} · by ${invoiceAuthor(data)}`}
         actions={
-          data.orderNumber && (
-            <Link to={`/orders/${data.orderNumber}`} className="btn btn--outline">
-              Order {data.orderNumber}
-            </Link>
-          )
+          <>
+            <PdfLink href={invoicePdfUrl(data.number)} name={`invoice ${data.number}`} />
+            {data.orderNumber && (
+              <Link to={`/orders/${data.orderNumber}`} className="btn btn--outline">
+                Order {data.orderNumber}
+              </Link>
+            )}
+          </>
         }
       />
       <div className="panels">
@@ -312,6 +329,7 @@ export function CreditMemoDetailPage() {
         actions={
           <>
             <StatusBadge {...restockBadge(data.restocked)} />
+            <PdfLink href={creditMemoPdfUrl(data.number)} name={`credit memo ${data.number}`} />
             {data.orderNumber && (
               <Link to={`/orders/${data.orderNumber}`} className="btn btn--outline">
                 Order {data.orderNumber}
@@ -382,6 +400,23 @@ export function CreditMemoDetailPage() {
                   <strong>{formatMoney(data.total)}</strong>
                 </td>
               </tr>
+              {/* Phase 10 §5: the part that went back to a gift card first, and the rest. */}
+              {data.giftCardRefund > 0 && (
+                <>
+                  <tr>
+                    <th scope="row" colSpan={2}>
+                      Returned to gift card
+                    </th>
+                    <td className="num">{formatMoney(data.giftCardRefund)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row" colSpan={2}>
+                      Refunded by the other payment method
+                    </th>
+                    <td className="num">{formatMoney(data.otherRefund ?? data.total - data.giftCardRefund)}</td>
+                  </tr>
+                </>
+              )}
             </tfoot>
           </table>
           {data.note && <p className="muted page-note">Note: {data.note}</p>}

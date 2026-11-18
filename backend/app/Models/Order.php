@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'customer_id', 'customer_group', 'source', 'created_by_admin_id', 'email', 'phone', 'status', 'payment_status', 'payment_method', 'shipping_method',
     'shipping_label', 'shipping_eta', 'coupon_code', 'applied_rules', 'subtotal', 'discount_total', 'shipping_total',
     'tax_total', 'grand_total', 'shipping_address', 'billing_address', 'placed_at',
+    'gift_card_id', 'gift_card_amount', // phase 10 (part B)
 ])]
 class Order extends Model
 {
@@ -68,6 +69,7 @@ class Order extends Model
             // Phase 8: Stripe Checkout (see App\Services\Payments\StripePayments).
             'payment_expires_at' => 'datetime',
             'paid_at' => 'datetime',
+            'gift_card_amount' => 'decimal:2', // phase 10 (part B): paid with the redeemed gift card
         ];
     }
 
@@ -101,6 +103,18 @@ class Order extends Model
         return $this->hasMany(CreditMemo::class)->orderBy('id');
     }
 
+    /** Phase 10 (part B): the gift card redeemed on this order. */
+    public function giftCard(): BelongsTo
+    {
+        return $this->belongsTo(GiftCard::class);
+    }
+
+    /** Phase 10 (part B): what is left to pay after the gift card (what Stripe or PayPal charge), in cents. */
+    public function dueCents(): int
+    {
+        return max(0, Pricing::toCents($this->grand_total) - Pricing::toCents($this->gift_card_amount ?? 0));
+    }
+
     public function returns(): HasMany
     {
         return $this->hasMany(OrderReturn::class)->orderBy('id');
@@ -113,7 +127,7 @@ class Order extends Model
     }
 
     /** What resources need to show an order with its documents (eager load, no N+1). */
-    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem'];
+    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem', 'giftCard']; // phase 10 (part B): giftCard
 
     /** Money recorded by invoices, in cents. */
     public function paidCents(): int

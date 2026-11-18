@@ -75,6 +75,9 @@ class ProductResource extends JsonResource
             'shipping_info' => $this->shipping_info,
             'return_policy' => $this->return_policy,
             'weight' => $this->weight,
+            // Phase 10 (part B): "simple" or "gift_card"; a gift card's amounts ({ amounts, custom: { min, max } | null }, else null).
+            'type' => $this->type ?? 'simple',
+            'gift_card' => $this->resource->giftCardOptions(),
             'reviews' => $this->when($this->detail && $this->relationLoaded('reviews'), fn () => $this->reviews
                 ->filter(fn (Review $review) => $review->status === 'approved')
                 ->map(fn (Review $review) => self::publicReview($review))->values()),

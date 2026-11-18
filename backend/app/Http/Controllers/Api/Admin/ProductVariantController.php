@@ -180,6 +180,7 @@ class ProductVariantController extends Controller
             'price' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0.01', 'max:1000000'],
             'stock_quantity' => ['sometimes', 'integer', 'min:0', 'max:100000'],
             'is_active' => ['sometimes', 'boolean'],
+            'weight' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'], // phase 10 (part B): grams, null = the product's
         ], [
             'sku.unique' => 'Another product or variant already has this SKU.',
             'sku.regex' => 'The SKU can only contain letters, numbers, and dashes.',
@@ -190,7 +191,7 @@ class ProductVariantController extends Controller
         DB::transaction(function () use ($product, $found, $data) {
             Product::whereKey($product->id)->lockForUpdate()->first();
             $variant = ProductVariant::whereKey($found->id)->lockForUpdate()->first();
-            $fields = ['sku', 'price', 'stock_quantity', 'is_active'];
+            $fields = ['sku', 'price', 'stock_quantity', 'is_active', 'weight'];
             $before = Audit::fieldsOf($variant, $fields);
 
             if (($data['is_active'] ?? false) && ! $this->isCurrent($product, $variant)) {

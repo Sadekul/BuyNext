@@ -2632,3 +2632,125 @@ code.path {
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* ---------- Phase 10: table rates, gift cards, refund split ---------- */
+.rates {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.rates__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-right: var(--space-5);
+}
+
+.rates__empty {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.rates__check .form,
+.rates__import .form {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.rates__check .table caption {
+  padding: var(--space-2) var(--space-5);
+  font-weight: 600;
+  text-align: left;
+}
+
+.rates__import .form-error,
+.rates__check .form-error,
+.rates__import .import-errors {
+  margin: 0 var(--space-5) var(--space-4);
+}
+
+.import-errors h3 {
+  font-size: var(--text-base);
+}
+
+.import-errors ul {
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.gift-card-line {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.gift-card-line p {
+  margin: 0;
+}
+
+.gift-card-created {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.gift-card-created p {
+  margin: 0;
+}
+
+.gift-card-created code {
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+.refund-split {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.refund-split__title {
+  margin: 0 0 var(--space-2);
+  font-weight: 700;
+}
+
+.refund-split dl {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.refund-split dl div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.refund-split dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* 390 px phones: the rate rows' four buttons wrap instead of widening the page. */
+@media (max-width: 600px) {
+  .rates__table .table__actions {
+    white-space: normal;
+  }
+
+  /* The four buttons in a 2 × 2 grid, so the row fits a phone without scrolling sideways. */
+  .rates__tools {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: var(--space-1);
+    justify-content: end;
+  }
+
+  .rates__table th,
+  .rates__table td {
+    padding-inline: var(--space-3);
+  }
+}

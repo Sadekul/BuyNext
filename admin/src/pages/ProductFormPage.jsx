@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuArrowLeft, LuBellRing } from 'react-icons/lu'
@@ -11,7 +11,7 @@ import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
-import { EMPTY_PRODUCT, LIVE_ONLY_FIELDS, productSchema } from '../utils/productSchema'
+import { EMPTY_PRODUCT, GIFT_CARD_FIELDS, LIVE_ONLY_FIELDS, giftCardFormFields, productSchema, toGiftCardValues } from '../utils/productSchema'
 import { formatCount, formatMoney } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
@@ -41,7 +41,7 @@ function ProductFormPage() {
 
   const initial = isNew
     ? EMPTY_PRODUCT
-    : Object.fromEntries(Object.keys(EMPTY_PRODUCT).map((key) => [key, product.data[key] ?? EMPTY_PRODUCT[key]]))
+    : { ...Object.fromEntries(Object.keys(EMPTY_PRODUCT).map((key) => [key, product.data[key] ?? EMPTY_PRODUCT[key]])), ...giftCardFormFields(product.data) }
 
   return (
     <>
@@ -71,6 +71,8 @@ function ProductFormPage() {
 }
 
 const FIELDS_FROM_SERVER = Object.keys(EMPTY_PRODUCT)
+// Phase 10 §5: the server's names for the gift card fields' errors ("giftCardAmounts.1" → the amounts field).
+const fieldOf = (field) => (field.startsWith('giftCardAmounts') ? 'giftCardAmounts' : field)
 
 function ProductForm({ productId, initial, categories, hasVariants }) {
   const isNew = productId === undefined
@@ -85,13 +87,18 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
     handleSubmit,
     setError,
     reset,
+    control,
     formState: { errors, isDirty },
   } = useForm({ resolver: zodResolver(productSchema), defaultValues: initial, mode: 'onSubmit', reValidateMode: 'onChange' })
 
+  const isGiftCard = useWatch({ control, name: 'type' }) === 'gift_card'
   const save = useMutation({
     mutationFn: (values) => {
       // The demo has no product status or SEO fields: don't send them.
-      const sent = LIVE_DATA ? values : Object.fromEntries(Object.entries(values).filter(([field]) => !LIVE_ONLY_FIELDS.includes(field)))
+      const sent = LIVE_DATA
+        ? // Phase 10 §5: the gift card text fields become numbers (and only gift cards send amounts).
+          { ...Object.fromEntries(Object.entries(values).filter(([field]) => !GIFT_CARD_FIELDS.includes(field))), ...toGiftCardValues(values) }
+        : Object.fromEntries(Object.entries(values).filter(([field]) => !LIVE_ONLY_FIELDS.includes(field)))
       return isNew ? createProduct(sent) : updateProduct(productId, sent)
     },
     onSuccess: (response, values) => {
@@ -111,7 +118,7 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
     onError: (error) => {
       // Server-side validation (422): show each message on its field.
       for (const [field, messages] of Object.entries(error.fieldErrors ?? {})) {
-        if (FIELDS_FROM_SERVER.includes(field)) setError(field, { message: messages[0] })
+        if (FIELDS_FROM_SERVER.includes(fieldOf(field))) setError(fieldOf(field), { message: messages[0] })
       }
     },
   })
@@ -183,10 +190,42 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
             )}
           </Field>
         )}
+        {LIVE_DATA && (
+          <Field label="Weight (g, optional)" error={errors.weight?.message} hint="Used by the shipping table rates. Empty: the store's default weight.">
+            {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" {...register('weight')} />}
+          </Field>
+        )}
+        {LIVE_DATA && (
+          <Field label="Product type" error={errors.type?.message} hint="A gift card is emailed to the person the shopper names; it needs no shipping and isn't taxed.">
+            {(a11y) => (
+              <select {...a11y} {...register('type')}>
+                <option value="simple">Simple product</option>
+                <option value="gift_card">Gift card</option>
+              </select>
+            )}
+          </Field>
+        )}
         <Field label="Description" error={errors.description?.message} className="form__wide">
           {(a11y) => <textarea {...a11y} rows={5} {...register('description')} />}
         </Field>
       </div>
+      {/* Phase 10 §5: the amounts a shopper can choose. */}
+      {LIVE_DATA && isGiftCard && (
+        <fieldset className="form__fieldset seo-fields">
+          <legend>Gift card amounts</legend>
+          <div className="form__grid">
+            <Field label="Amount choices (USD)" error={errors.giftCardAmounts?.message} hint="Separated by commas, like 25, 50, 100." className="seo-fields__wide">
+              {(a11y) => <input {...a11y} inputMode="decimal" autoComplete="off" {...register('giftCardAmounts')} />}
+            </Field>
+            <Field label="Custom amount from (optional)" error={errors.giftCardMinAmount?.message} hint="With both ends, shoppers can also type an amount in this range.">
+              {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="1" step="0.01" {...register('giftCardMinAmount')} />}
+            </Field>
+            <Field label="Custom amount up to (optional)" error={errors.giftCardMaxAmount?.message}>
+              {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="1" step="0.01" {...register('giftCardMaxAmount')} />}
+            </Field>
+          </div>
+        </fieldset>
+      )}
       {LIVE_DATA && (
         <fieldset className="form__fieldset seo-fields">
           <legend>Search engines</legend>

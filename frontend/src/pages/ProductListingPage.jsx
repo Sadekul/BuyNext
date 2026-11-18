@@ -59,7 +59,11 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const { categorySlug } = useParams()
   const [searchParams] = useSearchParams()
   const searchQuery = searchParams.get('q')?.trim() ?? ''
+  // Phase 10: "Search instead for …" asks for the words exactly as typed (no typo correction).
+  const exact = Boolean(searchQuery) && searchParams.get('exact') === '1'
   const sortOption = getSortOption(searchParams.get('sort'), defaultSort)
+  // The same cache entry as the results below (no extra request): did the API correct a typo?
+  const correctedQuery = useQuery({ ...catalogQuery({ searchQuery, categorySlug, exact }), enabled: Boolean(searchQuery) }).data?.correctedQuery ?? null
 
   // Phase 7: an exact search term the store sends straight to a page (the
   // same small request the search box's suggestions make, so usually cached).
@@ -79,12 +83,12 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const subcategories = currentCategory ? childCategories(categories, currentCategory.slug) : []
 
   let heading = title
-  if (searchQuery) heading = `Results for "${searchQuery}"`
+  if (searchQuery) heading = `Results for "${correctedQuery ?? searchQuery}"`
   else if (categorySlug) heading = currentCategory?.name ?? 'Category'
 
   // A new scope (search or category) = a new `key`, so React throws away the
   // old Catalog's local state (open quick view, mobile filter panel).
-  const scopeKey = searchQuery ? `search:${searchQuery}` : `category:${categorySlug ?? 'all'}`
+  const scopeKey = searchQuery ? `search:${exact ? 'exact:' : ''}${searchQuery}` : `category:${categorySlug ?? 'all'}`
 
   // Search and link-preview tags: a category's own SEO fields (admin, phase 5) when set.
   // Search results are left out of search engines (noindex): they're endless and thin.
@@ -111,6 +115,15 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
           />
         )}
         <h1 className="listing__title">{heading}</h1>
+        {/* Phase 10: the API searched for a corrected spelling; the shopper can still have their own words. */}
+        {correctedQuery && (
+          <p className="listing__correction">
+            Showing results for <strong>{correctedQuery}</strong>.{' '}
+            <Link to={`${ROUTES.products}?${new URLSearchParams({ q: searchQuery, exact: '1' })}`}>
+              Search instead for <em>{searchQuery}</em>
+            </Link>
+          </p>
+        )}
         {categories.length > 0 && (
           <CategoryNav categories={topLevelCategories(categories)} activeSlug={ancestors[0]?.slug ?? null} />
         )}
@@ -143,6 +156,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         <Catalog
           key={scopeKey}
           searchQuery={searchQuery}
+          exact={exact}
           categorySlug={categorySlug}
           categoryName={currentCategory?.name}
           sortOption={sortOption}
@@ -165,9 +179,9 @@ function UnknownCategory({ slug }) {
 }
 
 /** Fetches one scope, then filters, sorts, and paginates it on the client. */
-function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultSort }) {
+function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, defaultSort }) {
   // Search and category are fetched on the server; each scope is cached separately.
-  const request = useQuery(catalogQuery({ searchQuery, categorySlug }))
+  const request = useQuery(catalogQuery({ searchQuery, categorySlug, exact }))
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [areFiltersOpen, setAreFiltersOpen] = useState(false)
@@ -182,7 +196,7 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
 
   // useMemo: filtering + sorting up to 194 products is cheap, but it would
   // otherwise re-run on every render (e.g. opening quick view or the drawer).
-  const products = request.data
+  const products = request.data?.items
   const brandOptions = useMemo(() => getBrandOptions(products ?? []), [products])
   // An impossible price range (min > max) is ignored rather than showing zero
   // results. The list, the chips, and the filter count all use these filters,
@@ -237,7 +251,7 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
     chips.push({
       id: 'q',
       label: `Search: "${searchQuery}"`,
-      onRemove: () => setSearchParams(withParam(withParam(searchParams, 'q', null), 'page', null)),
+      onRemove: () => setSearchParams(withParam(withParam(withParam(searchParams, 'q', null), 'exact', null), 'page', null)),
     })
   }
   if (categorySlug) {
@@ -269,7 +283,7 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
 
   function handleClearAllChips() {
     // Drop search, filters, and page but keep sort and view; leave a category page for all products.
-    const next = withParam(withFilters(searchParams, EMPTY_FILTERS), 'q', null)
+    const next = withParam(withParam(withFilters(searchParams, EMPTY_FILTERS), 'q', null), 'exact', null)
     if (categorySlug) navigate({ pathname: ROUTES.products, search: next.toString() })
     else setSearchParams(next)
   }
@@ -329,7 +343,8 @@ function Catalog({ searchQuery, categorySlug, categoryName, sortOption, defaultS
               <LuSlidersHorizontal aria-hidden="true" />
               Filters{activeFilterCount > 0 && ` (${activeFilterCount})`}
             </button>
-            <SortSelect value={sortOption.value} onChange={handleSortChange} />
+            {/* A search keeps the API's order by default: the most relevant first (BuyNest's API ranks results). */}
+            <SortSelect value={sortOption.value} onChange={handleSortChange} labels={searchQuery ? { featured: 'Best match' } : undefined} />
             <ViewToggle value={layout} onChange={handleLayoutChange} />
           </div>
         </div>

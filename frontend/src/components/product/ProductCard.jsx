@@ -12,6 +12,7 @@ import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { IMAGE_SIZES, responsiveImageProps } from '../../utils/images'
+import { isGiftCardProduct } from '../../utils/giftCards'
 import './ProductCard.css'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
@@ -29,6 +30,8 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
   const isOutOfStock = stock === 0
   const { canBuy } = getPurchaseLimits(product)
   const productUrl = ROUTES.productDetails(id)
+  const isGiftCard = isGiftCardProduct(product)
+  const choosesOnPage = product.hasVariants || isGiftCard
 
   return (
     <article className={cn('product-card', `product-card--${layout}`)}>
@@ -94,20 +97,21 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
           )}
         </p>
 
-        {/* A product with options (size, color) is bought on its page, where a variant is chosen. */}
-        {onAddToCart && product.hasVariants && (
+        {/* A product with options (size, color) is bought on its page, where a variant is chosen;
+            a gift card too (phase 10), where its amount and recipient are chosen. */}
+        {onAddToCart && choosesOnPage && (
           <Button
             to={productUrl}
             variant="outline"
             size="sm"
             fullWidth={layout === 'grid'}
             className="product-card__action"
-            aria-label={`Choose options for ${title}`}
+            aria-label={`${isGiftCard ? 'Choose an amount' : 'Choose options'} for ${title}`}
           >
-            Choose options
+            {isGiftCard ? 'Choose amount' : 'Choose options'}
           </Button>
         )}
-        {onAddToCart && !product.hasVariants && (
+        {onAddToCart && !choosesOnPage && (
           <Button
             variant={canBuy ? 'primary' : 'outline'}
             size="sm"

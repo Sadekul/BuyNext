@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { LuArrowLeft, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -13,6 +13,7 @@ import QuantitySelector from '../components/product/QuantitySelector'
 import ReviewForm from '../components/product/ReviewForm'
 import VariantSelector from '../components/product/VariantSelector'
 import StockAlertForm from '../components/product/StockAlertForm'
+import GiftCardForm from '../components/product/GiftCardForm'
 import RatingStars from '../components/product/RatingStars'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -31,6 +32,8 @@ import { toDescription } from '../utils/pageMeta'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { categoryAncestors } from '../utils/categories'
 import { chooseValue, findVariant, hasVariants, initialSelection, variantPriceRange, withVariant } from '../utils/variants'
+import { isGiftCardProduct } from '../utils/giftCards'
+import { trackViewItem } from '../utils/analytics'
 import './ProductDetailsPage.css'
 
 const RELATED_LIMIT = 4
@@ -95,6 +98,10 @@ function ProductDetails({ product }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { addItem } = useCart()
+  // Phase 10: statistics (only after the visitor accepted them; no personal data).
+  useEffect(() => trackViewItem(product), [product])
+  // Phase 10: gift cards are bought by amount, for a recipient (GiftCardForm), not by quantity.
+  const isGiftCard = isGiftCardProduct(product)
   // The category tree (BuyNest's API) names the breadcrumb's parents; the demo needs no extra request.
   const { data: categories } = useQuery({ ...categoriesQuery(), enabled: HAS_CATEGORY_TREE })
   const hintId = useId()
@@ -199,6 +206,13 @@ function ProductDetails({ product }) {
             </a>
           )}
 
+          {isGiftCard ? (
+            <>
+              {product.description && <p className="product-details__description">{product.description}</p>}
+              <GiftCardForm product={product} onAdd={(purchasable) => addItem(purchasable, 1)} />
+            </>
+          ) : (
+          <>
           <div className="product-details__price">
             <span className="product-details__price-current">
               {showFrom && <span className="product-details__price-from">From </span>}
@@ -254,6 +268,8 @@ function ProductDetails({ product }) {
           {/* key: a new form (and message) for each variant. */}
           {REAL_SHOP && isSoldOut && (
             <StockAlertForm key={variant?.id ?? 'product'} productId={product.id} variantId={variant?.id ?? null} variantLabel={variant ? purchasable.variantLabel : null} />
+          )}
+          </>
           )}
 
           <ul className="product-details__perks">

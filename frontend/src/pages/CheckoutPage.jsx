@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -37,16 +37,25 @@ import { MAX_SAVED_ADDRESSES, defaultAddress, isSameAddress, toOrderAddress } fr
 import { rememberGuestPayment } from '../utils/payment'
 import SavedAddressPicker from '../components/checkout/SavedAddressPicker'
 import GroupDiscountNote from '../components/cart/GroupDiscountNote'
+import GiftCardRedeem from '../components/checkout/GiftCardRedeem'
+import { trackBeginCheckout } from '../utils/analytics'
 import './CheckoutPage.css'
 
 // API field names → checkout form fields. The shop service (server/shop/laravel.js)
 // already turns the API's snake_case into these camelCase paths.
 const ADDRESS_FIELDS = ['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'postalCode', 'country']
+// Phase 10: gift cards only: the one address on the form is the billing address (sent as both).
+const GIFT_CARD_ONLY_FIELD_MAP = {
+  shippingAddress: 'billing.line1',
+  ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`shippingAddress.${field}`, `billing.${field}`])),
+}
 const SERVER_FIELD_MAP = {
   email: 'email',
   phone: 'phone',
   shippingMethod: 'shippingMethod',
   paymentMethod: 'paymentMethod',
+  shippingAddress: 'shipping.line1',
+  billingAddress: 'billing.line1',
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`shippingAddress.${field}`, `shipping.${field}`])),
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`billingAddress.${field}`, `billing.${field}`])),
 }
@@ -64,6 +73,9 @@ const PAYMENT_NOTES = {
   cod: 'Your order is confirmed straight away. Pay the courier when it arrives.',
   stripe:
     "Next you'll pay on Stripe's secure payment page (it also offers Apple Pay and Google Pay where available). BuyNest never sees your card number. Your order is saved first, so you can pay later from your order page if you leave.",
+  // Phase 10: PayPal orders are approved on PayPal's site (a redirect, no PayPal script on this page).
+  paypal:
+    "Next you'll approve the payment on PayPal's site, then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
   online:
     "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers.",
 }
@@ -140,8 +152,11 @@ function CheckoutPage() {
     )
   }
 
+  // Phase 10: a cart of gift cards only is emailed: no delivery address or method.
+  const requiresShipping = cart.totals.requiresShipping !== false
+
   // Nothing the shopper could choose (a misconfigured store): say so instead of a form that can't be sent.
-  if (settings.shippingMethods.length === 0 || settings.paymentMethods.length === 0 || settings.countries.length === 0) {
+  if ((requiresShipping && settings.shippingMethods.length === 0) || settings.paymentMethods.length === 0 || settings.countries.length === 0) {
     return (
       <div className="section container">
         <EmptyState icon={LuTriangleAlert} title="Checkout is unavailable right now" message={`Please try again later, or contact us at ${settings.supportEmail ?? SITE.supportEmail}.`}>
@@ -178,7 +193,10 @@ function CheckoutPage() {
   const separateBilling = savedBilling && !isSameAddress(savedBilling, shippingDefaults) ? toOrderAddress(savedBilling) : null
 
   return (
+    // A new form when the cart starts or stops needing delivery (e.g. changed in another tab): other fields apply.
     <CheckoutForm
+      key={requiresShipping ? 'delivery' : 'email-only'}
+      requiresShipping={requiresShipping}
       isCheckingPrices={refresh.isFetching}
       refreshProducts={refresh.refetch}
       settings={settings}
@@ -190,7 +208,8 @@ function CheckoutPage() {
         phone: profile?.phone || savedShipping?.phone || '',
         shipping: shippingDefaults,
         billingSameAsShipping: !separateBilling,
-        billing: separateBilling ?? emptyAddress,
+        // Gift cards only: the billing address is the one asked for, so it starts from what we know.
+        billing: separateBilling ?? (requiresShipping ? emptyAddress : shippingDefaults),
         saveAddress: false,
         shippingMethod: defaultShippingMethodId(settings),
         // Cash on delivery is the one real order that needs no payment provider (when the store offers it).
@@ -209,7 +228,7 @@ function withVariantLabels(lines, items) {
   })
 }
 
-function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings, savedAddresses = [], addressBookFull = false, group = null }) {
+function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings, savedAddresses = [], addressBookFull = false, group = null, requiresShipping = true }) {
   const cart = useCart()
   const { user, isAuthenticated, authorizedRequest } = useAuth()
   const { placeOrder } = useOrders()
@@ -222,10 +241,14 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       ? createCheckoutSchema({
           countries: settings.countries,
           shippingMethodIds: settings.shippingMethods.map((method) => method.id),
-          paymentMethodIds: settings.paymentMethods.map((method) => method.id),
+          // "gift_card": set on submit when a gift card pays everything (phase 10).
+          paymentMethodIds: [...settings.paymentMethods.map((method) => method.id), 'gift_card'],
+          requiresShipping,
         })
       : checkoutSchema,
   )
+  // Phase 10: the gift card applied at checkout (one per order). The server decides what it pays.
+  const [giftCardCode, setGiftCardCode] = useState(null)
 
   // A MUTATION: a request that changes something on the server (here: the
   // server prices the cart). Unlike queries, mutations run only when called.
@@ -282,13 +305,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   // REAL_SHOP: the server's prices are the ones shown and charged. The local
   // calculation (same rules, but no coupon: the server decides about those)
   // fills in until the first answer arrives.
-  // With tax on, the shipping country goes along too: the server's tax depends on it.
+  // The shipping country goes along too: the tax and (phase 10) the delivery prices depend on it.
+  // A cart of gift cards only has neither: no method, no country.
   const pricingInput = {
     items: cart.items,
     couponCode: cart.couponCode,
-    shippingMethod,
+    shippingMethod: requiresShipping ? shippingMethod : null,
     email: looksLikeEmail(guestEmail) ? guestEmail : undefined,
-    country: REAL_SHOP && settings.taxEnabled ? shippingCountry : undefined,
+    country: REAL_SHOP && requiresShipping ? shippingCountry : undefined,
+    giftCardCode: REAL_SHOP ? (giftCardCode ?? undefined) : undefined,
   }
   const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
   const serverCart = REAL_SHOP ? pricing.data : null
@@ -299,18 +324,44 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const coupon = serverCart ? serverCart.coupon : localTotals.coupon
   const couponError = serverCart ? serverCart.couponError : localTotals.couponError
   const problems = serverCart?.problems ?? []
-  const shippingLabel = settings.shippingMethods.find((method) => method.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
   const changedCount = cart.items.filter((item) => item.notice).length
-  const shippingOptions = settings.shippingMethods.map((method) => {
-    const serverPrice = serverCart?.shippingOptions.find((option) => option.id === method.id)?.price
-    const price = serverPrice ?? calculateCartTotals(cart.items, localCoupon, method.id, settings).shipping
-    return { ...method, description: method.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
+  // Phase 10: exactly the delivery methods the server offers for this cart (table rates by country,
+  // weight, and subtotal), with its prices. Methods it doesn't offer aren't shown. Until its first
+  // answer, the store's methods with the local estimate fill in.
+  const offered = serverCart ? serverCart.shippingOptions : null
+  const shippingOptions = (offered ?? settings.shippingMethods.map((method) => ({ ...method, price: calculateCartTotals(cart.items, localCoupon, method.id, settings).shipping }))).map((option) => {
+    const known = settings.shippingMethods.find((method) => method.id === option.id)
+    const price = option.price ?? 0
+    return { id: option.id, label: option.label ?? known?.label ?? option.id, description: option.eta ?? known?.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
   })
+  const shippingLabel = shippingOptions.find((option) => option.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
+  // The chosen method isn't offered for this cart (any more): switch to the first that is.
+  const firstOffered = offered?.[0]?.id
+  const chosenIsOffered = !requiresShipping || !offered || offered.some((option) => option.id === shippingMethod)
+  useEffect(() => {
+    if (requiresShipping && !chosenIsOffered && firstOffered) setValue('shippingMethod', firstOffered, { shouldValidate: isSubmitted })
+  }, [requiresShipping, chosenIsOffered, firstOffered, setValue, isSubmitted])
+  const noDelivery = REAL_SHOP && requiresShipping && offered !== null && offered.length === 0
   const isPricing = REAL_SHOP && (pricing.isPending || pricing.isFetching)
   const isBusy = isSubmitting || isCheckingPrices || isPricing
-  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0)
+  // Phase 10: what the gift card pays, and whether it pays everything (no other payment needed).
+  const giftCardError = giftCardCode ? (serverCart?.giftCardError ?? null) : null
+  const giftCardPays = giftCardCode && !giftCardError ? (serverCart?.totals.giftCard ?? 0) : 0
+  const amountDue = serverCart?.totals.amountDue ?? Math.max(0, Math.round((totals.total - giftCardPays) * 100) / 100)
+  const fullyCovered = REAL_SHOP && giftCardPays > 0 && amountDue === 0
+  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0 || noDelivery || !chosenIsOffered || Boolean(giftCardError))
   // Phase 8: a card order is paid on Stripe's page right after it is created.
-  const payByStripe = REAL_SHOP && settings.cardPayments === 'stripe' && paymentMethod === 'card'
+  const payByStripe = REAL_SHOP && !fullyCovered && settings.cardPayments === 'stripe' && paymentMethod === 'card'
+  // Phase 10: a PayPal order is approved on PayPal's site right after it is created.
+  const payByPaypal = REAL_SHOP && !fullyCovered && settings.paypalPayments === 'paypal' && paymentMethod === 'paypal'
+
+  // Phase 10 statistics: the shopper started checking out (once; only with their consent, no personal data).
+  const beganCheckout = useRef(false)
+  useEffect(() => {
+    if (beganCheckout.current) return
+    beganCheckout.current = true
+    trackBeginCheckout(cart.items, totals.total)
+  }, [cart.items, totals.total])
 
   async function placeDemoOrder(values) {
     // 1. The server prices the cart; stop if anything changed since it was added.
@@ -336,8 +387,17 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     // Only ids, quantities, and choices are sent; `expectedTotal` is the total
     // the shopper saw, so the server refuses (409) if its own total differs.
     // "Save this address" only when it is offered (an address already in the book isn't saved twice).
-    const saveAddress = offerToSave && values.saveAddress === true
-    const order = await orderMutation.mutateAsync({ items: cart.items, couponCode: cart.couponCode, values: { ...values, saveAddress }, expectedTotal: totals.total })
+    const saveAddress = requiresShipping && offerToSave && values.saveAddress === true
+    // Phase 10: a gift card that pays everything is the payment method; otherwise the chosen one pays the rest.
+    const paymentChoice = fullyCovered ? 'gift_card' : values.paymentMethod === 'gift_card' ? defaultValues.paymentMethod : values.paymentMethod
+    const order = await orderMutation.mutateAsync({
+      items: cart.items,
+      couponCode: cart.couponCode,
+      values: { ...values, paymentMethod: paymentChoice, saveAddress },
+      expectedTotal: totals.total,
+      giftCardCode: giftCardCode && !giftCardError ? giftCardCode : undefined,
+      requiresShipping,
+    })
     queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
     queryClient.invalidateQueries({ queryKey: orderKeys.all })
     if (saveAddress) queryClient.invalidateQueries({ queryKey: customerKeys.addresses(user.id) })
@@ -346,7 +406,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     // then leaves for Stripe's page (`payNow`), or shows why it couldn't with
     // "Pay now" to retry. A guest's number and email are kept in this tab for
     // the way back from Stripe.
-    const payNow = order.payment?.provider === 'stripe' && order.paymentStatus !== 'paid' ? true : undefined
+    // Phase 10: PayPal works the same way (its approval page instead of Stripe's).
+    const payNow = ['stripe', 'paypal'].includes(order.payment?.provider) && order.paymentStatus !== 'paid' ? true : undefined
     if (payNow && !isAuthenticated) rememberGuestPayment(order.number, order.email)
     // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
     navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order, ...(payNow && { payNow }) } })
@@ -373,10 +434,17 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
         setError('root.server', { message: error.data?.code === 'guest_checkout_disabled' ? GUEST_CHECKOUT_OFF : error.message })
         return
       }
-      if (applyServerFieldErrors(error, setError, SERVER_FIELD_MAP)) return
+      if (applyServerFieldErrors(error, setError, requiresShipping ? SERVER_FIELD_MAP : { ...SERVER_FIELD_MAP, ...GIFT_CARD_ONLY_FIELD_MAP })) return
       // The code stopped applying (phase 7 messages say why: "Spend $20.00 more
       // to use this code", "This code applies to Shoes only"): re-price, so the
       // summary and the code box show the server's answer too.
+      // Phase 10: the gift card stopped working (spent elsewhere, disabled, expired): re-price and say why.
+      const giftCardMessage = error.fieldErrors?.giftCardCode?.[0]
+      if (giftCardMessage) {
+        pricing.refetch()
+        setError('root.server', { message: `Gift card: ${giftCardMessage} Remove it or try another card.` })
+        return
+      }
       const couponMessage = error.fieldErrors?.couponCode?.[0]
       if (couponMessage) {
         pricing.refetch()
@@ -392,8 +460,18 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     }
   }
 
-  const placeLabel = isBusy ? 'Checking prices…' : payByStripe ? 'Continue to secure payment' : `Place order · ${formatPrice(totals.total)}`
-  const paymentNote = REAL_SHOP ? (paymentMethod === 'cod' ? PAYMENT_NOTES.cod : payByStripe ? PAYMENT_NOTES.stripe : PAYMENT_NOTES.online) : null
+  const placeLabel = isBusy
+    ? 'Checking prices…'
+    : payByStripe
+      ? 'Continue to secure payment'
+      : payByPaypal
+        ? 'Continue to PayPal'
+        : `Place order · ${formatPrice(giftCardPays > 0 ? amountDue : totals.total)}`
+  let paymentNote = null
+  if (REAL_SHOP) {
+    paymentNote = paymentMethod === 'cod' ? PAYMENT_NOTES.cod : payByStripe ? PAYMENT_NOTES.stripe : payByPaypal ? PAYMENT_NOTES.paypal : PAYMENT_NOTES.online
+    if (giftCardPays > 0) paymentNote = `Your gift card pays ${formatPrice(giftCardPays)}; the remaining ${formatPrice(amountDue)} is paid as chosen above. ${paymentNote}`
+  }
 
   return (
     <div className="checkout section container">
@@ -435,6 +513,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             </div>
           </section>
 
+          {requiresShipping ? (
           <section className="checkout__section" aria-labelledby="shipping-title">
             <h2 id="shipping-title">Shipping address</h2>
             {canUseAddressBook && savedAddresses.length > 0 && (
@@ -443,7 +522,19 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} />
             {offerToSave && <CheckboxField label="Save this address to my address book" {...register('saveAddress')} />}
           </section>
+          ) : (
+            // Phase 10: gift cards only: nothing ships, so only the billing address is asked for.
+            <section className="checkout__section" aria-labelledby="billing-title">
+              <h2 id="billing-title">Billing address</h2>
+              <p className="checkout__note">Gift cards are sent by email, so there's no delivery address or shipping charge.</p>
+              {canUseAddressBook && savedAddresses.length > 0 && (
+                <SavedAddressPicker label="Saved addresses" addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
+              )}
+              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
+            </section>
+          )}
 
+          {requiresShipping && (
           <section className="checkout__section" aria-labelledby="billing-title">
             <h2 id="billing-title">Billing address</h2>
             <CheckboxField label="Same as shipping address" {...register('billingSameAsShipping')} />
@@ -455,25 +546,42 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             )}
           </section>
 
-          <section className="checkout__section">
-            <ChoiceCards
-              legend="Delivery"
-              options={shippingOptions}
-              registration={register('shippingMethod')}
-              selectedId={shippingMethod}
-              error={errors.shippingMethod?.message}
-            />
-          </section>
+          )}
+
+          {requiresShipping && (
+            <section className="checkout__section">
+              <ChoiceCards
+                legend="Delivery"
+                options={shippingOptions}
+                registration={register('shippingMethod')}
+                selectedId={shippingMethod}
+                error={errors.shippingMethod?.message}
+              />
+              {noDelivery && (
+                <p className="checkout__error" role="alert">
+                  {serverCart?.shippingError ?? `We can't deliver this order to ${shippingCountry}.`} Choose another country, or contact us at{' '}
+                  {settings.supportEmail ?? SITE.supportEmail}.
+                </p>
+              )}
+            </section>
+          )}
 
           <section className="checkout__section">
-            <ChoiceCards
-              legend="Payment"
-              options={settings.paymentMethods}
-              registration={register('paymentMethod')}
-              selectedId={paymentMethod}
-              error={errors.paymentMethod?.message}
-            />
-            {REAL_SHOP ? (
+            {fullyCovered ? (
+              <fieldset className="choice-cards">
+                <legend className="choice-cards__legend">Payment</legend>
+                <p className="checkout__note">Your gift card pays for the whole order: no other payment is needed.</p>
+              </fieldset>
+            ) : (
+              <ChoiceCards
+                legend="Payment"
+                options={settings.paymentMethods}
+                registration={register('paymentMethod')}
+                selectedId={paymentMethod}
+                error={errors.paymentMethod?.message}
+              />
+            )}
+            {fullyCovered ? null : REAL_SHOP ? (
               <p className="checkout__note" aria-live="polite">
                 {paymentNote}
               </p>
@@ -492,7 +600,14 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           </h2>
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
           {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} />}
-          <OrderTotals totals={totals} couponCode={cart.couponCode} appliedRules={serverCart?.appliedRules} shippingLabel={shippingLabel} showTax={!REAL_SHOP || settings.taxEnabled} />
+          <OrderTotals
+            totals={giftCardPays > 0 ? { ...totals, giftCard: giftCardPays, amountDue } : totals}
+            couponCode={cart.couponCode}
+            appliedRules={serverCart?.appliedRules}
+            shippingLabel={shippingLabel}
+            showTax={!REAL_SHOP || settings.taxEnabled}
+            requiresShipping={requiresShipping}
+          />
           <CouponForm
             appliedCode={cart.couponCode}
             coupon={coupon}
@@ -502,6 +617,17 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             disabled={isSubmitting}
             checking={isPricing}
           />
+          {REAL_SHOP && (
+            <GiftCardRedeem
+              appliedCode={giftCardCode}
+              applied={giftCardCode && !giftCardError ? serverCart?.giftCard : null}
+              error={giftCardError}
+              onApply={setGiftCardCode}
+              onRemove={() => setGiftCardCode(null)}
+              disabled={isSubmitting}
+              checking={isPricing}
+            />
+          )}
 
           {changedCount > 0 && (
             <p className="checkout__notice" role="status">

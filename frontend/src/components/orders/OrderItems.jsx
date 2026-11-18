@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
+import { recipientLabel } from '../../utils/giftCards'
 import './OrderItems.css'
 
 /**
@@ -18,7 +19,7 @@ function OrderItems({ items }) {
         const lineTotal = item.lineTotal ?? salePrice * item.quantity
         return (
           // Two variants of one product are two lines: the key includes the variant.
-          <li key={`${item.productId ?? item.sku}-${item.variantId ?? ''}-${index}`} className="order-items__row">
+          <li key={`${item.productId ?? item.sku}-${item.variantId ?? item.giftCard?.id ?? ''}-${index}`} className="order-items__row">
             <span className="order-items__thumb">
               <img src={item.thumbnail} alt="" width="56" height="56" loading="lazy" />
               <span className="order-items__qty" aria-hidden="true">
@@ -29,6 +30,8 @@ function OrderItems({ items }) {
               {/* A product deleted since the order has no page any more. */}
               {item.productId ? <Link to={ROUTES.productDetails(item.productId)}>{item.title}</Link> : item.title}
               {item.variantLabel && <span className="order-items__variant">{item.variantLabel}</span>}
+              {/* Phase 10: a gift card names its recipient (never its code). */}
+              {item.giftCard?.recipientName && <span className="order-items__variant">{recipientLabel(item.giftCard)}</span>}
               {/* Phase 7: the catalog price rule that set the price ("VIP price", "Black Friday"). */}
               {item.priceLabel && <span className="order-items__price-label">{item.priceLabel}</span>}
               <span className="order-items__meta">

@@ -72,7 +72,7 @@ describe('Stripe webhook (POST /api/payments/stripe/webhook)', () => {
     const get = await request('/api/payments/stripe/webhook', { method: 'GET' })
     expect(get.status).toBe(405)
     expect(get.headers.get('allow')).toBe('POST')
-    expect((await request('/api/payments/paypal/webhook', { headers: { 'Stripe-Signature': SIGNATURE }, body: RAW })).status).toBe(404)
+    expect((await request('/api/payments/square/webhook', { headers: { 'Stripe-Signature': SIGNATURE }, body: RAW })).status).toBe(404)
     expect(calls).toEqual([])
   })
 

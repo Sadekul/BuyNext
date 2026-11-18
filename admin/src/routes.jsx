@@ -43,6 +43,9 @@ import SearchTermsPage from './pages/SearchTermsPage'
 import { REAL_ACCOUNTS } from './auth/accounts'
 import TwoFactorPage from './pages/TwoFactorPage'
 import BackupsPage from './pages/BackupsPage'
+// Phase 10: shipping table rates and gift cards.
+import ShippingRatesPage from './pages/ShippingRatesPage'
+import { GiftCardDetailPage, GiftCardsPage } from './pages/GiftCardsPages'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -121,6 +124,10 @@ export function AdminRoutes() {
             <Route path="backups" element={guarded('backups.view', <BackupsPage />)} />
             {/* The backup_failed notification links here. */}
             <Route path="system/backups" element={<Navigate to="/backups" replace />} />
+            {/* Phase 10: Settings → Shipping → Table rates, Marketing → Gift cards. */}
+            <Route path="settings/shipping-rates" element={guarded('settings.edit', <ShippingRatesPage />)} />
+            <Route path="gift-cards" element={guarded('gift_cards.view', <GiftCardsPage />)} />
+            <Route path="gift-cards/:giftCardId" element={guarded('gift_cards.view', <GiftCardDetailPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

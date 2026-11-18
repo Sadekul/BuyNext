@@ -6,7 +6,7 @@ use App\Models\Admin;
 use App\Models\CreditMemo;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -29,7 +29,7 @@ use Illuminate\Validation\ValidationException;
  */
 class Refunds
 {
-    public function __construct(private Audit $audit, private Inventory $inventory, private StripePayments $stripe) {}
+    public function __construct(private Audit $audit, private Inventory $inventory, private OnlinePayments $payments, private GiftCards $giftCards) {}
 
     /**
      * The limits for the admin's refund form (GET .../refundable), in cents:
@@ -100,6 +100,8 @@ class Refunds
             ], $limits['items'])),
             'shipping_refundable' => Pricing::format($limits['shipping_cents']),
             'max_total' => Pricing::format($limits['max_cents']),
+            // Phase 10 (part B): a refund goes back to the redeemed gift card first, up to this much.
+            'gift_card_refundable' => Pricing::format(min($limits['max_cents'], $this->giftCards->refundableCents($order))),
         ];
     }
 
@@ -133,7 +135,7 @@ class Refunds
                     ? "{$limit['item']->name} has already been fully refunded."
                     : "Only {$limit['refundable']} of {$limit['item']->name} can be refunded.";
             } elseif ($quantity > 0) { // rows left at 0 are simply not refunded
-                $lines[$id] = ['item' => $limit['item'], 'quantity' => $quantity, 'amount_cents' => $this->amountCents($limit, $quantity)];
+                $lines[$id] = ['item' => $limit['item'], 'quantity' => $quantity, 'amount_cents' => $this->amountCents($limit, $quantity), 'index' => $index];
             }
         }
 
@@ -156,16 +158,27 @@ class Refunds
                 .' (what was paid and not refunded yet).']);
         }
 
-        $restock = (bool) ($data['restock'] ?? false) && $lines !== [];
-        // Phase 8: an order paid through Stripe gets the money back on the card, BEFORE the memo is
-        // saved: Stripe refusing throws a 422 and the transaction keeps nothing. Others: refunded by hand.
-        $refundReference = $this->stripe->refund($order, $total, $order->creditMemos->count() + 1);
+        // Phase 10 (part B): refunded gift card purchases take back (disable) unused cards; gift cards aren't restocked.
+        foreach ($lines as $line) {
+            if ($line['item']->isGiftCard()) {
+                $this->giftCards->disableForRefund($line['item'], $line['quantity'], "items.{$line['index']}.quantity");
+            }
+        }
+        $stockLines = array_filter($lines, fn ($line) => ! $line['item']->isGiftCard());
+        $restock = (bool) ($data['restock'] ?? false) && $stockLines !== [];
+        // Phase 10 (part B): the redeemed gift card gets its part back first; only the rest goes to the card / PayPal.
+        $giftCardRefund = min($total, $this->giftCards->refundableCents($order));
+        $otherRefund = $total - $giftCardRefund;
+        // Phase 8: an order paid through Stripe (phase 10: or PayPal) gets the money back BEFORE the memo is
+        // saved: the provider refusing throws a 422 and the transaction keeps nothing. Others: refunded by hand.
+        $refundReference = $otherRefund > 0 ? $this->payments->refund($order, $otherRefund, $order->creditMemos->count() + 1) : null;
         $memo = $order->creditMemos()->create([
             'return_id' => $data['return_id'] ?? null, // phase 6: the return this refund settles
             'subtotal' => Pricing::format($subtotal),
             'shipping_refund' => Pricing::format($shipping),
             'adjustment' => Pricing::format($adjustment),
             'total' => Pricing::format($total),
+            'gift_card_refund' => Pricing::format($giftCardRefund),
             'refund_reference' => $refundReference,
             'restocked' => $restock,
             'admin_id' => $admin->id,
@@ -177,8 +190,9 @@ class Refunds
             $memo->items()->create(['order_item_id' => $id, 'quantity' => $line['quantity'], 'amount' => Pricing::format($line['amount_cents'])]);
         }
         if ($restock) {
-            $this->restock($lines);
+            $this->restock($stockLines);
         }
+        $this->giftCards->refundTo($order, $giftCardRefund, $memo);
 
         // Full refund: the money is all back, or nothing is left to refund but
         // a fee the shop kept (negative adjustment). Then the order is closed.
@@ -194,7 +208,12 @@ class Refunds
             'status' => $order->status,
             'payment_status' => $order->payment_status,
             'note' => "Credit memo {$memo->number} created; \${$memo->total} refunded"
-                .($refundReference ? ' to the card through Stripe.' : '.').($restock ? ' Items returned to stock.' : ''),
+                .($giftCardRefund > 0 ? ' ($'.Pricing::format($giftCardRefund).' to the gift card)' : '')
+                .match (true) {
+                    $refundReference && $order->payment_provider === 'paypal' => ' through PayPal.',
+                    (bool) $refundReference => ' to the card through Stripe.',
+                    default => '.',
+                }.($restock ? ' Items returned to stock.' : ''),
             'admin_id' => $admin->id,
             'customer_notified' => $notify,
         ]);
@@ -204,6 +223,7 @@ class Refunds
                 'order' => $order->number, 'subtotal' => $memo->subtotal, 'shipping_refund' => $memo->shipping_refund,
                 'adjustment' => $memo->adjustment, 'total' => $memo->total, 'restocked' => $restock, 'payment_status' => $order->payment_status,
                 ...($refundReference ? ['refund_reference' => $refundReference] : []),
+                ...($giftCardRefund > 0 ? ['gift_card_refund' => $memo->gift_card_refund] : []),
             ]], $admin);
 
         return $memo;
@@ -229,7 +249,9 @@ class Refunds
         // The tax on top = what the order costs beyond merchandise and shipping (0 when tax was off or included in the prices).
         $taxOnTop = Pricing::toCents($order->grand_total) - (array_sum($paid) + $shipping);
         if ($taxOnTop > 0) {
-            $taxShares = $this->share($taxOnTop, $paid + ['shipping' => $shipping]); // + keeps the item ids as keys
+            // Phase 10 (part B): gift card lines carry no tax, so they get no share of it.
+            $taxed = array_diff_key($paid, array_flip($order->items->filter(fn (OrderItem $item) => $item->isGiftCard())->pluck('id')->all()));
+            $taxShares = $this->share($taxOnTop, $taxed + ['shipping' => $shipping]); // + keeps the item ids as keys
             $shipping += $taxShares['shipping'];
             unset($taxShares['shipping']);
             foreach ($taxShares as $id => $cents) {

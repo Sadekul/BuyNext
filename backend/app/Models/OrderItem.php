@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'order_id', 'product_id', 'variant_id', 'sku', 'name', 'variant_label', 'thumbnail_url', 'unit_price', 'discount_percent',
     'group_discount_percent', 'sale_price', 'quantity', 'line_total', 'discount_amount', 'price_label',
+    'gift_card', // phase 10 (part B)
 ])]
 class OrderItem extends Model
 {
@@ -25,6 +26,8 @@ class OrderItem extends Model
             'line_total' => 'decimal:2',
             'discount_amount' => 'decimal:2', // phase 7: its share of the cart rules' discount (null before)
             'quantity' => 'integer',
+            // Phase 10 (part B): a gift card line's { amount, recipient_name, recipient_email, message } (null otherwise).
+            'gift_card' => 'array',
         ];
     }
 
@@ -42,6 +45,12 @@ class OrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class);
+    }
+
+    /** Phase 10 (part B): a line that bought gift cards (no shipping, no tax). */
+    public function isGiftCard(): bool
+    {
+        return $this->gift_card !== null;
     }
 
     /** "Blue Shirt (Size: M / Color: Red)" for emails and documents. */

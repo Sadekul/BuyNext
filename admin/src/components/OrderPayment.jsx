@@ -4,8 +4,12 @@ import { LuCopy, LuExternalLink, LuLink } from 'react-icons/lu'
 import { adminKeys, createPaymentLink } from '../api/admin'
 import StatusBadge from './StatusBadge'
 import { formatDateTime } from '../utils/format'
+import { providerName } from '../utils/orders'
 
-const PROVIDERS = { stripe: 'Stripe' }
+// Phase 10 §3: PayPal's sandbox is its test mode.
+const MODE_BADGES = { test: 'Test mode', sandbox: 'Sandbox' }
+// What each provider calls the payment's reference.
+const REFERENCE_LABELS = { stripe: 'Reference', paypal: 'Capture ID' }
 
 /**
  * Phase 8: how a real order is paid by card through Stripe, as rows of the
@@ -14,6 +18,8 @@ const PROVIDERS = { stripe: 'Stripe' }
  * for an unpaid card order the payment link to copy and send to the
  * customer (or "Create payment link" when none is open). Nothing for orders
  * Stripe never saw.
+ * Phase 10 §3: the same for PayPal: the capture id links to PayPal's
+ * dashboard (sandbox or live), and the payment link is PayPal's approval page.
  */
 function OrderPayment({ order, canEdit }) {
   const payment = order.payment
@@ -22,22 +28,25 @@ function OrderPayment({ order, canEdit }) {
     <>
       <dt>Paid through</dt>
       <dd>
-        {PROVIDERS[payment.provider] ?? payment.provider ?? 'Stripe'}
-        {payment.mode === 'test' && (
+        {payment.provider ? providerName(payment.provider) : 'Stripe'}
+        {MODE_BADGES[payment.mode] && (
           <>
             {' '}
-            <StatusBadge tone="info" label="Test mode" />
+            <StatusBadge tone="info" label={MODE_BADGES[payment.mode]} />
           </>
         )}
       </dd>
       {payment.reference && (
         <>
-          <dt>Reference</dt>
+          <dt>{REFERENCE_LABELS[payment.provider] ?? 'Reference'}</dt>
           <dd>
             {payment.dashboardUrl ? (
               <a href={payment.dashboardUrl} target="_blank" rel="noopener noreferrer" className="external-link">
                 <code>{payment.reference}</code> <LuExternalLink aria-hidden="true" />
-                <span className="visually-hidden"> (opens the payment in Stripe's {payment.mode === 'live' ? 'live' : 'test'} dashboard, in a new tab)</span>
+                <span className="visually-hidden">
+                  {' '}
+                  (opens the payment in {providerName(payment.provider ?? 'stripe')}'s {payment.mode === 'live' ? 'live' : payment.mode === 'sandbox' ? 'sandbox' : 'test'} dashboard, in a new tab)
+                </span>
               </a>
             ) : (
               <code>{payment.reference}</code>
@@ -65,8 +74,9 @@ function OrderPayment({ order, canEdit }) {
   )
 }
 
-/** The open Stripe payment page to copy, or a button to open one (orders.edit). */
+/** The open Stripe (or PayPal) payment page to copy, or a button to open one (orders.edit). */
 function PaymentLink({ order, canEdit }) {
+  const provider = providerName(order.payment.provider ?? (order.paymentMethod === 'paypal' ? 'paypal' : 'stripe'))
   const queryClient = useQueryClient()
   const inputId = useId()
   const [copied, setCopied] = useState(null) // null | 'copied' | 'select'
@@ -80,7 +90,7 @@ function PaymentLink({ order, canEdit }) {
   const fresh = create.data?.payment
   const url = fresh?.url ?? order.payment.url
   const expiresAt = fresh?.url ? fresh.expiresAt : order.payment.expiresAt
-  const error = create.error?.fieldErrors?.order?.[0] ?? create.error?.message ?? (fresh && !fresh.url ? (fresh.error ?? "Stripe couldn't be reached. Try again in a moment.") : null)
+  const error = create.error?.fieldErrors?.order?.[0] ?? create.error?.message ?? (fresh && !fresh.url ? (fresh.error ?? `${provider} couldn't be reached. Try again in a moment.`) : null)
 
   async function copy() {
     try {
@@ -106,7 +116,7 @@ function PaymentLink({ order, canEdit }) {
               <LuCopy aria-hidden="true" /> Copy link
             </button>
           </div>
-          {expiresAt && <p className="field__hint">Open until {formatDateTime(expiresAt)}. Send it to the customer; the order is marked paid when Stripe confirms the payment.</p>}
+          {expiresAt && <p className="field__hint">Open until {formatDateTime(expiresAt)}. Send it to the customer; the order is marked paid when {provider} confirms the payment.</p>}
         </>
       ) : (
         <p className="muted">No payment page is open for this order.</p>

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuPlus, LuTrash2 } from 'react-icons/lu'
+import { LuPlus, LuTable2, LuTrash2 } from 'react-icons/lu'
 import { adminKeys, getSettings, updateSettings } from '../api/admin'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import Field from '../components/Field'
@@ -49,6 +50,9 @@ function SettingsPage() {
           <CatalogForm saved={settings.data.catalog ?? {}} />
           {settings.data.returns && <ReturnsForm saved={settings.data.returns} />}
           {isOwner && settings.data.security && <SecurityForm saved={settings.data.security} />}
+          {/* Phase 10 §2 and §6: PDF documents and visitor statistics. */}
+          {settings.data.documents && <DocumentsForm saved={settings.data.documents} />}
+          {settings.data.analytics && <AnalyticsForm saved={settings.data.analytics} />}
         </div>
       )}
     </>
@@ -176,15 +180,30 @@ function Choices({ legend, options, chosen, onChange, error, hint }) {
 }
 
 function ShippingForm({ saved }) {
-  const [values, setValues] = useState(() => ({ ...Object.fromEntries(MONEY_FIELDS.map((key) => [key, toText(saved[key])])), enabledMethods: saved.enabledMethods ?? [] }))
+  const { can } = useAdminAuth()
+  // Phase 10 §4: the weight of products without one (only when the API has the setting).
+  const hasWeight = saved.defaultWeightGrams !== undefined
+  const [values, setValues] = useState(() => ({
+    ...Object.fromEntries(MONEY_FIELDS.map((key) => [key, toText(saved[key])])),
+    enabledMethods: saved.enabledMethods ?? [],
+    defaultWeightGrams: toText(saved.defaultWeightGrams ?? 500),
+  }))
   const [errors, setErrors] = useState({})
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.value })
   function toValues() {
     const found = {}
     for (const key of MONEY_FIELDS) if (!isMoneyText(values[key])) found[key] = ['Enter an amount of 0 or more, with at most 2 decimals.']
     if (values.enabledMethods.length === 0) found.enabledMethods = ['Keep at least one shipping method.']
+    const weight = Number(values.defaultWeightGrams)
+    if (hasWeight && (values.defaultWeightGrams.trim() === '' || !Number.isInteger(weight) || weight < 0 || weight > 100_000)) found.defaultWeightGrams = ['Enter a whole number of grams from 0 to 100,000.']
     if (Object.keys(found).length > 0) return { errors: found }
-    return { values: { ...Object.fromEntries(MONEY_FIELDS.map((key) => [key, Number(values[key])])), enabledMethods: values.enabledMethods } }
+    return {
+      values: {
+        ...Object.fromEntries(MONEY_FIELDS.map((key) => [key, Number(values[key])])),
+        enabledMethods: values.enabledMethods,
+        ...(hasWeight && { defaultWeightGrams: weight }),
+      },
+    }
   }
   const money = (key, label, hint) => (
     <Field label={label} error={err(errors, key)} hint={hint}>
@@ -200,6 +219,22 @@ function ShippingForm({ saved }) {
         {money('nextDayPrice', 'Next-day price')}
       </div>
       <Choices legend="Shipping methods offered" options={SHIPPING_METHODS} chosen={values.enabledMethods} onChange={(enabledMethods) => setValues({ ...values, enabledMethods })} error={err(errors, 'enabledMethods')} />
+      {hasWeight && (
+        <div className="form__grid">
+          <Field label="Weight of products without one (grams)" error={err(errors, 'defaultWeightGrams')} hint="Used by the table rates to weigh a cart.">
+            {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.defaultWeightGrams} onChange={set('defaultWeightGrams')} />}
+          </Field>
+        </div>
+      )}
+      {/* Phase 10 §4: prices by country, weight, and order value. */}
+      {can('settings.edit') && (
+        <p className="field__hint">
+          A method with table rates takes its price from them instead of the price above.{' '}
+          <Link to="/settings/shipping-rates">
+            <LuTable2 aria-hidden="true" /> Table rates
+          </Link>
+        </p>
+      )}
     </SettingsGroup>
   )
 }
@@ -465,6 +500,65 @@ function SecurityForm({ saved }) {
         {ownOff && ' Turn it on for your own account first, under Two-step sign-in.'}
       </p>
       {err(errors, 'requireAdminTwoFactor') && <span className="field__error">{err(errors, 'requireAdminTwoFactor')}</span>}
+    </SettingsGroup>
+  )
+}
+
+/** Phase 10 §2: invoice and credit memo PDFs. */
+function DocumentsForm({ saved }) {
+  const [paperSize, setPaperSize] = useState(saved.paperSize === 'letter' ? 'letter' : 'a4')
+  const [attach, setAttach] = useState(saved.attachPdfToEmails !== false)
+  return (
+    <SettingsGroup group="documents" title="Documents" description="Invoice and credit memo PDFs." toValues={() => ({ values: { paperSize, attachPdfToEmails: attach } })} setErrors={() => {}}>
+      <fieldset className="form__fieldset choices">
+        <legend>Paper size</legend>
+        <label className="checkbox">
+          <input type="radio" name="documents-paper-size" value="a4" checked={paperSize === 'a4'} onChange={() => setPaperSize('a4')} />
+          A4 (210 × 297 mm)
+        </label>
+        <label className="checkbox">
+          <input type="radio" name="documents-paper-size" value="letter" checked={paperSize === 'letter'} onChange={() => setPaperSize('letter')} />
+          US Letter (8.5 × 11 in)
+        </label>
+      </fieldset>
+      <label className="checkbox">
+        <input type="checkbox" checked={attach} aria-describedby="documents-attach-hint" onChange={(event) => setAttach(event.target.checked)} />
+        Attach the PDF to invoice emails
+      </label>
+      <p id="documents-attach-hint" className="field__hint">
+        The customer can also download it from their order in the store.
+      </p>
+    </SettingsGroup>
+  )
+}
+
+// Google Analytics 4 measurement ids look like G-XXXXXXXXXX.
+const GA4_ID = /^G-[A-Z0-9]{4,12}$/
+
+/** Phase 10 §6: visitor statistics (Google Analytics 4), loaded only after the shopper accepts cookies. */
+function AnalyticsForm({ saved }) {
+  const [id, setId] = useState(toText(saved.ga4MeasurementId))
+  const [errors, setErrors] = useState({})
+  function toValues() {
+    const value = id.trim().toUpperCase()
+    if (value && !GA4_ID.test(value)) return { errors: { ga4MeasurementId: ['Enter a GA4 measurement ID like G-ABC123XYZ, or leave it empty to turn statistics off.'] } }
+    return { values: { ga4MeasurementId: value } }
+  }
+  return (
+    <SettingsGroup
+      group="analytics"
+      title="Analytics"
+      description="Visitor statistics with Google Analytics 4. Shoppers see a cookie banner and nothing is loaded until they accept statistics. The admin is never tracked."
+      toValues={toValues}
+      setErrors={setErrors}
+    >
+      <Field
+        label="GA4 measurement ID"
+        error={err(errors, 'ga4MeasurementId')}
+        hint="From Google Analytics: Admin → Data streams → your web stream. Empty = off. The store's build must also allow Google's addresses (VITE_ANALYTICS=ga4)."
+      >
+        {(a11y) => <input {...a11y} value={id} maxLength={30} placeholder="G-XXXXXXXXXX" autoComplete="off" spellCheck={false} onChange={(event) => setId(event.target.value)} />}
+      </Field>
     </SettingsGroup>
   )
 }

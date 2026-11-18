@@ -48,7 +48,13 @@ export const FOOTER_LINK_GROUPS = [
       { label: 'Wishlist', to: ROUTES.wishlist },
       { label: 'Cart', to: ROUTES.cart },
       // Guests look up an order with its number and email (real orders only).
-      ...(REAL_SHOP ? [{ label: 'Track your order', to: ROUTES.trackOrder }] : []),
+      ...(REAL_SHOP
+        ? [
+            { label: 'Track your order', to: ROUTES.trackOrder },
+            // Phase 10: gift cards (real orders only).
+            { label: 'Check gift card balance', to: ROUTES.giftCardBalance },
+          ]
+        : []),
     ],
   },
   // The admin's CMS pages (REAL_SHOP; seeded by the API, editable in the admin).

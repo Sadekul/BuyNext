@@ -8,7 +8,7 @@ use App\Mail\OrderStatusMail;
 use App\Models\Order;
 use App\Services\Audit;
 use App\Services\OrderDocuments;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
 use App\Services\Pricing;
 use App\Services\Settings;
 use App\Support\Csv;
@@ -221,7 +221,7 @@ class OrderController extends Controller
      * data.payment.url is the link; url null + error when Stripe can't be
      * reached. 422 { errors: { order } } when the order can't be paid online.
      */
-    public function paymentLink(Request $request, string $number, StripePayments $payments): AdminOrderResource|JsonResponse
+    public function paymentLink(Request $request, string $number, OnlinePayments $payments): AdminOrderResource|JsonResponse
     {
         $order = Order::where('number', strtoupper($number))->first();
         if (! $order) {

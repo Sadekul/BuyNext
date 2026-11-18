@@ -105,7 +105,8 @@ class StripePayments
             $minutes = (int) config($forAdmin ? 'buynest.stripe.admin_link_minutes' : 'buynest.stripe.checkout_minutes');
             $expiresAt = now()->addMinutes($minutes);
             $page = config('buynest.storefront_url').'/order-confirmation/'.rawurlencode($order->number);
-            $cents = Pricing::toCents($order->grand_total);
+            // Phase 10 (part B): a gift card may have paid part of it; Stripe charges the rest.
+            $cents = $order->dueCents();
 
             try {
                 $session = $this->gateway->createCheckoutSession([
@@ -216,19 +217,15 @@ class StripePayments
      * A verified webhook event. Returns what was done ("duplicate", "paid",
      * "cancelled", "ignored", ...); the controller always answers 200 for a
      * valid event (Stripe retries anything else). Each event id is handled
-     * once (stripe_events); an exception rolls everything back, including the
+     * once (payment_events); an exception rolls everything back, including the
      * event row, so Stripe's retry runs it again.
      */
     public function handleWebhook(array $event): string
     {
         $mail = null;
         $outcome = DB::transaction(function () use ($event, &$mail) {
-            $new = DB::table('stripe_events')->insertOrIgnore([
-                'id' => mb_substr($event['id'], 0, 255),
-                'type' => mb_substr($event['type'], 0, 100),
-                'created_at' => now(),
-            ]);
-            if (! $new) {
+            // Phase 10 (part B): payment_events (provider + event id) replaces stripe_events.
+            if (! PaymentEvents::claim('stripe', $event['id'], $event['type'])) {
                 return 'duplicate';
             }
 
@@ -239,7 +236,7 @@ class StripePayments
                 'checkout.session.expired' => is_array($session) ? $this->expired($session, $mail) : 'ignored',
                 default => 'ignored',
             };
-            DB::table('stripe_events')->where('id', $event['id'])->update(['processed_at' => now()]);
+            PaymentEvents::processed('stripe', $event['id']);
 
             return $outcome;
         });
@@ -287,13 +284,13 @@ class StripePayments
 
             return 'cancelled_order';
         }
-        if ($amount !== Pricing::toCents($order->grand_total) || $currency !== $this->gateway->currency()) {
+        if ($amount !== $order->dueCents() || $currency !== $this->gateway->currency()) {
             Log::warning('Stripe payment does not match the order.', [
                 'order' => $order->number, 'session' => $session['id'] ?? null, 'amount' => $amount, 'currency' => $currency,
-                'expected_amount' => Pricing::toCents($order->grand_total), 'expected_currency' => $this->gateway->currency(),
+                'expected_amount' => $order->dueCents(), 'expected_currency' => $this->gateway->currency(),
             ]);
             $this->problem($order, "Payment amount mismatch on order {$order->number}",
-                "Stripe reported {$paidText} ({$intent}) but the order total is \${$order->grand_total} ".strtoupper($this->gateway->currency())
+                "Stripe reported {$paidText} ({$intent}) but the amount due is \$".Pricing::format($order->dueCents()).' '.strtoupper($this->gateway->currency())
                 .'. The order was left unpaid: check the payment in the Stripe dashboard.');
             $order->history()->create([
                 'status' => $order->status,

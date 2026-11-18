@@ -7,7 +7,7 @@ use App\Models\Coupon;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Shipment;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -44,13 +44,16 @@ class OrderDocuments
         }
 
         $order->load('items');
-        $this->inventory->restock($order->items->map(fn ($item) => [
+        // Phase 10 (part B): gift card lines took no stock, so they give none back.
+        $this->inventory->restock($order->items->reject(fn ($item) => $item->isGiftCard())->map(fn ($item) => [
             'product_id' => $item->product_id, 'variant_id' => $item->variant_id, 'quantity' => $item->quantity,
         ])->all(), withTrashed: true);
         Coupon::releaseFor($order);
+        // Phase 10 (part B): a redeemed gift card gets its amount back.
+        app(GiftCards::class)->release($order);
         $order->forceFill(['status' => 'cancelled'])->save();
-        // Resolved here, not injected: StripePayments uses this class too.
-        app(StripePayments::class)->expireOpenSession($order);
+        // Resolved here, not injected: the payment services use this class too. Phase 10 (part B): Stripe or PayPal.
+        app(OnlinePayments::class)->expireOpenSession($order);
 
         $order->history()->create([
             'status' => 'cancelled',
@@ -95,12 +98,16 @@ class OrderDocuments
             'status' => $order->status,
             'payment_status' => 'paid',
             'note' => "Invoice {$invoice->number} created; payment of \${$invoice->amount} recorded."
-                .($admin ? '' : ' Paid by card through Stripe.'),
+                // Phase 10 (part B): the payment's own note ("Paid by card through Stripe.", "Paid through PayPal.", "Paid with gift card ••••ABCD.").
+                .($admin ? '' : ' '.($note ?? 'Paid online.')),
             'admin_id' => $admin?->id,
             'customer_notified' => $notify,
         ]);
         $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} (\${$invoice->amount}).",
             'invoice', $invoice->id, ['before' => ['payment_status' => 'unpaid'], 'after' => ['payment_status' => 'paid', 'amount' => $invoice->amount]], $admin);
+
+        // Phase 10 (part B): gift cards bought with the order are made (and emailed after the commit) once it is paid.
+        app(GiftCards::class)->issueFor($order);
 
         return $invoice;
     }

@@ -222,3 +222,32 @@ export async function laravelDownload(path, { token, request, maxBytes = 20 * 10
     return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
   }
 }
+
+/**
+ * Phase 10: a GET to the Laravel API whose answer is a PDF (invoices). On
+ * success the API's own body is handed on as a stream (never read into
+ * memory here), with its type, size, and attachment name:
+ * { status, stream, contentType, contentLength, disposition }. Anything that
+ * isn't a PDF attachment (an error, which is JSON) → { status, data } like laravel().
+ */
+export async function laravelPdf(path, { token, request, headers = {} } = {}) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      headers: { Accept: 'application/pdf, application/json', ...headers, ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      signal: AbortSignal.timeout(60_000),
+    })
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!response.ok || !/^application\/pdf\b/i.test(contentType) || !response.body) {
+      return { status: response.ok ? 502 : response.status, data: await response.json().catch(() => ({})) }
+    }
+    return {
+      status: response.status,
+      stream: response.body,
+      contentType: 'application/pdf',
+      contentLength: response.headers.get('content-length'),
+      disposition: response.headers.get('content-disposition') ?? '',
+    }
+  } catch {
+    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+  }
+}

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * The product's discount percent applies to it. Variants are never deleted,
  * so old orders keep their link; ones whose values were removed are deactivated.
  */
-#[Fillable(['product_id', 'sku', 'option_value_ids', 'option_key', 'price', 'stock_quantity', 'is_active'])]
+#[Fillable(['product_id', 'sku', 'option_value_ids', 'option_key', 'price', 'stock_quantity', 'is_active', 'weight'])]
 class ProductVariant extends Model
 {
     public const MAX_PER_PRODUCT = 200;
@@ -24,6 +24,7 @@ class ProductVariant extends Model
             'option_value_ids' => 'array',
             'price' => 'decimal:2',
             'stock_quantity' => 'integer',
+            'weight' => 'integer', // phase 10 (part B): grams, null = the product's
             'is_active' => 'boolean',
         ];
     }

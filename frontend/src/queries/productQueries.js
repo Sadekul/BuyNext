@@ -38,15 +38,24 @@ export const allProductsQuery = () =>
     queryFn: async ({ signal }) => (await getProducts({ all: true, signal })).items,
   })
 
-/** One catalog scope: all products, a search, or a category (filtered client-side afterwards). */
-export const catalogQuery = ({ searchQuery, categorySlug }) =>
+/**
+ * One catalog scope: all products, a search, or a category (filtered
+ * client-side afterwards) → { items, correctedQuery }. A search's items keep
+ * the API's order (most relevant first, with BuyNest's API); `correctedQuery`
+ * is the corrected spelling the API searched for instead, or null.
+ * `exact`: search the words as typed ("Search instead for …").
+ */
+export const catalogQuery = ({ searchQuery, categorySlug, exact = false }) =>
   queryOptions({
-    queryKey: productKeys.catalog(searchQuery ? { q: searchQuery } : { category: categorySlug ?? 'all' }),
+    queryKey: productKeys.catalog(searchQuery ? { q: searchQuery, ...(exact && { exact: true }) } : { category: categorySlug ?? 'all' }),
     queryFn: async ({ signal }) => {
       const options = { all: true, signal }
-      if (searchQuery) return (await searchProducts(searchQuery, options)).items
-      if (categorySlug) return (await getProductsByCategory(categorySlug, options)).items
-      return (await getProducts(options)).items
+      if (searchQuery) {
+        const page = await searchProducts(searchQuery, { ...options, exact })
+        return { items: page.items, correctedQuery: exact ? null : (page.correctedQuery ?? null) }
+      }
+      if (categorySlug) return { items: (await getProductsByCategory(categorySlug, options)).items, correctedQuery: null }
+      return { items: (await getProducts(options)).items, correctedQuery: null }
     },
   })
 

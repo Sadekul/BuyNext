@@ -239,3 +239,13 @@
 - Privacy by design: changing an email only after the new address proves itself, telling the old address, data export, and account deletion that keeps the shop's accounting records without the person
 - Event-driven notifications: one model hook for "back in stock" instead of a call in every place stock changes
 - Testing lessons: waiting for focus that moves on the next animation frame; longer limits for long flows when the whole suite runs in parallel
+
+## Phase 10: Search, PDFs, PayPal, shipping rates, gift cards, analytics
+
+- Search relevance in MySQL: FULLTEXT indexes, ranking tiers (exact SKU, exact name, prefix, contains), and typo correction with an edit-distance vocabulary that never "corrects" a real word
+- Server-side PDFs with dompdf: no remote resources, embedded fonts, font subsetting for small files, attaching documents to emails
+- A second payment provider behind the same design: OAuth client credentials, server-side capture after the shopper returns, webhook verification through the provider's API, one idempotency table for every provider
+- Table-based shipping rules: matching by country, weight, and order value, and keeping cart, checkout, and staff orders on the same calculation
+- Stored value done safely: gift card codes stored as hashes, balances changed only under row locks, every movement recorded, refunds returned to the card first
+- Privacy-first analytics: consent before any tracking script loads, Consent Mode v2, events without personal data, a CSP that only allows the analytics hosts when analytics is built in
+- Testing lessons: wait for the app's own "busy" signals (a debounced price check) instead of clicking a briefly disabled button; compare counts with the API instead of hard-coding them

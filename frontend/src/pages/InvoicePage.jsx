@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { LuArrowLeft, LuFileX, LuPrinter } from 'react-icons/lu'
 import Button from '../components/ui/Button'
+import InvoicePdfButton from '../components/orders/InvoicePdfButton'
 import EmptyState from '../components/ui/EmptyState'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
@@ -80,9 +81,13 @@ function InvoicePage() {
       <title>{`Invoice ${invoice.number} | ${SITE.name}`}</title>
       <div className="invoice-page__actions">
         {backLink}
-        <Button onClick={() => window.print()} variant="outline">
-          <LuPrinter aria-hidden="true" /> Print
-        </Button>
+        <div className="invoice-page__buttons">
+          {/* Phase 10: the store's own PDF, made by the server. */}
+          <InvoicePdfButton orderNumber={orderId} invoiceNumber={invoice.number} />
+          <Button onClick={() => window.print()} variant="outline">
+            <LuPrinter aria-hidden="true" /> Print
+          </Button>
+        </div>
       </div>
 
       <article className="invoice" aria-labelledby="invoice-title">

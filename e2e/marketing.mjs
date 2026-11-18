@@ -603,10 +603,10 @@ try {
   await part('email templates', async () => {
     await admin.goto(`${BASE}/admin/email-templates`, { waitUntil: 'networkidle' })
     log(await visible(admin.getByRole('heading', { name: 'Email templates' })), 'Content → Email templates opens')
-    // 11 from phase 7, "Payment not completed" (phase 8), and 5 from phase 9 (email change code, email changed,
-    // order cancelled by you, account deleted, back in stock)
-    log((await admin.locator('tbody tr').count()) === 17,
-    `every email the store sends is listed (${await admin.locator('tbody tr').count()})`)
+    // Every template the API knows is listed (the count grows as phases add emails, so compare with the API).
+    const known = (await admin$('/email-templates')).body?.data?.length ?? -1
+    const listed = await admin.locator('tbody tr').count()
+    log(known >= 17 && listed === known, `every email the store sends is listed (${listed} of ${known})`)
     await axe(admin, 'email templates')
     await admin.getByRole('link', { name: 'Email verification code' }).first().click()
     await admin.waitForURL(/\/admin\/email-templates\/email_verification$/)

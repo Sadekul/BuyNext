@@ -284,7 +284,15 @@ export const CSV_REPORTS = ['sales', 'products']
  */
 const SETTINGS = {
   general: { store_name: 'storeName', support_email: 'supportEmail', support_phone: 'supportPhone', address: 'address' },
-  shipping: { standard_price: 'standardPrice', free_shipping_threshold: 'freeShippingThreshold', express_price: 'expressPrice', next_day_price: 'nextDayPrice', enabled_methods: 'enabledMethods' },
+  shipping: {
+    standard_price: 'standardPrice',
+    free_shipping_threshold: 'freeShippingThreshold',
+    express_price: 'expressPrice',
+    next_day_price: 'nextDayPrice',
+    enabled_methods: 'enabledMethods',
+    // Phase 10 §4: the weight of products without one (table rates).
+    default_weight_grams: 'defaultWeightGrams',
+  },
   tax: { tax_enabled: 'taxEnabled', tax_rates: 'taxRates', prices_include_tax: 'pricesIncludeTax' },
   checkout: { allowed_countries: 'allowedCountries', guest_checkout: 'guestCheckout', enabled_payment_methods: 'enabledPaymentMethods' },
   inventory: { low_stock_threshold: 'lowStockThreshold' },
@@ -294,6 +302,9 @@ const SETTINGS = {
   returns: { returns_enabled: 'returnsEnabled', return_window_days: 'returnWindowDays', return_reasons: 'returnReasons' },
   // Phase 9: two-step sign-in for every admin (only the Owner may change it; the API checks).
   security: { require_admin_two_factor: 'requireAdminTwoFactor' },
+  // Phase 10 §2: invoice and credit memo PDFs; §6: Google Analytics 4 (null = off).
+  documents: { paper_size: 'paperSize', attach_pdf_to_emails: 'attachPdfToEmails' },
+  analytics: { ga4_measurement_id: 'ga4MeasurementId' },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']

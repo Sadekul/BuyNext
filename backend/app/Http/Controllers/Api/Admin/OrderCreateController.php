@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PhoneNumber;
+use App\Http\Requests\PlaceOrderRequest;
 use App\Http\Resources\AdminOrderResource;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Services\Checkout;
 use App\Services\OneTimeCodes;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,9 +50,10 @@ class OrderCreateController extends Controller
         $quote = $checkout->quote([
             'items' => $data['items'],
             'coupon_code' => $data['coupon_code'] ?? null,
-            'shipping_method' => $data['shipping_method'] ?? $this->settings->defaultShippingMethod(),
+            'shipping_method' => $data['shipping_method'] ?? null, // phase 10 (part B): the default, or the first available one
             'email' => $customer?->email ?? ($data['guest']['email'] ?? null),
             'shipping_address' => $data['shipping_address'] ?? null,
+            'gift_card_code' => $data['gift_card_code'] ?? null,
         ], $customer);
 
         return response()->json(['data' => [
@@ -61,7 +63,7 @@ class OrderCreateController extends Controller
     }
 
     /** POST /api/admin/v1/orders → 201 { data: AdminOrderResource } (source "admin"). */
-    public function store(Request $request, Checkout $checkout, StripePayments $payments): JsonResponse
+    public function store(Request $request, Checkout $checkout, OnlinePayments $payments): JsonResponse
     {
         $data = $this->validated($request, quote: false);
         $customer = $this->customer($data);
@@ -71,8 +73,9 @@ class OrderCreateController extends Controller
         $order = $checkout->place([
             'items' => $data['items'],
             'coupon_code' => $data['coupon_code'] ?? null,
-            'shipping_method' => $data['shipping_method'],
+            'shipping_method' => $data['shipping_method'] ?? null,
             'payment_method' => $data['payment_method'],
+            'gift_card_code' => $data['gift_card_code'] ?? null, // phase 10 (part B)
             'email' => $customer ? $customer->email : $data['guest']['email'],
             'phone' => $customer ? $customer->phone : $data['guest']['phone'],
             'shipping_address' => $shipping,
@@ -82,7 +85,8 @@ class OrderCreateController extends Controller
         ], $customer, $request->user(), notify: (bool) ($data['notify_customer'] ?? true));
 
         // Phase 8: a card order (Stripe on) gets a payment link for staff to send (data.payment.url, open 24 hours).
-        $payment = $payments->usesStripe($order) ? $payments->startCheckout($order, forAdmin: true) : null;
+        // Phase 10 (part B): PayPal orders too (open 3 hours).
+        $payment = $payments->uses($order) ? $payments->startCheckout($order, forAdmin: true) : null;
 
         $order = Order::with(['items', 'customer', 'createdBy', 'history.admin', ...Order::DOCUMENTS])->find($order->id);
 
@@ -131,9 +135,12 @@ class OrderCreateController extends Controller
             ...$address('shipping_address', true),
             ...$address('billing_address', false),
             'same_as_shipping' => ['nullable', 'boolean'],
-            'shipping_method' => [$need, 'string', Rule::in(array_keys($this->settings->shippingMethods()))],
-            // The store's enabled methods, plus bank transfer and cash (staff only).
-            'payment_method' => [$need, 'string', Rule::in($this->settings->adminPaymentMethods())],
+            // Phase 10 (part B): not needed when every item is a gift card.
+            'shipping_method' => [$quote ? 'nullable' : Rule::requiredIf(fn () => ! PlaceOrderRequest::onlyGiftCards($request->input('items'))),
+                'nullable', 'string', Rule::in(array_keys($this->settings->shippingMethods()))],
+            // The store's enabled methods, plus bank transfer and cash (staff only); phase 10: "gift_card" when a card pays it all.
+            'payment_method' => [$need, 'string', Rule::in([...$this->settings->adminPaymentMethods(), 'gift_card'])],
+            'gift_card_code' => ['nullable', 'string', 'max:40'],
             'note' => ['nullable', 'string', 'max:1000'],
             'notify_customer' => ['nullable', 'boolean'],
             'expected_total' => ['nullable', 'numeric', 'min:0'],

@@ -38,6 +38,7 @@ class InvoiceResource extends JsonResource
             'billing_address' => $order->billing_address,
             'items' => OrderResource::itemsOf($order),
             'totals' => OrderResource::totalsOf($order),
+            'gift_card' => OrderResource::giftCardOf($order), // phase 10 (part B)
         ];
     }
 }

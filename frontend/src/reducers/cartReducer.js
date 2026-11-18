@@ -2,6 +2,7 @@ import { formatPrice } from '../utils/formatters'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { effectiveDiscountPercent, getProductPricing } from '../utils/pricing'
 import { storedInteger, storedProductSnapshot, storedText } from '../utils/storedValues'
+import { giftCardLineId, storedGiftCard } from '../utils/giftCards'
 
 /*
  * Cart reducer: a pure function (state, action) → new state.
@@ -48,11 +49,17 @@ function toSnapshot(product) {
  * without a variant have neither key, exactly as carts saved before variants.
  */
 export function cartLineKey(item) {
+  // Phase 10: one gift card line per amount, recipient, and message (utils/giftCards.js).
+  // (The server's priced lines carry the same details without the id: it is worked out the same way.)
+  if (item.giftCard) return `${item.productId}:gc-${item.giftCard.id ?? giftCardLineId(item.giftCard)}`
   return item.variantId ? `${item.productId}:${item.variantId}` : String(item.productId)
 }
 
 /** The variant fields of a line, or nothing (lines without a variant keep their old shape). */
 const variantFields = (variantId, variantLabel) => (variantId ? { variantId, variantLabel: variantLabel ?? null } : {})
+
+/** Phase 10: a gift card line's fields (its type and recipient), or nothing for every other line. */
+const giftCardFields = (giftCard) => (giftCard ? { productType: 'gift_card', giftCard } : {})
 
 /** The line an action is about: `lineKey`, or (older callers) `productId` for a line without a variant. */
 const actionKey = (action) => action.lineKey ?? String(action.productId)
@@ -72,7 +79,9 @@ export function cartReducer(state, action) {
       if (!limits.canBuy) return state
       // A configurable product sells only through a variant (utils/variants.js withVariant).
       if (product.hasVariants && !product.variantId) return state
-      const key = cartLineKey({ productId: product.id, variantId: product.variantId })
+      // A gift card needs its amount and recipient (utils/giftCards.js withGiftCard).
+      if (product.type === 'gift_card' && !product.giftCard) return state
+      const key = cartLineKey({ productId: product.id, variantId: product.variantId, giftCard: product.giftCard })
 
       // Tell the shopper when the requested amount had to be capped by stock.
       const existing = state.items.find((item) => cartLineKey(item) === key)
@@ -99,6 +108,7 @@ export function cartReducer(state, action) {
       const newItem = {
         productId: product.id,
         ...variantFields(product.variantId, product.variantLabel),
+        ...giftCardFields(product.giftCard),
         ...toSnapshot(product),
         quantity: newQuantity,
         notice: quantityNotice(quantity, newQuantity, limits),
@@ -146,6 +156,8 @@ export function cartReducer(state, action) {
         items: state.items.map((item) => {
           const fresh = freshById.get(item.productId)
           if (!fresh) return { ...item, isUnavailable: true, notice: 'This product is no longer available.' }
+          // A gift card line keeps its chosen amount (the list only has the product's own price).
+          if (item.giftCard) return { ...item, title: fresh.title ?? item.title, thumbnail: fresh.thumbnail ?? item.thumbnail, isUnavailable: false }
           // A variant line: the list only has the product's own price and total
           // stock, so the variant's price and stock stay as they were (the
           // server checks them again in cart/validate). The rest is refreshed.
@@ -190,7 +202,8 @@ export function cartReducer(state, action) {
           const merged = existing ? { ...existing, ...line, brand: existing.brand, category: existing.category } : line
           return { ...merged, quantity: clampQuantity(line.quantity, getPurchaseLimits(merged)), notice: null, isUnavailable: false }
         })
-        return { ...state, items }
+        // Gift card lines live only in this browser (the saved cart holds products): they stay.
+        return { ...state, items: [...items, ...state.items.filter((item) => item.giftCard)] }
       }
       const items = [...state.items]
       for (const line of lines) {
@@ -275,9 +288,13 @@ export function sanitizeCart(value) {
     if (!Number.isInteger(stored.quantity) || stored.quantity < 1) continue
     // Carts saved before variants have no variantId: they load as plain lines.
     const variantId = storedInteger(stored.variantId, 1)
+    // A gift card line without valid recipient details can't be bought: it is dropped.
+    const giftCard = stored.productType === 'gift_card' || stored.giftCard ? storedGiftCard(stored.giftCard) : null
+    if ((stored.productType === 'gift_card' || stored.giftCard) && !giftCard) continue
     const item = {
       productId: stored.productId,
       ...variantFields(variantId, storedText(stored.variantLabel)),
+      ...giftCardFields(giftCard),
       ...storedProductSnapshot(stored),
       quantity: stored.quantity,
       notice: storedText(stored.notice),

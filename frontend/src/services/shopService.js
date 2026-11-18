@@ -1,5 +1,6 @@
-import { apiClient } from './apiClient'
+import { ApiError, apiClient } from './apiClient'
 import { normalizePhone } from '../utils/validation'
+import { giftCardPayload } from '../utils/giftCards'
 
 /*
  * Carts and orders with BuyNest's Laravel API, through the shop service on
@@ -17,10 +18,16 @@ import { normalizePhone } from '../utils/validation'
 const SHOP = { sameOrigin: true } // the customer session cookie, when signed in
 
 // A variant line (phase 5) also names its variant; lines without one are sent exactly as before.
+// A gift card line (phase 10) carries its amount and recipient.
 const cartLines = (items) =>
   items
     .filter((item) => !item.isUnavailable)
-    .map((item) => ({ productId: item.productId, ...(item.variantId && { variantId: item.variantId }), quantity: item.quantity }))
+    .map((item) => ({
+      productId: item.productId,
+      ...(item.variantId && { variantId: item.variantId }),
+      quantity: item.quantity,
+      ...(item.giftCard && { giftCard: giftCardPayload(item.giftCard) }),
+    }))
 
 /**
  * POST /api/shop/products/:id/reviews { rating, title?, comment } → the new review
@@ -40,8 +47,16 @@ export function submitReview(productId, { rating, title, comment }) {
  * signed-in customer is recognised by the session cookie. The shipping
  * `country` (sent only when the store charges tax) lets the server work out the tax.
  */
-export function validateCart({ items, couponCode, shippingMethod, email, country }, { signal } = {}) {
-  const body = { items: cartLines(items), couponCode: couponCode || null, shippingMethod, ...(email && { email }), ...(country && { country }) }
+export function validateCart({ items, couponCode, shippingMethod, email, country, giftCardCode }, { signal } = {}) {
+  const body = {
+    items: cartLines(items),
+    couponCode: couponCode || null,
+    // null: a cart of gift cards only (phase 10), which needs no delivery. Left out: standard delivery.
+    ...(shippingMethod !== undefined && { shippingMethod }),
+    ...(email && { email }),
+    ...(country && { country }),
+    ...(giftCardCode && { giftCardCode }),
+  }
   return apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
 }
 
@@ -52,20 +67,23 @@ export function validateCart({ items, couponCode, shippingMethod, email, country
  * `values.saveAddress` (signed in) keeps the shipping address in the address
  * book; the server skips it when the book is full or already has it.
  */
-export function placeOrder({ items, couponCode, values, expectedTotal }) {
+export function placeOrder({ items, couponCode, values, expectedTotal, giftCardCode, requiresShipping = true }) {
   const { shipping, billingSameAsShipping, billing } = values
   return apiClient.post(
     '/api/shop/orders',
     {
       items: cartLines(items),
       couponCode: couponCode || null,
-      shippingMethod: values.shippingMethod,
+      // Phase 10: a cart of gift cards only has no delivery: no method. The form asks for one
+      // address (billing); the API still keeps an address on the order, so it goes as both.
+      shippingMethod: requiresShipping ? values.shippingMethod : null,
       paymentMethod: values.paymentMethod,
       email: values.email.trim(),
       phone: normalizePhone(values.phone),
-      shippingAddress: shipping,
-      billingAddress: billingSameAsShipping ? null : billing,
+      shippingAddress: requiresShipping ? shipping : billing,
+      billingAddress: requiresShipping && !billingSameAsShipping ? billing : null,
       expectedTotal,
+      ...(giftCardCode && { giftCardCode }),
       // Signed-in customers (phase 6): add the shipping address to the address book afterwards.
       ...(values.saveAddress === true && { saveAddress: true }),
     },
@@ -86,6 +104,53 @@ export function getOrder(number, { signal } = {}) {
 /** GET /api/shop/orders/:number/invoices/:invoice → a printable invoice of the customer's own order (404 otherwise). */
 export function getInvoice(number, invoice, { signal } = {}) {
   return apiClient.get(`/api/shop/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}`, { ...SHOP, signal })
+}
+
+/**
+ * Phase 10: POST /api/shop/orders/:number/paypal/capture { token, email? } →
+ * the order. Back from PayPal (?payment=success&provider=paypal&token=…), the
+ * server captures the approved payment and checks it. A guest proves the
+ * order is theirs with its email. ApiError 422 when PayPal refused it.
+ */
+export function capturePaypal(number, { token, email } = {}) {
+  return apiClient.post(`/api/shop/orders/${encodeURIComponent(number)}/paypal/capture`, { token, ...(email && { email: email.trim() }) }, SHOP)
+}
+
+/**
+ * Phase 10: POST /api/shop/gift-cards/check { code } → { balance, currency,
+ * expiresAt, status }. ApiError 422 (the same for unknown and disabled codes), 429 when asked too often.
+ */
+export function checkGiftCard(code, { signal } = {}) {
+  return apiClient.post('/api/shop/gift-cards/check', { code }, { ...SHOP, signal })
+}
+
+/**
+ * Phase 10: an invoice as a PDF → { blob, fileName }. Signed-in customers:
+ * GET with the session; a guest: POST with the order's email (the proof).
+ * Errors become ApiError like every other call.
+ */
+export async function getInvoicePdf(number, invoice, { email } = {}) {
+  const path = `/api/shop/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}.pdf`
+  let response
+  try {
+    response = await fetch(new URL(path, window.location.origin), {
+      method: email ? 'POST' : 'GET',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/pdf, application/json', ...(email && { 'Content-Type': 'application/json' }) },
+      body: email ? JSON.stringify({ email: email.trim() }) : undefined,
+      signal: AbortSignal.timeout(60_000),
+    })
+  } catch (error) {
+    throw new ApiError(error?.name === 'TimeoutError' ? 'The server took too long to respond. Please try again.' : 'Network error. Check your internet connection and try again.')
+  }
+  const type = response.headers.get('content-type') ?? ''
+  if (!response.ok || !type.includes('application/pdf')) {
+    const data = await response.json().catch(() => null)
+    const fallback = response.status === 404 ? "We couldn't find that invoice." : "We couldn't download the PDF. Please try again."
+    throw new ApiError(data?.message ?? fallback, { status: response.ok ? 502 : response.status, data })
+  }
+  const match = /filename="?([\w.-]+\.pdf)"?/i.exec(response.headers.get('content-disposition') ?? '')
+  return { blob: await response.blob(), fileName: match?.[1] ?? `${invoice}.pdf` }
 }
 
 /** POST /api/shop/orders/lookup { number, email } → the order (guests). 404 when either doesn't match. */

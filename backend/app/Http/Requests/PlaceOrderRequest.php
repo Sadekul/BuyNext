@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Http\Controllers\Api\V1\CartController;
 use App\Models\Customer;
+use App\Models\Product;
 use App\Services\Settings;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -66,8 +67,12 @@ class PlaceOrderRequest extends FormRequest
             ...CartController::rules(),
             'items' => ['required', 'array', 'min:1', 'max:50'],
             // Only what the settings switch on: a method that is off → 422.
-            'shipping_method' => ['required', 'string', Rule::in(array_keys($settings->shippingMethods()))],
-            'payment_method' => ['required', 'string', Rule::in($settings->paymentMethods())],
+            // Phase 10 (part B): not needed when every item is a gift card (nothing to ship).
+            'shipping_method' => [Rule::requiredIf(fn () => ! self::onlyGiftCards($this->input('items'))), 'nullable', 'string',
+                Rule::in(array_keys($settings->shippingMethods()))],
+            // Phase 10 (part B): "gift_card" when the gift card pays the whole total (see Checkout).
+            'payment_method' => ['required', 'string', Rule::in([...$settings->paymentMethods(), 'gift_card'])],
+            'gift_card_code' => ['nullable', 'string', 'max:40'],
             'email' => ['required', 'string', 'email', 'max:190'],
             'phone' => ['required', 'string', PhoneNumber::RULE],
             'shipping_address' => ['required', 'array'],
@@ -104,6 +109,20 @@ class PlaceOrderRequest extends FormRequest
         }
 
         return $attributes;
+    }
+
+    /** Phase 10 (part B): are all $items (as sent) gift card products? Then no shipping method is needed. */
+    public static function onlyGiftCards(mixed $items): bool
+    {
+        if (! is_array($items) || $items === []) {
+            return false;
+        }
+        $ids = collect($items)->map(fn ($item) => is_array($item) && is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : 0)->unique();
+        if ($ids->contains(0)) {
+            return false;
+        }
+
+        return Product::withTrashed()->whereIn('id', $ids)->where('type', 'gift_card')->count() === $ids->count();
     }
 
     /** The address as stored: only the known fields, in a fixed order. */

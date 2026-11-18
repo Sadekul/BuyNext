@@ -29,6 +29,7 @@ use Illuminate\Support\Str;
     'sku', 'name', 'slug', 'description', 'category_id', 'brand_id', 'price', 'discount_percent',
     'stock_quantity', 'min_order_quantity', 'status', 'rating_average', 'thumbnail_url',
     'warranty', 'shipping_info', 'return_policy', 'weight', 'tags', 'meta_title', 'meta_description',
+    'type', 'gift_card_amounts', 'gift_card_min_amount', 'gift_card_max_amount', // phase 10 (part B)
 ])]
 class Product extends Model
 {
@@ -36,6 +37,9 @@ class Product extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUSES = ['draft', 'active', 'archived'];
+
+    /** Phase 10 (part B): a gift card product sells cards of a chosen amount (no stock, shipping, tax, or discounts). */
+    public const TYPES = ['simple', 'gift_card'];
 
     /**
      * The sale price in SQL, for filtering and sorting by the price shoppers
@@ -58,6 +62,10 @@ class Product extends Model
             'review_count' => 'integer',
             // Phase 9 (part B): the thumbnail's resized copies ({ "320": url, "960": url }).
             'thumbnail_variants' => 'array',
+            // Phase 10 (part B): gift card products.
+            'gift_card_amounts' => 'array',
+            'gift_card_min_amount' => 'decimal:2',
+            'gift_card_max_amount' => 'decimal:2',
         ];
     }
 
@@ -204,10 +212,52 @@ class Product extends Model
     public function availability(): string
     {
         return match (true) {
+            $this->isGiftCard() => 'in_stock', // phase 10 (part B): gift cards have no stock
             $this->stock_quantity <= 0 => 'out_of_stock',
             $this->stock_quantity < app(Settings::class)->get('low_stock_threshold') => 'low_stock',
             default => 'in_stock',
         };
+    }
+
+    /** Phase 10 (part B). */
+    public function isGiftCard(): bool
+    {
+        return $this->type === 'gift_card';
+    }
+
+    /**
+     * Phase 10 (part B): what a gift card product offers, for the answers:
+     * { amounts: ["25.00", ...], custom: { min, max } | null }, or null for other products.
+     */
+    public function giftCardOptions(): ?array
+    {
+        if (! $this->isGiftCard()) {
+            return null;
+        }
+        $amounts = array_map(fn ($amount) => Pricing::format(Pricing::toCents((string) $amount)), $this->gift_card_amounts ?? []);
+        sort($amounts, SORT_NUMERIC);
+
+        return [
+            'amounts' => array_values($amounts),
+            'custom' => $this->gift_card_min_amount !== null && $this->gift_card_max_amount !== null
+                ? ['min' => $this->gift_card_min_amount, 'max' => $this->gift_card_max_amount] : null,
+        ];
+    }
+
+    /** Phase 10 (part B): is $cents an amount this gift card product sells? */
+    public function allowsGiftCardAmount(int $cents): bool
+    {
+        if ($cents <= 0) {
+            return false;
+        }
+        foreach ($this->gift_card_amounts ?? [] as $amount) {
+            if (Pricing::toCents((string) $amount) === $cents) {
+                return true;
+            }
+        }
+
+        return $this->gift_card_min_amount !== null && $this->gift_card_max_amount !== null
+            && $cents >= Pricing::toCents($this->gift_card_min_amount) && $cents <= Pricing::toCents($this->gift_card_max_amount);
     }
 
     public function priceCents(): int

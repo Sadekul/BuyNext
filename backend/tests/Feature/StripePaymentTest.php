@@ -340,7 +340,7 @@ class StripePaymentTest extends TestCase
         // A signature for a different body (tampered amount).
         $this->webhook([...$event, 'type' => 'checkout.session.expired'], StripeGateway::signature($payload, self::WEBHOOK_SECRET))->assertStatus(400);
         $this->assertSame('unpaid', Order::sole()->payment_status);
-        $this->assertDatabaseCount('stripe_events', 0);
+        $this->assertDatabaseCount('payment_events', 0); // phase 10 (part B): stripe_events became payment_events
 
         // Several v1 signatures (secret being rolled): one valid is enough. 4 minutes old is fine.
         $t = now()->subMinutes(4)->getTimestamp();
@@ -364,8 +364,8 @@ class StripePaymentTest extends TestCase
         $this->webhook($this->sessionEvent('checkout.session.async_payment_succeeded', $number))->assertOk()->assertJsonPath('result', 'already_paid');
 
         $this->assertSame(1, Invoice::count());
-        $this->assertDatabaseCount('stripe_events', 2);
-        $this->assertNotNull(DB::table('stripe_events')->where('id', 'evt_same')->value('processed_at'));
+        $this->assertSame(2, DB::table('payment_events')->where('provider', 'stripe')->count());
+        $this->assertNotNull(DB::table('payment_events')->where('provider', 'stripe')->where('id', 'evt_same')->value('processed_at'));
         $this->assertSame(0, AdminNotification::count());
     }
 

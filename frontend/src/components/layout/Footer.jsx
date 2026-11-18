@@ -4,6 +4,7 @@ import { LuMail, LuPhone } from 'react-icons/lu'
 import Logo from '../common/Logo'
 import { FOOTER_LINK_GROUPS, SITE, SOCIAL_LINKS } from '../../constants/site'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
+import { analyticsAvailable, openCookieSettings } from '../../utils/analytics'
 import './Footer.css'
 
 // Maps the data-friendly icon keys in SOCIAL_LINKS to icon components.
@@ -61,6 +62,12 @@ function Footer() {
           <p>
             © {currentYear} {storeName}. All rights reserved.
           </p>
+          {/* Phase 10: change the statistics choice at any time (only when the store uses statistics). */}
+          {analyticsAvailable(settings) && (
+            <button type="button" className="site-footer__cookie-settings" onClick={openCookieSettings}>
+              Cookie settings
+            </button>
+          )}
           <ul className="site-footer__social" aria-label="Social media">
             {SOCIAL_LINKS.map((social) => {
               const Icon = SOCIAL_ICONS[social.icon]

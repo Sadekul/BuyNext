@@ -3,6 +3,8 @@ import { camelPath, fromAddress, fromLine, fromOrder, fromShipment, fromTotals }
 import { productParts } from './adminCatalog.js'
 // Phase 7 (system): the dashboard's new blocks.
 import { dashboardBlocks } from './adminContent.js'
+// Phase 10: gift cards on the order page.
+import { issuedGiftCards, lineGiftCard, orderGiftCardPayment } from './adminPhase10.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -29,6 +31,12 @@ const PRODUCT_FIELDS = {
   // Phase 7 (system): SEO.
   metaTitle: 'meta_title',
   metaDescription: 'meta_description',
+  // Phase 10 §4 and §5: weight in grams; gift card products and their amounts.
+  weight: 'weight',
+  type: 'type',
+  giftCardAmounts: 'gift_card_amounts',
+  giftCardMinAmount: 'gift_card_min_amount',
+  giftCardMaxAmount: 'gift_card_max_amount',
 }
 const FORM_FIELD = Object.fromEntries(Object.entries(PRODUCT_FIELDS).map(([form, api]) => [api, form]))
 const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber' }
@@ -76,7 +84,23 @@ export function adminProduct(raw) {
     ...productParts(raw),
     // Phase 9: shoppers waiting for a back-in-stock email (product detail only).
     ...(Number.isInteger(raw.stock_alerts_waiting) && { stockAlertsWaiting: raw.stock_alerts_waiting }),
+    // Phase 10 §4 and §5: weight (grams, null = the store's default), product type and gift card amounts.
+    ...productPhase10(raw),
   }
+}
+
+/** Phase 10: { weight, type, giftCardAmounts, giftCardMinAmount, giftCardMaxAmount } (only what the API sent). */
+function productPhase10(raw) {
+  const fields = {}
+  if (raw.weight !== undefined) fields.weight = Number.isInteger(raw.weight) ? raw.weight : null
+  if (raw.type !== undefined) fields.type = raw.type === 'gift_card' ? 'gift_card' : 'simple'
+  if (raw.gift_card !== undefined) {
+    const card = raw.gift_card && typeof raw.gift_card === 'object' ? raw.gift_card : {}
+    fields.giftCardAmounts = (Array.isArray(card.amounts) ? card.amounts : []).map(money).filter((amount) => Number.isFinite(amount))
+    fields.giftCardMinAmount = money(card.custom?.min)
+    fields.giftCardMaxAmount = money(card.custom?.max)
+  }
+  return fields
 }
 
 /** Admin form values (already validated) → the API's product fields. */
@@ -138,6 +162,8 @@ function adminOrderDetail(raw) {
       quantity: item.quantity,
       total: money(item.price) * item.quantity,
       discountedTotal: money(item.line_total),
+      // Phase 10 §5: a gift card bought for someone (amount, recipient, message).
+      ...(item.gift_card && { giftCard: lineGiftCard(item) }),
     })),
     subtotal: order.totals.subtotal,
     total: order.totals.total,
@@ -151,8 +177,11 @@ function adminOrderDetail(raw) {
     createdByAdmin: typeof raw.created_by_admin?.name === 'string' ? raw.created_by_admin.name : null,
     returns: (Array.isArray(raw.returns) ? raw.returns : []).map((entry) => ({ number: entry.number, status: entry.status, itemCount: entry.items_count ?? null, createdAt: entry.created_at ?? null })),
     returnEligibility: returnEligibility(raw.return_eligibility),
-    // Phase 8: Stripe provider, reference, paid at, and the payment link.
+    // Phase 8: Stripe provider, reference, paid at, and the payment link (phase 10: PayPal too).
     payment: adminPayment(raw.payment),
+    // Phase 10 §5: what a redeemed gift card paid ({ last4, amount } | null), and the cards this order bought.
+    giftCardPayment: orderGiftCardPayment(raw),
+    giftCardsIssued: issuedGiftCards(raw),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -171,6 +200,8 @@ const httpsUrl = (value) => (typeof value === 'string' && /^https:\/\/[^\s]+$/.t
 
 // Stripe's dashboard, the only place a payment's link may point to.
 const STRIPE_DASHBOARD = /^https:\/\/dashboard\.stripe\.com\/(test\/)?payments\/[A-Za-z0-9_]+$/
+// Phase 10 §3: PayPal's activity page for a capture, sandbox or live.
+const PAYPAL_DASHBOARD = /^https:\/\/www\.(sandbox\.)?paypal\.com\/activity\/payment\/[A-Za-z0-9]+$/
 
 /**
  * Phase 8: the order's card payment through Stripe (the API's `payment`
@@ -182,13 +213,27 @@ const STRIPE_DASHBOARD = /^https:\/\/dashboard\.stripe\.com\/(test\/)?payments\/
 export function adminPayment(raw) {
   const payment = raw && typeof raw === 'object' ? raw : {}
   const reference = stripeId(payment.reference)
+  // Phase 10 §3: a PayPal capture links to PayPal's dashboard (the API says sandbox or live); nothing is guessed.
+  if (payment.provider === 'paypal') return { ...paymentFields(payment), ...payPalDashboard(payment, reference) }
   const given = typeof payment.dashboard_url === 'string' && STRIPE_DASHBOARD.test(payment.dashboard_url) ? payment.dashboard_url : null
-  const dashboardUrl = given ?? (reference ? `https://dashboard.stripe.com/test/payments/${reference}` : null)
+  const dashboardUrl = given ?? (reference && payment.provider !== 'gift_card' ? `https://dashboard.stripe.com/test/payments/${reference}` : null)
   return {
-    provider: typeof payment.provider === 'string' ? payment.provider : null,
+    ...paymentFields(payment),
     reference,
     dashboardUrl,
     mode: dashboardUrl?.includes('/test/') ? 'test' : dashboardUrl ? 'live' : null,
+  }
+}
+
+function payPalDashboard(payment, reference) {
+  const dashboardUrl = typeof payment.dashboard_url === 'string' && PAYPAL_DASHBOARD.test(payment.dashboard_url) ? payment.dashboard_url : null
+  return { reference, dashboardUrl, mode: dashboardUrl ? (dashboardUrl.includes('.sandbox.') ? 'sandbox' : 'live') : null }
+}
+
+/** The fields every provider has: provider, paid at, the open payment page, and whether it can still be paid. */
+function paymentFields(payment) {
+  return {
+    provider: typeof payment.provider === 'string' ? payment.provider : null,
     paidAt: typeof payment.paid_at === 'string' ? payment.paid_at : null,
     url: httpsUrl(payment.url),
     expiresAt: typeof payment.expires_at === 'string' ? payment.expires_at : null,
@@ -260,8 +305,10 @@ export function adminCreditMemo(raw) {
     total: money(raw.total),
     restocked: raw.restocked === true,
     returnNumber: typeof raw.return_number === 'string' ? raw.return_number : null,
-    // Phase 8: Stripe's refund id when the money went back to the card through Stripe.
+    // Phase 8: Stripe's refund id when the money went back to the card through Stripe (phase 10: or PayPal's).
     refundReference: stripeId(raw.refund_reference),
+    // Phase 10 §5: what went back to a gift card, and the rest (by the other payment method).
+    ...(raw.gift_card_refund !== undefined && { giftCardRefund: money(raw.gift_card_refund) ?? 0, otherRefund: money(raw.other_refund) ?? money(raw.total) - (money(raw.gift_card_refund) ?? 0) }),
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
@@ -283,6 +330,8 @@ function refundLimits(raw) {
     })),
     shippingRefundable: money(raw.shipping_refundable) ?? 0,
     maxTotal: money(raw.max_total) ?? 0,
+    // Phase 10 §5: what can still go back to the redeemed gift card (refunds go there first).
+    ...(raw.gift_card_refundable !== undefined && raw.gift_card_refundable !== null && { giftCardRefundable: money(raw.gift_card_refundable) ?? 0 }),
   }
 }
 

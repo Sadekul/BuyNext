@@ -48,6 +48,7 @@ class SettingsTest extends TestCase
             ->assertJsonPath('data.shipping', [
                 'standard_price' => '4.99', 'free_shipping_threshold' => '50.00', 'express_price' => '12.99', 'next_day_price' => '24.99',
                 'enabled_methods' => ['standard', 'express', 'nextDay'],
+                'default_weight_grams' => 500, // phase 10 (part B)
             ])
             ->assertJsonPath('data.tax', ['tax_enabled' => false, 'tax_rates' => [], 'prices_include_tax' => false])
             ->assertJsonPath('data.checkout.allowed_countries', ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India'])
@@ -77,6 +78,8 @@ class SettingsTest extends TestCase
             'return_window_days' => 30,
             'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
             'card_payments' => 'manual',
+            'paypal_payments' => 'manual', // phase 10 (part B)
+            'ga4_measurement_id' => null, // phase 10 (part A)
         ]]);
     }
 

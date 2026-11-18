@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import CheckoutPage from './CheckoutPage'
@@ -48,6 +48,10 @@ async function fillGuestCheckout(user) {
   await screen.findByLabelText('Email') // the form appears once the store settings are in
   const fields = { Email: 'ava@example.com', Phone: '+1 555 010 0100', 'First name': 'Ava', 'Last name': 'Guest', 'Street address': '12 Market Street', City: 'Springfield', 'State / region': 'Oregon', 'Postal code': '29112' }
   for (const [label, value] of Object.entries(fields)) await user.type(screen.getByLabelText(label), value)
+  // The guest's email starts a fresh price check 600 ms after typing stops (per-customer coupon limits);
+  // the button reads "Checking prices…" and is disabled meanwhile. Let that run before clicking.
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  await waitFor(() => expect(screen.queryByText('Checking prices…')).toBeNull())
 }
 
 describe('guest checkout with server prices', () => {
@@ -61,7 +65,8 @@ describe('guest checkout with server prices', () => {
     expect(await screen.findByRole('heading', { name: 'Checkout' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument()
     const place = await screen.findByRole('button', { name: 'Place order · $22.87' })
-    expect(sent(fetchMock, '/api/shop/cart/validate')).toEqual({ items: [{ productId: 1, quantity: 2 }], couponCode: null, shippingMethod: 'standard' })
+    // Phase 10: the shipping country always goes along (delivery prices come from table rates by country).
+    expect(sent(fetchMock, '/api/shop/cart/validate')).toEqual({ items: [{ productId: 1, quantity: 2 }], couponCode: null, shippingMethod: 'standard', country: 'United States' })
 
     await fillGuestCheckout(user)
     await user.click(place)
@@ -82,7 +87,8 @@ describe('guest checkout with server prices', () => {
     renderWithProviders(<CheckoutPage />, { route: '/checkout', path: '/checkout' })
     await user.click(await screen.findByRole('radio', { name: /Credit or debit card/ }))
     expect(screen.getByText(/No payment provider is connected yet, so nothing is charged now/)).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: /card/i })).not.toBeInTheDocument() // never any card fields
+    // Never any card fields (the phase 10 "Gift card" code field is not a payment card).
+    expect(screen.queryByRole('textbox', { name: /^(?!gift card$).*card/i })).not.toBeInTheDocument()
   })
 
   it('shows new prices when they changed (409) and does not place the order', TYPES_THE_CHECKOUT_FORM, async () => {

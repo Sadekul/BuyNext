@@ -26,7 +26,8 @@ function CartPage() {
   // (same request and cache entry as the checkout's standard delivery).
   const { settings } = useStoreSettings()
   const pricing = useQuery({
-    ...cartPricingQuery({ items: cart.items, couponCode: cart.couponCode, shippingMethod: defaultShippingMethodId(settings) }),
+    // A cart of gift cards only (phase 10) has no delivery method.
+    ...cartPricingQuery({ items: cart.items, couponCode: cart.couponCode, shippingMethod: cart.totals.requiresShipping ? defaultShippingMethodId(settings) : null }),
     enabled: REAL_SHOP && cart.items.length > 0,
   })
   const totals = REAL_SHOP ? withServerPricing(cart.totals, pricing.data) : cart.totals

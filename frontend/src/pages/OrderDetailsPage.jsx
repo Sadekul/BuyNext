@@ -27,7 +27,7 @@ function NotFound() {
   )
 }
 
-function OrderSection({ order, invoiceLink, payAction, actions = null, children }) {
+function OrderSection({ order, invoiceLink, invoicePdf, payAction, actions = null, children }) {
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
@@ -39,7 +39,7 @@ function OrderSection({ order, invoiceLink, payAction, actions = null, children 
         Order {id}
       </h2>
       {actions}
-      <OrderDetailsView order={order} invoiceLink={invoiceLink} payAction={payAction} />
+      <OrderDetailsView order={order} invoiceLink={invoiceLink} invoicePdf={invoicePdf} payAction={payAction} />
       {children}
     </section>
   )
@@ -74,8 +74,10 @@ function ServerOrderDetailsPage() {
     <OrderSection
       order={request.data}
       invoiceLink={(invoice) => ROUTES.invoice(request.data.number, invoice)}
-      // Phase 8: an unpaid card order can be paid on Stripe's page.
-      payAction={canPayOrder(request.data, settings.cardPayments) ? <PayNowButton order={request.data} /> : null}
+      // Phase 8: an unpaid card order can be paid on Stripe's page (phase 10: a PayPal order on PayPal's).
+      // Phase 10: each invoice can be downloaded as a PDF.
+      invoicePdf={{ orderNumber: request.data.number }}
+      payAction={canPayOrder(request.data, settings.cardPayments, settings.paypalPayments) ? <PayNowButton order={request.data} /> : null}
       // Phase 9: an unpaid order with nothing shipped can be cancelled here.
       actions={<CancelOrderButton order={request.data} onCancelled={handleCancelled} />}
     >

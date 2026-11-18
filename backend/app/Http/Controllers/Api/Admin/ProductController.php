@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\Audit;
+use App\Services\Pricing;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,13 +16,15 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /** Products, as shop staff manage them: every status, create, edit, (soft) delete. */
 class ProductController extends Controller
 {
     // What the audit log records about a product (not counters like ratings).
     private const AUDITED = ['name', 'sku', 'status', 'price', 'discount_percent', 'stock_quantity', 'min_order_quantity',
-        'category_id', 'brand_id', 'description', 'thumbnail_url', 'meta_title', 'meta_description'];
+        'category_id', 'brand_id', 'description', 'thumbnail_url', 'meta_title', 'meta_description',
+        'type', 'weight', 'gift_card_amounts', 'gift_card_min_amount', 'gift_card_max_amount']; // phase 10 (part B): the last five
 
     public function __construct(private Audit $audit) {}
 
@@ -81,6 +84,7 @@ class ProductController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate($this->rules(null), $this->messages());
+        $this->checkGiftCard(null, $data);
 
         $product = DB::transaction(function () use ($data) {
             $product = new Product([
@@ -117,6 +121,7 @@ class ProductController extends Controller
             return $this->notFound();
         }
         $data = $request->validate($this->rules($product), $this->messages());
+        $this->checkGiftCard($product, $data);
 
         DB::transaction(function () use ($product, $data) {
             $before = Audit::fieldsOf($product, self::AUDITED);
@@ -186,6 +191,13 @@ class ProductController extends Controller
             'images' => ['nullable', 'array', 'max:'.Product::MAX_IMAGES],
             // A web address, or one of the product's uploaded images (/media/products/...), to keep it in the list.
             'images.*' => ['required', 'string', 'max:2048', 'regex:#^(https?://\S+|/media/products/\d+/[a-f0-9]{32}\.(jpg|png|webp))$#'],
+            // Phase 10 (part B): the weight in grams (shipping table rates), and gift card products.
+            'weight' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'type' => ['sometimes', Rule::in(Product::TYPES)],
+            'gift_card_amounts' => ['nullable', 'array', 'max:10'],
+            'gift_card_amounts.*' => ['numeric', 'decimal:0,2', 'min:1', 'max:10000', 'distinct'],
+            'gift_card_min_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:1', 'max:10000', 'required_with:gift_card_max_amount'],
+            'gift_card_max_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:1', 'max:10000', 'required_with:gift_card_min_amount', 'gte:gift_card_min_amount'],
         ];
     }
 
@@ -219,6 +231,27 @@ class ProductController extends Controller
         ];
     }
 
+    /**
+     * Phase 10 (part B): a gift card product needs amounts or a custom range,
+     * and can't be a product with options.
+     */
+    private function checkGiftCard(?Product $product, array $data): void
+    {
+        $type = $data['type'] ?? $product?->type ?? 'simple';
+        if ($type !== 'gift_card') {
+            return;
+        }
+        $amounts = array_key_exists('gift_card_amounts', $data) ? ($data['gift_card_amounts'] ?? []) : ($product?->gift_card_amounts ?? []);
+        $min = array_key_exists('gift_card_min_amount', $data) ? $data['gift_card_min_amount'] : $product?->gift_card_min_amount;
+        $max = array_key_exists('gift_card_max_amount', $data) ? $data['gift_card_max_amount'] : $product?->gift_card_max_amount;
+        if ($amounts === [] && ($min === null || $max === null)) {
+            throw ValidationException::withMessages(['gift_card_amounts' => 'A gift card needs at least one amount, or a minimum and maximum for custom amounts.']);
+        }
+        if ($product?->has_variants) {
+            throw ValidationException::withMessages(['type' => 'A product with options can\'t be a gift card. Remove its options first.']);
+        }
+    }
+
     /** The fields shared by create and update (only those present in $data). */
     private function fill(Product $product, array $data): void
     {
@@ -232,6 +265,23 @@ class ProductController extends Controller
                 $product->{$field} = filled($data[$field]) ? trim($data[$field]) : null;
             }
         }
+        // Phase 10 (part B).
+        foreach (['weight', 'type'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $product->{$field} = $data[$field] ?? ($field === 'type' ? 'simple' : null);
+            }
+        }
+        if (array_key_exists('gift_card_amounts', $data)) {
+            $amounts = array_map(fn ($amount) => Pricing::format(Pricing::toCents((string) $amount)), $data['gift_card_amounts'] ?? []);
+            sort($amounts, SORT_NUMERIC);
+            $product->gift_card_amounts = $amounts === [] ? null : array_values($amounts);
+        }
+        foreach (['gift_card_min_amount', 'gift_card_max_amount'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $product->{$field} = $data[$field] === null ? null : Pricing::format(Pricing::toCents((string) $data[$field]));
+            }
+        }
+
         if (array_key_exists('category', $data)) {
             $product->category_id = Category::where('slug', $data['category'])->value('id');
         }

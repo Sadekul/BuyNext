@@ -205,6 +205,8 @@ const SETTING_RULES = {
     expressPrice: moneyRule,
     nextDayPrice: moneyRule,
     enabledMethods: someOf(SHIPPING_METHODS, 'Keep at least one shipping method.'),
+    // Phase 10 §4.
+    defaultWeightGrams: (value) => (Number.isInteger(value) && value >= 0 && value <= 100_000 ? null : 'Enter a whole number of grams from 0 to 100,000.'),
   },
   tax: {
     taxEnabled: isBoolean('Choose whether tax is charged.'),
@@ -237,6 +239,15 @@ const SETTING_RULES = {
   security: {
     requireAdminTwoFactor: isBoolean('Choose whether every admin must use two-step sign-in.'),
   },
+  // Phase 10 §2 and §6.
+  documents: {
+    paperSize: (value) => (['a4', 'letter'].includes(value) ? null : 'Choose A4 or Letter.'),
+    attachPdfToEmails: isBoolean('Choose whether invoice emails carry the PDF.'),
+  },
+  analytics: {
+    // "" or null turns statistics off; otherwise a GA4 measurement id (G-ABC123XYZ).
+    ga4MeasurementId: (value) => (value === null || value === '' || (typeof value === 'string' && /^G-[A-Z0-9]{4,12}$/.test(value)) ? null : 'Enter a GA4 measurement ID like G-ABC123XYZ, or leave it empty.'),
+  },
 }
 
 /** PATCH /settings: { group: { key: value } }, known groups and keys only; errors as "group.key". */
@@ -251,6 +262,8 @@ export function validateSettings(body) {
   }
   if (values.tax?.taxRates) values.tax.taxRates = values.tax.taxRates.map((rate) => ({ country: rate.country.trim(), rate: rate.rate }))
   if (values.returns?.returnReasons) values.returns.returnReasons = values.returns.returnReasons.map((reason) => reason.trim())
+  // Phase 10: an empty measurement id turns statistics off.
+  if (values.analytics?.ga4MeasurementId === '') values.analytics.ga4MeasurementId = null
   if (values.checkout?.allowedCountries) values.checkout.allowedCountries = [...new Set(values.checkout.allowedCountries.map((country) => country.trim()))]
   if (Object.keys(errors).length === 0 && Object.keys(values).length === 0) errors.settings = ['Change at least one setting.']
   return Object.keys(errors).length > 0 ? { errors } : { values }

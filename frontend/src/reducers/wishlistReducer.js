@@ -32,7 +32,8 @@ const SNAPSHOT_FIELDS = [
 function toSnapshot(product) {
   return {
     ...Object.fromEntries(SNAPSHOT_FIELDS.map((field) => [field, product[field] ?? null])),
-    ...(product.hasVariants === true && { hasVariants: true }),
+    // Phase 10: a gift card's amount and recipient are chosen on its page too.
+    ...((product.hasVariants === true || product.type === 'gift_card') && { hasVariants: true }),
   }
 }
 

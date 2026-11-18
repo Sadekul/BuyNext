@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+
+// findBy…/waitFor give up after 1 s by default. Multi-step page flows (checkout, then a payment
+// redirect) can take longer while ~50 test files run in parallel, so wait up to 5 s.
+configure({ asyncUtilTimeout: 5000 })
 
 // Server-side tests (e.g. server/authBff.test.js) run in Node, without a DOM.
 const hasDom = typeof window !== 'undefined'

@@ -23,6 +23,9 @@ export const DEFAULT_STORE_SETTINGS = {
   taxEnabled: false,
   // Phase 8: no payment provider in the demo (or while the real settings load).
   cardPayments: 'manual',
+  // Phase 10: no PayPal connection and no statistics in the demo (or while the real settings load).
+  paypalPayments: 'manual',
+  ga4MeasurementId: null,
 }
 
 /**

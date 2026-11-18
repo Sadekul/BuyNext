@@ -53,13 +53,17 @@ export const invoiceQuery = (userId, number, invoice, authorizedRequest) =>
  * lines, coupon, or delivery method change. The key holds only ids and
  * quantities, so a refreshed product snapshot doesn't trigger a new request.
  */
-export const cartPricingKey = ({ items, couponCode, shippingMethod, email, country }) => [
+export const cartPricingKey = ({ items, couponCode, shippingMethod, email, country, giftCardCode }) => [
   'cart-pricing',
-  items.filter((item) => !item.isUnavailable).map((item) => `${item.productId}${item.variantId ? `v${item.variantId}` : ''}x${item.quantity}`),
+  // A gift card line (phase 10) is "<product>g<line id>x<quantity>": its amount and recipient are part of the id.
+  items
+    .filter((item) => !item.isUnavailable)
+    .map((item) => `${item.productId}${item.giftCard ? `g${item.giftCard.id}` : item.variantId ? `v${item.variantId}` : ''}x${item.quantity}`),
   couponCode ?? null,
-  shippingMethod,
+  shippingMethod ?? null, // null: a cart of gift cards only (no delivery)
   email ?? null, // a guest's email can change whether a code applies (one use per customer)
   country ?? null, // the tax depends on the shipping country
+  giftCardCode ?? null, // phase 10: the gift card that pays (part of) the total
 ]
 
 export const cartPricingQuery = (input) =>

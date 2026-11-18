@@ -36,7 +36,11 @@ export function getProducts(options = {}) {
   return getProductList(catalog.listProducts, options)
 }
 
-/** Server-side search over product names and descriptions. */
+/**
+ * Server-side search over product names and descriptions. With BuyNest's API
+ * the results come ranked by relevance, and `correctedQuery` says when a typo
+ * was corrected; `{ exact: true }` searches the words exactly as typed.
+ */
 export function searchProducts(query, options = {}) {
   return getProductList((pageOptions) => catalog.searchProducts(query, pageOptions), options)
 }

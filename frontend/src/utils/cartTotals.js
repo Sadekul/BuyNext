@@ -60,27 +60,31 @@ function amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents) {
 export function calculateCartTotals(items, couponCode = null, shippingMethodId = 'standard', rules = DEMO_RULES) {
   const lines = items.filter((item) => !item.isUnavailable)
   const unavailableCount = items.length - lines.length
+  // Phase 10: gift cards are emailed; a cart of gift cards only has nothing to ship.
+  const requiresShipping = lines.length === 0 || lines.some((line) => !line.giftCard)
 
   let itemCount = 0
   let originalCents = 0
   let subtotalCents = 0
+  let giftCardCents = 0 // phase 10: gift cards don't count toward free shipping
   for (const line of lines) {
     const { salePrice, originalPrice } = getProductPricing(line)
     itemCount += line.quantity
     originalCents += toCents(originalPrice) * line.quantity
     subtotalCents += toCents(salePrice) * line.quantity
+    if (line.giftCard) giftCardCents += toCents(salePrice) * line.quantity
   }
 
   const { coupon, discountCents, error: couponError } = evaluateCoupon(couponCode, subtotalCents)
   const afterDiscountCents = subtotalCents - discountCents
   const methods = rules.shippingMethods.length > 0 ? rules.shippingMethods : SHIPPING_METHODS
   // Free shipping is a standard-delivery rule: without standard delivery (or a threshold) there is none.
-  const freeShippingThreshold = methods.some((option) => option.id === 'standard') ? rules.freeShippingThreshold : null
+  const freeShippingThreshold = requiresShipping && methods.some((option) => option.id === 'standard') ? rules.freeShippingThreshold : null
   const thresholdCents = freeShippingThreshold === null ? null : toCents(freeShippingThreshold)
-  const qualifiesForFreeShipping = thresholdCents !== null && afterDiscountCents >= thresholdCents
+  const qualifiesForFreeShipping = thresholdCents !== null && afterDiscountCents - giftCardCents >= thresholdCents
   const method = methods.find((option) => option.id === shippingMethodId) ?? methods[0]
   let shippingCents = 0
-  if (itemCount > 0) {
+  if (itemCount > 0 && requiresShipping) {
     if (method.price !== null) shippingCents = toCents(method.price)
     else if (!qualifiesForFreeShipping) shippingCents = toCents(rules.standardShippingCost)
   }
@@ -96,9 +100,10 @@ export function calculateCartTotals(items, couponCode = null, shippingMethodId =
     couponError,
     discount: toDollars(discountCents),
     shippingMethod: method,
+    requiresShipping,
     shipping: toDollars(shippingCents),
     freeShippingThreshold,
-    amountToFreeShipping: thresholdCents === null ? null : toDollars(amountToFreeShippingCents(subtotalCents, couponCode, thresholdCents)),
+    amountToFreeShipping: thresholdCents === null ? null : toDollars(amountToFreeShippingCents(subtotalCents - giftCardCents, couponCode, thresholdCents)),
     total: toDollars(afterDiscountCents + shippingCents),
   }
 }
@@ -126,7 +131,9 @@ export function withServerPricing(localTotals, serverCart) {
     // Phase 7: each cart price rule that applied (automatic ones too), for the summary rows.
     appliedRules: serverCart.appliedRules ?? [],
   }
-  const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount)
+  // Gift card lines (phase 10) don't count toward free shipping.
+  const giftCardCents = (serverCart.lines ?? []).filter((line) => line.giftCard).reduce((sum, line) => sum + toCents(line.lineTotal ?? 0), 0)
+  const afterDiscountCents = toCents(totals.subtotal) - toCents(totals.discount) - giftCardCents
   // Totals built without store rules (older callers) use the demo threshold.
   const freeShippingThreshold = localTotals.freeShippingThreshold === undefined ? SHIPPING_RULES.freeShippingThreshold : localTotals.freeShippingThreshold
   if (freeShippingThreshold === null) return { ...base, amountToFreeShipping: null }

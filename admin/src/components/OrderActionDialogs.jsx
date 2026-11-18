@@ -6,7 +6,7 @@ import Field from './Field'
 import FormDialog from './FormDialog'
 import { ErrorState, Loading } from './States'
 import { formatMoney } from '../utils/format'
-import { CARRIERS, paidThroughStripe } from '../utils/orders'
+import { CARRIERS, giftCardSplit, paidThroughProvider } from '../utils/orders'
 
 /*
  * The actions on a real order, each in its own dialog with its own note and
@@ -56,7 +56,9 @@ export function InvoiceDialog({ order, onDone, onCancel }) {
       isOpen
       title={`Invoice order ${order.number}`}
       description={
-        order.payment?.canPay
+        order.payment?.canPay && order.payment.provider === 'paypal'
+          ? `Records a payment of ${formatMoney(order.totals.total)}, the order total. PayPal payments are recorded by themselves when PayPal confirms them: invoice by hand only if the customer paid another way.`
+          : order.payment?.canPay
           ? `Records a payment of ${formatMoney(order.totals.total)}, the order total. Card payments through Stripe are recorded by themselves when Stripe confirms them: invoice by hand only if the customer paid another way.`
           : `Records a payment of ${formatMoney(order.totals.total)}, the order total. No payment provider is connected yet: invoice once the money has arrived.`
       }
@@ -160,8 +162,32 @@ const hasCents = (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e
 const REFUND_DESCRIPTION = 'Records a refund (credit memo). No payment provider is connected yet: return the money yourself by the original payment method.'
 // Phase 8: paid by card through Stripe, the API refunds the card itself before saving the memo.
 const STRIPE_REFUND_DESCRIPTION = "Records a refund (credit memo). The refund goes back to the customer's card through Stripe; if Stripe refuses it, nothing is saved."
+// Phase 10 §3: the same through PayPal.
+const PAYPAL_REFUND_DESCRIPTION = "Records a refund (credit memo). The refund goes back through PayPal to the customer's PayPal account; if PayPal refuses it, nothing is saved and PayPal's reason is shown here."
+// Phase 10 §5: part (or all) of it was paid by gift card.
+const GIFT_CARD_REFUND_NOTE = ' Money goes back to the gift card first, up to what it paid; the rest by the other payment method.'
 
-const refundDescription = (order) => (paidThroughStripe(order) ? STRIPE_REFUND_DESCRIPTION : REFUND_DESCRIPTION)
+// Phase 10 §5: a gift card paid the whole order.
+const GIFT_CARD_ONLY_REFUND_DESCRIPTION = 'Records a refund (credit memo). The money goes back to the gift card the order was paid with.'
+
+function refundDescription(order) {
+  if (order.paymentMethod === 'gift_card') return GIFT_CARD_ONLY_REFUND_DESCRIPTION
+  const provider = paidThroughProvider(order)
+  const base = provider === 'stripe' ? STRIPE_REFUND_DESCRIPTION : provider === 'paypal' ? PAYPAL_REFUND_DESCRIPTION : REFUND_DESCRIPTION
+  return order.giftCardPayment?.amount > 0 ? `${base}${GIFT_CARD_REFUND_NOTE}` : base
+}
+/** After the refund: where the money is going (phase 8 Stripe, phase 10 PayPal and gift cards). */
+function refundDestination(order, creditMemo) {
+  const parts = []
+  if (creditMemo.giftCardRefund > 0) parts.push(` ${formatMoney(creditMemo.giftCardRefund)} went back to the gift card.`)
+  const other = creditMemo.giftCardRefund > 0 ? toCents(creditMemo.total) - toCents(creditMemo.giftCardRefund) : toCents(creditMemo.total)
+  if (other <= 0 && parts.length > 0) return parts.join('')
+  const provider = paidThroughProvider(order)
+  if (provider === 'paypal') parts.push(' PayPal is returning the money to the customer.')
+  else if (creditMemo.refundReference || provider === 'stripe') parts.push(" Stripe is returning the money to the customer's card.")
+  else if (order.paymentMethod !== 'gift_card') parts.push(' Return the money by the original payment method.')
+  return parts.join('')
+}
 
 /**
  * Credit memo: per-item quantities (bounded by what is still refundable),
@@ -206,13 +232,12 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
     (Number.isFinite(shippingValue) ? toCents(shippingValue) : 0) +
     (Number.isFinite(adjustmentValue) ? toCents(adjustmentValue) : 0)
 
-  const stripe = paidThroughStripe(order)
   const create = useMutation({
     mutationFn: (values) => createCreditMemo(order.number, values),
     onSuccess: ({ creditMemo }) => {
       const full = toCents(creditMemo.total) >= toCents(limits.maxTotal)
       onDone(
-        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''}${creditMemo.refundReference || stripe ? " Stripe is returning the money to the customer's card." : ' Return the money by the original payment method.'}`,
+        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''}${refundDestination(order, creditMemo)}`,
       )
     },
     onError: (error, sent) => {
@@ -256,6 +281,8 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
   }
 
   const totalError = errors.total?.[0] ?? errors.items?.[0]
+  // Phase 10 §5: how the refund divides between the gift card and the other method.
+  const split = giftCardSplit(order, totalCents, limits)
   return (
     <FormDialog
       isOpen
@@ -353,12 +380,36 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
         </span>
       </p>
       <p className="field__hint">{ESTIMATE_NOTE}</p>
+      {split && <RefundSplit split={split} order={order} />}
       {totalError && (
         <p id="refund-total-error" className="field__error" role="alert">
           {totalError}
         </p>
       )}
     </FormDialog>
+  )
+}
+
+/** Phase 10 §5: the refund's split, as the server will make it (announced as it changes). */
+function RefundSplit({ split, order }) {
+  const provider = paidThroughProvider(order)
+  const other = provider === 'paypal' ? 'Through PayPal' : provider === 'stripe' ? 'To the card through Stripe' : 'By the other payment method'
+  return (
+    <div className="refund-split" aria-live="polite">
+      <p className="refund-split__title">How the refund is split</p>
+      <dl>
+        <div>
+          <dt>Back to the gift card{split.last4 && ` ending ${split.last4}`}</dt>
+          <dd>{formatMoney(split.toCardCents / 100)}</dd>
+        </div>
+        {order.paymentMethod !== 'gift_card' && (
+          <div>
+            <dt>{other}</dt>
+            <dd>{formatMoney(split.otherCents / 100)}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
   )
 }
 

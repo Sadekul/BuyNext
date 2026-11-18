@@ -48,6 +48,9 @@ final class Permissions
             // Phase 7 (part B): newsletter.
             'newsletter.view' => 'View newsletter subscribers and campaigns',
             'newsletter.send' => 'Write and send newsletters, unsubscribe subscribers, send cart reminders',
+            // Phase 10 (part B): gift cards.
+            'gift_cards.view' => 'View gift cards and their history',
+            'gift_cards.manage' => 'Create gift cards, adjust balances, disable cards',
         ]],
         'content' => ['label' => 'Content', 'permissions' => [
             'content.view' => 'View pages and home page content',
@@ -112,7 +115,8 @@ final class Permissions
             ['name' => 'Marketing', 'description' => 'Coupons and content.', 'is_system' => false,
                 'permissions' => ['coupons.view', 'coupons.edit', 'content.view', 'content.edit',
                     'newsletter.view', 'newsletter.send', 'seo.manage', // phase 7 (part B)
-                    'price_rules.manage']], // phase 7 (part A)
+                    'price_rules.manage', // phase 7 (part A)
+                    'gift_cards.view', 'gift_cards.manage']], // phase 10 (part B)
             ['name' => 'Viewer', 'description' => 'Can look at everything, change nothing.', 'is_system' => false, 'permissions' => $views],
         ];
     }

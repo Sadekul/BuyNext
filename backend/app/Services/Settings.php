@@ -25,7 +25,8 @@ class Settings
     /** The groups the admin shows (GET/PATCH /api/admin/v1/settings) and their keys. */
     public const GROUPS = [
         'general' => ['store_name', 'support_email', 'support_phone', 'address'],
-        'shipping' => ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'enabled_methods'],
+        // Phase 10 (part B): default_weight_grams (products without a weight, for table rates).
+        'shipping' => ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'enabled_methods', 'default_weight_grams'],
         'tax' => ['tax_enabled', 'tax_rates', 'prices_include_tax'],
         'checkout' => ['allowed_countries', 'guest_checkout', 'enabled_payment_methods'],
         'inventory' => ['low_stock_threshold'],
@@ -35,6 +36,9 @@ class Settings
         'returns' => ['returns_enabled', 'return_window_days', 'return_reasons'],
         // Phase 9 (part A): Settings → Security (changing it needs the Owner role, see SettingsController).
         'security' => ['require_admin_two_factor'],
+        // Phase 10 (part A): Settings → Documents (PDF invoices and credit memos) and Settings → Analytics.
+        'documents' => ['paper_size', 'attach_pdf_to_emails'],
+        'analytics' => ['ga4_measurement_id'],
     ];
 
     public const DEFAULTS = [
@@ -46,6 +50,7 @@ class Settings
         'free_shipping_threshold' => '50.00',
         'express_price' => '12.99',
         'next_day_price' => '24.99',
+        'default_weight_grams' => 500, // phase 10 (part B)
         'enabled_methods' => ['standard', 'express', 'nextDay'],
         'tax_enabled' => false,
         'tax_rates' => [], // [{ country: "Germany", rate: "19.00" }] (percent)
@@ -60,6 +65,10 @@ class Settings
         'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
         // Phase 9 (part A): every admin must use two-step sign-in.
         'require_admin_two_factor' => false,
+        // Phase 10 (part A): PDF paper size (a4|letter), the invoice email's PDF, and Google Analytics 4 (null = off).
+        'paper_size' => 'a4',
+        'attach_pdf_to_emails' => true,
+        'ga4_measurement_id' => null,
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price'];
@@ -192,6 +201,7 @@ class Settings
             'shipping.free_shipping_threshold' => $money,
             'shipping.express_price' => $money,
             'shipping.next_day_price' => $money,
+            'shipping.default_weight_grams' => ['integer', 'min:0', 'max:100000'], // phase 10 (part B)
             'shipping.enabled_methods' => ['array', 'min:1'],
             'shipping.enabled_methods.*' => ['string', 'distinct', Rule::in(array_keys(config('buynest.store.shipping_methods')))],
             'tax.tax_enabled' => ['boolean'],
@@ -212,6 +222,10 @@ class Settings
             'returns.return_reasons.*' => ['string', 'min:1', 'max:60', 'distinct:ignore_case'],
             // Phase 9 (part A).
             'security.require_admin_two_factor' => ['boolean'],
+            // Phase 10 (part A).
+            'documents.paper_size' => ['string', Rule::in(['a4', 'letter'])],
+            'documents.attach_pdf_to_emails' => ['boolean'],
+            'analytics.ga4_measurement_id' => ['nullable', 'string', 'regex:/^G-[A-Z0-9]{4,12}$/'],
         ];
     }
 
@@ -219,10 +233,11 @@ class Settings
     public function normalize(string $key, mixed $value): mixed
     {
         return match (true) {
+            $key === 'attach_pdf_to_emails' => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 10 (part A)
             in_array($key, self::MONEY_KEYS, true) => Pricing::format(Pricing::toCents((string) $value)),
             in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval', 'returns_enabled',
                 'require_admin_two_factor'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 9 (part A): the last one
-            in_array($key, ['low_stock_threshold', 'return_window_days'], true) => (int) $value,
+            in_array($key, ['low_stock_threshold', 'return_window_days', 'default_weight_grams'], true) => (int) $value, // phase 10 (part B): the last one
             $key === 'tax_rates' => array_values(array_map(fn ($rate) => [
                 'country' => trim($rate['country']),
                 'rate' => Pricing::format(Pricing::toCents((string) $rate['rate'])),

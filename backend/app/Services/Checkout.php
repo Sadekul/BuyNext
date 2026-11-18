@@ -23,7 +23,8 @@ use Throwable;
  */
 class Checkout
 {
-    public function __construct(private Pricing $pricing, private AddressBook $addressBook, private Audit $audit) {}
+    public function __construct(private Pricing $pricing, private AddressBook $addressBook, private Audit $audit,
+        private OrderDocuments $documents, private GiftCards $giftCards) {}
 
     /**
      * Prices an order without placing it (no locks, no stock change): the
@@ -31,9 +32,10 @@ class Checkout
      */
     public function quote(array $data, ?Customer $customer): CartQuote
     {
-        return $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
+        return $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null),
-            country: $data['shipping_address']['country'] ?? null, group: $customer?->priceGroup());
+            country: $data['shipping_address']['country'] ?? null, group: $customer?->priceGroup(),
+            giftCardCode: $data['gift_card_code'] ?? null); // phase 10 (part B)
     }
 
     /**
@@ -48,9 +50,9 @@ class Checkout
     public function place(array $data, ?Customer $customer, ?Admin $admin = null, bool $notify = true): Order
     {
         $order = DB::transaction(function () use ($data, $customer, $admin) {
-            $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'],
+            $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
                 lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null,
-                group: $customer?->priceGroup());
+                group: $customer?->priceGroup(), giftCardCode: $data['gift_card_code'] ?? null);
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
@@ -61,6 +63,24 @@ class Checkout
             }
             if ($quote->couponError) {
                 throw ValidationException::withMessages(['coupon_code' => $quote->couponError]);
+            }
+            // Phase 10 (part B): table rates may leave a method (or every method) out for this cart.
+            if ($quote->shippingRequired && $quote->shippingError) {
+                throw ValidationException::withMessages(['shipping_method' => $quote->shippingError]);
+            }
+            if (! $quote->requestedShippingAvailable) {
+                throw ValidationException::withMessages(['shipping_method' => 'This shipping method isn\'t available for your order. Please choose another one.']);
+            }
+            // Phase 10 (part B): a gift card that covers everything is the payment; one that doesn't needs another method.
+            if ($quote->giftCardError) {
+                throw ValidationException::withMessages(['gift_card_code' => $quote->giftCardError]);
+            }
+            if ($quote->giftCard && $quote->amountDueCents() === 0 && $quote->itemCount > 0) {
+                $data['payment_method'] = 'gift_card';
+            } elseif ($data['payment_method'] === 'gift_card') {
+                throw ValidationException::withMessages(['payment_method' => $quote->giftCard
+                    ? 'Your gift card doesn\'t cover the whole total. Choose how to pay the rest.'
+                    : 'Enter your gift card code, or choose another payment method.']);
             }
             // The shopper saw a total; never charge a different one without asking.
             if (isset($data['expected_total']) && Pricing::toCents($data['expected_total']) !== $quote->totalCents) {
@@ -119,6 +139,9 @@ class Checkout
             'shipping_total' => Pricing::format($quote->shippingCents),
             'tax_total' => Pricing::format($quote->taxCents),
             'grand_total' => Pricing::format($quote->totalCents),
+            // Phase 10 (part B): the gift card's part of the payment (taken below).
+            'gift_card_id' => $quote->giftCard?->id,
+            'gift_card_amount' => Pricing::format($quote->giftCardCents),
             'shipping_address' => $data['shipping_address'],
             'billing_address' => $data['billing_address'] ?? $data['shipping_address'],
             'placed_at' => now(),
@@ -131,7 +154,9 @@ class Checkout
             $variant = $line['variant'];
             // decrement() is one UPDATE ... SET stock = stock - n; the row is locked, so it can't go negative.
             // A variant line takes the variant's stock (also locked); the product's stock is their sum.
-            if ($variant) {
+            if ($line['type'] === 'gift_card') {
+                // Phase 10 (part B): gift cards have no stock; the cards are made when the order is paid.
+            } elseif ($variant) {
                 $variant->decrement('stock_quantity', $line['quantity']);
                 $product->syncVariantStock();
             } else {
@@ -153,6 +178,7 @@ class Checkout
                 'line_total' => Pricing::format($line['line_cents']),
                 'discount_amount' => Pricing::format($line['discount_cents'] ?? 0),
                 'price_label' => $line['price_label'],
+                'gift_card' => $line['gift_card'], // phase 10 (part B): amount and recipient of a gift card line
             ]);
         }
 
@@ -177,6 +203,16 @@ class Checkout
             'admin_id' => $admin?->id,
             'customer_notified' => true,
         ]);
+
+        // Phase 10 (part B): the gift card's balance (locked by quote()) is taken now; when it pays
+        // everything the order is paid at once (invoice), with no other payment.
+        if ($quote->giftCard && $quote->giftCardCents > 0) {
+            $this->giftCards->redeem($quote->giftCard, $quote->giftCardCents, $order);
+            if ($data['payment_method'] === 'gift_card') {
+                $order->forceFill(['payment_provider' => 'gift_card', 'paid_at' => now()])->save();
+                $this->documents->invoice($order, null, "Paid with gift card ••••{$quote->giftCard->last4}.", false);
+            }
+        }
         if ($admin) {
             if (filled($data['note'] ?? null)) {
                 // A staff note about the phone order: internal, never shown to the customer.

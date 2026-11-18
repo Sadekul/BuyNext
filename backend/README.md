@@ -104,7 +104,7 @@ The agreement: [docs/backend/PHASE8_CONTRACT.md](../docs/backend/PHASE8_CONTRACT
 | Area | What it does |
 | --- | --- |
 | Card payments | With `STRIPE_SECRET_KEY` set, a card order gets a **Stripe Checkout** page for its grand total (`data.payment.url` on the order answer); card details never reach BuyNest. `POST /api/v1/orders/{number}/pay` opens a new page (Pay now). Staff get a payment link for card orders they create (`POST /api/admin/v1/orders/{number}/payment-link`). Without the key everything works as before (staff invoice card orders by hand). No Stripe SDK: `App\Services\Payments\StripeGateway` uses Laravel's HTTP client. |
-| Webhook | `POST /api/v1/payments/stripe/webhook`, signed with `STRIPE_WEBHOOK_SECRET` (checked: HMAC, 5-minute window). Paid → the invoice is created (and emailed) like a staff invoice; page expired unpaid → the order is cancelled (stock and coupon back, "Payment not completed" email); amounts that don't match → order left unpaid + a critical admin notification. Each event is handled once (`stripe_events`). `App\Services\Payments\StripePayments`. |
+| Webhook | `POST /api/v1/payments/stripe/webhook`, signed with `STRIPE_WEBHOOK_SECRET` (checked: HMAC, 5-minute window). Paid → the invoice is created (and emailed) like a staff invoice; page expired unpaid → the order is cancelled (stock and coupon back, "Payment not completed" email); amounts that don't match → order left unpaid + a critical admin notification. Each event is handled once (`stripe_events`, since phase 10 `payment_events`). `App\Services\Payments\StripePayments`. |
 | Refunds | A credit memo on a Stripe-paid order refunds the card first (`refund_reference`); Stripe refusing → 422 and nothing saved. |
 | Email | `php artisan buynest:mail-test you@example.com` sends a test email through the configured mailer. |
 
@@ -116,7 +116,7 @@ The agreement: [docs/backend/PHASE8_CONTRACT.md](../docs/backend/PHASE8_CONTRACT
 | Catalog | `products.view` (also the category tree), `products.edit` (also images, options, variants, mass actions), `products.delete` (also the bulk `delete`), `categories.edit`, `products.import` (CSV import and export), `reviews.view`, `reviews.moderate` |
 | Sales | `orders.view` (orders, invoices, credit memo and shipment lists, refundable amounts, packing slips, order export, the bulk route), `orders.edit`, `invoices.create`, `shipments.create`, `credit_memos.create`, `orders.create` (phone orders and their quote), `returns.view`, `returns.manage` |
 | Customers | `customers.view` (also groups, addresses, notes, export), `customers.edit` (account, addresses, notes, password reset, block), `customers.create`, `customers.delete`, `customer_groups.manage` |
-| Marketing | `coupons.view`, `coupons.edit`, `newsletter.view`, `newsletter.send` (campaigns, unsubscribing, cart reminders) |
+| Marketing | `coupons.view`, `coupons.edit`, `newsletter.view`, `newsletter.send` (campaigns, unsubscribing, cart reminders), `gift_cards.view`, `gift_cards.manage` (phase 10) |
 | Content | `content.view`, `content.edit`, `email_templates.manage` (Owner-only by default), `seo.manage` (redirects, search terms) |
 | Reports | `reports.view` |
 | Settings | `settings.view`, `settings.edit` |
@@ -144,6 +144,20 @@ The agreement: [docs/backend/PHASE9_CONTRACT.md](../docs/backend/PHASE9_CONTRACT
 - **Backups:** `php artisan buynest:backup [--list]` (gzipped `mysqldump`, password in a temporary 0600 file, never on the command line) to the `backups` disk (`BACKUP_DISK=local|s3`), daily at 03:00, `BACKUP_KEEP_DAYS` kept; admin System → Backups (`backups.view`, Owner only) with signed 5-minute downloads. Restore: `docs/DEPLOY_RAILWAY.md` step 15.
 - **Back in stock:** `POST /api/v1/products/{id}/stock-alerts` (always 202), queued `back_in_stock` emails whenever stock returns (one model-event hook in `app/Providers/LaunchServiceProvider.php`), a signed "stop these alerts" link, Account → Stock alerts, and Reports → Stock alerts.
 - Shapes: `docs/backend/PHASE9_CONTRACT.md`, "Implementation notes — part B".
+
+## What's here (phase 10, part A: better search, PDF documents, analytics setting)
+
+- **Search:** a MySQL FULLTEXT index on products (name, description, and `search_text` = brand, category, tags, SKUs) ranks results when no sort is chosen (exact SKU, exact name, name matches, then relevance, then rating). A misspelled word ("ihpone") is corrected to the closest word in `search_vocabulary` and the answer says so in `meta.corrected_query`; `correct=0` searches exactly as typed. Real words are never "corrected". `app/Services/CatalogSearch.php` (matching, ranking, corrections) and `SearchIndex.php` (kept in step by `app/Providers/SearchServiceProvider.php`). Rebuild by hand with `php artisan buynest:search:reindex` (also daily at 04:10, and automatically after catalog changes).
+- **PDF invoices and credit memos:** `barryvdh/laravel-dompdf` draws `resources/views/documents/*.blade.php` (DejaVu Sans, nothing loaded from the network). Downloads for the storefront (owner's token or `?email=`) and the admin; the "payment received" email attaches the invoice. Settings → Documents: `paper_size` (a4/letter), `attach_pdf_to_emails`.
+- **Analytics:** Settings → Analytics `ga4_measurement_id` (`G-…`, empty = off), public in `GET /api/v1/store`; the storefront asks for cookie consent before loading Google Analytics.
+- Shapes: `docs/backend/PHASE10_CONTRACT.md`, "Implementation notes — part A".
+
+## What's here (phase 10, part B: PayPal, shipping table rates, gift cards)
+
+- **PayPal:** with `PAYPAL_CLIENT_ID` + `PAYPAL_CLIENT_SECRET` set, a PayPal order gets a PayPal approval link (Orders API v2, redirect; `data.payment.url`); back on the confirmation page the storefront calls `POST /api/v1/orders/{number}/paypal/capture { token }` and the API captures and invoices it. Webhook `POST /api/v1/payments/paypal/webhook` (verified by PayPal's verify-webhook-signature API with `PAYPAL_WEBHOOK_ID`), Pay now and staff payment links, refunds through PayPal, and `php artisan buynest:payments:expire-paypal` (every 5 minutes) cancels orders left unpaid for 3 hours. No SDK: `App\Services\Payments\PayPalGateway` (HTTP client, cached OAuth token, `PayPal-Request-Id` on every POST); `OnlinePayments` picks Stripe or PayPal per order. Webhook events of both providers are kept in `payment_events` (provider + id). Without the keys PayPal orders wait for staff, as before.
+- **Shipping table rates:** `shipping_rates` rows (method, country, weight and subtotal ranges, price) price a method by the cart's weight (product or variant `weight` in grams, else Settings → Shipping `default_weight_grams`); a method with rows but no matching row isn't offered; methods without rows keep their flat price; free shipping still applies on top. Cart validation, checkout, and admin orders all use it (`App\Services\ShippingRates`, inside `Pricing::quote`). Admin: `/shipping-rates` CRUD, reorder, CSV import/export, and a "check a cart" tool.
+- **Gift cards:** gift card products (`type: "gift_card"`, `gift_card_amounts`, optional custom range) sold with recipient details; cards are created and emailed (`gift_card_received`, buyer copy `gift_card_purchased`) only when the order is paid. Codes are random (16 characters, no look-alikes), stored as SHA-256 + last 4. `gift_card_code` at checkout pays up to the total (`payment_method: "gift_card"` when it covers everything), balances change only under a row lock with a transaction row each, cancelling gives the amount back, refunds return to the card first. `POST /api/v1/gift-cards/check` (rate-limited, one answer for unknown/disabled/expired). Admin: Marketing → Gift cards (`gift_cards.view`, `gift_cards.manage`) and `GET /reports/gift-cards`. `App\Services\GiftCards`.
+- Shapes: `docs/backend/PHASE10_CONTRACT.md`, "Implementation notes — part B".
 
 ## Endpoints
 
@@ -176,6 +190,7 @@ Storefront (customers), `/api/v1`:
 | GET | `/orders` | customer; their orders, newest first |
 | GET | `/orders/{number}` | customer; someone else's → 404. Includes `invoices`, `shipments`, `credit_memos`, `returns`, `return_eligibility` |
 | GET | `/orders/{number}/invoices/{invoice}` | customer; the printable invoice (own orders only, else 404) |
+| GET | `/orders/{number}/invoices/{invoice}.pdf` | Phase 10: the owner's token or `?email=` (the lookup's proof) → `INV-….pdf` (attachment); else the lookup's 404 |
 | POST | `/orders/lookup` | guest; `number, email` → the order, or the same 404 whichever is wrong (limited like sign-in) |
 | POST | `/orders/{number}/pay` | Phase 8: the order's customer (token) or `{ email }` (the lookup's proof) → `data.payment` `{ provider, url, expires_at, can_pay, paid_at }` (the open Stripe page, or a new one); 422 when it can't be paid online |
 | POST | `/orders/{number}/cancel` | Phase 9: owner's token or `{ email }`, `reason?` → the order, cancelled; 422 once paid, invoiced, or shipped |
@@ -183,6 +198,9 @@ Storefront (customers), `/api/v1`:
 | GET | `/me/export` | Phase 9: `buynest-my-data-YYYY-MM-DD.json` (3 per hour) |
 | POST | `/me/delete` | Phase 9: `password, confirm: "DELETE"` → deleted (422 while an order is open) |
 | POST | `/payments/stripe/webhook` | Stripe only (signed `Stripe-Signature`, raw body); 400 bad signature, else 200 `{ received, result }` |
+| POST | `/orders/{number}/paypal/capture` | Phase 10: `{ token, email? }` after PayPal's approval → `{ data, result: "paid" \| "already_paid" }`; 422 `errors.payment` |
+| POST | `/payments/paypal/webhook` | Phase 10: PayPal only (raw body + `PAYPAL-*` headers, verified with PayPal); 400 not verified, 503 PayPal unreachable, else 200 `{ received, result }` |
+| POST | `/gift-cards/check` | Phase 10: `{ code }` → `{ last4, balance, currency, expires_at, status }`; one 422 for unknown, disabled, expired; 10 per minute |
 
 Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403), and the permission in brackets ([Permissions](#permissions)):
 
@@ -234,6 +252,9 @@ Admin (shop staff), `/api/admin/v1`, admin token only (a customer token gets 403
 | POST | `/orders/{number}/credit-memos` | `items[{order_item_id, quantity}], shipping_refund, adjustment, restock, note, notify_customer, return_number?` → 201 CreditMemoResource (a received return becomes refunded, never restocked twice) |
 | GET | `/invoices`, `/invoices/{number}` | `search` (invoice number, order number, email), `page, per_page` |
 | GET | `/credit-memos`, `/credit-memos/{number}` | same |
+| GET | `/invoices/{number}.pdf`, `/credit-memos/{number}.pdf` | [orders.view] Phase 10: the document as a PDF (attachment) |
+| GET / POST / PATCH / DELETE | `/shipping-rates`, `/shipping-rates/{id}` | Phase 10: table rates; read [settings.view], change [settings.edit]; also POST `/shipping-rates/reorder`, `/shipping-rates/import` (CSV), `/shipping-rates/check` (country, weight, subtotal → prices) and GET `/shipping-rates/export.csv` |
+| GET / POST / PATCH | `/gift-cards`, `/gift-cards/{id}` | Phase 10: read [gift_cards.view]; create (the code is shown once), PATCH `status, expires_at`, POST `/gift-cards/{id}/adjust` `amount, note` [gift_cards.manage]; GET `/reports/gift-cards` [reports.view] |
 | GET / POST | `/coupons` | `search, status` (`active, inactive, scheduled, expired, used_up`), `page, per_page`; create → 201 |
 | GET / PATCH / DELETE | `/coupons/{id}` | partial update; DELETE: used coupons are only disabled (200), unused ones deleted (204) |
 | GET / POST | `/catalog-rules` | Phase 7 catalog price rules: `search, status, page, per_page` [coupons.view]; create [price_rules.manage] → 201 |
@@ -326,6 +347,10 @@ Without Stripe keys, card orders wait for staff to invoice them (Sales → Order
 
 `STRIPE_CURRENCY` (default `usd`) must match the store's prices; `STRIPE_CHECKOUT_MINUTES` (default 30, Stripe's minimum; at most 1440) is how long the payment page stays open; when it expires unpaid the order is cancelled and its stock released. Live mode: the same steps with `sk_live_…` and a webhook endpoint registered in the Stripe dashboard (`https://<store>/api/payments/stripe/webhook`, events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`). Tests never call Stripe (`Http::fake`).
 
+## PayPal (sandbox)
+
+Without PayPal keys, PayPal orders wait for staff to invoice them. To take sandbox payments: create a REST app in the [PayPal developer dashboard](https://developer.paypal.com/dashboard/applications/sandbox), copy its client id and secret into `.env` (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE=sandbox`), and add a webhook to `https://<store>/api/payments/paypal/webhook` with the events `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`; put its id in `PAYPAL_WEBHOOK_ID`. Pay with a sandbox personal account. Live: `PAYPAL_MODE=live` with the live app's keys and webhook. `PAYPAL_API_URL` is only for tests against a stand-in. The scheduler must run (`buynest:payments:expire-paypal`). Tests never call PayPal (`Http::fake`).
+
 ## Tests
 
 ```bash
@@ -344,3 +369,5 @@ vendor/bin/pint      # code style
 - Product photos: run `php artisan storage:link` once, keep `storage/app/public` on persistent disk (not a throwaway container filesystem) and include it in backups. The web server must serve `/storage/...` to the storefront's server functions, which pass photos to shoppers at `/media/...`.
 - Uploads: allow request bodies up to 60 MB in the web server and PHP (`upload_max_filesize=5M`, `max_file_uploads=10`, `post_max_size=60M`).
 - Phase 9 (part B): PHP's GD with JPEG, PNG and WebP (resized photos), the `mysqldump` client and a `BACKUP_DISK` both the scheduler and the API can reach (a bucket on multi-container hosts), and optionally `SENTRY_LARAVEL_DSN`.
+- Phase 10 (part B): PayPal live keys and `PAYPAL_WEBHOOK_ID` only in production's environment; the scheduler running (unpaid PayPal orders expire after 3 hours).
+- Phase 10 (part A): MySQL 5.7+/8 with InnoDB (FULLTEXT); after deploying run `php artisan migrate` (it builds the search index) and, after any import done with plain SQL, `php artisan buynest:search:reindex`. PHP's `dom` and `mbstring` (PDFs; DejaVu Sans ships with dompdf, nothing to install).

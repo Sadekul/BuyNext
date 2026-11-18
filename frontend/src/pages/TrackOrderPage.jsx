@@ -83,7 +83,12 @@ function TrackOrderPage() {
           {/* Phase 9: an unpaid order can be cancelled; the email that found it proves it is theirs. */}
           <CancelOrderButton order={order} email={lookup.variables?.email} onCancelled={setCancelled} />
           {/* Phase 8: an unpaid card order can be paid here; the email that found it proves it is theirs. */}
-          <OrderDetailsView order={order} payAction={canPayOrder(order, settings.cardPayments) ? <PayNowButton order={order} email={lookup.variables?.email} /> : null} />
+          <OrderDetailsView
+            order={order}
+            // Phase 10: the invoices as PDFs, with the email the order was found with as the proof.
+            invoicePdf={lookup.variables?.email ? { orderNumber: order.number, email: lookup.variables.email } : null}
+            payAction={canPayOrder(order, settings.cardPayments, settings.paypalPayments) ? <PayNowButton order={order} email={lookup.variables?.email} /> : null}
+          />
         </section>
       )}
     </div>

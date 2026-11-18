@@ -21,6 +21,7 @@ export const ROUTES = {
   privacy: '/account/privacy', // download my data, delete my account (REAL_SHOP)
   accountDeleted: '/goodbye', // after deleting the account (REAL_SHOP)
   stockAlertsUnsubscribe: '/stock-alerts/unsubscribe', // the link in back-in-stock emails (REAL_SHOP)
+  giftCardBalance: '/gift-cards/balance', // check a gift card's balance (REAL_SHOP, phase 10)
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',

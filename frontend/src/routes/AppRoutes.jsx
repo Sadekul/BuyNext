@@ -37,6 +37,7 @@ const StockAlertsPage = lazy(() => import('../pages/StockAlertsPage'))
 const PrivacyPage = lazy(() => import('../pages/PrivacyPage'))
 const AccountDeletedPage = lazy(() => import('../pages/AccountDeletedPage'))
 const StockAlertUnsubscribePage = lazy(() => import('../pages/StockAlertUnsubscribePage'))
+const GiftCardBalancePage = lazy(() => import('../pages/GiftCardBalancePage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -86,6 +87,8 @@ function AppRoutes() {
         {REAL_SHOP && <Route path="goodbye" element={<AccountDeletedPage />} />}
         {/* The "stop these alerts" link in back-in-stock emails (phase 9): no sign-in needed. */}
         {REAL_SHOP && <Route path="stock-alerts/unsubscribe" element={<StockAlertUnsubscribePage />} />}
+        {/* Phase 10: what's left on a gift card (no sign-in needed). */}
+        {REAL_SHOP && <Route path="gift-cards/balance" element={<GiftCardBalancePage />} />}
 
         {/* Signed-in customers only (UX guard; the API enforces real access). */}
         <Route element={<ProtectedRoute />}>

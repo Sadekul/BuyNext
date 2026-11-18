@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\CatalogSearch;
 use App\Services\SearchTerms;
 use App\Support\CategoryTree;
 use Illuminate\Http\JsonResponse;
@@ -15,11 +16,11 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 /** The public catalog: no sign-in, only products for sale (active, in a visible category). */
 class CatalogController extends Controller
 {
-    public function __construct(private SearchTerms $searchTerms) {}
+    public function __construct(private SearchTerms $searchTerms, private CatalogSearch $search) {}
 
     /**
      * GET /api/v1/products?search&category&brand[]&min_price&max_price&min_rating&available
-     *     &sort=price|rating|discount|name|newest&direction=asc|desc&page&per_page
+     *     &sort=price|rating|discount|name|newest&direction=asc|desc&page&per_page&suggest&correct
      * Prices include catalog price rules for everyone (ProductResource); the price filters and
      * sort use the product's own sale price (rules are matched in PHP, not SQL).
      */
@@ -28,6 +29,8 @@ class CatalogController extends Controller
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'suggest' => ['nullable', 'boolean'],
+            // Phase 10 (part A): correct=0 searches the words exactly as typed ("Search instead for …").
+            'correct' => ['nullable', 'boolean'],
             'category' => ['nullable', 'string', 'max:100'],
             'brand' => ['nullable', 'array', 'max:50'],
             'brand.*' => ['string', 'max:80'],
@@ -41,14 +44,17 @@ class CatalogController extends Controller
         ]);
 
         $tree = CategoryTree::load();
+
+        // Phase 10 (part A): typo correction (a word nobody could find becomes the closest
+        // vocabulary word), then FULLTEXT matching and relevance ranking (App\Services\CatalogSearch).
+        $search = filled($data['search'] ?? null) ? $data['search'] : null;
+        $correctedQuery = $search !== null && $request->boolean('correct', true)
+            ? $this->search->correct(SearchTerms::normalize($search), $tree)
+            : null;
+        $phrase = $correctedQuery ?? $search;
+
         $query = Product::forSale($tree)->with(['category', 'brand'])
-            ->when($data['search'] ?? null, function ($query, $search) {
-                // addcslashes: a search for "%" means the character, not "anything".
-                $like = '%'.addcslashes($search, '%_\\').'%';
-                $query->where(fn ($q) => $q->where('name', 'like', $like)->orWhere('description', 'like', $like)
-                    ->orWhereHas('brand', fn ($b) => $b->where('name', 'like', $like))
-                    ->orWhereHas('category', fn ($c) => $c->where('name', 'like', $like)));
-            })
+            ->when($phrase !== null, fn ($query) => $this->search->filter($query, $phrase))
             // A category includes its subcategories' products.
             ->when($data['category'] ?? null, function ($query, $slug) use ($tree) {
                 $id = Category::where('slug', $slug)->value('id');
@@ -61,7 +67,12 @@ class CatalogController extends Controller
             ->when($request->boolean('available'), fn ($query) => $query->where('stock_quantity', '>', 0)
                 ->whereColumn('stock_quantity', '>=', 'min_order_quantity'));
 
-        $this->sort($query, $data['sort'] ?? null, $data['direction'] ?? null);
+        // An explicit sort wins; a search without one is ordered by relevance.
+        if ($phrase !== null && empty($data['sort'])) {
+            $this->search->rank($query, $phrase);
+        } else {
+            $this->sort($query, $data['sort'] ?? null, $data['direction'] ?? null);
+        }
         $page = $query->paginate($data['per_page'] ?? 12)->withQueryString();
         $products = ProductResource::collection($page);
 
@@ -73,7 +84,11 @@ class CatalogController extends Controller
             if (! $request->boolean('suggest')) {
                 $this->searchTerms->record($term, $page->total(), $request->ip());
             }
-            $products->additional(['meta' => ['redirect_url' => $this->searchTerms->redirectFor($term)]]);
+            $products->additional(['meta' => [
+                'redirect_url' => $this->searchTerms->redirectFor($term),
+                // Phase 10 (part A): what was searched instead ("Showing results for …"), null when nothing was corrected.
+                'corrected_query' => $correctedQuery,
+            ]]);
         }
 
         return $products;

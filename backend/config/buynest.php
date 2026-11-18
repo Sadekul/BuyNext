@@ -62,6 +62,27 @@ return [
         'webhooks_per_minute' => (int) env('BUYNEST_STRIPE_WEBHOOKS_PER_MINUTE', 300),
     ],
 
+    /*
+     * Phase 10 (part B): PayPal (Orders API v2, redirect approval). On only
+     * when the client id and secret are set; without them PayPal orders wait
+     * for staff to invoice them, as before. Never logged.
+     */
+    'paypal' => [
+        'client_id' => env('PAYPAL_CLIENT_ID') ?: null,
+        'client_secret' => env('PAYPAL_CLIENT_SECRET') ?: null,
+        'mode' => env('PAYPAL_MODE') === 'live' ? 'live' : 'sandbox',
+        'webhook_id' => env('PAYPAL_WEBHOOK_ID') ?: null,
+        // Only changed for local tests against a stand-in server.
+        'api_url' => rtrim((string) (env('PAYPAL_API_URL') ?: (env('PAYPAL_MODE') === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com')), '/'),
+        // PayPal's approval link stays valid for 3 hours; unpaid orders are cancelled after that.
+        'approval_minutes' => 180,
+        'timeout_seconds' => 15,
+        'webhooks_per_minute' => (int) env('BUYNEST_PAYPAL_WEBHOOKS_PER_MINUTE', 300),
+    ],
+
+    // Phase 10 (part B): gift card balance checks per visitor per minute.
+    'gift_card_checks_per_minute' => (int) env('BUYNEST_GIFT_CARD_CHECKS_PER_MINUTE', 10),
+
     // Phase 7: newsletter sign-ups per visitor per minute, and per email per hour.
     'newsletter_per_minute' => (int) env('BUYNEST_NEWSLETTER_PER_MINUTE', 10),
     'newsletter_per_email_per_hour' => (int) env('BUYNEST_NEWSLETTER_PER_EMAIL_PER_HOUR', 3),

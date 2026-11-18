@@ -100,7 +100,8 @@ export function useSavedCartSync({ status, userId, itemCount, dispatch, authoriz
     const baseline = readBaseline(id)
     const stillSignedIn = () => currentUserRef.current === id
     if (freshSignIn) {
-      const toAdd = linesAbove(local.items.filter((item) => !item.isUnavailable), baseline)
+      // Gift card lines (phase 10) stay in this browser: the saved cart holds products only.
+      const toAdd = linesAbove(local.items.filter((item) => !item.isUnavailable && !item.giftCard), baseline)
       writeJson(lockKey(id), Date.now())
       let saved
       try {

@@ -40,6 +40,8 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
   const request = useQuery(suggestionsQuery(debouncedQuery)) // disabled below MIN_QUERY_LENGTH
   const suggestions = canSuggest ? (request.data?.items ?? []) : []
   const total = request.data?.total ?? 0
+  // Phase 10: the API corrected a typo for these suggestions ("ihpone" → "iphone").
+  const correctedQuery = canSuggest ? (request.data?.correctedQuery ?? null) : null
 
   // The highlighted option only counts for the query it was chosen in
   // (derived reset: typing a new letter clears the highlight, no effect needed).
@@ -127,6 +129,11 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
       </div>
 
       <ul id={listboxId} role="listbox" aria-label="Search suggestions" className="search-bar__suggestions" hidden={!showList}>
+        {correctedQuery && suggestions.length > 0 && (
+          <li className="search-bar__corrected" role="presentation">
+            Showing suggestions for <strong>{correctedQuery}</strong>
+          </li>
+        )}
         {suggestions.map((product, index) => (
           <li
             key={product.id}
@@ -142,7 +149,7 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
           >
             <img src={product.thumbnail} alt="" width="40" height="40" />
             <span className="search-bar__option-text">
-              <HighlightedText text={product.title} query={debouncedQuery} />
+              <HighlightedText text={product.title} query={correctedQuery ?? debouncedQuery} />
               {product.category && <span className="search-bar__option-meta">{formatSlug(product.category)}</span>}
             </span>
             <span className="search-bar__option-price">{formatPrice(getProductPricing(product).salePrice)}</span>
@@ -168,7 +175,10 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
         )}
       </ul>
       <p className="visually-hidden" role="status">
-        {showList && (suggestions.length > 0 ? `${suggestions.length} suggestions available` : 'No suggestions')}
+        {showList &&
+          (suggestions.length > 0
+            ? `${suggestions.length} suggestions available${correctedQuery ? ` for ${correctedQuery}` : ''}`
+            : 'No suggestions')}
       </p>
     </form>
   )

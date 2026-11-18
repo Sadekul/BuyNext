@@ -44,6 +44,7 @@ class AdminProductResource extends ProductResource
                     'effective_price' => $variant->unitPrice($this->resource),
                     'final_price' => Pricing::format($variant->salePriceCents($this->resource)),
                     'stock_quantity' => $variant->stock_quantity,
+                    'weight' => $variant->weight, // phase 10 (part B): grams, null = the product's
                     'is_active' => $variant->is_active,
                     // false: one of its values was removed from the options; it stays inactive.
                     'is_current' => count($variant->option_value_ids ?? []) === $optionCount

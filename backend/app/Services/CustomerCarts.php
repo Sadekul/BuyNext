@@ -132,7 +132,8 @@ class CustomerCarts
             $productId = (int) ($item['product_id'] ?? 0);
             $variantId = isset($item['variant_id']) && $item['variant_id'] ? (int) $item['variant_id'] : null;
             $quantity = (int) ($item['quantity'] ?? 0);
-            if ($productId < 1 || $quantity < 1) {
+            // Phase 10 (part B): gift card lines (amount + recipient) stay in the browser's cart only.
+            if ($productId < 1 || $quantity < 1 || ! empty($item['gift_card'])) {
                 continue;
             }
             $key = $productId.':'.($variantId ?? 0);

@@ -29,6 +29,9 @@ import {
   LuUsers,
   // Phase 9.
   LuDatabaseBackup,
+  // Phase 10.
+  LuGift,
+  LuTable2,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -77,6 +80,9 @@ export const PERMISSION_LABELS = {
   'newsletter.send': 'Write and send newsletters, unsubscribe people, and send cart reminders',
   // Phase 9.
   'backups.view': 'View and download database backups, and start one',
+  // Phase 10.
+  'gift_cards.view': 'View gift cards and their history',
+  'gift_cards.manage': 'Create gift cards, adjust their balance, and disable them',
 }
 export const permissionLabel = (key) => PERMISSION_LABELS[key] ?? key
 
@@ -124,6 +130,8 @@ const LIVE_NAV = [
       // Phase 7 (marketing): price rules, newsletter, abandoned carts, search terms.
       { to: '/catalog-rules', label: 'Catalog price rules', icon: LuPercent, permission: 'coupons.view' },
       { to: '/coupons', label: 'Coupons', icon: LuTicketPercent, permission: 'coupons.view' },
+      // Phase 10 §5.
+      { to: '/gift-cards', label: 'Gift cards', icon: LuGift, permission: 'gift_cards.view' },
       { to: '/newsletter/subscribers', label: 'Newsletter subscribers', icon: LuMailPlus, permission: 'newsletter.view' },
       { to: '/newsletter/campaigns', label: 'Newsletter campaigns', icon: LuMails, permission: 'newsletter.view' },
       { to: '/abandoned-carts', label: 'Abandoned carts', icon: LuShoppingCart, permission: 'reports.view' },
@@ -141,7 +149,9 @@ const LIVE_NAV = [
     ],
   },
   { to: '/reports', label: 'Reports', icon: LuChartColumn, permission: 'reports.view' },
-  { to: '/settings', label: 'Settings', icon: LuSettings, permission: 'settings.view' },
+  // `end`: Settings → Shipping → Table rates (phase 10) has its own entry.
+  { to: '/settings', label: 'Settings', icon: LuSettings, end: true, permission: 'settings.view' },
+  { to: '/settings/shipping-rates', label: 'Shipping table rates', icon: LuTable2, permission: 'settings.edit' },
   {
     heading: 'System',
     items: [

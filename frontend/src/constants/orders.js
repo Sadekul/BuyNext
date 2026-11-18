@@ -48,16 +48,23 @@ export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: st
  * orders wait until the store records the payment (nothing was charged).
  * `stripe`: the store takes card payments through Stripe (store settings).
  */
-export function paymentNote(order, { stripe = false } = {}) {
+export function paymentNote(order, { stripe = false, paypal = false } = {}) {
   const byStripe = order.paymentMethod === 'card' && (order.paymentProvider === 'stripe' || stripe)
+  // Phase 10: PayPal orders approved on PayPal's site, and orders paid in full by a gift card.
+  const byPaypal = order.paymentMethod === 'paypal' && (order.paymentProvider === 'paypal' || paypal)
+  if (order.paymentMethod === 'gift_card' && order.paymentStatus === 'paid') return 'Paid in full with a gift card. Thank you.'
   if (order.paymentStatus === 'refunded') return 'Your payment was refunded in full, by the same method you paid with.'
   if (order.paymentStatus === 'partially_refunded') return 'Part of your payment was refunded, by the same method you paid with. See the refunds below.'
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'card' && order.paymentProvider === 'stripe') {
     return order.paidAt ? `Paid by card on ${formatDate(order.paidAt)}. Thank you.` : 'Paid by card. Thank you.'
   }
+  if (order.paymentStatus === 'paid' && order.paymentMethod === 'paypal' && order.paymentProvider === 'paypal') {
+    return order.paidAt ? `Paid with PayPal on ${formatDate(order.paidAt)}. Thank you.` : 'Paid with PayPal. Thank you.'
+  }
   if (order.paymentStatus === 'paid') return 'Payment received. Thank you.'
   if (order.status === 'cancelled') return 'This order was cancelled, so nothing will be charged.'
   if (order.paymentMethod === 'cod') return 'Pay the courier when your order arrives.'
+  if (byPaypal) return "Awaiting payment: nothing has been charged yet. Approve the payment on PayPal's site with Pay now. If it isn't completed in time, the order is cancelled and the items are released."
   if (byStripe) return "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released."
   return "Nothing has been charged. Card and PayPal payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
 }

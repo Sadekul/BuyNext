@@ -14,13 +14,15 @@ import { json, laravel, pick } from './http.js'
  *   GET /api/catalog/redirects?path=/old → GET /api/v1/redirects?path=/old ({ data: { from_path, to_path, status_code } }, or 404)
  *                                        the admin's URL redirects, checked by the storefront's "not found" page (phase 7)
  * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
+ * Phase 10: a search the API corrected ("ihpone" → "iphone") says so in `meta.corrected_query`.
  *
  * Only these paths and the query keys below are forwarded (an allow-list), so
  * the service can't be used to reach anything else on the API. Answers are
  * public and may be cached for a minute by the browser and the host's CDN.
  */
 
-const QUERY_KEYS = ['search', 'suggest', 'category', 'brand[]', 'min_price', 'max_price', 'min_rating', 'available', 'sort', 'direction', 'page', 'per_page']
+// `correct=0` (phase 10): search the words exactly as typed, without typo correction.
+const QUERY_KEYS = ['search', 'correct', 'suggest', 'category', 'brand[]', 'min_price', 'max_price', 'min_rating', 'available', 'sort', 'direction', 'page', 'per_page']
 const MAX_VALUE_LENGTH = 100
 const CACHE = 'public, max-age=60'
 
@@ -68,7 +70,7 @@ export async function handleCatalogRequest(request, segments) {
   const { status, data } = await laravel(path, { request })
   if (status !== 200) return json({ message: data?.message ?? 'The catalog could not be loaded.' }, status)
   // Only the documented keys: Laravel's `links`, `meta.links`, and `meta.path` hold the API's internal address.
-  const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url']) }) }
+  const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query']) }) }
   const response = json(body)
   response.headers.set('Cache-Control', CACHE)
   return response

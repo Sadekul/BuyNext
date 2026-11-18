@@ -19,7 +19,8 @@ use Illuminate\Support\Collection;
  */
 class Pricing
 {
-    public function __construct(private Settings $settings, private CatalogRules $catalogRules, private CartRules $cartRules) {}
+    public function __construct(private Settings $settings, private CatalogRules $catalogRules, private CartRules $cartRules,
+        private ShippingRates $shippingRates, private GiftCards $giftCards) {}
 
     /** "9.99" → 999. Decimal strings from the database have 2 places, so this is exact. */
     public static function toCents(string|int|float $amount): int
@@ -80,34 +81,48 @@ class Pricing
      * Its discount comes off every line's sale price, after the product's own
      * discount and before coupons.
      */
-    public function quote(array $items, ?string $couponCode, string $shippingMethod, bool $lock = false, ?int $customerId = null,
-        ?string $email = null, ?string $country = null, ?CustomerGroup $group = null): CartQuote
+    public function quote(array $items, ?string $couponCode, ?string $shippingMethod, bool $lock = false, ?int $customerId = null,
+        ?string $email = null, ?string $country = null, ?CustomerGroup $group = null, ?string $giftCardCode = null): CartQuote
     {
         $group ??= CustomerGroup::general();
         $groupBasisPoints = $group?->discountBasisPoints() ?? 0;
         // The same product (and variant) twice counts as one line (stock is checked on the sum).
         // The same product with two different variants is two lines.
-        $quantities = [];
-        foreach ($items as $item) {
-            $key = (int) $item['product_id'].':'.(int) ($item['variant_id'] ?? 0);
-            $quantities[$key] = ($quantities[$key] ?? 0) + (int) $item['quantity'];
+        // Phase 10 (part B): each gift card item (with its amount and recipient) is a line of its own.
+        $entries = [];
+        foreach (array_values($items) as $index => $item) {
+            $productId = (int) $item['product_id'];
+            $variantId = (int) ($item['variant_id'] ?? 0);
+            if (is_array($item['gift_card'] ?? null)) {
+                $entries["{$productId}:{$variantId}:g{$index}"] = [$productId, $variantId, (int) $item['quantity'], $item['gift_card']];
+
+                continue;
+            }
+            $key = "{$productId}:{$variantId}";
+            $entries[$key] = [$productId, $variantId, ($entries[$key][2] ?? 0) + (int) $item['quantity'], null];
         }
 
-        $productIds = array_values(array_unique(array_map(fn ($key) => (int) explode(':', $key)[0], array_keys($quantities))));
-        $variantIds = array_values(array_filter(array_unique(array_map(fn ($key) => (int) explode(':', $key)[1], array_keys($quantities)))));
+        $productIds = array_values(array_unique(array_column($entries, 0)));
+        $variantIds = array_values(array_filter(array_unique(array_column($entries, 1))));
         // Products first, then variants, each in id order: the same order everywhere, so checkouts can't deadlock.
         $products = $this->loadProducts($productIds, $lock);
         $variants = $this->loadVariants($variantIds, $lock);
         $tree = CategoryTree::load();
+        $defaultWeight = (int) $this->settings->get('default_weight_grams', 500);
 
         $lines = [];
         $problems = [];
-        foreach ($quantities as $key => $quantity) {
-            [$productId, $variantId] = array_map('intval', explode(':', $key));
+        foreach ($entries as [$productId, $variantId, $quantity, $giftCard]) {
             $product = $products->get($productId);
             $variant = $variantId ? $variants->get($variantId) : null;
-            $problem = $this->problemWith($product, $variantId ?: null, $variant, $quantity, $tree);
-            $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null, $groupBasisPoints, $group);
+            if ($product?->isGiftCard()) {
+                $problem = $this->giftCardProblem($product, $variantId ?: null, $giftCard, $tree);
+                $lines[] = $this->giftCardLine($productId, $product, $giftCard, $quantity, $problem['code'] ?? null);
+            } else {
+                $problem = $this->problemWith($product, $variantId ?: null, $variant, $quantity, $tree);
+                $lines[] = $this->line($productId, $variantId ?: null, $product, $variant, $quantity, $problem['code'] ?? null, $groupBasisPoints, $group,
+                    $defaultWeight);
+            }
             if ($problem) {
                 $problems[] = ['product_id' => $productId, 'variant_id' => $variantId ?: null, ...$problem];
             }
@@ -118,24 +133,43 @@ class Pricing
         $itemCount = array_sum(array_column($charged, 'quantity'));
         $subtotal = array_sum(array_column($charged, 'line_cents'));
         $groupDiscount = array_sum(array_map(fn ($line) => ($line['base_sale_cents'] - $line['sale_cents']) * $line['quantity'], $charged));
+        // Phase 10 (part B): gift card lines get no discounts, no tax, no shipping, and don't count toward coupon
+        // minimums or the free-shipping threshold; "merchandise" below is everything else.
+        $shippable = array_filter($charged, fn ($line) => $line['requires_shipping']);
+        $giftLines = $subtotal - array_sum(array_column($shippable, 'line_cents'));
+        $merchandise = $subtotal - $giftLines;
+        $weight = array_sum(array_map(fn ($line) => $line['weight_grams'] * $line['quantity'], $shippable));
+        $shippingRequired = $itemCount === 0 || $shippable !== [];
+
+        // Phase 10 (part B): table rates decide which methods are offered and their price (flat price without rows).
+        $methods = $shippingRequired ? $this->shippingRates->options($this->settings->shippingMethods(), $country, $weight, $merchandise) : [];
+        $default = $this->settings->defaultShippingMethod();
+        $chosenId = match (true) {
+            $shippingMethod !== null && isset($methods[$shippingMethod]) => $shippingMethod,
+            isset($methods[$default]) => $default,
+            default => array_key_first($methods),
+        };
+        $shippingError = null;
+        if ($shippingRequired && $itemCount > 0 && $methods === []) {
+            $shippingError = $country !== null
+                ? "We can't ship this order to {$country} with the available methods."
+                : 'We can\'t ship this order with the available methods. Please check the shipping address.';
+        }
 
         // Phase 7: cart price rules (the best automatic rule + the typed code), each spread over its eligible lines.
         // The best automatic rule is chosen with the chosen method's normal price (what free shipping would save).
-        $methods = $this->settings->shippingMethods();
-        $chosenId = isset($methods[$shippingMethod]) ? $shippingMethod : (isset($methods[$this->settings->defaultShippingMethod()])
-            ? $this->settings->defaultShippingMethod() : array_key_first($methods));
-        $rules = $this->cartRules->apply($lines, $couponCode, $subtotal, $customerId, $email, $group,
+        $rules = $this->cartRules->apply($lines, $couponCode, $merchandise, $customerId, $email, $group,
             $chosenId !== null ? $methods[$chosenId]['price_cents'] : 0, $lock);
         foreach ($lines as $key => $line) {
             $lines[$key]['discount_cents'] = $line['available'] ? ($rules['line_discounts'][$key] ?? 0) : null;
         }
         $discount = $rules['discount_cents'];
         $afterDiscount = $subtotal - $discount;
-        $freeStandard = $afterDiscount >= $this->settings->cents('free_shipping_threshold');
+        $freeStandard = $merchandise - $discount >= $this->settings->cents('free_shipping_threshold');
         // A free-shipping rule makes every method free (not just standard).
         $freeEverything = $rules['free_shipping'];
 
-        // Only the methods switched on in the settings (with their prices from there).
+        // Only the methods switched on in the settings (and offered by their table rates), with their prices.
         $options = [];
         foreach ($methods as $id => $method) {
             $options[$id] = [
@@ -143,11 +177,20 @@ class Pricing
                 'label' => $method['label'],
                 'eta' => $method['eta'],
                 'price_cents' => $freeEverything || ($method['free_over_threshold'] && $freeStandard) ? 0 : $method['price_cents'],
+                'source' => $method['source'],
             ];
         }
-        $method = $options[$shippingMethod] ?? $options[$this->settings->defaultShippingMethod()] ?? reset($options);
-        $shipping = $itemCount > 0 ? $method['price_cents'] : 0;
-        [$tax, $taxIncluded] = $itemCount > 0 ? $this->tax($afterDiscount + $shipping, $country) : [0, false];
+        $method = match (true) {
+            ! $shippingRequired => self::NO_SHIPPING,
+            default => $chosenId !== null ? $options[$chosenId] : null,
+        };
+        $shipping = $itemCount > 0 && $method ? $method['price_cents'] : 0;
+        [$tax, $taxIncluded] = $itemCount > 0 ? $this->tax($merchandise - $discount + $shipping, $country) : [0, false];
+        // Prices that already include tax: the tax is shown, but not added again.
+        $total = $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax);
+
+        // Phase 10 (part B): a gift card pays up to the total, but never for other gift cards.
+        [$giftCard, $giftCardCents, $giftCardError] = $this->giftCard($giftCardCode, $lock, $total, $giftLines);
 
         return new CartQuote(
             lines: $lines,
@@ -161,14 +204,50 @@ class Pricing
             discountCents: $discount,
             shippingCents: $shipping,
             taxCents: $tax,
-            // Prices that already include tax: the tax is shown, but not added again.
-            totalCents: $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax),
+            totalCents: $total,
             couponId: collect($rules['applied'])->map(fn ($rule) => $rule['coupon'])->first(fn ($rule) => ! $rule->auto_apply)?->id,
             taxEstimated: ! $this->settings->get('tax_enabled') || $country !== null,
             group: $group,
             groupDiscountCents: $groupDiscount,
             appliedRules: $rules['applied'],
+            shippingRequired: $shippingRequired,
+            shippingError: $shippingError,
+            requestedShippingAvailable: ! $shippingRequired || ($shippingMethod !== null && isset($options[$shippingMethod])),
+            weightGrams: $weight,
+            giftCard: $giftCard,
+            giftCardCents: $giftCardCents,
+            giftCardError: $giftCardError,
         );
+    }
+
+    /** Phase 10 (part B): the method of a cart of only gift cards (stored on the order as "none"). */
+    public const NO_SHIPPING = ['id' => 'none', 'label' => 'No shipping needed', 'eta' => '', 'price_cents' => 0, 'source' => null];
+
+    /**
+     * Phase 10 (part B): [card, cents it pays, error] for a typed gift card
+     * code. It pays min(balance, total − gift card lines). With $lock the card
+     * row stays locked until the order is written (after products, variants,
+     * and cart rules: the same order everywhere).
+     */
+    private function giftCard(?string $code, bool $lock, int $totalCents, int $giftLinesCents): array
+    {
+        if (GiftCards::normalize($code) === '') {
+            return [null, 0, null];
+        }
+        $card = $this->giftCards->usable($code, $lock);
+        if (! $card) {
+            return [null, 0, GiftCards::INVALID];
+        }
+        $balance = self::toCents($card->balance);
+        if ($balance <= 0) {
+            return [null, 0, 'This gift card has no balance left.'];
+        }
+        $payable = max(0, $totalCents - $giftLinesCents);
+        if ($payable === 0 && $giftLinesCents > 0) {
+            return [null, 0, 'Gift cards can\'t be used to buy other gift cards.'];
+        }
+
+        return [$card, min($balance, $payable), null];
     }
 
     /**
@@ -245,7 +324,8 @@ class Pricing
     }
 
     /** Problems that make a line unavailable (not charged); stock and minimum problems still price the line. */
-    private const UNAVAILABLE = ['unavailable', 'variant_required', 'variant_unavailable'];
+    private const UNAVAILABLE = ['unavailable', 'variant_required', 'variant_unavailable',
+        'gift_card_details_required', 'gift_card_amount_invalid']; // phase 10 (part B): the last two
 
     /**
      * A group discount on a sale price, in cents: round(cents × (1 − percent / 100)),
@@ -261,7 +341,7 @@ class Pricing
     }
 
     private function line(int $productId, ?int $variantId, ?Product $product, ?ProductVariant $variant, int $quantity, ?string $problem,
-        int $groupBasisPoints = 0, ?CustomerGroup $group = null): array
+        int $groupBasisPoints = 0, ?CustomerGroup $group = null, int $defaultWeight = 500): array
     {
         $available = $product !== null && ! in_array($problem, self::UNAVAILABLE, true);
         $sellsVariant = $available && $variant !== null;
@@ -291,7 +371,80 @@ class Pricing
             'stock_quantity' => $available ? ($sellsVariant ? $variant->stock_quantity : $product->stock_quantity) : 0,
             'min_order_quantity' => $product?->min_order_quantity ?? 1,
             'available' => $available,
+            // Phase 10 (part B): gift card fields, and the unit weight for table rates (variant, else product, else the default).
+            'type' => $product?->type ?? 'simple',
+            'gift_card' => null,
+            'requires_shipping' => true,
+            'weight_grams' => $sellsVariant && $variant->weight !== null ? $variant->weight : ($product?->weight ?? $defaultWeight),
         ];
+    }
+
+    /**
+     * Phase 10 (part B): a gift card line. It costs the chosen amount: no
+     * product price, discount, price rule, or group discount; no stock, no
+     * shipping. $details: { amount, recipient_name, recipient_email, message? }.
+     */
+    private function giftCardLine(int $productId, Product $product, ?array $details, int $quantity, ?string $problem): array
+    {
+        $available = ! in_array($problem, self::UNAVAILABLE, true);
+        $cents = $available ? self::toCents((string) $details['amount']) : null;
+
+        return [
+            'product_id' => $productId,
+            'variant_id' => null,
+            'product' => $product,
+            'variant' => null,
+            'name' => $product->name,
+            'variant_label' => null,
+            'sku' => $product->sku,
+            'thumbnail_url' => $product->thumbnail_url,
+            'price_cents' => $cents,
+            'discount_percent' => $available ? 0.0 : null,
+            'group_discount_percent' => $available ? 0.0 : null,
+            'base_sale_cents' => $cents,
+            'price_rule' => null,
+            'price_label' => null,
+            'sale_cents' => $cents,
+            'quantity' => $quantity,
+            'line_cents' => $available ? $cents * $quantity : 0,
+            'stock_quantity' => $product->stock_quantity,
+            'min_order_quantity' => 1,
+            'available' => $available,
+            'type' => 'gift_card',
+            'gift_card' => is_array($details) ? [
+                'amount' => isset($details['amount']) && is_numeric($details['amount']) ? self::format(self::toCents((string) $details['amount'])) : null,
+                'recipient_name' => isset($details['recipient_name']) ? trim((string) $details['recipient_name']) : null,
+                'recipient_email' => isset($details['recipient_email']) ? mb_strtolower(trim((string) $details['recipient_email'])) : null,
+                'message' => filled($details['message'] ?? null) ? trim((string) $details['message']) : null,
+            ] : null,
+            'requires_shipping' => false,
+            'weight_grams' => 0,
+        ];
+    }
+
+    /** Phase 10 (part B): what stops a gift card line (null: none). */
+    private function giftCardProblem(Product $product, ?int $variantId, ?array $details, CategoryTree $tree): ?array
+    {
+        if (! $product->isForSale($tree)) {
+            return ['code' => 'unavailable', 'message' => 'This product is no longer available.'];
+        }
+        if ($variantId !== null) {
+            return ['code' => 'variant_unavailable', 'message' => "This option of {$product->name} is no longer available."];
+        }
+        if (! is_array($details) || ! is_numeric($details['amount'] ?? null) || blank($details['recipient_name'] ?? null)
+            || blank($details['recipient_email'] ?? null)) {
+            return ['code' => 'gift_card_details_required', 'message' => "Choose an amount and enter the recipient for {$product->name}."];
+        }
+        if (! $product->allowsGiftCardAmount(self::toCents((string) $details['amount']))) {
+            $options = $product->giftCardOptions();
+
+            return ['code' => 'gift_card_amount_invalid', 'message' => $options['custom']
+                ? "Choose an amount for {$product->name} between \${$options['custom']['min']} and \${$options['custom']['max']}"
+                    .($options['amounts'] ? ', or one of the listed amounts.' : '.')
+                : "Choose one of the amounts for {$product->name}."];
+        }
+
+        return null;
     }
 
     private function problemWith(?Product $product, ?int $variantId, ?ProductVariant $variant, int $quantity, CategoryTree $tree): ?array

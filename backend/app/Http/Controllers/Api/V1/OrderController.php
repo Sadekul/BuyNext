@@ -12,7 +12,8 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Services\Checkout;
 use App\Services\OrderDocuments;
-use App\Services\Payments\StripePayments;
+use App\Services\Payments\OnlinePayments;
+use App\Services\Payments\PayPalPayments;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ use Illuminate\Validation\ValidationException;
 class OrderController extends Controller
 {
     /** POST /api/v1/orders → 201 { data: OrderResource } (phase 8: data.payment for card orders). Guests, or customers with their Bearer token. */
-    public function store(PlaceOrderRequest $request, Checkout $checkout, StripePayments $payments): JsonResponse
+    public function store(PlaceOrderRequest $request, Checkout $checkout, OnlinePayments $payments): JsonResponse
     {
         $data = $request->validated();
         $data['shipping_address'] = $request->address('shipping_address');
@@ -35,7 +36,8 @@ class OrderController extends Controller
 
         // Phase 8: a card order (Stripe on) gets its payment page now. If Stripe can't be reached the
         // order still exists, unpaid: payment.url is null, payment.error says why, and Pay now retries.
-        $payment = $payments->usesStripe($order) ? $payments->startCheckout($order) : null;
+        // Phase 10 (part B): a PayPal order (PayPal on) gets its approval link the same way.
+        $payment = $payments->uses($order) ? $payments->startCheckout($order) : null;
 
         return (new OrderResource($order))->withPayment($payment)->response()->setStatusCode(201);
     }
@@ -48,7 +50,7 @@ class OrderController extends Controller
      * page that's still open, or opens a new one. 422 when the order can't be
      * paid online (not card, paid, cancelled, Stripe off); 404 as the lookup.
      */
-    public function pay(Request $request, string $number, StripePayments $payments): OrderResource|JsonResponse
+    public function pay(Request $request, string $number, OnlinePayments $payments): OrderResource|JsonResponse
     {
         $data = $request->validate(['email' => ['nullable', 'string', 'email', 'max:190']]);
         $customer = $request->user() instanceof Customer ? $request->user() : null;
@@ -66,6 +68,31 @@ class OrderController extends Controller
         $payment = $payments->startCheckout($order);
 
         return (new OrderResource($order->refresh()->load(['items', 'history', ...Order::DOCUMENTS])))->withPayment($payment);
+    }
+
+    /**
+     * POST /api/v1/orders/{number}/paypal/capture { token, email? } → 200 { data: OrderResource, result: "paid" | "already_paid" }.
+     * Phase 10 (part B): the shopper is back from PayPal (?token=<PayPal order id>); we capture the payment
+     * server-side and invoice the order. Who may: as for Pay now. 422 { errors: { payment } } when it can't be done.
+     */
+    public function paypalCapture(Request $request, string $number, PayPalPayments $paypal): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:64'],
+            'email' => ['nullable', 'string', 'email', 'max:190'],
+        ]);
+        $customer = $request->user() instanceof Customer ? $request->user() : null;
+
+        $order = Order::where('number', strtoupper(trim($number)))->first();
+        $owner = $order && $customer && $order->customer_id === $customer->id;
+        $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
+        if (! $owner && ! $emailMatches) {
+            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+        }
+
+        [$result, $order] = $paypal->captureForShopper($order, trim($data['token']));
+
+        return (new OrderResource($order->load(['items', 'history', ...Order::DOCUMENTS])))->additional(['result' => $result])->response();
     }
 
     /**

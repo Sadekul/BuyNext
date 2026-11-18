@@ -38,7 +38,9 @@ class RefundMail extends Mailable
             'credit_memo_number' => $memo->number,
             'refund_total' => $memo->total,
             'payment_method' => config("buynest.store.payment_methods.{$order->payment_method}")
-                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", $order->payment_method),
+                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", $order->payment_method === 'gift_card' ? 'Gift card' : $order->payment_method)
+                // Phase 10 (part B): what went back to the gift card first.
+                .((float) $memo->gift_card_refund > 0 ? '; $'.$memo->gift_card_refund.' back to your gift card' : ''),
             'items_table' => EmailBlocks::itemsTable(
                 $memo->items->map(fn ($item) => ["{$item->orderItem->displayName()} × {$item->quantity}", self::money($item->amount)])->all(),
                 $totals,

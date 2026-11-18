@@ -110,7 +110,7 @@ class CustomerGroupTest extends TestCase
             ->assertJsonPath('data.lines.0.line_total', '16.10')
             ->assertJsonPath('data.customer_group', ['name' => 'Wholesale', 'discount_percent' => '10.00'])
             ->assertJsonPath('data.totals', ['item_count' => 2, 'subtotal' => '16.10', 'discount' => '1.61', 'group_discount' => '1.78',
-                'shipping' => '4.99', 'tax' => '0.00', 'total' => '19.48']);
+                'shipping' => '4.99', 'tax' => '0.00', 'total' => '19.48', 'gift_card' => '0.00', 'amount_due' => '19.48']); // phase 10 (part B): the last two
 
         // Checkout charges the same and stores the group.
         $order = $this->placeOrder([['product_id' => $mascara->id, 'quantity' => 2]], ['coupon_code' => 'NEST10', 'expected_total' => '19.48'], $headers)

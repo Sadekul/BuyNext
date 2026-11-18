@@ -21,6 +21,8 @@ import {
 import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 // Phase 9: two-step sign-in, backups, stock alerts (adminSecurityApi.js).
 import { TWO_STEP_SESSION_ROUTES, matchSecurityRoute } from './adminSecurityApi.js'
+// Phase 10: PDFs, shipping table rates, gift cards (adminPhase10Api.js).
+import { matchPhase10Route } from './adminPhase10Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -172,6 +174,15 @@ const PRODUCT_RULES = {
   // Phase 7 (system): SEO; empty or null = none (the store falls back to the name and description).
   metaTitle: (value) => (value === null || (typeof value === 'string' && value.trim().length <= 190) ? null : 'Keep the meta title under 190 characters.'),
   metaDescription: (value) => (value === null || (typeof value === 'string' && value.trim().length <= 500) ? null : 'Keep the meta description under 500 characters.'),
+  // Phase 10 §4 and §5: the weight in grams (table rates), and gift card products with their amounts.
+  weight: (value) => (value === null || (Number.isInteger(value) && value >= 0 && value <= 1_000_000) ? null : 'Enter the weight in whole grams, or leave it empty.'),
+  type: (value) => (['simple', 'gift_card'].includes(value) ? null : 'Choose a product type.'),
+  giftCardAmounts: (value) =>
+    value === null || (Array.isArray(value) && value.length <= 10 && value.every((amount) => typeof amount === 'number' && amount >= 1 && amount <= 10_000 && hasCents(amount)))
+      ? null
+      : 'List up to 10 amounts from 1 to 10,000.',
+  giftCardMinAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
+  giftCardMaxAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
 }
 const REQUIRED_ON_CREATE = ['title', 'category', 'price', 'stock']
 
@@ -613,6 +624,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 10: invoices/:number/pdf, credit-memos/:number/pdf, shipping-rates[/…], gift-cards[/…].
+  const phase10 = matchPhase10Route(method, segments)
+  if (phase10 !== undefined) return phase10
   // Phase 9: me/two-factor[/…], admins/:id/two-factor/reset, backups[/…], reports/stock-alerts.
   const security = matchSecurityRoute(method, segments)
   if (security !== undefined) return security

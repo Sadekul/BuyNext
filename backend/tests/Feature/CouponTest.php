@@ -190,7 +190,8 @@ class CouponTest extends TestCase
 
         $express = $this->cart('shipfree', 1, ['shipping_method' => 'express']);
         $express->assertJsonPath('data.coupon', ['code' => 'SHIPFREE', 'description' => 'Free shipping'])
-            ->assertJsonPath('data.totals', ['item_count' => 1, 'subtotal' => '25.00', 'discount' => '0.00', 'group_discount' => '0.00', 'shipping' => '0.00', 'tax' => '0.00', 'total' => '25.00']);
+            ->assertJsonPath('data.totals', ['item_count' => 1, 'subtotal' => '25.00', 'discount' => '0.00', 'group_discount' => '0.00', 'shipping' => '0.00', 'tax' => '0.00', 'total' => '25.00',
+                'gift_card' => '0.00', 'amount_due' => '25.00']);
         $this->assertSame(['0.00', '0.00', '0.00'], array_column($express->json('data.shipping_options'), 'price'));
 
         $this->order('SHIPFREE', ['shipping_method' => 'nextDay', 'expected_total' => '25.00'])->assertCreated()

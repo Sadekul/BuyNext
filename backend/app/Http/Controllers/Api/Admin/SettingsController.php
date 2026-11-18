@@ -64,6 +64,9 @@ class SettingsController extends Controller
             'returns.return_window_days.min' => 'The return window must be at least 1 day.',
             '*.*.*.distinct' => 'This is listed twice.',
             'tax.tax_rates.*.country.distinct' => 'This country already has a rate.',
+            // Phase 10 (part A).
+            'documents.paper_size.in' => 'Choose A4 or Letter.',
+            'analytics.ga4_measurement_id.regex' => 'Enter a GA4 measurement ID like G-ABC123XYZ, or leave it empty.',
         ])->validate();
 
         $changes = [];

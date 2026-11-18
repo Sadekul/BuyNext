@@ -1,0 +1,88 @@
+.gift-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-lg);
+}
+
+.gift-card-form__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.gift-card-form__amounts {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.gift-card-form__legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+.gift-card-form__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Each amount is a pill-shaped radio: the native input stays (keyboard, screen readers). */
+.gift-card-form__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+.gift-card-form__option:has(input:checked) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.gift-card-form__option:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.gift-card-form__grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .gift-card-form__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.gift-card-form__message {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.gift-card-form__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 480px) {
+  .gift-card-form {
+    padding: var(--space-4);
+  }
+
+  .gift-card-form__submit {
+    width: 100%;
+  }
+}

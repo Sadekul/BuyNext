@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\CreditMemo;
+use App\Services\Pricing;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,7 +33,10 @@ class CreditMemoResource extends JsonResource
             'shipping_refund' => $this->shipping_refund,
             'adjustment' => $this->adjustment,
             'total' => $this->total,
-            'refund_reference' => $this->refund_reference, // phase 8: the Stripe refund id (null: refunded by hand)
+            'refund_reference' => $this->refund_reference, // phase 8: the Stripe refund id (null: refunded by hand); phase 10: or PayPal's
+            // Phase 10 (part B): returned to the redeemed gift card first, the rest by the payment method.
+            'gift_card_refund' => $this->gift_card_refund ?? '0.00',
+            'other_refund' => Pricing::format(Pricing::toCents($this->total) - Pricing::toCents($this->gift_card_refund ?? 0)),
             'restocked' => $this->restocked,
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'admin_name' => $this->admin?->name,

@@ -13,7 +13,9 @@ use App\Http\Controllers\Api\Admin\CustomerAddressController;
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Api\Admin\CustomerGroupController;
 use App\Http\Controllers\Api\Admin\CustomerNoteController;
+use App\Http\Controllers\Api\Admin\DocumentPdfController;
 use App\Http\Controllers\Api\Admin\EmailTemplateController;
+use App\Http\Controllers\Api\Admin\GiftCardController as AdminGiftCardController;
 use App\Http\Controllers\Api\Admin\HomeController as AdminHomeController;
 use App\Http\Controllers\Api\Admin\InvoiceController;
 use App\Http\Controllers\Api\Admin\NewsletterCampaignController;
@@ -37,6 +39,7 @@ use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SearchTermController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\ShipmentController;
+use App\Http\Controllers\Api\Admin\ShippingRateController;
 use App\Http\Controllers\Api\Admin\StockAlertReportController;
 use App\Http\Controllers\Api\Admin\TwoFactorController;
 use App\Http\Controllers\Api\Admin\UrlRedirectController;
@@ -47,9 +50,12 @@ use App\Http\Controllers\Api\V1\ClientErrorController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
 use App\Http\Controllers\Api\V1\CustomerCartController;
+use App\Http\Controllers\Api\V1\GiftCardController;
+use App\Http\Controllers\Api\V1\InvoicePdfController;
 use App\Http\Controllers\Api\V1\MyAccountController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\PayPalWebhookController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
@@ -82,7 +88,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('me', [ProfileController::class, 'update']);
         Route::get('orders', [OrderController::class, 'index']);
         Route::get('orders/{number}', [OrderController::class, 'show']);
-        Route::get('orders/{number}/invoices/{invoice}', [OrderController::class, 'invoice']);
+        Route::get('orders/{number}/invoices/{invoice}', [OrderController::class, 'invoice'])->where('invoice', '[^/.]+'); // phase 10 (part A): "….pdf" is the PDF route
         // Phase 6: the address book and returns.
         Route::get('me/addresses', [AddressController::class, 'index']);
         Route::post('me/addresses', [AddressController::class, 'store']);
@@ -139,6 +145,9 @@ Route::prefix('v1')->group(function () {
     Route::post('orders', [OrderController::class, 'store'])->middleware(['customer.optional', 'throttle:orders']);
     // Guest order lookup: limited like sign-in, so order numbers can't be guessed quickly.
     Route::post('orders/lookup', [OrderController::class, 'lookup'])->middleware('throttle:auth');
+    // Phase 10 (part A): an invoice as a PDF: the order's customer, or the order's email (?email=, the lookup's proof), limited like the lookup.
+    Route::get('orders/{number}/invoices/{invoice}.pdf', InvoicePdfController::class)->where('invoice', '[^/.]+')
+        ->middleware(['customer.optional', 'throttle:auth']);
 
     // Phase 8: Stripe card payments. Pay now: the order's customer, or the order's email (the lookup's proof), limited like the lookup.
     Route::post('orders/{number}/pay', [OrderController::class, 'pay'])->middleware(['customer.optional', 'throttle:auth']);
@@ -146,6 +155,12 @@ Route::prefix('v1')->group(function () {
     Route::post('orders/{number}/cancel', [OrderController::class, 'cancel'])->middleware(['customer.optional', 'throttle:auth']);
     // Stripe's webhook: no sign-in (the signature is the proof), its own rate limit.
     Route::post('payments/stripe/webhook', StripeWebhookController::class)->middleware('throttle:stripe-webhooks');
+
+    // Phase 10 (part B): PayPal (capture after the approval, its webhook) and gift card balance checks.
+    Route::post('orders/{number}/paypal/capture', [OrderController::class, 'paypalCapture'])->middleware(['customer.optional', 'throttle:auth']);
+    Route::post('payments/paypal/webhook', PayPalWebhookController::class)->middleware('throttle:paypal-webhooks');
+    Route::post('gift-cards/check', [GiftCardController::class, 'check'])->middleware('throttle:gift-card-check');
+    // End of phase 10 part B store routes.
 
     // Phase 9 (part B): "email me when it's back" (guests and customers), its "stop these alerts" link,
     // and browser error reports (only from the sign-in service: the shared key is always required).
@@ -260,9 +275,13 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('orders/{number}/refundable', [CreditMemoController::class, 'refundable'])->middleware('can.admin:orders.view');
         Route::post('orders/{number}/credit-memos', [CreditMemoController::class, 'store'])->middleware('can.admin:credit_memos.create');
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware('can.admin:orders.view');
-        Route::get('invoices/{number}', [InvoiceController::class, 'show'])->middleware('can.admin:orders.view');
+        Route::get('invoices/{number}', [InvoiceController::class, 'show'])->where('number', '[^/.]+')->middleware('can.admin:orders.view');
         Route::get('credit-memos', [CreditMemoController::class, 'index'])->middleware('can.admin:orders.view');
-        Route::get('credit-memos/{number}', [CreditMemoController::class, 'show'])->middleware('can.admin:orders.view');
+        Route::get('credit-memos/{number}', [CreditMemoController::class, 'show'])->where('number', '[^/.]+')->middleware('can.admin:orders.view');
+        // Phase 10 (part A): the documents as PDF files.
+        Route::get('invoices/{number}.pdf', [DocumentPdfController::class, 'invoice'])->where('number', '[^/.]+')->middleware('can.admin:orders.view');
+        Route::get('credit-memos/{number}.pdf', [DocumentPdfController::class, 'creditMemo'])->where('number', '[^/.]+')->middleware('can.admin:orders.view');
+        // End of phase 10 part A admin routes.
         // Phase 6: the shipments list, and returns (RMA).
         Route::get('shipments', [ShipmentController::class, 'index'])->middleware('can.admin:orders.view');
         Route::get('shipments/{number}', [ShipmentController::class, 'show'])->middleware('can.admin:orders.view');
@@ -370,6 +389,25 @@ Route::prefix('admin/v1')->group(function () {
 
         Route::get('settings', [SettingsController::class, 'show'])->middleware('can.admin:settings.view');
         Route::patch('settings', [SettingsController::class, 'update'])->middleware('can.admin:settings.edit');
+
+        // Phase 10 (part B): shipping table rates (Settings → Shipping) and gift cards (Marketing).
+        Route::get('shipping-rates', [ShippingRateController::class, 'index'])->middleware('can.admin:settings.view');
+        Route::get('shipping-rates/export.csv', [ShippingRateController::class, 'export'])->middleware('can.admin:settings.view');
+        Route::post('shipping-rates/check', [ShippingRateController::class, 'check'])->middleware('can.admin:settings.view');
+        Route::middleware('can.admin:settings.edit')->controller(ShippingRateController::class)->group(function () {
+            Route::post('shipping-rates', 'store');
+            Route::post('shipping-rates/import', 'import');
+            Route::post('shipping-rates/reorder', 'reorder');
+            Route::patch('shipping-rates/{id}', 'update')->whereNumber('id');
+            Route::delete('shipping-rates/{id}', 'destroy')->whereNumber('id');
+        });
+        Route::get('gift-cards', [AdminGiftCardController::class, 'index'])->middleware('can.admin:gift_cards.view');
+        Route::post('gift-cards', [AdminGiftCardController::class, 'store'])->middleware('can.admin:gift_cards.manage');
+        Route::get('gift-cards/{id}', [AdminGiftCardController::class, 'show'])->whereNumber('id')->middleware('can.admin:gift_cards.view');
+        Route::patch('gift-cards/{id}', [AdminGiftCardController::class, 'update'])->whereNumber('id')->middleware('can.admin:gift_cards.manage');
+        Route::post('gift-cards/{id}/adjust', [AdminGiftCardController::class, 'adjust'])->whereNumber('id')->middleware('can.admin:gift_cards.manage');
+        Route::get('reports/gift-cards', [AdminGiftCardController::class, 'report'])->middleware('can.admin:reports.view');
+        // End of phase 10 part B admin routes.
 
         // Phase 9 (part B): Reports → Stock alerts, and System → Backups (Owner only by default).
         Route::get('reports/stock-alerts', StockAlertReportController::class)->middleware('can.admin:reports.view');

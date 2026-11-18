@@ -144,7 +144,8 @@ class Coupon extends Model
         }
         $products = array_map('intval', $this->product_ids ?? []);
 
-        return array_keys(array_filter($lines, fn (array $line) => $line['available'] && match ($this->applies_to) {
+        // Phase 10 (part B): gift card lines are never discounted.
+        return array_keys(array_filter($lines, fn (array $line) => $line['available'] && ($line['type'] ?? 'simple') !== 'gift_card' && match ($this->applies_to) {
             'categories' => in_array((int) $line['product']->category_id, $categories, true),
             'products' => in_array((int) $line['product_id'], $products, true),
             default => true,

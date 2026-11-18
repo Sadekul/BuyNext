@@ -59,6 +59,30 @@ export function orderActions(order) {
 /** Phase 8: paid by card through Stripe, so refunds go back to the card through Stripe. */
 export const paidThroughStripe = (order) => order.payment?.provider === 'stripe' && Boolean(order.payment.reference || order.payment.paidAt)
 
+/*
+ * Phase 10 §3: PayPal works like Stripe (redirect approval, captured by the
+ * server, refunds through PayPal first). The provider's name for messages.
+ */
+export const PAYMENT_PROVIDERS = { stripe: 'Stripe', paypal: 'PayPal', gift_card: 'Gift card' }
+export const providerName = (provider) => PAYMENT_PROVIDERS[provider] ?? provider ?? 'the payment provider'
+/** Paid through PayPal (a capture exists), so refunds go back through PayPal. */
+export const paidThroughPayPal = (order) => order.payment?.provider === 'paypal' && Boolean(order.payment.reference || order.payment.paidAt)
+/** The provider that took the money ('stripe' | 'paypal'), or null when staff record payments by hand. */
+export const paidThroughProvider = (order) => (paidThroughStripe(order) ? 'stripe' : paidThroughPayPal(order) ? 'paypal' : null)
+
+/*
+ * Phase 10 §5: what a gift card paid of the order and what can still go back
+ * to it. A refund returns money to the card first, up to what it paid; the
+ * rest goes back by the other payment method.
+ */
+export function giftCardSplit(order, totalCents, limits) {
+  const card = order.giftCardPayment
+  if (!card || !(card.amount > 0)) return null
+  const left = limits?.giftCardRefundable ?? Math.max(card.amount - (card.refunded ?? 0), 0)
+  const toCard = Math.min(Math.max(totalCents, 0), Math.round(left * 100))
+  return { last4: card.last4 ?? null, toCardCents: toCard, otherCents: Math.max(totalCents - toCard, 0) }
+}
+
 export const CARRIERS = { dhl: 'DHL', fedex: 'FedEx', ups: 'UPS', usps: 'USPS', other: 'Other carrier' }
 
 export const COUPON_TYPES = { percent: 'Percent off', fixed: 'Fixed amount off', free_shipping: 'Free shipping' }
@@ -73,7 +97,8 @@ export const COUPON_STATUSES = {
 export const couponStatus = (status) => COUPON_STATUSES[status] ?? unknown(status)
 export const COUPON_FILTERS = Object.fromEntries(Object.entries(COUPON_STATUSES).map(([status, { label }]) => [status, label]))
 
-export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery', bank_transfer: 'Bank transfer', cash: 'Cash' }
+// Phase 10: gift_card = a gift card paid the whole order.
+export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery', bank_transfer: 'Bank transfer', cash: 'Cash', gift_card: 'Gift card' }
 /** Payment methods only admins may choose for an order they create (phase 6). */
 export const ADMIN_ONLY_PAYMENT_METHODS = ['bank_transfer', 'cash']
 

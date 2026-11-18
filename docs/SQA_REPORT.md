@@ -211,6 +211,20 @@ Built by four agents in parallel (two backend; storefront with its sign-in servi
 
 Checks: backend 400 feature tests; frontend 501 unit tests; admin 130; browser checks 1,039 on the dev server and 1,032 on the production build, all passing (new `launch.mjs`: 158).
 
+## Phase 10 (search, PDF documents, PayPal, shipping rates, gift cards, analytics) — 2026-11-18
+
+Built against [backend/PHASE10_CONTRACT.md](backend/PHASE10_CONTRACT.md), then verified with the new `extras.mjs` browser suite (164 checks). It runs its own API and store with stand-ins for PayPal and Google, so no real account is called. Security points checked: gift card codes are stored hashed, and balances are locked while an order spends them, so one card can't be spent twice at the same moment. PayPal webhooks are verified with PayPal before anything changes, and an order is only marked paid when the captured amount matches. A guest's PDF download needs both the order number and the order's email. Analytics loads nothing until the visitor accepts cookies (Consent Mode v2 defaults to denied), and Google is only allowed in the Content-Security-Policy when GA4 is turned on. New packages (`barryvdh/laravel-dompdf`): `composer audit` and `npm audit` found no known vulnerabilities.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| X1 | Medium | A guest's invoice PDF link put the order email in the address (`?email=`), so it could end up in server logs and browser history | The sign-in service now sends it in an `X-Order-Email` header; the API accepts the header; tests updated |
+| X2 | Low | The "payment not completed" email still said "card payment" and named Stripe, which is wrong for a PayPal order | Wording made neutral ("online payment") |
+| X3 | Test | Checkout unit tests were flaky under load: they filled the form and clicked before the 600 ms price re-check finished | Helpers wait for "Checking prices…" to clear; longer test limits; 6 runs in a row green |
+| X4 | Test | The marketing browser check expected a fixed number of email templates; phase 10 added more | It now compares with the number the API lists |
+| X5 | Environment | After a system update to MySQL 8.4.13, the project's own MySQL (8.4.11) crashed on start | Data backed up, the project's copy updated to 8.4.13; data upgraded cleanly with nothing lost |
+
+Checks: backend 451 feature tests (Pint clean); frontend 568 unit tests; admin 143; browser checks 1,203 on the dev server and 1,196 on the production build, all passing (new `extras.mjs`: 164). Not automated: the PDF attached to the invoice email (the test inbox keeps no attachments; backend tests cover it), and PayPal's unpaid-order expiry and amount-mismatch cases (backend tests cover both).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

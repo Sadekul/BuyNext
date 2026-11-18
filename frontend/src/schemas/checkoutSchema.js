@@ -40,8 +40,25 @@ export function createCheckoutSchema({
   countries = COUNTRIES,
   shippingMethodIds = SHIPPING_METHODS.map((method) => method.id),
   paymentMethodIds = PAYMENT_METHODS.map((method) => method.id),
+  // Phase 10: a cart of gift cards only has no delivery: no shipping address or method, the billing address instead.
+  requiresShipping = true,
 } = {}) {
   const storeAddressSchema = createAddressSchema(countries)
+  if (!requiresShipping) {
+    return z.object({
+      email: z.email('Enter a valid email address.'),
+      phone: z
+        .string({ error: 'Enter a valid phone number.' })
+        .trim()
+        .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a valid phone number.'),
+      shipping: z.any(),
+      billingSameAsShipping: z.any(),
+      billing: storeAddressSchema,
+      shippingMethod: z.any(),
+      paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
+      saveAddress: z.boolean().optional(),
+    })
+  }
   return z
     .object({
       email: z.email('Enter a valid email address.'),

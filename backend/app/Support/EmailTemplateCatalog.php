@@ -149,7 +149,7 @@ final class EmailTemplateCatalog
             ],
             'payment_not_completed' => [
                 'name' => 'Payment not completed',
-                'description' => 'Sent when a card order is cancelled because the secure payment page (Stripe) expired before it was paid.',
+                'description' => 'Sent when an online-payment order (card through Stripe, or PayPal) is cancelled because it wasn’t paid in time.',
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
@@ -161,7 +161,7 @@ final class EmailTemplateCatalog
                 'subject' => 'Payment not completed for order {{ order_number }}',
                 'body' => '<h2>Payment not completed</h2>'
                     .'<p>Hi {{ customer_first_name }},</p>'
-                    .'<p>We didn’t receive the card payment for order <strong>{{ order_number }}</strong> in time, so the order was cancelled '
+                    .'<p>We didn’t receive the online payment for order <strong>{{ order_number }}</strong> in time, so the order was cancelled '
                     .'and the items were released. Nothing was charged to your card.</p>'
                     .'<blockquote>Order <strong>{{ order_number }}</strong> · ${{ order_total }}</blockquote>'
                     .'<p>Still want these items? You’re welcome to place the order again.</p>'
@@ -371,6 +371,50 @@ final class EmailTemplateCatalog
                     .'{{ button }}'
                     .'<p>This is the only email you’ll get about this item.</p>',
             ],
+            // Phase 10 (part B): gift cards (the code goes to the recipient only; the buyer's copy never has it).
+            'gift_card_received' => [
+                'name' => 'Gift card received',
+                'description' => 'Sent to the recipient when a gift card is paid for (or created by staff), with the code to spend it.',
+                'variables' => [
+                    'recipient_name' => ['Recipient name', 'text'],
+                    'sender_name' => ['Who sent it (the buyer, or the store)', 'text'],
+                    'amount' => ['Gift card amount ($)', 'text'],
+                    'code' => ['The gift card code', 'text'],
+                    'message' => ['The buyer’s message, empty without one', 'block'],
+                    'expires' => ['“It can be used until …” or “It doesn’t expire.”', 'text'],
+                    'shop_url' => ['Link to the store', 'url'],
+                    'button' => ['“Start shopping” button', 'block'],
+                ],
+                'required' => [['code']],
+                'subject' => '{{ sender_name }} sent you a ${{ amount }} {{ store_name }} gift card',
+                'body' => '<h2>You received a gift card</h2>'
+                    .'<p>Hi {{ recipient_name }},</p>'
+                    .'<p>{{ sender_name }} sent you a <strong>${{ amount }}</strong> gift card for {{ store_name }}.</p>'
+                    .'{{ message }}'
+                    .'<p>Your gift card code:</p><blockquote><h3>{{ code }}</h3></blockquote>'
+                    .'<p>Enter the code at checkout to use it. {{ expires }} Keep this email safe: anyone with the code can spend the balance.</p>'
+                    .'{{ button }}',
+            ],
+            'gift_card_purchased' => [
+                'name' => 'Gift card sent (buyer copy)',
+                'description' => 'Sent to the buyer when a gift card they bought was paid for and emailed to its recipient. It never contains the code.',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                    'order_number' => ['Order number', 'text'],
+                    'recipient_name' => ['Recipient name', 'text'],
+                    'recipient_email' => ['Recipient email', 'text'],
+                    'amount' => ['Gift card amount ($)', 'text'],
+                    'last4' => ['Last 4 characters of the code', 'text'],
+                ],
+                'required' => [['recipient_email']],
+                'subject' => 'Your gift card was sent to {{ recipient_name }}',
+                'body' => '<h2>Your gift card was sent</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>We emailed your <strong>${{ amount }}</strong> gift card (ending in {{ last4 }}) to {{ recipient_name }} at {{ recipient_email }}.</p>'
+                    .'<blockquote>Order <strong>{{ order_number }}</strong></blockquote>'
+                    .'<p>For security, the code is only in the recipient’s email. If it doesn’t arrive, ask them to check their spam folder, or reply to this email.</p>',
+            ],
+            // End of phase 10 part B templates.
         ];
     }
 
@@ -457,6 +501,17 @@ final class EmailTemplateCatalog
                 'product_url' => config('buynest.storefront_url').'/products/1',
                 'unsubscribe_url' => config('buynest.storefront_url').'/stock-alerts/unsubscribe?token=sample',
                 'button' => EmailBlocks::button(config('buynest.storefront_url').'/products/1', 'Shop now'),
+            ],
+            // Phase 10 (part B).
+            'gift_card_received' => [
+                'recipient_name' => 'Sam', 'sender_name' => 'Ava Customer', 'amount' => '50.00', 'code' => 'ABCD-EFGH-JKMN-PQRS',
+                'message' => EmailBlocks::paragraph('“Happy birthday, Sam!”'), 'expires' => 'It doesn’t expire.',
+                'shop_url' => config('buynest.storefront_url'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url'), 'Start shopping'),
+            ],
+            'gift_card_purchased' => [
+                'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'recipient_name' => 'Sam', 'recipient_email' => 'sam@example.com',
+                'amount' => '50.00', 'last4' => 'PQRS',
             ],
         };
 

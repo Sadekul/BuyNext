@@ -7,6 +7,7 @@ import OfflineBanner from '../components/layout/OfflineBanner'
 import ScrollToTop from '../components/common/ScrollToTop'
 import ErrorBoundary from '../components/common/ErrorBoundary'
 import CartDrawer from '../components/cart/CartDrawer'
+import CookieConsent from '../components/layout/CookieConsent'
 import Loader from '../components/ui/Loader'
 import { ANNOUNCEMENTS } from '../constants/site'
 import { useNavLinks } from '../hooks/useNavLinks'
@@ -31,6 +32,8 @@ function MainLayout() {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
+      {/* Phase 10: asks before any statistics load (only when the store uses them); sends page views after. */}
+      <CookieConsent />
       <OfflineBanner />
       <AnnouncementBar messages={ANNOUNCEMENTS} />
       <Header navLinks={links} mobileNavLinks={mobileLinks} />

@@ -41,6 +41,8 @@ export function normalizeProduct(raw) {
     // The admin's alt text per image (phase 5), in the same order; null when none was written.
     imageAlts: (raw.images ?? []).map((image) => (typeof image.alt === 'string' && image.alt.trim() ? image.alt.trim() : null)),
     sku: raw.sku ?? null,
+    // Phase 10: gift cards are sold by amount, to a recipient (no stock, no shipping).
+    ...(raw.type === 'gift_card' && { type: 'gift_card', giftCard: normalizeGiftCardOptions(raw) }),
     tags: raw.tags ?? [],
     minimumOrderQuantity: raw.min_order_quantity ?? 1,
     warrantyInformation: raw.warranty ?? null,
@@ -56,6 +58,22 @@ export function normalizeProduct(raw) {
     ...(raw.options !== undefined && { options: normalizeOptions(raw.options) }),
     ...(raw.variants !== undefined && { variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant, raw)) }),
   }
+}
+
+/**
+ * A gift card product's amounts (`gift_card: { amounts: ["25.00", …], custom:
+ * { min, max } | null }`): the fixed choices and, when the store allows any
+ * amount, its limits.
+ */
+export function normalizeGiftCardOptions(raw) {
+  const options = raw.gift_card && typeof raw.gift_card === 'object' ? raw.gift_card : {}
+  const amounts = (Array.isArray(options.amounts) ? options.amounts : [])
+    .map(Number)
+    .filter((amount) => Number.isFinite(amount) && amount > 0)
+    .toSorted((a, b) => a - b)
+  const min = toNumberOrNull(options.custom?.min)
+  const max = toNumberOrNull(options.custom?.max)
+  return { amounts: [...new Set(amounts)], custom: min !== null && max !== null && min > 0 && max >= min ? { min, max } : null }
 }
 
 function thumbnailVariants(raw) {
@@ -111,7 +129,16 @@ export function normalizeProductPage(raw) {
   const { current_page: page, per_page: perPage, total } = raw.meta
   // Phase 7: the admin can send an exact search term straight to a page (`meta.redirect_url`).
   const redirectUrl = safeRedirectTarget(raw.meta.redirect_url)
-  return { items: raw.data.map(normalizeProduct), total, skip: (page - 1) * perPage, limit: perPage, ...(redirectUrl && { redirectUrl }) }
+  // Phase 10: the API corrected a typo ("ihpone" → "iphone") and searched for this instead.
+  const correctedQuery = typeof raw.meta.corrected_query === 'string' && raw.meta.corrected_query.trim() ? raw.meta.corrected_query.trim().slice(0, 100) : null
+  return {
+    items: raw.data.map(normalizeProduct),
+    total,
+    skip: (page - 1) * perPage,
+    limit: perPage,
+    ...(redirectUrl && { redirectUrl }),
+    ...(correctedQuery && { correctedQuery }),
+  }
 }
 
 /** Single resource `{ data: {...} }` → BuyNest product. */

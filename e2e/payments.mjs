@@ -744,7 +744,8 @@ async function cleanup() {
     tinker(
       `$ids = App\\Models\\AdminNotification::where('type', 'payment_problem')->whereIn('link', [${links}])->pluck('id');` +
         ` DB::table('admin_notification_reads')->whereIn('notification_id', $ids)->delete(); App\\Models\\AdminNotification::whereIn('id', $ids)->delete();` +
-        ` DB::table('stripe_events')->where('id', 'like', '${eventIds()}')->delete();`,
+        // Phase 10 (part B): stripe_events became payment_events (provider + id).
+        ` DB::table('payment_events')->where('provider', 'stripe')->where('id', 'like', '${eventIds()}')->delete();`,
     )
   })
   await attempt('saved carts', async () => {

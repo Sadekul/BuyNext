@@ -117,5 +117,12 @@ export function normalizeStoreSettings(raw) {
     taxEnabled: data.tax_enabled === true,
     // Phase 8: "stripe" when card orders are paid on Stripe's page right away, "manual" otherwise.
     cardPayments: data.card_payments === 'stripe' ? 'stripe' : 'manual',
+    // Phase 10: "paypal" when PayPal orders are approved on PayPal's site right away, "manual" otherwise.
+    paypalPayments: data.paypal_payments === 'paypal' ? 'paypal' : 'manual',
+    // Phase 10: the store's Google Analytics 4 measurement id (null = no statistics, no consent banner).
+    ga4MeasurementId: measurementId(data.analytics?.ga4_measurement_id ?? data.ga4_measurement_id),
   }
 }
+
+/** "G-ABC123XYZ9" or null: only a well-formed GA4 id ever reaches a script address. */
+export const measurementId = (value) => (typeof value === 'string' && /^G-[A-Z0-9]{4,20}$/.test(value.trim()) ? value.trim() : null)

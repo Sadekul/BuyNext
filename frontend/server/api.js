@@ -15,15 +15,15 @@ import { handleClientErrorRequest } from './clientErrorsApi.js'
  *   /api/admin/*    admin service, admins only (adminApi.js)
  *   /api/catalog/*  public product catalog, read-only (catalogApi.js)
  *   /api/shop/*     cart pricing and orders, guests too (shopApi.js)
- *   /api/payments/* payment provider webhooks, server to server (paymentsApi.js)
+ *   /api/payments/* payment provider webhooks (Stripe, PayPal), server to server (paymentsApi.js)
  *   /api/client-errors  browser error reports from the store and the admin (clientErrorsApi.js)
  */
 export async function handleApiRequest(request) {
   const url = new URL(request.url)
   const segments = url.pathname.split('/').filter(Boolean) // ["api", "auth", "login"]
 
-  // Stripe calls the webhook from its own servers: no browser, no cookies, no
-  // Fetch Metadata. Its signature (checked by the API) is the protection.
+  // Stripe and PayPal call their webhooks from their own servers: no browser, no cookies, no
+  // Fetch Metadata. Their signatures (checked by the API) are the protection.
   if (segments[0] === 'api' && segments[1] === 'payments') return handlePaymentsRequest(request, segments.slice(2))
 
   // Only BuyNest's own pages may call these services. Browsers label requests

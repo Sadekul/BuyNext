@@ -4,6 +4,7 @@ import { json, laravelRaw, readLimitedBody } from './http.js'
  * Payment provider callbacks, at /api/payments/* (docs/backend/PHASE8_CONTRACT.md §1).
  *
  *   POST /api/payments/stripe/webhook → POST /api/v1/payments/stripe/webhook
+ *   POST /api/payments/paypal/webhook → POST /api/v1/payments/paypal/webhook (phase 10)
  *
  * Stripe calls this server to server (no browser, no cookies) when a
  * Checkout Session is paid or expires. The Laravel API checks the
@@ -39,13 +40,46 @@ async function stripeWebhook(request) {
   return json(typeof data?.message === 'string' ? { message: data.message.slice(0, 500) } : { received: status >= 200 && status < 300 }, status)
 }
 
+/*
+ * Phase 10: PayPal's webhook. The API verifies it with PayPal's
+ * verify-webhook-signature API, which needs these five headers and the event
+ * exactly as PayPal sent it, so the body goes on as raw bytes here too.
+ */
+export const PAYPAL_HEADERS = ['PayPal-Transmission-Id', 'PayPal-Transmission-Time', 'PayPal-Transmission-Sig', 'PayPal-Cert-Url', 'PayPal-Auth-Algo']
+const MAX_PAYPAL_HEADER_LENGTH = 2048
+
+async function paypalWebhook(request) {
+  const headers = {}
+  for (const name of PAYPAL_HEADERS) {
+    const value = request.headers.get(name)
+    if (!value || value.length > MAX_PAYPAL_HEADER_LENGTH) return json({ message: `Missing or invalid ${name} header.` }, 400)
+    headers[name] = value
+  }
+
+  const body = await readLimitedBody(request, MAX_WEBHOOK_BYTES)
+  if (body.tooLarge) return json({ message: 'The webhook payload is too large.' }, 413)
+
+  const { status, data } = await laravelRaw('/api/v1/payments/paypal/webhook', {
+    request,
+    bytes: body.bytes,
+    contentType: request.headers.get('content-type') || 'application/json',
+    headers,
+    // The API asks PayPal to verify the signature before answering.
+    timeout: 25_000,
+  })
+  return json(typeof data?.message === 'string' ? { message: data.message.slice(0, 500) } : { received: status >= 200 && status < 300 }, status)
+}
+
+const WEBHOOKS = { 'stripe/webhook': stripeWebhook, 'paypal/webhook': paypalWebhook }
+
 /** /api/payments/<segments> */
 export async function handlePaymentsRequest(request, segments) {
-  if (segments.join('/') !== 'stripe/webhook') return json({ message: 'Not found.' }, 404)
+  const webhook = WEBHOOKS[segments.join('/')]
+  if (!webhook) return json({ message: 'Not found.' }, 404)
   if (request.method !== 'POST') {
     const response = json({ message: 'Method not allowed.' }, 405)
     response.headers.set('Allow', 'POST')
     return response
   }
-  return stripeWebhook(request)
+  return webhook(request)
 }

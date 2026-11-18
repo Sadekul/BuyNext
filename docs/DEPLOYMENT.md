@@ -65,6 +65,29 @@ With Laravel accounts the browser never calls the API: only the server functions
 
 Photos uploaded in the admin are stored by the Laravel API. Shoppers load them from the store's own address, `/media/products/{id}/{file}`: a server function (`frontend/server/mediaApi.js`; `api/media` on Vercel, `netlify/functions/media.mjs` on Netlify) fetches them from `BUYNEST_LARAVEL_URL/storage/...` and sends them with a one-year cache header. Only file names the API creates are accepted; anything else is a 404. Because the photos come from the store's own address, the Content-Security-Policy needs no change. On the API server, keep `storage/app/public` on persistent disk (see the [production checklist](../backend/README.md#production-checklist)); on Railway that's the volume in [DEPLOY_RAILWAY.md step 5](DEPLOY_RAILWAY.md#5-the-photo-volume).
 
+## Visitor statistics (Google Analytics 4, with consent)
+
+Off unless **both** of these are set:
+
+| Where | Setting | What it does |
+| --- | --- | --- |
+| The store's build (Vercel/Netlify environment, then rebuild) | `VITE_ANALYTICS=ga4` | Adds Google's addresses to the Content-Security-Policy (`vite.config.js`, `buildContentSecurityPolicy`) and lets the store show the cookie banner. Read at **build** time. |
+| The admin: Settings (stored by the API as `analytics.ga4_measurement_id`) | `G-XXXXXXXXXX` | Which Google Analytics property receives the data. Read at **run** time from `GET /api/v1/store`; clearing it turns statistics off without a rebuild. |
+
+With both, visitors see a cookie banner (Accept all / Reject / Settings, "Statistics" off by default). **Nothing loads before Accept**: no Google script, request, or cookie. Reject loads nothing. The choice is kept for 6 months in the first-party cookie `buynest_consent`, and the footer's "Cookie settings" link reopens the banner. After Accept, `gtag.js` is added with Consent Mode v2 (everything denied by default, then only `analytics_storage` granted; no ads features), and the store sends `page_view` (path only, no query string), `view_item`, `add_to_cart`, `begin_checkout`, and `purchase` (order number, value, currency, items). It never sends emails, names, addresses, or gift card recipients. The admin (`/admin/`) is never tracked.
+
+What `VITE_ANALYTICS=ga4` adds to the policy (without it, the policy is exactly as before):
+
+| Directive | Added origins |
+| --- | --- |
+| `script-src` | `https://www.googletagmanager.com` |
+| `connect-src` | `https://*.google-analytics.com`, `https://*.analytics.google.com`, `https://www.googletagmanager.com` |
+| `img-src` | `https://*.google-analytics.com`, `https://www.googletagmanager.com` (Google's fallback beacons) |
+
+A measurement id without the build flag does nothing (the banner stays hidden, since the policy would block the script anyway); the build flag without a measurement id does nothing either. To check after deploying: open the store in a private window, confirm the banner appears and the browser's Network tab shows no request to Google; click Accept and see `gtag/js` load and a `collect` request; reload and confirm the banner doesn't return.
+
+PayPal (phase 10) needs no policy change: shoppers are sent to PayPal's site and back, and no PayPal script runs on the store.
+
 ## Release checklist
 - [ ] `npm run lint` passes, `npm test` passes
 - [ ] No `console.log` / `debugger` left (`grep -rn "console.log\|debugger" src`)

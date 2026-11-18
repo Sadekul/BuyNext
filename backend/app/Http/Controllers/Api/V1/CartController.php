@@ -19,7 +19,7 @@ class CartController extends Controller
      * (optional customer Bearer token). country: the shipping country, for tax; without it the
      * tax is 0 and tax_estimated is false (when tax is on).
      */
-    public function validateCart(Request $request, Pricing $pricing, Settings $settings): JsonResponse
+    public function validateCart(Request $request, Pricing $pricing): JsonResponse
     {
         $data = $request->validate([
             ...self::rules(),
@@ -32,9 +32,11 @@ class CartController extends Controller
         $customer = $request->user();
         $customer = $customer instanceof Customer ? $customer : null;
 
-        $quote = $pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? $settings->defaultShippingMethod(),
+        // Phase 10 (part B): without a shipping_method the default (or the first available) method is used; gift_card_code redeems a card.
+        $quote = $pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null,
-            group: $customer?->priceGroup()); // phase 6: the customer's group price (guests: General)
+            group: $customer?->priceGroup(), // phase 6: the customer's group price (guests: General)
+            giftCardCode: $data['gift_card_code'] ?? null);
 
         // Phase 7: a signed-in customer's cart is saved (restore on another device, abandoned carts report).
         if ($customer) {
@@ -56,6 +58,13 @@ class CartController extends Controller
             'coupon_code' => ['nullable', 'string', 'max:40'],
             // Only the methods switched on in the settings; any other → 422.
             'shipping_method' => ['nullable', 'string', Rule::in(array_keys(app(Settings::class)->shippingMethods()))],
+            // Phase 10 (part B): a gift card line's amount and recipient, and a gift card to pay with.
+            'items.*.gift_card' => ['nullable', 'array'],
+            'items.*.gift_card.amount' => ['required_with:items.*.gift_card', 'numeric', 'decimal:0,2', 'min:0.01', 'max:100000'],
+            'items.*.gift_card.recipient_name' => ['required_with:items.*.gift_card', 'string', 'max:120'],
+            'items.*.gift_card.recipient_email' => ['required_with:items.*.gift_card', 'string', 'email', 'max:190'],
+            'items.*.gift_card.message' => ['nullable', 'string', 'max:500'],
+            'gift_card_code' => ['nullable', 'string', 'max:40'],
         ];
     }
 
@@ -66,6 +75,10 @@ class CartController extends Controller
             'items.*.quantity.min' => 'The quantity must be at least 1.',
             'items.*.quantity.max' => 'The quantity can be at most 999.',
             'shipping_method.in' => 'Choose a shipping method.',
+            'items.*.gift_card.amount.required_with' => 'Choose a gift card amount.',
+            'items.*.gift_card.recipient_name.required_with' => 'Enter the recipient\'s name.',
+            'items.*.gift_card.recipient_email.required_with' => 'Enter the recipient\'s email.',
+            'items.*.gift_card.recipient_email.email' => 'Enter a valid email address for the recipient.',
         ];
     }
 }

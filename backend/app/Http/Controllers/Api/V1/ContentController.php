@@ -7,6 +7,7 @@ use App\Http\Resources\PageResource;
 use App\Http\Resources\ProductResource;
 use App\Models\Page;
 use App\Services\HomeContent;
+use App\Services\Payments\PayPalPayments;
 use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\Settings;
@@ -37,7 +38,7 @@ class ContentController extends Controller
      * storefront shows the same ones (shipping prices, countries, payment
      * methods, guest checkout, whether tax is charged).
      */
-    public function store(Settings $settings, StripePayments $payments): JsonResponse
+    public function store(Settings $settings, StripePayments $payments, PayPalPayments $paypal): JsonResponse
     {
         return response()->json(['data' => [
             'store_name' => $settings->get('store_name'),
@@ -60,6 +61,10 @@ class ContentController extends Controller
             'return_reasons' => array_values($settings->get('return_reasons', [])),
             // Phase 8: "stripe" = card orders are paid online on Stripe's page; "manual" = staff invoice them.
             'card_payments' => $payments->cardPayments(),
+            // Phase 10 (part B): "paypal" = PayPal orders are approved on PayPal's site and captured online; "manual" = staff invoice them.
+            'paypal_payments' => $paypal->paypalPayments(),
+            // Phase 10 (part A): Google Analytics 4 (null = off; the storefront asks for cookie consent first).
+            'ga4_measurement_id' => $settings->get('ga4_measurement_id'),
         ]]);
     }
 }

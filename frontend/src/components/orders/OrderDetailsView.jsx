@@ -5,6 +5,7 @@ import OrderItems from './OrderItems'
 import OrderStatus from './OrderStatus'
 import OrderStatusBadge from './OrderStatusBadge'
 import OrderTotals from './OrderTotals'
+import InvoicePdfButton from './InvoicePdfButton'
 import { PAYMENT_METHODS } from '../../constants/store'
 import { paymentNote } from '../../constants/orders'
 import { formatDate, formatPrice } from '../../utils/formatters'
@@ -59,8 +60,12 @@ function Shipments({ shipments }) {
   )
 }
 
-/** Invoices (payments recorded); linked to the printable page when the viewer may open it (customers, not guests). */
-function Invoices({ invoices, invoiceLink }) {
+/**
+ * Invoices (payments recorded); linked to the printable page when the viewer
+ * may open it (customers, not guests). `invoicePdf` (phase 10): the order's
+ * proof for the PDF download ({ email } for a guest, {} for the customer).
+ */
+function Invoices({ invoices, invoiceLink, invoicePdf }) {
   if (!invoices?.length) return null
   return (
     <>
@@ -79,6 +84,7 @@ function Invoices({ invoices, invoiceLink }) {
               <strong>{formatPrice(invoice.amount)}</strong>
             </p>
             <p className="order-view__muted">Issued {formatDate(invoice.createdAt)}</p>
+            {invoicePdf && <InvoicePdfButton orderNumber={invoicePdf.orderNumber} invoiceNumber={invoice.number} email={invoicePdf.email} size="sm" variant="ghost" />}
           </li>
         ))}
       </ul>
@@ -118,8 +124,11 @@ function Refunds({ creditMemos }) {
  * invoice to its printable page. `payAction` (phase 8): the "Pay now" button
  * of an unpaid card order, shown with the payment.
  */
-function OrderDetailsView({ order, invoiceLink, payAction = null }) {
-  const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod)
+// Phase 10: an order paid in full by a gift card (no other method).
+const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card' }
+
+function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = null }) {
+  const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
   // Phase 8: whether card orders are paid through Stripe (cached store settings only: no extra request).
   const { settings } = useStoreSettings({ enabled: false })
   const contact = order.contact ?? { email: order.email, phone: order.phone }
@@ -147,10 +156,13 @@ function OrderDetailsView({ order, invoiceLink, payAction = null }) {
       <div className="order-view__columns">
         <section className="order-view__card" aria-labelledby="order-delivery-title">
           <h2 id="order-delivery-title">Delivery</h2>
-          <AddressBlock address={order.shippingAddress} />
-          <p>
-            <strong>{order.shippingMethod.label}</strong> — {order.shippingMethod.eta}
-          </p>
+          {/* Phase 10: gift cards only: nothing ships (no address, no method). */}
+          {order.shippingAddress && order.requiresShipping !== false ? <AddressBlock address={order.shippingAddress} /> : <p>Sent by email: nothing to ship.</p>}
+          {order.shippingMethod && (
+            <p>
+              <strong>{order.shippingMethod.label}</strong> — {order.shippingMethod.eta}
+            </p>
+          )}
           <p className="order-view__muted">
             {contact.email} · {contact.phone}
           </p>
@@ -164,7 +176,13 @@ function OrderDetailsView({ order, invoiceLink, payAction = null }) {
                 <strong>{payment?.label ?? order.paymentMethod}</strong>
                 <OrderStatusBadge status={order.paymentStatus} payment />
               </p>
-              <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe' })}</p>
+              <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe', paypal: settings.paypalPayments === 'paypal' })}</p>
+              {/* Phase 10: the gift card that paid part (or all) of it: its last 4 characters only. */}
+              {order.giftCard?.applied > 0 && (
+                <p className="order-view__muted">
+                  Gift card {order.giftCard.last4 ? `•••• ${order.giftCard.last4} ` : ''}paid {formatPrice(order.giftCard.applied)}.
+                </p>
+              )}
               {payAction && <div className="order-view__pay">{payAction}</div>}
             </>
           ) : (
@@ -174,7 +192,7 @@ function OrderDetailsView({ order, invoiceLink, payAction = null }) {
           )}
           <h3 className="order-view__subheading">Billing address</h3>
           <AddressBlock address={order.billingAddress} />
-          <Invoices invoices={order.invoices} invoiceLink={invoiceLink} />
+          <Invoices invoices={order.invoices} invoiceLink={invoiceLink} invoicePdf={invoicePdf} />
           <Refunds creditMemos={order.creditMemos} />
         </section>
       </div>
@@ -184,7 +202,13 @@ function OrderDetailsView({ order, invoiceLink, payAction = null }) {
           Items
         </h2>
         <OrderItems items={order.items} />
-        <OrderTotals totals={order.totals} couponCode={order.couponCode ?? order.totals.couponCode} appliedRules={order.appliedRules} shippingLabel={order.shippingMethod.label} />
+        <OrderTotals
+          totals={order.totals}
+          couponCode={order.couponCode ?? order.totals.couponCode}
+          appliedRules={order.appliedRules}
+          shippingLabel={order.shippingMethod?.label}
+          requiresShipping={order.requiresShipping !== false}
+        />
         {order.verification && (
           <p className="cart-summary__note">
             Prices verified with the server (DummyJSON cart #{order.verification.cartId}). Its own discounted total was{' '}

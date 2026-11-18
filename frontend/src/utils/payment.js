@@ -16,24 +16,22 @@ export const paymentPage = {
   },
 }
 
-/** Only Stripe-style https addresses are followed (the shop service already drops anything else). */
+/** Only https addresses (Stripe's or PayPal's page) are followed (the shop service already drops anything else). */
 export const isPaymentUrl = (url) => typeof url === 'string' && /^https:\/\/[^\s]+$/.test(url)
 
 /**
  * Whether "Pay now" can start a new payment: an unpaid card order that is
  * still waiting for its payment, in a store that takes card payments through
- * Stripe. The API's own `canPay` wins when it sends one; it refuses (422)
- * anything else anyway.
+ * Stripe, or (phase 10) a PayPal order in a store connected to PayPal. The
+ * API's own `canPay` wins when it sends one; it refuses (422) anything else anyway.
  */
-export function canPayOrder(order, cardPayments) {
+export function canPayOrder(order, cardPayments, paypalPayments = 'manual') {
   if (!order || order.isSimulated) return false
   if (typeof order.canPay === 'boolean') return order.canPay
-  return (
-    order.paymentMethod === 'card' &&
-    order.paymentStatus === 'unpaid' &&
-    order.status === 'pending_payment' &&
-    (order.paymentProvider === 'stripe' || cardPayments === 'stripe')
-  )
+  if (order.paymentStatus !== 'unpaid' || order.status !== 'pending_payment') return false
+  if (order.paymentMethod === 'card') return order.paymentProvider === 'stripe' || cardPayments === 'stripe'
+  if (order.paymentMethod === 'paypal') return order.paymentProvider === 'paypal' || paypalPayments === 'paypal'
+  return false
 }
 
 // sessionStorage can be missing or throw (private windows, blocked storage): every access is guarded.

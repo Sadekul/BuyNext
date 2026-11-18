@@ -31,7 +31,8 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
         <DiscountRows rules={totals.appliedRules} discount={totals.discount} couponCode={couponCode} />
         <div>
           <dt>Estimated shipping</dt>
-          <dd>{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>
+          {/* Phase 10: gift cards only: they're emailed. */}
+          <dd>{totals.requiresShipping === false ? 'None (sent by email)' : totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</dd>
         </div>
         {/* A store that charges no tax (REAL_SHOP settings) shows no tax line. */}
         {showTax && (

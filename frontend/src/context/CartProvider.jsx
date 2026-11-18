@@ -9,6 +9,7 @@ import { calculateCartTotals } from '../utils/cartTotals'
 import { getPurchaseLimits } from '../utils/inventory'
 import { REAL_SHOP } from '../constants/shop'
 import { useSavedCartSync, writeSavedCartBaseline } from '../hooks/useSavedCartSync'
+import { trackAddToCart } from '../utils/analytics'
 
 const STORAGE_OPTIONS = {
   storageKey: STORAGE_KEYS.cart,
@@ -48,6 +49,8 @@ function CartProvider({ children }) {
   const addItem = useCallback((product, quantity = getPurchaseLimits(product).min) => {
     dispatch({ type: CART_ACTIONS.ADDED, product, quantity })
     setIsCartOpen(true)
+    // Phase 10 statistics (only with the visitor's consent; no personal data, never a gift card's recipient).
+    if (getPurchaseLimits(product).canBuy && !(product.hasVariants && !product.variantId) && !(product.type === 'gift_card' && !product.giftCard)) trackAddToCart(product, quantity)
   }, [dispatch])
   // Lines are addressed by cartLineKey(item): the product id, plus the variant id for variant lines.
   const updateQuantity = useCallback(

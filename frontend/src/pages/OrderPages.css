@@ -198,3 +198,19 @@
 .order-page__hero .pay-now {
   margin-top: var(--space-3);
 }
+
+/* Phase 10: the gift card balance result. */
+.gift-card-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 32rem;
+  padding: var(--space-4);
+  background: var(--color-success-soft);
+  border-radius: var(--radius-md);
+}
+
+.gift-card-balance__amount {
+  font-weight: 700;
+}

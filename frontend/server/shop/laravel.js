@@ -1,4 +1,4 @@
-import { laravel, pick } from '../http.js'
+import { laravel, laravelPdf, pick } from '../http.js'
 
 /*
  * Shopping with BuyNest's Laravel API (docs/backend/PHASE2_CONTRACT.md):
@@ -23,12 +23,43 @@ export const camelPath = (field) => field.split('.').map(camelKey).join('.')
 // ---- browser → API ----
 
 const toQuantity = (value) => (Number.isInteger(value) ? value : Number.parseInt(value, 10))
+const trimmed = (value, max) => str(value)?.trim().slice(0, max)
+
+/**
+ * Phase 10: what the shopper chose for a gift card line (the amount, and who
+ * receives it). The amount is a choice, not a price: the API checks it
+ * against the product's amounts and limits, and prices the line itself.
+ */
+export function toGiftCard(raw) {
+  if (!raw || typeof raw !== 'object') return undefined
+  const amount = Number(raw.amount)
+  return {
+    amount: Number.isFinite(amount) && amount > 0 ? amount.toFixed(2) : null,
+    recipient_name: trimmed(raw.recipientName, 100) ?? null,
+    recipient_email: trimmed(raw.recipientEmail, 254) ?? null,
+    message: trimmed(raw.message, 500) || null,
+  }
+}
+
 // variant_id (phase 5) only when the line names one: lines without it are sent as before.
+// gift_card (phase 10) only on gift card lines.
 const toItems = (items) =>
   (Array.isArray(items) ? items.slice(0, 50) : []).map((item) => {
     const variantId = toQuantity(item?.variantId)
-    return { product_id: toQuantity(item?.productId), ...(Number.isInteger(variantId) && variantId > 0 && { variant_id: variantId }), quantity: toQuantity(item?.quantity) }
+    const giftCard = toGiftCard(item?.giftCard)
+    return {
+      product_id: toQuantity(item?.productId),
+      ...(Number.isInteger(variantId) && variantId > 0 && { variant_id: variantId }),
+      quantity: toQuantity(item?.quantity),
+      ...(giftCard && { gift_card: giftCard }),
+    }
   })
+
+/** Phase 10: a gift card code typed at checkout (letters, digits, dashes, spaces), or undefined. */
+const toGiftCardCode = (value) => {
+  const code = str(value)?.trim().toUpperCase().slice(0, 40)
+  return code && /^[A-Z0-9 -]{4,40}$/.test(code) ? code : undefined
+}
 
 const toAddress = (address) =>
   address && typeof address === 'object'
@@ -70,7 +101,33 @@ export const fromTotals = (raw = {}) => ({
   ...(raw.refunded !== undefined && { refunded: money(raw.refunded) ?? 0 }),
   // Phase 6: what the customer group's discount took off (already inside the subtotal).
   ...(raw.group_discount !== undefined && { groupDiscount: money(raw.group_discount) ?? 0 }),
+  // Phase 10: what a gift card pays of the total, and what is left to pay by another method.
+  ...(raw.gift_card !== undefined && raw.gift_card !== null && { giftCard: money(raw.gift_card) ?? 0 }),
+  ...(raw.amount_due !== undefined && raw.amount_due !== null && { amountDue: money(raw.amount_due) ?? 0 }),
 })
+
+/** Phase 10: a gift card line's recipient and message (never the card's code: it's emailed to the recipient). */
+const fromGiftCardLine = (raw) =>
+  raw && typeof raw === 'object'
+    ? {
+        amount: money(raw.amount),
+        recipientName: str(raw.recipient_name) ?? '',
+        recipientEmail: str(raw.recipient_email) ?? '',
+        message: str(raw.message) ?? null,
+      }
+    : null
+
+/** Phase 10: the gift card applied at checkout: its last 4 characters, what it pays, and what stays on it. */
+export const fromAppliedGiftCard = (raw) =>
+  raw && typeof raw === 'object'
+    ? {
+        last4: str(raw.last4) ?? str(raw.code_last4) ?? null,
+        applied: money(raw.applied ?? raw.amount) ?? 0,
+        balance: money(raw.balance) ?? null,
+        remaining: money(raw.balance_after) ?? null,
+        expiresAt: str(raw.expires_at) ?? null,
+      }
+    : null
 
 /** Phase 6: the shopper's customer group as the API names it ({ name, discount_percent }), or null. */
 export const fromGroup = (raw) =>
@@ -96,6 +153,9 @@ export const fromLine = (raw) => ({
   // and the line's share of the cart rules' discount. Older lines have neither.
   ...(typeof raw.price_label === 'string' && raw.price_label.trim() && { priceLabel: raw.price_label.trim().slice(0, 120) }),
   ...(raw.discount !== undefined && raw.discount !== null && { discount: money(raw.discount) ?? 0 }),
+  // Phase 10: gift card lines carry the recipient they go to (and need no shipping).
+  ...(raw.gift_card && typeof raw.gift_card === 'object' && { giftCard: fromGiftCardLine(raw.gift_card) }),
+  ...(raw.type === 'gift_card' && { productType: 'gift_card' }),
 })
 
 /** Phase 7: a cart price rule that applied (a typed code, or an automatic rule). */
@@ -130,7 +190,14 @@ export function fromCart(raw = {}) {
     couponError: raw.coupon_error ?? null,
     // Phase 7: every cart rule that applied, automatic ones first (each with its label and saving).
     appliedRules: fromAppliedRules(raw.applied_rules),
-    shippingOptions: (raw.shipping_options ?? []).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price) })),
+    // Phase 10: only the methods offered for this cart (table rates by country, weight, and subtotal), each with its price.
+    shippingOptions: (raw.shipping_options ?? []).filter((option) => option && option.available !== false).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price) })),
+    // Phase 10: a cart of gift cards only needs no delivery.
+    requiresShipping: raw.shipping_required !== false,
+    // Why no delivery method is offered (e.g. no table rate for that country or weight), or null.
+    shippingError: str(raw.shipping_error) ?? null,
+    giftCard: fromAppliedGiftCard(raw.gift_card),
+    giftCardError: str(raw.gift_card_error) ?? null,
     // Phase 4 tax: false when no country was given, so the tax shown is not final (0).
     totals: fromTotals(raw.totals),
     taxEstimated: (raw.tax_estimated ?? raw.totals?.tax_estimated) === true,
@@ -236,7 +303,7 @@ export function fromOrder(raw) {
     status: raw.status,
     paymentStatus: raw.payment_status,
     paymentMethod: raw.payment_method,
-    shippingMethod: raw.shipping_method ? pick(raw.shipping_method, ['id', 'label', 'eta']) : null,
+    shippingMethod: raw.shipping_method && typeof raw.shipping_method === 'object' && raw.shipping_method.id !== 'none' ? pick(raw.shipping_method, ['id', 'label', 'eta']) : null,
     email: raw.email,
     phone: raw.phone,
     shippingAddress: fromAddress(raw.shipping_address),
@@ -259,6 +326,10 @@ export function fromOrder(raw) {
     ...fromOrderPayment(raw),
     // Phase 9: whether the shopper may cancel it themselves (unpaid, nothing invoiced or shipped).
     ...(typeof raw.can_cancel === 'boolean' && { canCancel: raw.can_cancel }),
+    // Phase 10: the gift card that paid (part of) it, and whether it ships at all.
+    ...(raw.gift_card && typeof raw.gift_card === 'object' && { giftCard: fromAppliedGiftCard(raw.gift_card) }),
+    // A gift-card-only order is stored with shipping method "none" ("No shipping needed").
+    ...((raw.shipping_required === false || raw.shipping_method?.id === 'none') && { requiresShipping: false }),
   }
 }
 
@@ -306,12 +377,15 @@ export const laravelShop = {
     const email = str(body.email)?.trim().slice(0, 254)
     // The shipping country prices tax (phase 4); without it the API leaves tax at 0.
     const country = str(body.country)?.trim().slice(0, 60)
+    const giftCardCode = toGiftCardCode(body.giftCardCode)
     const payload = {
       items: toItems(body.items),
       coupon_code: str(body.couponCode) || null,
-      shipping_method: str(body.shippingMethod) ?? 'standard',
+      // null: a cart of gift cards only (no delivery).
+      shipping_method: body.shippingMethod === null ? null : (str(body.shippingMethod) ?? 'standard'),
       ...(email && { email }),
       ...(country && { country }),
+      ...(giftCardCode && { gift_card_code: giftCardCode }),
     }
     let result = await laravel('/api/v1/cart/validate', { method: 'POST', token, request, body: payload })
     // An expired session shouldn't stop the cart from being priced: ask again as a guest.
@@ -328,8 +402,10 @@ export const laravelShop = {
       body: {
         items: toItems(body.items),
         coupon_code: str(body.couponCode) || null,
-        shipping_method: str(body.shippingMethod),
+        shipping_method: body.shippingMethod === null ? null : str(body.shippingMethod),
         payment_method: str(body.paymentMethod),
+        // Phase 10: one gift card per order; "gift_card" as the payment method when it pays everything.
+        ...(toGiftCardCode(body.giftCardCode) && { gift_card_code: toGiftCardCode(body.giftCardCode) }),
         email: str(body.email),
         phone: str(body.phone),
         shipping_address: toAddress(body.shippingAddress),
@@ -412,8 +488,73 @@ export const laravelShop = {
     return answer(result, [200], (data) => fromOrder(data.data))
   },
 
+  /**
+   * Phase 10: back from PayPal with ?token=…, the API captures the approved
+   * payment server-side (status, amount, and currency checked) and answers
+   * with the order. The customer's token, or a guest's order email, proves
+   * the order is theirs. → the order (paid, or still waiting).
+   */
+  async capturePaypal(token, number, body, request) {
+    const paypalToken = str(body.token)?.trim()
+    if (!paypalToken || !/^[A-Za-z0-9_-]{6,64}$/.test(paypalToken)) {
+      const message = "This payment link isn't valid. Open your order and use Pay now."
+      return { ok: false, status: 422, body: { message, errors: { token: [message] } } }
+    }
+    const email = token ? undefined : str(body.email)?.trim().slice(0, 254)
+    const result = await laravel(`/api/v1/orders/${encodeURIComponent(number)}/paypal/capture`, {
+      method: 'POST',
+      token,
+      request,
+      body: { token: paypalToken, ...(email && { email }) },
+    })
+    return answer(result, [200, 201], (data) => fromOrder(data.data))
+  },
+
+  /**
+   * Phase 10: an invoice as a PDF file (the customer's token, or a guest's
+   * order email). → { ok: true, stream, … } with the API's own headers, or a failure.
+   */
+  async invoicePdf(token, number, invoice, body, request) {
+    const email = token ? undefined : str(body?.email)?.trim().slice(0, 254)
+    if (!token && !email) return { ok: false, status: 401, body: { message: 'Please sign in to continue.' } }
+    // The guest's email goes in a header, not the address, so it stays out of the API's request logs.
+    const result = await laravelPdf(`/api/v1/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}.pdf`, {
+      token,
+      request,
+      headers: email ? { 'X-Order-Email': email } : {},
+    })
+    if (!result.stream) return failed(result)
+    return { ok: true, status: 200, data: { ...result, fileName: pdfFileName(result.disposition, invoice) } }
+  },
+
+  /** Phase 10: a gift card's balance. The API gives the same 422 for unknown and disabled codes. */
+  async checkGiftCard(body, request) {
+    const code = toGiftCardCode(body.code)
+    if (!code) {
+      const message = 'Enter the gift card code from your email.'
+      return { ok: false, status: 422, body: { message, errors: { code: [message] } } }
+    }
+    const result = await laravel('/api/v1/gift-cards/check', { method: 'POST', request, body: { code } })
+    return answer(result, [200], (data) => fromGiftCardBalance(data.data ?? data))
+  },
+
   async lookupOrder(body, request) {
     const result = await laravel('/api/v1/orders/lookup', { method: 'POST', request, body: { number: str(body.number)?.trim(), email: str(body.email)?.trim() } })
     return answer(result, [200], (data) => fromOrder(data.data))
   },
 }
+
+/** "INV-100001.pdf" from the API's Content-Disposition, or the invoice number (only safe file names get through). */
+export function pdfFileName(disposition, invoice) {
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? '')
+  const name = match ? decodeURIComponent(match[1]).trim() : ''
+  return /^[\w.-]{1,100}\.pdf$/i.test(name) ? name : `${invoice}.pdf`
+}
+
+/** POST /gift-cards/check → { balance, currency, expiresAt, status } (no code, no history). */
+export const fromGiftCardBalance = (raw = {}) => ({
+  balance: money(raw.balance) ?? 0,
+  currency: str(raw.currency) ?? 'USD',
+  expiresAt: str(raw.expires_at) ?? null,
+  status: ['active', 'disabled', 'expired'].includes(raw.status) ? raw.status : 'active',
+})

@@ -69,6 +69,18 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  *                                              with the order's email); 422 with the API's text when it is paid or shipped
  * Orders carry `canCancel` (phase 9).
  *
+ * Phase 10 (docs/backend/PHASE10_CONTRACT.md):
+ *   GET  /api/shop/orders/:number/invoices/:invoice.pdf  → the API's PDF, streamed with its type, size, and
+ *                                              file name (customer session)
+ *   POST /api/shop/orders/:number/invoices/:invoice.pdf { email } → the same for a guest (the order's email is the proof)
+ *   POST /api/shop/orders/:number/paypal/capture { token, email? } → the order (back from PayPal with ?token=…:
+ *                                              the API captures the approved payment; customer session or a guest's email)
+ *   POST /api/shop/gift-cards/check            { code } → { balance, currency, expiresAt, status } (no sign-in)
+ * cart/validate and orders also take `giftCardCode`, gift card lines (`giftCard: { amount, recipientName,
+ * recipientEmail, message }`), and `shippingMethod: null` for a cart of gift cards only. Priced carts carry
+ * `requiresShipping`, `giftCard: { last4, applied, balance, remaining }`, `giftCardError`, and
+ * `totals.giftCard` / `totals.amountDue`; `shippingOptions` lists only the methods offered for this cart.
+ *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */
@@ -77,6 +89,7 @@ const isProductId = (value) => /^\d{1,9}$/.test(value ?? '')
 const isAddressId = isProductId // the same: a positive whole number
 const isOrderNumber = (value) => /^BN-\d{1,12}$/.test(value ?? '')
 const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
+const isInvoicePdf = (value) => /^INV-\d{1,12}\.pdf$/.test(value ?? '')
 const isReturnNumber = (value) => /^RMA-\d{1,12}$/.test(value ?? '')
 const isAlertId = isProductId
 const pageOf = (url) => Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
@@ -240,6 +253,40 @@ const ROUTES = {
   async 'POST orders/:number/cancel'({ request, cookies, param }) {
     return reply(await laravelShop.cancelOrder(cookies[CUSTOMER.access], param, await readBody(request), request))
   },
+
+  // ---- phase 10: invoice PDFs, PayPal, gift cards ----
+
+  async 'GET orders/:number/invoices/:invoice.pdf'({ request, cookies, param, invoice }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return pdfReply(await laravelShop.invoicePdf(cookies[CUSTOMER.access], param, invoice, {}, request))
+  },
+
+  // A guest proves the order is theirs with its email (in the body, so it stays out of URLs and logs).
+  async 'POST orders/:number/invoices/:invoice.pdf'({ request, cookies, param, invoice }) {
+    return pdfReply(await laravelShop.invoicePdf(cookies[CUSTOMER.access], param, invoice, await readBody(request), request))
+  },
+
+  async 'POST orders/:number/paypal/capture'({ request, cookies, param }) {
+    return reply(await laravelShop.capturePaypal(cookies[CUSTOMER.access], param, await readBody(request), request))
+  },
+
+  async 'POST gift-cards/check'({ request }) {
+    return reply(await laravelShop.checkGiftCard(await readBody(request), request))
+  },
+}
+
+/** The API's PDF, passed on as it streams in: never parsed or rebuilt here. */
+function pdfReply(result) {
+  if (!result.ok) return json(result.body, result.status)
+  const { stream, contentLength, fileName } = result.data
+  const headers = new Headers({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${fileName}"`,
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  })
+  if (contentLength && /^\d{1,10}$/.test(contentLength)) headers.set('Content-Length', contentLength)
+  return new Response(stream, { status: 200, headers })
 }
 
 /** /api/shop/<segments> → a route, or null. */
@@ -269,6 +316,12 @@ function matchRoute(method, segments) {
   }
   if (segments.length === 3 && segments[0] === 'products' && isProductId(segments[1]) && segments[2] === 'reviews') {
     return { route: ROUTES[`${method} products/:id/reviews`], param: segments[1] }
+  }
+  if (segments.length === 4 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'invoices' && isInvoicePdf(segments[3])) {
+    return { route: ROUTES[`${method} orders/:number/invoices/:invoice.pdf`], param: segments[1], invoice: segments[3].slice(0, -4) }
+  }
+  if (segments.length === 4 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'paypal' && segments[3] === 'capture') {
+    return { route: ROUTES[`${method} orders/:number/paypal/capture`], param: segments[1] }
   }
   if (segments.length === 4 && segments[0] === 'orders' && isOrderNumber(segments[1]) && segments[2] === 'invoices' && isInvoiceNumber(segments[3])) {
     return { route: ROUTES[`${method} orders/:number/invoices/:invoice`], param: segments[1], invoice: segments[3] }
