@@ -93,3 +93,4 @@ Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/REA
 | B11 | Phase 11: wishlists, comparison, linked products, reward points, display currencies | Done: the wishlist is saved to the customer's account and can be shared by link, products can be compared side by side (up to 4, with specifications), admins choose related products, up-sells and cross-sells (and can duplicate a product), reward points are earned on paid orders and spent at checkout (off until turned on), shoppers can see prices in another currency such as BDT while paying in USD, and recently viewed products are shown; see [docs/backend/PHASE11_CONTRACT.md](docs/backend/PHASE11_CONTRACT.md) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).
+# BuyNext
