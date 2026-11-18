@@ -309,6 +309,21 @@ describe('import / export', () => {
     expect(init.body.get('file').name).toBe('products.csv')
   })
 
+  it('lists skipped values (phase 11 warnings) without blocking the import', async () => {
+    start(OWNER, '/import-export', {
+      'POST /api/admin/products/import': {
+        body: { dryRun: true, rows: 1, created: 0, updated: 1, unchanged: 0, errors: [], warnings: [{ row: 2, column: 'related_skus', message: 'No product has SKU "NOPE": skipped.' }] },
+      },
+    })
+    const user = userEvent.setup()
+    await user.upload(await screen.findByLabelText('CSV file'), file())
+    await user.click(screen.getByRole('button', { name: /Check file/ }))
+    expect(await screen.findByText(/1 note: some values were skipped/)).toBeInTheDocument()
+    const notes = within(screen.getByRole('table', { name: /Skipped values/ }))
+    expect(notes.getByRole('row', { name: '2 related_skus No product has SKU "NOPE": skipped.' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Import now/ })).toBeInTheDocument()
+  })
+
   it('refuses a file that is not CSV before sending it', async () => {
     const fetchMock = start(OWNER, '/import-export', {})
     const user = userEvent.setup({ applyAccept: false })

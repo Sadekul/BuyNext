@@ -36,7 +36,12 @@ class CreditMemoResource extends JsonResource
             'refund_reference' => $this->refund_reference, // phase 8: the Stripe refund id (null: refunded by hand); phase 10: or PayPal's
             // Phase 10 (part B): returned to the redeemed gift card first, the rest by the payment method.
             'gift_card_refund' => $this->gift_card_refund ?? '0.00',
-            'other_refund' => Pricing::format(Pricing::toCents($this->total) - Pricing::toCents($this->gift_card_refund ?? 0)),
+            // Phase 11: reward points are settled first: the money returned as points, the points given back, earned points taken back.
+            'reward_points_refund' => $this->reward_points_refund ?? '0.00',
+            'reward_points_returned' => (int) $this->reward_points_returned,
+            'reward_points_reversed' => (int) $this->reward_points_reversed,
+            'other_refund' => Pricing::format(Pricing::toCents($this->total) - Pricing::toCents($this->gift_card_refund ?? 0)
+                - Pricing::toCents($this->reward_points_refund ?? 0)),
             'restocked' => $this->restocked,
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'admin_name' => $this->admin?->name,

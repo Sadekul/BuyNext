@@ -1,4 +1,4 @@
-import { formatPrice } from '../utils/formatters'
+import { formatBasePrice } from '../utils/formatters'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { effectiveDiscountPercent, getProductPricing } from '../utils/pricing'
 import { storedInteger, storedProductSnapshot, storedText } from '../utils/storedValues'
@@ -179,7 +179,7 @@ export function cartReducer(state, action) {
           const newSalePrice = getProductPricing(fresh).salePrice
           let notice = quantityNotice(item.quantity, quantity, limits)
           if (!notice && oldSalePrice !== newSalePrice) {
-            notice = `Price changed from ${formatPrice(oldSalePrice)} to ${formatPrice(newSalePrice)}.`
+            notice = `Price changed from ${formatBasePrice(oldSalePrice)} to ${formatBasePrice(newSalePrice)}.`
           }
           return { ...item, ...toSnapshot(fresh), quantity, isUnavailable: false, notice }
         }),

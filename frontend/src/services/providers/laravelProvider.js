@@ -1,5 +1,6 @@
 import {
   normalizeCategories,
+  normalizeCompareList,
   normalizeProductDetail,
   normalizeProductPage,
 } from '../adapters/laravelAdapter'
@@ -45,10 +46,13 @@ export const laravelProvider = {
     productDetail: (id) => ({ path: `/api/catalog/products/${encodeURIComponent(id)}` }),
     suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit, suggest: 1 } }),
     categories: () => ({ path: '/api/catalog/categories' }),
+    // Phase 11: 2–4 products side by side (visible ones only; unknown ids are skipped).
+    compare: (ids) => ({ path: '/api/catalog/products/compare', params: { ids: ids.join(',') } }),
   },
   adapter: {
     productPage: normalizeProductPage,
     product: normalizeProductDetail,
     categories: normalizeCategories,
+    compareList: normalizeCompareList,
   },
 }

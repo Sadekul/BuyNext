@@ -26,6 +26,8 @@ const COLUMNS = [
   { id: 'status', label: 'Status' },
   { id: 'joined', label: 'Joined' },
   { id: 'lastLogin', label: 'Last sign-in' },
+  // Phase 11 §4: the reward points balance, off until chosen under Columns.
+  { id: 'points', label: 'Points', optional: true },
 ]
 const ROLE_LABELS = { admin: 'Admin', moderator: 'Moderator', user: 'Customer' }
 const VERIFIED_FILTERS = [
@@ -227,6 +229,11 @@ function CustomersPage() {
                   {grid.isVisible('status') && <th scope="col">Status</th>}
                   {grid.isVisible('joined') && <th scope="col">Joined</th>}
                   {grid.isVisible('lastLogin') && <th scope="col">Last sign-in</th>}
+                  {profiles && grid.isVisible('points') && (
+                    <th scope="col" className="num">
+                      Points
+                    </th>
+                  )}
                   <th scope="col">
                     <span className="visually-hidden">Actions</span>
                   </th>
@@ -259,6 +266,7 @@ function CustomersPage() {
                     )}
                     {grid.isVisible('joined') && <td>{formatDate(customer.createdAt)}</td>}
                     {grid.isVisible('lastLogin') && <td>{formatDate(customer.lastLoginAt, 'Never')}</td>}
+                    {profiles && grid.isVisible('points') && <td className="num">{typeof customer.rewardPoints === 'number' ? formatCount(customer.rewardPoints) : '—'}</td>}
                     <td>
                       {!can('customers.edit') ? null : customer.isActive ? (
                         <button

@@ -1,4 +1,5 @@
 import { laravel, laravelPdf, pick } from '../http.js'
+import { productCards } from './productCard.js'
 
 /*
  * Shopping with BuyNest's Laravel API (docs/backend/PHASE2_CONTRACT.md):
@@ -104,7 +105,46 @@ export const fromTotals = (raw = {}) => ({
   // Phase 10: what a gift card pays of the total, and what is left to pay by another method.
   ...(raw.gift_card !== undefined && raw.gift_card !== null && { giftCard: money(raw.gift_card) ?? 0 }),
   ...(raw.amount_due !== undefined && raw.amount_due !== null && { amountDue: money(raw.amount_due) ?? 0 }),
+  // Phase 11: what reward points pay of the total (after tax, before a gift card).
+  ...(raw.reward_points !== undefined && raw.reward_points !== null && { rewardPoints: money(raw.reward_points) ?? 0 }),
 })
+
+const wholePoints = (value) => (Number.isInteger(value) ? value : Number.parseInt(value, 10) || 0)
+
+/**
+ * Phase 11: the signed-in customer's reward points on this cart (null for
+ * guests, or when the store has points off): balance, the most usable here,
+ * what this order would earn, and what is applied.
+ */
+export const fromCartRewards = (raw) =>
+  raw && typeof raw === 'object' && raw.enabled !== false
+    ? {
+        enabled: true,
+        balance: wholePoints(raw.balance),
+        pointValue: money(raw.point_value) ?? 0,
+        minRedeem: wholePoints(raw.min_redeem),
+        maxPoints: wholePoints(raw.max_points),
+        earnEstimate: wholePoints(raw.earn_estimate),
+        appliedPoints: wholePoints(raw.applied_points),
+        appliedAmount: money(raw.applied_amount) ?? 0,
+      }
+    : null
+
+/** Phase 11: an order's reward points (spent, what they paid, earned once paid), as top-level fields. */
+function fromOrderRewards(raw) {
+  if (!raw || typeof raw !== 'object') return {}
+  return {
+    rewardPointsSpent: wholePoints(raw.spent),
+    rewardPointsAmount: money(raw.amount) ?? 0,
+    rewardPointsEarned: raw.earned === null || raw.earned === undefined ? null : wholePoints(raw.earned),
+  }
+}
+
+/** Phase 11: reward points to spend (a whole number ≥ 0), or undefined. */
+const toRewardPoints = (value) => {
+  const points = toQuantity(value)
+  return Number.isInteger(points) && points > 0 ? Math.min(points, 100_000_000) : undefined
+}
 
 /** Phase 10: a gift card line's recipient and message (never the card's code: it's emailed to the recipient). */
 const fromGiftCardLine = (raw) =>
@@ -203,7 +243,18 @@ export function fromCart(raw = {}) {
     taxEstimated: (raw.tax_estimated ?? raw.totals?.tax_estimated) === true,
     // Phase 6: the group the cart was priced for (General for guests).
     customerGroup: fromGroup(raw.customer_group),
+    // Phase 11: "Customers also bought" (product cards, the catalog's shape), and reward points.
+    crossSells: productCards(raw.cross_sells, 4),
+    rewards: fromCartRewards(raw.rewards),
+    rewardPoints: rewardPointsApplied(raw.rewards),
+    rewardPointsError: str(raw.reward_points_error) ?? null,
   }
+}
+
+/** { points, amount } of the reward points applied to the cart, or null. */
+function rewardPointsApplied(raw) {
+  const rewards = fromCartRewards(raw)
+  return rewards && rewards.appliedPoints > 0 ? { points: rewards.appliedPoints, amount: rewards.appliedAmount } : null
 }
 
 // Tracking links become <a href>: only https addresses get through (never javascript: or http:).
@@ -330,6 +381,8 @@ export function fromOrder(raw) {
     ...(raw.gift_card && typeof raw.gift_card === 'object' && { giftCard: fromAppliedGiftCard(raw.gift_card) }),
     // A gift-card-only order is stored with shipping method "none" ("No shipping needed").
     ...((raw.shipping_required === false || raw.shipping_method?.id === 'none') && { requiresShipping: false }),
+    // Phase 11: reward points spent on it (and what they paid), and earned once it was paid.
+    ...fromOrderRewards(raw.reward_points),
   }
 }
 
@@ -378,6 +431,7 @@ export const laravelShop = {
     // The shipping country prices tax (phase 4); without it the API leaves tax at 0.
     const country = str(body.country)?.trim().slice(0, 60)
     const giftCardCode = toGiftCardCode(body.giftCardCode)
+    const rewardPoints = token ? toRewardPoints(body.rewardPoints) : undefined
     const payload = {
       items: toItems(body.items),
       coupon_code: str(body.couponCode) || null,
@@ -386,10 +440,16 @@ export const laravelShop = {
       ...(email && { email }),
       ...(country && { country }),
       ...(giftCardCode && { gift_card_code: giftCardCode }),
+      // Phase 11: reward points to spend (signed in only: a guest has none).
+      ...(rewardPoints && { reward_points: rewardPoints }),
     }
     let result = await laravel('/api/v1/cart/validate', { method: 'POST', token, request, body: payload })
-    // An expired session shouldn't stop the cart from being priced: ask again as a guest.
-    if (result.status === 401 && token) result = await laravel('/api/v1/cart/validate', { method: 'POST', request, body: payload })
+    // An expired session shouldn't stop the cart from being priced: ask again as a guest (without points).
+    if (result.status === 401 && token) {
+      const guestPayload = { ...payload }
+      delete guestPayload.reward_points
+      result = await laravel('/api/v1/cart/validate', { method: 'POST', request, body: guestPayload })
+    }
     return answer(result, [200], (data) => fromCart(data.data))
   },
 
@@ -406,6 +466,9 @@ export const laravelShop = {
         payment_method: str(body.paymentMethod),
         // Phase 10: one gift card per order; "gift_card" as the payment method when it pays everything.
         ...(toGiftCardCode(body.giftCardCode) && { gift_card_code: toGiftCardCode(body.giftCardCode) }),
+        // Phase 11: reward points (signed-in customers; points pay before a gift card). "reward_points" as the
+        // payment method when they (alone) pay everything.
+        ...(token && toRewardPoints(body.rewardPoints) && { reward_points: toRewardPoints(body.rewardPoints) }),
         email: str(body.email),
         phone: str(body.phone),
         shipping_address: toAddress(body.shippingAddress),

@@ -60,3 +60,21 @@ export async function getProductById(productId, { signal } = {}) {
   const { path, params } = catalog.productDetail(productId)
   return adapter.product(await apiClient.get(path, { params, signal }))
 }
+
+/**
+ * Phase 11: the products of the compare page, in the order given. BuyNest's
+ * API answers them in one request (with specifications); the demo loads each
+ * DummyJSON product (no specifications there). Products that no longer exist are skipped.
+ */
+export async function getCompareProducts(ids, { signal } = {}) {
+  if (ids.length === 0) return []
+  if (catalog.compare) {
+    const { path, params } = catalog.compare(ids)
+    const products = adapter.compareList(await apiClient.get(path, { params, signal }))
+    return ids.map((id) => products.find((product) => product.id === id)).filter(Boolean)
+  }
+  const results = await Promise.allSettled(ids.map((id) => getProductById(id, { signal })))
+  const failure = results.find((result) => result.status === 'rejected' && result.reason?.status !== 404)
+  if (failure) throw failure.reason
+  return results.filter((result) => result.status === 'fulfilled').map((result) => result.value)
+}

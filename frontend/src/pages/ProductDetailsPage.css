@@ -184,6 +184,43 @@
   color: var(--color-text-muted);
 }
 
+/* Phase 11: the admin's specifications. */
+.product-details__spec-table {
+  width: 100%;
+  font-size: var(--text-sm);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.product-details__spec-table th,
+.product-details__spec-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+}
+
+.product-details__spec-table tr + tr th,
+.product-details__spec-table tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.product-details__spec-table th {
+  width: 40%;
+  font-weight: 600;
+}
+
+.product-details__spec-table td {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.product-details__points {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 @media (min-width: 900px) {
   .product-details__main {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

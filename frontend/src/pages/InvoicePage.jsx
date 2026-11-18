@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 import { invoiceQuery } from '../queries/orderQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, formatPrice } from '../utils/formatters'
+import { formatDate, formatBasePrice } from '../utils/formatters'
 import './InvoicePage.css'
 
 function Address({ address }) {
@@ -147,8 +147,8 @@ function InvoicePage() {
                   {item.sku && <span className="invoice__muted"> · {item.sku}</span>}
                 </td>
                 <td className="invoice__num">{item.quantity}</td>
-                <td className="invoice__num">{formatPrice(item.salePrice)}</td>
-                <td className="invoice__num">{formatPrice(item.lineTotal)}</td>
+                <td className="invoice__num">{formatBasePrice(item.salePrice)}</td>
+                <td className="invoice__num">{formatBasePrice(item.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
@@ -157,39 +157,39 @@ function InvoicePage() {
               <th scope="row" colSpan={3}>
                 Subtotal
               </th>
-              <td className="invoice__num">{formatPrice(totals.subtotal)}</td>
+              <td className="invoice__num">{formatBasePrice(totals.subtotal)}</td>
             </tr>
             {totals.discount > 0 && (
               <tr>
                 <th scope="row" colSpan={3}>
                   Discount
                 </th>
-                <td className="invoice__num">−{formatPrice(totals.discount)}</td>
+                <td className="invoice__num">−{formatBasePrice(totals.discount)}</td>
               </tr>
             )}
             <tr>
               <th scope="row" colSpan={3}>
                 Shipping
               </th>
-              <td className="invoice__num">{totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}</td>
+              <td className="invoice__num">{totals.shipping === 0 ? 'Free' : formatBasePrice(totals.shipping)}</td>
             </tr>
             <tr>
               <th scope="row" colSpan={3}>
                 Tax
               </th>
-              <td className="invoice__num">{formatPrice(totals.tax)}</td>
+              <td className="invoice__num">{formatBasePrice(totals.tax)}</td>
             </tr>
             <tr className="invoice__total">
               <th scope="row" colSpan={3}>
                 Total
               </th>
-              <td className="invoice__num">{formatPrice(totals.total)}</td>
+              <td className="invoice__num">{formatBasePrice(totals.total)}</td>
             </tr>
             <tr>
               <th scope="row" colSpan={3}>
                 Amount paid
               </th>
-              <td className="invoice__num">{formatPrice(invoice.amount)}</td>
+              <td className="invoice__num">{formatBasePrice(invoice.amount)}</td>
             </tr>
           </tfoot>
         </table>

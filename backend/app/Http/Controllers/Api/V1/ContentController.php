@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\Admin\CurrencyController;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PageResource;
 use App\Http\Resources\ProductResource;
+use App\Models\CurrencyRate;
 use App\Models\Page;
 use App\Services\HomeContent;
 use App\Services\Payments\PayPalPayments;
 use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
+use App\Services\RewardPoints;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 
@@ -38,7 +41,7 @@ class ContentController extends Controller
      * storefront shows the same ones (shipping prices, countries, payment
      * methods, guest checkout, whether tax is charged).
      */
-    public function store(Settings $settings, StripePayments $payments, PayPalPayments $paypal): JsonResponse
+    public function store(Settings $settings, StripePayments $payments, PayPalPayments $paypal, RewardPoints $rewards): JsonResponse
     {
         return response()->json(['data' => [
             'store_name' => $settings->get('store_name'),
@@ -65,6 +68,19 @@ class ContentController extends Controller
             'paypal_payments' => $paypal->paypalPayments(),
             // Phase 10 (part A): Google Analytics 4 (null = off; the storefront asks for cookie consent first).
             'ga4_measurement_id' => $settings->get('ga4_measurement_id'),
+            // Phase 11: reward points ("Earn about N points" = floor(price × earn_rate)) and display currencies (enabled, with a rate).
+            'rewards' => [
+                'enabled' => $rewards->enabled(),
+                'earn_rate' => $rewards->earnRateString(),
+                'point_value' => $rewards->pointValueString(),
+                'min_redeem' => $rewards->minRedeem(),
+            ],
+            'currencies' => [
+                'base' => CurrencyController::base(),
+                'display' => CurrencyRate::where('enabled', true)->where('rate', '>', 0)->orderBy('position')->orderBy('id')->get()
+                    ->map(fn (CurrencyRate $rate) => ['code' => $rate->code, 'symbol' => $rate->symbol, 'rate' => $rate->rate, 'decimals' => $rate->decimals])
+                    ->values()->all(),
+            ],
         ]]);
     }
 }

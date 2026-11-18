@@ -9,15 +9,16 @@ const ruleName = (rule) => (rule.code && rule.label !== rule.code ? `${rule.labe
  * automatic rule ("Spend $50, get 10% off") and a typed code alike, with what
  * each saved, or "Free shipping". Otherwise (the demo, older orders): one
  * "Discount (CODE)" row with the total discount.
+ * `format`: formatPrice (cart: the display currency) or formatBasePrice (orders: what is charged).
  */
-function DiscountRows({ rules, discount, couponCode }) {
+function DiscountRows({ rules, discount, couponCode, format = formatPrice }) {
   const shown = (rules ?? []).filter((rule) => rule.discount > 0 || rule.freeShipping)
   if (shown.length > 0) {
     return shown.map((rule, index) => (
       <div key={rule.id ?? `${rule.label}-${index}`} className="cart-summary__saving">
         <dt>{ruleName(rule)}</dt>
         <dd>
-          {rule.discount > 0 ? `−${formatPrice(rule.discount)}` : null}
+          {rule.discount > 0 ? `−${format(rule.discount)}` : null}
           {rule.discount > 0 && rule.freeShipping ? ' + ' : null}
           {rule.freeShipping ? 'Free shipping' : null}
         </dd>
@@ -28,7 +29,7 @@ function DiscountRows({ rules, discount, couponCode }) {
   return (
     <div className="cart-summary__saving">
       <dt>Discount{couponCode && ` (${couponCode})`}</dt>
-      <dd>−{formatPrice(discount)}</dd>
+      <dd>−{format(discount)}</dd>
     </div>
   )
 }

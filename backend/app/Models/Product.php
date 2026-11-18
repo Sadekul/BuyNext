@@ -30,6 +30,7 @@ use Illuminate\Support\Str;
     'stock_quantity', 'min_order_quantity', 'status', 'rating_average', 'thumbnail_url',
     'warranty', 'shipping_info', 'return_policy', 'weight', 'tags', 'meta_title', 'meta_description',
     'type', 'gift_card_amounts', 'gift_card_min_amount', 'gift_card_max_amount', // phase 10 (part B)
+    'specifications', // phase 11
 ])]
 class Product extends Model
 {
@@ -66,6 +67,8 @@ class Product extends Model
             'gift_card_amounts' => 'array',
             'gift_card_min_amount' => 'decimal:2',
             'gift_card_max_amount' => 'decimal:2',
+            // Phase 11: [{ label, value }] in order (null = none).
+            'specifications' => 'array',
         ];
     }
 
@@ -84,6 +87,24 @@ class Product extends Model
                 $product->thumbnail_variants = is_string($variants) ? json_decode($variants, true) : $variants;
             }
         });
+        // Phase 11: a deleted product (a soft delete) leaves every wishlist and every product link (both directions).
+        static::deleted(function (Product $product) {
+            WishlistItem::where('product_id', $product->id)->delete();
+            ProductLink::where('product_id', $product->id)->orWhere('linked_product_id', $product->id)->delete();
+        });
+    }
+
+    /** Phase 11: the product's links of every type, in position order. */
+    public function links(): HasMany
+    {
+        return $this->hasMany(ProductLink::class)->orderBy('type')->orderBy('position')->orderBy('id');
+    }
+
+    /** Phase 11: [{ label, value }] (never null). */
+    public function specificationList(): array
+    {
+        return array_values(array_map(fn ($row) => ['label' => (string) ($row['label'] ?? ''), 'value' => (string) ($row['value'] ?? '')],
+            is_array($this->specifications) ? $this->specifications : []));
     }
 
     /** The image limit per product (uploads and URLs together). */

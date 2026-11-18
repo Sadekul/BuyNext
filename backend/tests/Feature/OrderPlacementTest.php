@@ -50,7 +50,7 @@ class OrderPlacementTest extends TestCase
             ->assertJsonPath('data.shipping_method', ['id' => 'standard', 'label' => 'Standard', 'eta' => '3–5 business days'])
             ->assertJsonPath('data.coupon_code', 'NEST10')
             ->assertJsonPath('data.totals', ['item_count' => 2, 'subtotal' => '17.88', 'discount' => '1.79', 'shipping' => '4.99', 'tax' => '0.00', 'total' => '21.08',
-                'gift_card' => '0.00', 'amount_due' => '21.08', 'paid' => '0.00', 'refunded' => '0.00'])
+                'gift_card' => '0.00', 'reward_points' => '0.00', 'amount_due' => '21.08', 'paid' => '0.00', 'refunded' => '0.00'])
             ->assertJsonPath('data.items.0', [
                 'product_id' => $this->mascara->id, 'variant_id' => null, 'sku' => $this->mascara->sku, 'name' => $this->mascara->name, 'variant_label' => null,
                 'thumbnail_url' => $this->mascara->thumbnail_url,

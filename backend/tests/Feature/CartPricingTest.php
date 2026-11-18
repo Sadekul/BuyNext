@@ -45,7 +45,7 @@ class CartPricingTest extends TestCase
     {
         $this->assertSame(
             ['item_count' => $count, 'subtotal' => $subtotal, 'discount' => $discount, 'group_discount' => '0.00', 'shipping' => $shipping, 'tax' => '0.00', 'total' => $total,
-                'gift_card' => '0.00', 'amount_due' => $total], // phase 10 (part B)
+                'gift_card' => '0.00', 'reward_points' => '0.00', 'amount_due' => $total], // phase 10 (part B); phase 11: reward_points
             $response->json('data.totals'),
         );
     }

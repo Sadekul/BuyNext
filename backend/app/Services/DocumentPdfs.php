@@ -175,6 +175,7 @@ class DocumentPdfs
                 'applied_rules' => $order->applied_rules ?? [],
                 'billing_address' => $order->billing_address,
                 'shipping_address' => $order->shipping_address,
+                'reward_points' => OrderResource::rewardPointsOf($order), // phase 11
             ],
             'items' => OrderResource::itemsOf($order),
             'totals' => OrderResource::totalsOf($order),

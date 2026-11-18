@@ -51,6 +51,8 @@ class OrderDocuments
         Coupon::releaseFor($order);
         // Phase 10 (part B): a redeemed gift card gets its amount back.
         app(GiftCards::class)->release($order);
+        // Phase 11: spent reward points come back.
+        app(RewardPoints::class)->release($order);
         $order->forceFill(['status' => 'cancelled'])->save();
         // Resolved here, not injected: the payment services use this class too. Phase 10 (part B): Stripe or PayPal.
         app(OnlinePayments::class)->expireOpenSession($order);
@@ -108,6 +110,8 @@ class OrderDocuments
 
         // Phase 10 (part B): gift cards bought with the order are made (and emailed after the commit) once it is paid.
         app(GiftCards::class)->issueFor($order);
+        // Phase 11: a signed-in customer's paid order earns reward points (once).
+        app(RewardPoints::class)->earnFor($order);
 
         return $invoice;
     }

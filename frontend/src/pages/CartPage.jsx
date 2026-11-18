@@ -1,8 +1,10 @@
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LuShoppingBag } from 'react-icons/lu'
 import CartLineItem from '../components/cart/CartLineItem'
 import CartSummary from '../components/cart/CartSummary'
 import GroupDiscountNote from '../components/cart/GroupDiscountNote'
+import ProductGrid from '../components/product/ProductGrid'
 import { useAuth } from '../hooks/useAuth'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -36,6 +38,10 @@ function CartPage() {
   const changedCount = cart.items.filter((item) => item.notice).length
   // The server's line for each item (its prices include a customer group's discount).
   const pricedLine = (item) => pricing.data?.lines.find((line) => cartLineKey(line) === cartLineKey(item))
+  // Phase 11: "Customers also bought" (the admin's cross-sells for these products; none in the demo).
+  const crossSells = REAL_SHOP ? (pricing.data?.crossSells ?? []) : []
+  const { addItem } = cart
+  const handleAddToCart = useCallback((product) => addItem(product), [addItem])
 
   if (cart.items.length === 0) {
     return (
@@ -127,6 +133,13 @@ function CartPage() {
           )}
         </CartSummary>
       </div>
+
+      {crossSells.length > 0 && (
+        <section className="cart-page__cross-sells" aria-labelledby="cross-sells-title">
+          <h2 id="cross-sells-title">Customers also bought</h2>
+          <ProductGrid products={crossSells} onAddToCart={handleAddToCart} />
+        </section>
+      )}
     </div>
   )
 }

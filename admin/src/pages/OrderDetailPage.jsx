@@ -15,6 +15,8 @@ import { PAYMENT_METHODS, orderActions, orderSource, orderStatus, paymentStatus,
 import { creditMemoPdfUrl, invoicePdfUrl } from '../api/phase10'
 import { PdfLink } from './SalesDocumentsPages'
 import { useAdminAuth } from '../auth/useAdminAuth'
+// Phase 11 §4: reward points spent and earned.
+import { formatPoints } from '../utils/rewards'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -268,6 +270,8 @@ const byProvider = (entry) => {
 }
 
 const DIALOGS = { invoice: InvoiceDialog, ship: ShipDialog, refund: RefundDialog, return: CreateReturnDialog }
+// Payment methods that mean "nothing else was charged" (phase 10 gift card; phase 11 points, the same way).
+const COVERED_METHODS = ['gift_card', 'reward_points']
 
 /**
  * A real order (BuyNest's API): items, customer, delivery, payment, its
@@ -330,6 +334,8 @@ function LiveOrderDetailPage() {
   }
 
   const Dialog = DIALOGS[dialog]
+  // Phase 11 §4: what reward points paid (money).
+  const pointsPaid = data.rewardPoints?.spent > 0 ? data.rewardPoints.amount : 0
   return (
     <>
       <title>{`Order ${data.number} | BuyNest Admin`}</title>
@@ -442,22 +448,38 @@ function LiveOrderDetailPage() {
                   <strong>{formatMoney(data.totals.total)}</strong>
                 </td>
               </tr>
-              {/* Phase 10 §5: the part a gift card paid; the rest was paid by the order's payment method. */}
+              {/* Phase 11 §4: points paid first (after tax), then (phase 10 §5) a gift card; the rest by the order's payment method. */}
+              {pointsPaid > 0 && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Paid with reward points ({formatPoints(data.rewardPoints.spent)})
+                  </th>
+                  <td className="num">−{formatMoney(pointsPaid)}</td>
+                </tr>
+              )}
               {data.giftCardPayment?.amount > 0 && (
-                <>
-                  <tr>
-                    <th scope="row" colSpan={3}>
-                      Paid by gift card{data.giftCardPayment.last4 && ` (ending ${data.giftCardPayment.last4})`}
-                    </th>
-                    <td className="num">−{formatMoney(data.giftCardPayment.amount)}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row" colSpan={3}>
-                      {data.paymentMethod === 'gift_card' ? 'Left to pay' : `Paid by ${PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}`}
-                    </th>
-                    <td className="num">{formatMoney(Math.max(Math.round((data.totals.total - data.giftCardPayment.amount) * 100), 0) / 100)}</td>
-                  </tr>
-                </>
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Paid by gift card{data.giftCardPayment.last4 && ` (ending ${data.giftCardPayment.last4})`}
+                  </th>
+                  <td className="num">−{formatMoney(data.giftCardPayment.amount)}</td>
+                </tr>
+              )}
+              {(pointsPaid > 0 || data.giftCardPayment?.amount > 0) && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    {COVERED_METHODS.includes(data.paymentMethod) ? 'Left to pay' : `Paid by ${PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}`}
+                  </th>
+                  <td className="num">{formatMoney(Math.max(Math.round((data.totals.total - pointsPaid - (data.giftCardPayment?.amount ?? 0)) * 100), 0) / 100)}</td>
+                </tr>
+              )}
+              {Number.isInteger(data.rewardPoints?.earned) && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Reward points earned
+                  </th>
+                  <td className="num">{formatPoints(data.rewardPoints.earned)}</td>
+                </tr>
               )}
               {data.totals.paid !== undefined && (
                 <tr>

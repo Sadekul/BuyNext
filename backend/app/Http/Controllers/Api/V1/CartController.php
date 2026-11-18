@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Services\CustomerCarts;
 use App\Services\Pricing;
+use App\Services\ProductLinks;
 use App\Services\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class CartController extends Controller
      * (optional customer Bearer token). country: the shipping country, for tax; without it the
      * tax is 0 and tax_estimated is false (when tax is on).
      */
-    public function validateCart(Request $request, Pricing $pricing): JsonResponse
+    public function validateCart(Request $request, Pricing $pricing, ProductLinks $links): JsonResponse
     {
         $data = $request->validate([
             ...self::rules(),
@@ -36,14 +37,18 @@ class CartController extends Controller
         $quote = $pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null,
             group: $customer?->priceGroup(), // phase 6: the customer's group price (guests: General)
-            giftCardCode: $data['gift_card_code'] ?? null);
+            giftCardCode: $data['gift_card_code'] ?? null,
+            rewardsCustomer: $customer, rewardPoints: $data['reward_points'] ?? null); // phase 11
 
         // Phase 7: a signed-in customer's cart is saved (restore on another device, abandoned carts report).
         if ($customer) {
             app(CustomerCarts::class)->save($customer, $data['items'], $quote->subtotalCents);
         }
 
-        return response()->json(['data' => $quote->toArray()]);
+        // Phase 11: "Customers also bought": cross-sells of the cart's products.
+        $productIds = collect($quote->lines)->filter(fn ($line) => $line['available'])->pluck('product_id')->all();
+
+        return response()->json(['data' => [...$quote->toArray(), 'cross_sells' => $links->crossSells($productIds, $request)]]);
     }
 
     /** The cart part of the rules, shared with checkout (OrderController). */
@@ -65,6 +70,8 @@ class CartController extends Controller
             'items.*.gift_card.recipient_email' => ['required_with:items.*.gift_card', 'string', 'email', 'max:190'],
             'items.*.gift_card.message' => ['nullable', 'string', 'max:500'],
             'gift_card_code' => ['nullable', 'string', 'max:40'],
+            // Phase 11: reward points to spend (signed-in customers, rewards on).
+            'reward_points' => ['nullable', 'integer', 'min:0', 'max:100000000'],
         ];
     }
 

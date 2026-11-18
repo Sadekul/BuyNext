@@ -9,6 +9,8 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\RewardTransaction;
+use App\Models\WishlistItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -183,6 +185,68 @@ class Reports
     public function lowStockThreshold(): int
     {
         return (int) $this->settings->get('low_stock_threshold');
+    }
+
+    /**
+     * Phase 11: most wished-for products: wishlist rows added within the
+     * dates, by product (most customers first). [{ product_id, name, sku,
+     * thumbnail_url, customers, in_stock, availability }].
+     */
+    public function wishlist(CarbonImmutable $from, CarbonImmutable $to, int $limit): array
+    {
+        $counts = WishlistItem::whereBetween('created_at', $this->bounds($from, $to))
+            ->selectRaw('product_id, COUNT(DISTINCT customer_id) AS customers')->groupBy('product_id')
+            ->orderByDesc('customers')->orderBy('product_id')->limit($limit)->pluck('customers', 'product_id');
+        $products = Product::withTrashed()->whereIn('id', $counts->keys())->get()->keyBy('id');
+
+        return $counts->map(function ($customers, $id) use ($products) {
+            $product = $products->get($id);
+
+            return [
+                'product_id' => (int) $id,
+                'name' => $product?->name,
+                'sku' => $product?->sku,
+                'thumbnail_url' => $product?->thumbnail_url,
+                'customers' => (int) $customers,
+                'in_stock' => $product !== null && $product->availability() !== 'out_of_stock',
+                'availability' => $product?->availability() ?? 'out_of_stock',
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * Phase 11: reward points issued / spent per period, totals, and what is
+     * still owed (every balance now × the point value).
+     */
+    public function rewards(CarbonImmutable $from, CarbonImmutable $to, string $groupBy, RewardPoints $points): array
+    {
+        $rows = RewardTransaction::whereBetween('created_at', $this->bounds($from, $to))
+            ->selectRaw('date(created_at) as day, type, sum(points) as points')->groupBy('day', 'type')->get();
+        $series = [];
+        foreach ($this->periods($from, $to, $groupBy) as $period) {
+            $series[$period] = ['period' => $period, 'issued' => 0, 'spent' => 0];
+        }
+        $totals = ['issued' => 0, 'spent' => 0, 'returned' => 0, 'reversed' => 0, 'adjusted' => 0];
+        foreach ($rows as $row) {
+            $period = $this->periodOf(CarbonImmutable::parse($row->day), $groupBy);
+            $sum = (int) $row->points;
+            match ($row->type) {
+                'earn', 'signup', 'review' => [$series[$period]['issued'] += $sum, $totals['issued'] += $sum],
+                'spend' => [$series[$period]['spent'] += -$sum, $totals['spent'] += -$sum],
+                'cancel_return', 'refund_return' => $totals['returned'] += $sum,
+                'refund_reverse' => $totals['reversed'] += -$sum,
+                default => $totals['adjusted'] += $sum,
+            };
+        }
+        $outstanding = (int) Customer::sum('reward_points');
+
+        return [
+            'totals' => $totals,
+            'series' => array_values($series),
+            'outstanding_points' => $outstanding,
+            'outstanding_value' => Pricing::format($points->valueCents($outstanding)),
+            'point_value' => $points->pointValueString(),
+        ];
     }
 
     /** Orders that count, placed in the range. */

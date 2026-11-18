@@ -24,7 +24,7 @@ use Throwable;
 class Checkout
 {
     public function __construct(private Pricing $pricing, private AddressBook $addressBook, private Audit $audit,
-        private OrderDocuments $documents, private GiftCards $giftCards) {}
+        private OrderDocuments $documents, private GiftCards $giftCards, private RewardPoints $rewardPoints) {}
 
     /**
      * Prices an order without placing it (no locks, no stock change): the
@@ -52,7 +52,9 @@ class Checkout
         $order = DB::transaction(function () use ($data, $customer, $admin) {
             $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
                 lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null,
-                group: $customer?->priceGroup(), giftCardCode: $data['gift_card_code'] ?? null);
+                group: $customer?->priceGroup(), giftCardCode: $data['gift_card_code'] ?? null,
+                // Phase 11: reward points (storefront checkout only; the customer row is locked).
+                rewardsCustomer: $admin ? null : $customer, rewardPoints: $admin ? null : ($data['reward_points'] ?? null));
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
@@ -75,12 +77,19 @@ class Checkout
             if ($quote->giftCardError) {
                 throw ValidationException::withMessages(['gift_card_code' => $quote->giftCardError]);
             }
-            if ($quote->giftCard && $quote->amountDueCents() === 0 && $quote->itemCount > 0) {
-                $data['payment_method'] = 'gift_card';
+            // Phase 11: reward points pay first; points and/or a gift card covering everything are the payment.
+            if ($quote->rewardPointsError) {
+                throw ValidationException::withMessages(['reward_points' => $quote->rewardPointsError]);
+            }
+            $paidByCard = $quote->giftCard && $quote->giftCardCents > 0;
+            if (($paidByCard || $quote->rewardPointsCents > 0) && $quote->amountDueCents() === 0 && $quote->itemCount > 0) {
+                $data['payment_method'] = $paidByCard ? 'gift_card' : 'reward_points';
             } elseif ($data['payment_method'] === 'gift_card') {
                 throw ValidationException::withMessages(['payment_method' => $quote->giftCard
                     ? 'Your gift card doesn\'t cover the whole total. Choose how to pay the rest.'
                     : 'Enter your gift card code, or choose another payment method.']);
+            } elseif ($data['payment_method'] === 'reward_points') {
+                throw ValidationException::withMessages(['payment_method' => 'Your reward points don\'t cover the whole total. Choose how to pay the rest.']);
             }
             // The shopper saw a total; never charge a different one without asking.
             if (isset($data['expected_total']) && Pricing::toCents($data['expected_total']) !== $quote->totalCents) {
@@ -142,6 +151,9 @@ class Checkout
             // Phase 10 (part B): the gift card's part of the payment (taken below).
             'gift_card_id' => $quote->giftCard?->id,
             'gift_card_amount' => Pricing::format($quote->giftCardCents),
+            // Phase 11: the reward points' part of the payment (taken below).
+            'reward_points_spent' => $quote->rewardPoints,
+            'reward_points_amount' => Pricing::format($quote->rewardPointsCents),
             'shipping_address' => $data['shipping_address'],
             'billing_address' => $data['billing_address'] ?? $data['shipping_address'],
             'placed_at' => now(),
@@ -206,12 +218,22 @@ class Checkout
 
         // Phase 10 (part B): the gift card's balance (locked by quote()) is taken now; when it pays
         // everything the order is paid at once (invoice), with no other payment.
+        // Phase 11: reward points first (the customer row was locked by quote()).
+        if ($customer && $quote->rewardPoints > 0) {
+            $this->rewardPoints->spend($customer, $quote->rewardPoints, $order);
+        }
         if ($quote->giftCard && $quote->giftCardCents > 0) {
             $this->giftCards->redeem($quote->giftCard, $quote->giftCardCents, $order);
-            if ($data['payment_method'] === 'gift_card') {
-                $order->forceFill(['payment_provider' => 'gift_card', 'paid_at' => now()])->save();
-                $this->documents->invoice($order, null, "Paid with gift card ••••{$quote->giftCard->last4}.", false);
-            }
+        }
+        if (in_array($data['payment_method'], ['gift_card', 'reward_points'], true)) {
+            $points = $quote->rewardPoints > 0 ? 'reward points ('.number_format($quote->rewardPoints).' pts)' : null;
+            $note = match (true) {
+                $data['payment_method'] === 'gift_card' && $points !== null => "Paid with gift card ••••{$quote->giftCard->last4} and {$points}.",
+                $data['payment_method'] === 'gift_card' => "Paid with gift card ••••{$quote->giftCard->last4}.",
+                default => "Paid with {$points}.",
+            };
+            $order->forceFill(['payment_provider' => $data['payment_method'], 'paid_at' => now()])->save();
+            $this->documents->invoice($order, null, $note, false);
         }
         if ($admin) {
             if (filled($data['note'] ?? null)) {

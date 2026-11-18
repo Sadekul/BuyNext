@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react'
 import { LuGift } from 'react-icons/lu'
 import FormField from '../forms/FormField'
 import Button from '../ui/Button'
-import { formatPrice } from '../../utils/formatters'
+import { formatBasePrice } from '../../utils/formatters'
 import { GIFT_CARD_MESSAGE_MAX, GIFT_CARD_NAME_MAX, customAmountError, withGiftCard } from '../../utils/giftCards'
 import { validateEmail } from '../../utils/validation'
 import './GiftCardForm.css'
@@ -56,7 +56,7 @@ function GiftCardForm({ product, onAdd }) {
       return
     }
     onAdd(withGiftCard(product, { amount, recipientName: values.recipientName, recipientEmail: values.recipientEmail, message: values.message }))
-    setAdded(`A ${formatPrice(amount)} gift card for ${values.recipientName.trim()} was added to your cart.`)
+    setAdded(`A ${formatBasePrice(amount)} gift card for ${values.recipientName.trim()} was added to your cart.`)
     setSubmitted(false)
     setValues((current) => ({ ...current, recipientName: '', recipientEmail: '', message: '' }))
   }
@@ -85,7 +85,7 @@ function GiftCardForm({ product, onAdd }) {
                 onChange={change('choice')}
                 data-field={index === 0 ? 'choice' : undefined}
               />
-              <span>{formatPrice(value)}</span>
+              <span>{formatBasePrice(value)}</span>
             </label>
           ))}
           {custom && (
@@ -112,7 +112,7 @@ function GiftCardForm({ product, onAdd }) {
           step="0.01"
           value={values.customAmount}
           onChange={change('customAmount')}
-          hint={`From ${formatPrice(custom.min)} to ${formatPrice(custom.max)}.`}
+          hint={`From ${formatBasePrice(custom.min)} to ${formatBasePrice(custom.max)}.`}
           error={shown.customAmount}
           data-field="customAmount"
         />
@@ -160,7 +160,7 @@ function GiftCardForm({ product, onAdd }) {
       </div>
 
       <Button type="submit" size="lg" className="gift-card-form__submit">
-        <LuGift aria-hidden="true" /> Add to cart{Number.isFinite(amount) && amount > 0 && !errors.customAmount ? ` · ${formatPrice(amount)}` : ''}
+        <LuGift aria-hidden="true" /> Add to cart{Number.isFinite(amount) && amount > 0 && !errors.customAmount ? ` · ${formatBasePrice(amount)}` : ''}
       </Button>
       <p className="gift-card-form__note">Gift cards are delivered by email: no shipping, no tax. They can't be bought with another gift card or a discount code.</p>
       <p className="visually-hidden" role="status">

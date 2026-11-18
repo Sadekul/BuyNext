@@ -12,6 +12,8 @@ use App\Support\CategoryTree;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /** The public catalog: no sign-in, only products for sale (active, in a visible category). */
 class CatalogController extends Controller
@@ -105,8 +107,43 @@ class CatalogController extends Controller
             'reviews' => fn ($q) => $q->where('status', 'approved')])->find($id);
 
         return $product
-            ? (new ProductResource($product))->withDetail()
+            ? (new ProductResource($product))->withDetail()->withRecommendations() // phase 11: related and upsells
             : response()->json(['message' => 'Product not found.'], 404);
+    }
+
+    /**
+     * Phase 11: GET /api/v1/products/compare?ids=1,2,3 (2–4 ids) → { data: [card + description_short, options, specifications] }
+     * in the order asked; unknown and hidden products are skipped.
+     */
+    public function compare(Request $request): JsonResponse
+    {
+        $raw = (string) $request->query('ids', '');
+        $parts = array_filter(array_map('trim', explode(',', $raw)), fn ($part) => $part !== '');
+        $ids = array_values(array_unique(array_map('intval', $parts)));
+        if (count($parts) === 0 || array_filter($parts, fn ($part) => ! ctype_digit($part)) !== [] || count($ids) < 2 || count($ids) > 4) {
+            throw ValidationException::withMessages(['ids' => 'Choose 2 to 4 products to compare.']);
+        }
+        $products = Product::forSale()->with(['category', 'brand', 'options.values'])->whereIn('id', $ids)->get()->keyBy('id');
+
+        $data = [];
+        foreach ($ids as $id) {
+            $product = $products->get($id);
+            if (! $product) {
+                continue;
+            }
+            $description = trim((string) preg_replace('/\s+/', ' ', strip_tags((string) $product->description)));
+            $data[] = [
+                ...(new ProductResource($product))->resolve($request),
+                'description_short' => $description === '' ? null : Str::limit($description, 197, '...'),
+                'options' => $product->has_variants ? $product->options->map(fn ($option) => [
+                    'name' => $option->name,
+                    'values' => $option->values->pluck('value')->values()->all(),
+                ])->values()->all() : [],
+                'specifications' => $product->specificationList(),
+            ];
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     /**

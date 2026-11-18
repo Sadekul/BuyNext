@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductLink;
 use App\Models\ProductVariant;
 use App\Services\Audit;
 use App\Services\Pricing;
+use App\Services\ProductLinks;
 use App\Support\Csv;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,9 @@ use Illuminate\Validation\ValidationException;
  *
  * Columns: sku,name,category_slug,brand,price,discount_percent,stock_quantity,
  * status,description,tags,image_urls (tags and image URLs separated by "|").
+ * Phase 11 adds specifications ("Label: Value | Label: Value") and
+ * related_skus, upsell_skus, crosssell_skus ("|"-separated SKUs; unknown
+ * SKUs are skipped and reported in `warnings`; SKUs of the same file work).
  *
  * Import rules: products are matched by sku (update) or created (then
  * category_slug and price are required; status defaults to draft). An empty
@@ -31,13 +36,17 @@ use Illuminate\Validation\ValidationException;
  */
 class ProductTransferController extends Controller
 {
-    public const COLUMNS = ['sku', 'name', 'category_slug', 'brand', 'price', 'discount_percent', 'stock_quantity', 'status', 'description', 'tags', 'image_urls'];
+    public const COLUMNS = ['sku', 'name', 'category_slug', 'brand', 'price', 'discount_percent', 'stock_quantity', 'status', 'description', 'tags', 'image_urls',
+        'specifications', 'related_skus', 'upsell_skus', 'crosssell_skus']; // phase 11: the last four
+
+    /** Phase 11: CSV column → product link type. */
+    private const LINK_COLUMNS = ['related_skus' => 'related', 'upsell_skus' => 'upsell', 'crosssell_skus' => 'crosssell'];
 
     public const MAX_ROWS = 5000;
 
     public const MAX_KILOBYTES = 2048;
 
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private ProductLinks $links) {}
 
     /** GET /api/admin/v1/products/export.csv - the same filters as the product list. */
     public function export(Request $request): Response
@@ -45,7 +54,9 @@ class ProductTransferController extends Controller
         $data = $request->validate(ProductController::filterRules());
 
         $rows = [];
-        ProductController::filtered($data)->with(['category', 'brand', 'images'])->get()->each(function (Product $product) use (&$rows) {
+        ProductController::filtered($data)->with(['category', 'brand', 'images', 'links.linked'])->get()->each(function (Product $product) use (&$rows) {
+            $skus = fn (string $type) => $product->links->where('type', $type)->filter(fn ($link) => $link->linked)->sortBy('position')
+                ->map(fn ($link) => $link->linked->sku)->implode('|');
             $rows[] = [
                 $product->sku,
                 $product->name,
@@ -58,6 +69,11 @@ class ProductTransferController extends Controller
                 $product->description,
                 implode('|', $product->tags ?? []),
                 $product->images->pluck('url')->implode('|'),
+                // Phase 11.
+                self::specificationsCell($product->specificationList()),
+                $skus('related'),
+                $skus('upsell'),
+                $skus('crosssell'),
             ];
         });
 
@@ -84,10 +100,11 @@ class ProductTransferController extends Controller
         [$header, $rows] = $this->read((string) file_get_contents($request->file('file')->getRealPath()));
 
         $errors = [];
+        $warnings = []; // phase 11: unknown link SKUs (skipped)
         $plans = [];
         $columns = $this->columns($header, $errors);
         if ($errors === []) {
-            $plans = $this->plan($columns, $rows, $errors);
+            $plans = $this->plan($columns, $rows, $errors, $warnings);
         }
 
         $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
@@ -101,6 +118,14 @@ class ProductTransferController extends Controller
                 foreach ($plans as $plan) {
                     $this->apply($plan, $slugs);
                 }
+                // Phase 11: links after every product exists (a row may link to a product made further down).
+                $ids = Product::whereIn('sku', array_unique(array_merge(...array_map(fn ($plan) => [$plan['sku'], ...array_merge(...array_values($plan['links'] ?: [[]]))], $plans))))
+                    ->pluck('id', 'sku');
+                foreach ($plans as $plan) {
+                    if ($plan['links'] !== [] && isset($ids[$plan['sku']])) {
+                        $this->links->sync(Product::find($ids[$plan['sku']]), array_map(fn ($skus) => array_values(array_filter(array_map(fn ($sku) => $ids[$sku] ?? null, $skus))), $plan['links']));
+                    }
+                }
                 $this->audit->record('product.imported', sprintf('Products imported: %d created, %d updated, %d unchanged.', $counts['created'], $counts['updated'], $counts['unchanged']),
                     'product', null, ['before' => [], 'after' => ['rows' => count($rows), ...$counts]]);
             });
@@ -111,6 +136,7 @@ class ProductTransferController extends Controller
             'rows' => count($rows),
             ...$counts,
             'errors' => $errors,
+            'warnings' => $warnings,
         ]]);
     }
 
@@ -188,11 +214,21 @@ class ProductTransferController extends Controller
     }
 
     /** Checks every row; returns one plan per row (create, update, or unchanged). */
-    private function plan(array $columns, array $rows, array &$errors): array
+    private function plan(array $columns, array $rows, array &$errors, array &$warnings = []): array
     {
         $categories = Category::pluck('id', 'slug');
         $skus = array_filter(array_map(fn ($cells) => trim((string) ($cells[$columns['sku']] ?? '')), $rows));
-        $existing = Product::withTrashed()->with(['brand', 'images'])->whereIn('sku', $skus)->get()->keyBy('sku');
+        $existing = Product::withTrashed()->with(['brand', 'images', 'links.linked'])->whereIn('sku', $skus)->get()->keyBy('sku');
+        // Phase 11: SKUs a link may name: existing products and the file's own rows.
+        $linkSkus = [];
+        foreach ($rows as $cells) {
+            foreach (self::LINK_COLUMNS as $column => $type) {
+                if (isset($columns[$column])) {
+                    $linkSkus = [...$linkSkus, ...self::skuList((string) ($cells[$columns[$column]] ?? ''))];
+                }
+            }
+        }
+        $knownSkus = array_flip([...Product::whereIn('sku', array_unique($linkSkus))->pluck('sku')->all(), ...$skus]);
         $variantSkus = ProductVariant::whereIn('sku', $skus)->pluck('sku')->flip();
 
         $plans = [];
@@ -321,14 +357,48 @@ class ProductTransferController extends Controller
                 }
             }
 
+            // Phase 11: specifications ("Label: Value | Label: Value").
+            $specifications = $cell('specifications');
+            if ($specifications !== null) {
+                $parsed = self::parseSpecifications($specifications);
+                is_string($parsed) ? $error('specifications', $parsed) : $fields['specifications'] = $parsed;
+            }
+            // Phase 11: related_skus, upsell_skus, crosssell_skus. Unknown SKUs (and the product itself) are skipped with a warning.
+            $links = [];
+            foreach (self::LINK_COLUMNS as $column => $type) {
+                $value = $cell($column);
+                if ($value === null) {
+                    continue;
+                }
+                $list = [];
+                foreach (array_unique(self::skuList($value)) as $linked) {
+                    if ($linked === $sku) {
+                        $warnings[] = ['row' => $row, 'column' => $column, 'message' => 'A product can\'t be linked to itself: skipped.'];
+                    } elseif (! isset($knownSkus[$linked])) {
+                        $warnings[] = ['row' => $row, 'column' => $column, 'message' => "There is no product with SKU \"{$linked}\": skipped."];
+                    } else {
+                        $list[] = $linked;
+                    }
+                }
+                if (count($list) > ProductLink::MAX_PER_TYPE) {
+                    $error($column, 'At most '.ProductLink::MAX_PER_TYPE.' products per list.');
+                }
+                $links[$type] = $list;
+            }
+
             if (count($errors) > $errorCount) {
                 continue;
             }
 
             if ($creating) {
-                $plans[] = ['action' => 'created', 'sku' => $sku, 'name' => $name, 'fields' => $fields, 'brand' => $brand, 'images' => $newImages];
+                $plans[] = ['action' => 'created', 'sku' => $sku, 'name' => $name, 'fields' => $fields, 'brand' => $brand, 'images' => $newImages, 'links' => $links];
 
                 continue;
+            }
+            $linksChanged = false;
+            foreach ($links as $type => $list) {
+                $current = $product->links->where('type', $type)->filter(fn ($link) => $link->linked)->sortBy('position')->map(fn ($link) => $link->linked->sku)->values()->all();
+                $linksChanged = $linksChanged || $current !== $list;
             }
 
             // Only what differs from the product now.
@@ -341,6 +411,7 @@ class ProductTransferController extends Controller
                 $same = match ($field) {
                     'price', 'discount_percent' => Pricing::toCents((string) $current) === Pricing::toCents($value),
                     'tags' => ($current ?? []) === $value,
+                    'specifications' => $product->specificationList() === ($value ?? []),
                     default => (string) $current === (string) $value,
                 };
                 if (! $same) {
@@ -349,15 +420,63 @@ class ProductTransferController extends Controller
             }
             $brandChanged = $brand !== null && $brand !== $product->brand?->name;
             $plans[] = [
-                'action' => $changed || $brandChanged || $newImages ? 'updated' : 'unchanged',
+                'action' => $changed || $brandChanged || $newImages || $linksChanged ? 'updated' : 'unchanged',
                 'product' => $product,
+                'sku' => $sku,
                 'fields' => $changed,
                 'brand' => $brandChanged ? $brand : null,
                 'images' => $newImages,
+                'links' => $linksChanged ? $links : [],
             ];
         }
 
         return $plans;
+    }
+
+    /** Phase 11: "Label: Value | Label: Value" (empty → ""). */
+    public static function specificationsCell(array $rows): string
+    {
+        return implode(' | ', array_map(fn ($row) => "{$row['label']}: {$row['value']}", $rows));
+    }
+
+    /** Phase 11: the rows of a specifications cell, or the error message. */
+    public static function parseSpecifications(string $cell): array|string
+    {
+        $rows = [];
+        $labels = [];
+        foreach (array_filter(array_map('trim', explode('|', $cell)), fn ($part) => $part !== '') as $part) {
+            $at = strpos($part, ':');
+            if ($at === false) {
+                return "Write each specification as Label: Value (\"{$part}\" has no colon).";
+            }
+            $label = trim(substr($part, 0, $at));
+            $value = trim(substr($part, $at + 1));
+            if ($label === '' || $value === '') {
+                return "Each specification needs a label and a value (\"{$part}\").";
+            }
+            if (mb_strlen($label) > 60) {
+                return "The label \"{$label}\" is longer than 60 characters.";
+            }
+            if (mb_strlen($value) > 255) {
+                return "The value of \"{$label}\" is longer than 255 characters.";
+            }
+            if (isset($labels[mb_strtolower($label)])) {
+                return "The label \"{$label}\" is used twice.";
+            }
+            $labels[mb_strtolower($label)] = true;
+            $rows[] = ['label' => $label, 'value' => $value];
+        }
+        if (count($rows) > 40) {
+            return 'At most 40 specification rows.';
+        }
+
+        return $rows;
+    }
+
+    /** Phase 11: "A-1 | B-2" → ["A-1", "B-2"]. */
+    private static function skuList(string $cell): array
+    {
+        return array_values(array_filter(array_map('trim', explode('|', $cell)), fn ($sku) => $sku !== ''));
     }
 
     private function apply(array $plan, array &$slugs): void

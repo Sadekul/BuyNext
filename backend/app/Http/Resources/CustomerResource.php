@@ -24,6 +24,7 @@ class CustomerResource extends JsonResource
             'group' => $this->priceGroup()?->summary(),
             // Phase 7: the Account → newsletter toggle.
             'newsletter' => app(Newsletter::class)->isSubscribed($this->resource),
+            'reward_points' => (int) ($this->reward_points ?? 0), // phase 11: the reward point balance
             'created_at' => $this->created_at?->toIso8601ZuluString(),
         ];
     }

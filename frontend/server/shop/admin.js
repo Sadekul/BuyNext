@@ -5,6 +5,8 @@ import { productParts } from './adminCatalog.js'
 import { dashboardBlocks } from './adminContent.js'
 // Phase 10: gift cards on the order page.
 import { issuedGiftCards, lineGiftCard, orderGiftCardPayment } from './adminPhase10.js'
+// Phase 11: product specifications and links; reward points on orders, refunds, and credit memos.
+import { creditMemoPoints, orderRewardPoints, productPhase11, refundablePoints } from './adminPhase11.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -37,6 +39,9 @@ const PRODUCT_FIELDS = {
   giftCardAmounts: 'gift_card_amounts',
   giftCardMinAmount: 'gift_card_min_amount',
   giftCardMaxAmount: 'gift_card_max_amount',
+  // Phase 11 §2 and §3: [{ label, value }] and { related, upsell, crosssell } (product ids, in order).
+  specifications: 'specifications',
+  links: 'links',
 }
 const FORM_FIELD = Object.fromEntries(Object.entries(PRODUCT_FIELDS).map(([form, api]) => [api, form]))
 const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber' }
@@ -86,6 +91,8 @@ export function adminProduct(raw) {
     ...(Number.isInteger(raw.stock_alerts_waiting) && { stockAlertsWaiting: raw.stock_alerts_waiting }),
     // Phase 10 §4 and §5: weight (grams, null = the store's default), product type and gift card amounts.
     ...productPhase10(raw),
+    // Phase 11 §2 and §3: specifications, and linked products ({ id, name, sku, image, status } per type).
+    ...productPhase11(raw),
   }
 }
 
@@ -182,6 +189,8 @@ function adminOrderDetail(raw) {
     // Phase 10 §5: what a redeemed gift card paid ({ last4, amount } | null), and the cards this order bought.
     giftCardPayment: orderGiftCardPayment(raw),
     giftCardsIssued: issuedGiftCards(raw),
+    // Phase 11 §4: reward points spent (and their value) and earned ({ spent, amount, earned } | null).
+    rewardPoints: orderRewardPoints(raw),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -309,6 +318,8 @@ export function adminCreditMemo(raw) {
     refundReference: stripeId(raw.refund_reference),
     // Phase 10 §5: what went back to a gift card, and the rest (by the other payment method).
     ...(raw.gift_card_refund !== undefined && { giftCardRefund: money(raw.gift_card_refund) ?? 0, otherRefund: money(raw.other_refund) ?? money(raw.total) - (money(raw.gift_card_refund) ?? 0) }),
+    // Phase 11 §4: points given back (and their value) and earned points taken back.
+    ...creditMemoPoints(raw),
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
@@ -332,6 +343,8 @@ function refundLimits(raw) {
     maxTotal: money(raw.max_total) ?? 0,
     // Phase 10 §5: what can still go back to the redeemed gift card (refunds go there first).
     ...(raw.gift_card_refundable !== undefined && raw.gift_card_refundable !== null && { giftCardRefundable: money(raw.gift_card_refundable) ?? 0 }),
+    // Phase 11 §4: what can still go back as points (refunds settle points first, then the gift card).
+    ...refundablePoints(raw),
   }
 }
 

@@ -14,10 +14,17 @@ export const STORAGE_KEYS = {
   // Phase 7 (REAL_SHOP): the cart lines the server last saved for the account
   // ("<key>.user-<id>"), so signing in again doesn't add them twice (hooks/useSavedCartSync.js).
   cartSync: 'buynest.cartSync.v1',
+  // Phase 11 (REAL_SHOP): guest wishlist items waiting to be merged into the
+  // account's server wishlist ("<key>.user-<id>", context/WishlistProvider.jsx).
+  wishlistPending: 'buynest.wishlistPending.v1',
+  // Phase 11, per browser (not per account, works in the demo too):
+  compare: 'buynest.compare.v1', // the products picked for comparison (max 4)
+  recentlyViewed: 'buynest.recentlyViewed.v1', // the last 12 products opened, newest first
+  currency: 'buynest.currency.v1', // the display currency the shopper chose (prices are still charged in USD)
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */
-export const ACCOUNT_STORES = [STORAGE_KEYS.cart, STORAGE_KEYS.wishlist, STORAGE_KEYS.orders, STORAGE_KEYS.cartSync]
+export const ACCOUNT_STORES = [STORAGE_KEYS.cart, STORAGE_KEYS.wishlist, STORAGE_KEYS.orders, STORAGE_KEYS.cartSync, STORAGE_KEYS.wishlistPending]
 
 /**
  * Older keys that may still hold data from previous versions (v1 sessions held

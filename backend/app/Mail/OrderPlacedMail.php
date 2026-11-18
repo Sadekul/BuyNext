@@ -32,9 +32,16 @@ class OrderPlacedMail extends Mailable
         $totals[] = ["Shipping ({$order->shipping_label})", self::money($order->shipping_total)];
         $totals[] = ['Tax', self::money($order->tax_total)];
         $totals[] = ['Total', self::money($order->grand_total), true];
+        // Phase 11: the part reward points paid (before the gift card).
+        $points = (int) $order->reward_points_spent;
+        if ($points > 0) {
+            $totals[] = ['Reward points ('.number_format($points).' pts)', '-'.self::money($order->reward_points_amount)];
+        }
         // Phase 10 (part B): the part a gift card paid, and what is left.
         if ((float) $order->gift_card_amount > 0) {
             $totals[] = ['Paid by gift card', '-'.self::money($order->gift_card_amount)];
+        }
+        if ((float) $order->gift_card_amount > 0 || $points > 0) {
             $totals[] = ['Amount due', '$'.Pricing::format($order->dueCents()), true];
         }
 
@@ -43,13 +50,16 @@ class OrderPlacedMail extends Mailable
             'order_number' => $order->number,
             'order_total' => $order->grand_total,
             'payment_method' => config("buynest.store.payment_methods.{$order->payment_method}")
-                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", $order->payment_method === 'gift_card' ? 'Gift card' : $order->payment_method),
+                ?? config("buynest.store.admin_payment_methods.{$order->payment_method}", match ($order->payment_method) {
+                    'gift_card' => 'Gift card', 'reward_points' => 'Reward points', default => $order->payment_method, // phase 11: reward points
+                }),
             'shipping_method' => $order->shipping_label,
             'delivery_estimate' => $order->shipping_eta,
             'next_steps' => match (true) {
                 $order->payment_method === 'cod' => 'We are preparing your order now. Please pay the courier in cash when it arrives.',
                 // Phase 10 (part B): paid in full with a gift card; PayPal orders are approved on PayPal's site.
                 $order->payment_method === 'gift_card' => 'Your gift card paid for the whole order, so we are preparing it now.',
+                $order->payment_method === 'reward_points' => 'Your reward points paid for the whole order, so we are preparing it now.', // phase 11
                 app(PayPalPayments::class)->usesPayPal($order) => 'Your items are reserved. Complete the payment on PayPal '
                     .'(you can also use “Pay now” on your order page); we start preparing your order as soon as it is paid.',
                 // Phase 8: card orders are paid on Stripe's secure page.
@@ -62,6 +72,10 @@ class OrderPlacedMail extends Mailable
                 $totals,
             ),
             'address' => EmailBlocks::address($order->shipping_address),
+            // Phase 11: "You used 500 reward points ($5.00) on this order." (empty without points).
+            'reward_points_spent' => $points > 0
+                ? EmailBlocks::paragraph('You used '.number_format($points).' reward points ('.self::money($order->reward_points_amount).') on this order.')
+                : '',
         ];
     }
 }

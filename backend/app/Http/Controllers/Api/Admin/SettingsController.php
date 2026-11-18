@@ -72,6 +72,7 @@ class SettingsController extends Controller
         $changes = [];
         foreach ($validated as $group => $values) {
             foreach ($values as $key => $value) {
+                $key = Settings::storageKey($group, $key); // phase 11: rewards.enabled → rewards_enabled
                 $changes[$key] = $this->settings->normalize($key, $value);
             }
         }

@@ -97,8 +97,8 @@ export const COUPON_STATUSES = {
 export const couponStatus = (status) => COUPON_STATUSES[status] ?? unknown(status)
 export const COUPON_FILTERS = Object.fromEntries(Object.entries(COUPON_STATUSES).map(([status, { label }]) => [status, label]))
 
-// Phase 10: gift_card = a gift card paid the whole order.
-export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery', bank_transfer: 'Bank transfer', cash: 'Cash', gift_card: 'Gift card' }
+// Phase 10: gift_card = a gift card paid the whole order. Phase 11: reward_points = points (and maybe a gift card) did.
+export const PAYMENT_METHODS = { card: 'Card', paypal: 'PayPal', cod: 'Cash on delivery', bank_transfer: 'Bank transfer', cash: 'Cash', gift_card: 'Gift card', reward_points: 'Reward points' }
 /** Payment methods only admins may choose for an order they create (phase 6). */
 export const ADMIN_ONLY_PAYMENT_METHODS = ['bank_transfer', 'cash']
 

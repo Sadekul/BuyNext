@@ -23,6 +23,8 @@ import { ADMIN, clearedCookies, notSignedIn, sessionCookies } from './session.js
 import { TWO_STEP_SESSION_ROUTES, matchSecurityRoute } from './adminSecurityApi.js'
 // Phase 10: PDFs, shipping table rates, gift cards (adminPhase10Api.js).
 import { matchPhase10Route } from './adminPhase10Api.js'
+// Phase 11: a customer's wishlist and points, reports, currencies; product specifications and links (adminPhase11Api.js).
+import { cleanSpecifications, linksProblem, matchPhase11Route, specificationsProblem } from './adminPhase11Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -183,6 +185,9 @@ const PRODUCT_RULES = {
       : 'List up to 10 amounts from 1 to 10,000.',
   giftCardMinAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
   giftCardMaxAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
+  // Phase 11 §2 and §3: specification rows, and related products, up-sells and cross-sells by id (omitted = unchanged).
+  specifications: specificationsProblem,
+  links: linksProblem,
 }
 const REQUIRED_ON_CREATE = ['title', 'category', 'price', 'stock']
 
@@ -200,6 +205,7 @@ export function validateProduct(body, { partial }) {
   }
   // Phase 7 (system): a blank meta field is stored as null.
   for (const field of ['metaTitle', 'metaDescription']) if (values[field] === '') values[field] = null
+  if (values.specifications) values.specifications = cleanSpecifications(values.specifications)
   if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) {
     errors.title = ['Change at least one field.']
   }
@@ -624,6 +630,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 11: customers/:id/wishlist, customers/:id/rewards[/adjust], reports/wishlist|reward-points, currencies[/…].
+  const phase11 = matchPhase11Route(method, segments)
+  if (phase11 !== undefined) return phase11
   // Phase 10: invoices/:number/pdf, credit-memos/:number/pdf, shipping-rates[/…], gift-cards[/…].
   const phase10 = matchPhase10Route(method, segments)
   if (phase10 !== undefined) return phase10

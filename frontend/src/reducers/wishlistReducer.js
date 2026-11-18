@@ -1,4 +1,4 @@
-import { storedNumber, storedProductSnapshot, storedTimestamp } from '../utils/storedValues'
+import { storedInteger, storedNumber, storedProductSnapshot, storedText, storedTimestamp } from '../utils/storedValues'
 
 /*
  * Wishlist reducer: saved products, no duplicates, newest first.
@@ -11,7 +11,14 @@ export const WISHLIST_ACTIONS = {
   CLEARED: 'wishlist/cleared',
   PRODUCTS_REFRESHED: 'wishlist/productsRefreshed',
   REPLACED: 'wishlist/replaced',
+  // Phase 11 (REAL_SHOP, signed in): the list saved on the server.
+  SERVER_LOADED: 'wishlist/serverLoaded', // the server's list replaces this one
+  SERVER_ID_SET: 'wishlist/serverIdSet', // an added item was saved: its id on the server
+  NOTE_SET: 'wishlist/noteSet', // the shopper's note on an item
+  RESTORED: 'wishlist/restored', // a removal the server refused: the item comes back where it was
 }
+
+export const MAX_NOTE_LENGTH = 255
 
 export const EMPTY_WISHLIST = { items: [] }
 
@@ -69,8 +76,39 @@ export function wishlistReducer(state, action) {
     case WISHLIST_ACTIONS.REPLACED:
       return action.state
 
+    // `entries`: [{ id, product (a BuyNest product), variant, note, addedAt }] (services/wishlistService.js).
+    case WISHLIST_ACTIONS.SERVER_LOADED:
+      return { ...state, items: action.entries.filter((entry) => entry?.product?.id).map(fromServerEntry) }
+
+    case WISHLIST_ACTIONS.SERVER_ID_SET:
+      return { ...state, items: state.items.map((item) => (item.productId === action.productId ? { ...item, serverId: action.serverId } : item)) }
+
+    case WISHLIST_ACTIONS.NOTE_SET:
+      return { ...state, items: state.items.map((item) => (item.productId === action.productId ? { ...item, note: action.note || null } : item)) }
+
+    case WISHLIST_ACTIONS.RESTORED: {
+      if (state.items.some((item) => item.productId === action.item.productId)) return state
+      const items = [...state.items]
+      items.splice(Math.min(Math.max(action.index ?? 0, 0), items.length), 0, action.item)
+      return { ...state, items }
+    }
+
     default:
       return state
+  }
+}
+
+/** A server wishlist entry → a wishlist line (the same snapshot as a local one, plus its server id and note). */
+function fromServerEntry(entry) {
+  const addedAt = Date.parse(entry.addedAt ?? '')
+  return {
+    productId: entry.product.id,
+    ...toSnapshot(entry.product),
+    addedAt: Number.isFinite(addedAt) ? addedAt : null,
+    isUnavailable: false,
+    serverId: entry.id,
+    note: typeof entry.note === 'string' && entry.note ? entry.note : null,
+    ...(entry.variant?.label && { variantLabel: entry.variant.label }),
   }
 }
 
@@ -94,6 +132,10 @@ export function sanitizeWishlist(value) {
       rating: storedNumber(stored.rating, 0, 5),
       addedAt: storedTimestamp(stored.addedAt),
       ...(stored.hasVariants === true && { hasVariants: true }),
+      // Phase 11: the server's id for the item, the shopper's note, and the variant saved.
+      ...(storedInteger(stored.serverId, 1) !== null && { serverId: stored.serverId }),
+      ...(storedText(stored.note) && { note: stored.note.slice(0, MAX_NOTE_LENGTH) }),
+      ...(storedText(stored.variantLabel) && { variantLabel: stored.variantLabel.slice(0, 200) }),
     }
     if (item.title === null || item.price === null) continue
     seen.add(item.productId)

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuArrowLeft, LuBellRing } from 'react-icons/lu'
+import { LuArrowLeft, LuBellRing, LuCopy } from 'react-icons/lu'
 import { adminKeys, createProduct, getCategories, getProduct, updateProduct } from '../api/admin'
 import DemoNotice from '../components/DemoNotice'
 import Field from '../components/Field'
@@ -18,6 +18,11 @@ import { LIVE_DATA } from '../api/mode'
 import ProductImages from '../components/ProductImages'
 import ProductVariants from '../components/ProductVariants'
 import { withPaths } from '../utils/categories'
+// Phase 11 §2 and §3: specifications, and related products, up-sells and cross-sells.
+import ProductSpecifications from '../components/ProductSpecifications'
+import ProductLinks from '../components/ProductLinks'
+import { duplicateProduct } from '../api/phase11'
+import { EMPTY_LINKS, changed, linkLists, specRow, specificationErrors, toLinkIds, toSpecifications } from '../utils/productLinks'
 
 /**
  * /products/new and /products/:id: one form for adding and editing. With real
@@ -27,6 +32,7 @@ import { withPaths } from '../utils/categories'
 function ProductFormPage() {
   const { productId } = useParams()
   const { can } = useAdminAuth()
+  const location = useLocation()
   const isNew = productId === undefined
   const product = useQuery({
     queryKey: adminKeys.product(productId),
@@ -49,12 +55,30 @@ function ProductFormPage() {
       <Link to="/products" className="back-link">
         <LuArrowLeft aria-hidden="true" /> Products
       </Link>
-      <PageHeader title={isNew ? 'Add product' : product.data.title} description={isNew ? undefined : `Product #${productId}`} />
+      <PageHeader
+        title={isNew ? 'Add product' : product.data.title}
+        description={isNew ? undefined : `Product #${productId}`}
+        actions={LIVE_DATA && !isNew && product.data.live && can('products.edit') ? <DuplicateProductButton productId={productId} title={product.data.title} /> : undefined}
+      />
       {!LIVE_DATA && <DemoNotice />}
+      {/* Phase 11: arrived here from "Duplicate" on another product. */}
+      {!isNew && location.state?.duplicatedFrom && (
+        <p className="notice notice--success" role="status">
+          Copy of “{location.state.duplicatedFrom}” created as a draft. Its options, variants and uploaded photos weren't copied: add them below, then set the
+          status to Active when it's ready.
+        </p>
+      )}
       {/* Phase 9 §7: shoppers who asked to be emailed when it's back in stock. */}
       {!isNew && product.data.stockAlertsWaiting > 0 && <StockAlertsNotice count={product.data.stockAlertsWaiting} />}
       {/* key: a fresh form (and default values) per product */}
-      <ProductForm key={productId ?? 'new'} productId={productId} initial={initial} categories={categories.data ?? []} hasVariants={!isNew && product.data.hasVariants === true} />
+      <ProductForm
+        key={productId ?? 'new'}
+        productId={productId}
+        initial={initial}
+        extras={isNew ? { specifications: [], links: EMPTY_LINKS } : { specifications: product.data.specifications ?? [], links: linkLists(product.data.links) }}
+        categories={categories.data ?? []}
+        hasVariants={!isNew && product.data.hasVariants === true}
+      />
       {LIVE_DATA && !isNew && product.data.live && (
         <>
           <ProductImages productId={productId} images={product.data.imageList ?? []} editable={can('products.edit')} />
@@ -70,11 +94,49 @@ function ProductFormPage() {
   )
 }
 
+/** Phase 11: copies the product into a new draft (POST products/:id/duplicate) and opens the copy. */
+function DuplicateProductButton({ productId, title }) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const duplicate = useMutation({
+    mutationFn: () => duplicateProduct(productId),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      navigate(`/products/${response.product.id}`, { state: { duplicatedFrom: title } })
+    },
+  })
+  return (
+    <div className="duplicate-product">
+      <button type="button" className="btn btn--outline" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}>
+        <LuCopy aria-hidden="true" /> {duplicate.isPending ? 'Duplicating…' : 'Duplicate'}
+      </button>
+      {duplicate.error && (
+        <p className="form-error" role="alert">
+          {duplicate.error.message}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const FIELDS_FROM_SERVER = Object.keys(EMPTY_PRODUCT)
 // Phase 10 §5: the server's names for the gift card fields' errors ("giftCardAmounts.1" → the amounts field).
 const fieldOf = (field) => (field.startsWith('giftCardAmounts') ? 'giftCardAmounts' : field)
 
-function ProductForm({ productId, initial, categories, hasVariants }) {
+/** Server errors of the phase 11 sections ("specifications.2.label", "links.upsell.0") → { specifications: { list, rows }, links: { [type] } }. */
+function extraErrorsFrom(fieldErrors) {
+  const found = { specifications: {}, links: {} }
+  for (const [field, messages] of Object.entries(fieldErrors ?? {})) {
+    const spec = /^specifications(?:\.(\d+)\.(label|value))?/.exec(field)
+    const link = /^links(?:\.(related|upsell|crosssell))?/.exec(field)
+    if (spec?.[1] !== undefined) found.specifications.rows = { ...found.specifications.rows, [spec[1]]: { ...found.specifications.rows?.[spec[1]], [spec[2]]: messages[0] } }
+    else if (spec) found.specifications.list = messages[0]
+    else if (link) found.links[link[1] ?? 'general'] = messages[0]
+  }
+  return found
+}
+
+function ProductForm({ productId, initial, extras, categories, hasVariants }) {
   const isNew = productId === undefined
   const navigate = useNavigate()
   const { can } = useAdminAuth()
@@ -92,16 +154,31 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
   } = useForm({ resolver: zodResolver(productSchema), defaultValues: initial, mode: 'onSubmit', reValidateMode: 'onChange' })
 
   const isGiftCard = useWatch({ control, name: 'type' }) === 'gift_card'
+  // Phase 11 §2 and §3 (real data): kept here, sent only when they changed ("omitted = unchanged").
+  const [saved, setSaved] = useState(() => ({ specifications: toSpecifications(extras.specifications), links: toLinkIds(extras.links) }))
+  const [specs, setSpecs] = useState(() => extras.specifications.map(specRow))
+  const [links, setLinks] = useState(extras.links)
+  const [extraErrors, setExtraErrors] = useState({ specifications: {}, links: {} })
+  const specsChanged = LIVE_DATA && changed(toSpecifications(specs), saved.specifications)
+  const linksChanged = LIVE_DATA && changed(toLinkIds(links), saved.links)
   const save = useMutation({
     mutationFn: (values) => {
       // The demo has no product status or SEO fields: don't send them.
       const sent = LIVE_DATA
         ? // Phase 10 §5: the gift card text fields become numbers (and only gift cards send amounts).
-          { ...Object.fromEntries(Object.entries(values).filter(([field]) => !GIFT_CARD_FIELDS.includes(field))), ...toGiftCardValues(values) }
+          {
+            ...Object.fromEntries(Object.entries(values).filter(([field]) => !GIFT_CARD_FIELDS.includes(field))),
+            ...toGiftCardValues(values),
+            // Phase 11: only when changed, so a save never replaces them by accident.
+            ...(specsChanged && { specifications: toSpecifications(specs) }),
+            ...(linksChanged && { links: toLinkIds(links) }),
+          }
         : Object.fromEntries(Object.entries(values).filter(([field]) => !LIVE_ONLY_FIELDS.includes(field)))
       return isNew ? createProduct(sent) : updateProduct(productId, sent)
     },
     onSuccess: (response, values) => {
+      setExtraErrors({ specifications: {}, links: {} })
+      if (LIVE_DATA) setSaved({ specifications: toSpecifications(specs), links: toLinkIds(links) })
       if (response.live) {
         queryClient.invalidateQueries({ queryKey: ['products'] })
         queryClient.invalidateQueries({ queryKey: adminKeys.overview })
@@ -120,11 +197,22 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
       for (const [field, messages] of Object.entries(error.fieldErrors ?? {})) {
         if (FIELDS_FROM_SERVER.includes(fieldOf(field))) setError(fieldOf(field), { message: messages[0] })
       }
+      setExtraErrors(extraErrorsFrom(error.fieldErrors))
     },
   })
 
   return (
-    <form className="form" onSubmit={handleSubmit((values) => save.mutate(values))} noValidate>
+    <form
+      className="form"
+      onSubmit={handleSubmit((values) => {
+        // Phase 11: the specification rows are checked here first, like the other fields.
+        const rows = LIVE_DATA ? specificationErrors(specs) : {}
+        setExtraErrors({ specifications: rows, links: {} })
+        if (rows.list || rows.rows) return
+        save.mutate(values)
+      })}
+      noValidate
+    >
       {result?.simulated && (
         <p className="notice notice--success" role="status">
           {isNew ? `Product created (demo, id #${result.product.id}). ` : 'Changes saved (demo). '}
@@ -240,9 +328,16 @@ function ProductForm({ productId, initial, categories, hasVariants }) {
         </fieldset>
       )}
 
+      {LIVE_DATA && (
+        <>
+          <ProductSpecifications rows={specs} onChange={setSpecs} errors={extraErrors.specifications} disabled={!can('products.edit')} />
+          <ProductLinks productId={productId} lists={links} onChange={setLinks} errors={extraErrors.links} disabled={!can('products.edit')} />
+        </>
+      )}
+
       <div className="form__actions">
         {can('products.edit') ? (
-          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty)}>
+          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty && !specsChanged && !linksChanged)}>
             {save.isPending ? 'Saving…' : isNew ? 'Add product' : 'Save changes'}
           </button>
         ) : (

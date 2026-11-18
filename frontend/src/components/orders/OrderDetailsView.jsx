@@ -8,7 +8,8 @@ import OrderTotals from './OrderTotals'
 import InvoicePdfButton from './InvoicePdfButton'
 import { PAYMENT_METHODS } from '../../constants/store'
 import { paymentNote } from '../../constants/orders'
-import { formatDate, formatPrice } from '../../utils/formatters'
+import { formatDate, formatBasePrice } from '../../utils/formatters'
+import { formatPoints } from '../../utils/rewards'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import './OrderDetailsView.css'
 
@@ -81,7 +82,7 @@ function Invoices({ invoices, invoiceLink, invoicePdf }) {
               ) : (
                 <span>Invoice {invoice.number}</span>
               )}
-              <strong>{formatPrice(invoice.amount)}</strong>
+              <strong>{formatBasePrice(invoice.amount)}</strong>
             </p>
             <p className="order-view__muted">Issued {formatDate(invoice.createdAt)}</p>
             {invoicePdf && <InvoicePdfButton orderNumber={invoicePdf.orderNumber} invoiceNumber={invoice.number} email={invoicePdf.email} size="sm" variant="ghost" />}
@@ -104,7 +105,7 @@ function Refunds({ creditMemos }) {
               <span>
                 <LuUndo2 aria-hidden="true" /> Refund {memo.number}
               </span>
-              <strong>{formatPrice(memo.total)}</strong>
+              <strong>{formatBasePrice(memo.total)}</strong>
             </p>
             <p className="order-view__muted">{formatDate(memo.createdAt)}</p>
           </li>
@@ -124,8 +125,8 @@ function Refunds({ creditMemos }) {
  * invoice to its printable page. `payAction` (phase 8): the "Pay now" button
  * of an unpaid card order, shown with the payment.
  */
-// Phase 10: an order paid in full by a gift card (no other method).
-const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card' }
+// Phase 10: an order paid in full by a gift card (no other method); phase 11: by reward points.
+const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card', reward_points: 'Reward points' }
 
 function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = null }) {
   const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
@@ -180,9 +181,16 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
               {/* Phase 10: the gift card that paid part (or all) of it: its last 4 characters only. */}
               {order.giftCard?.applied > 0 && (
                 <p className="order-view__muted">
-                  Gift card {order.giftCard.last4 ? `•••• ${order.giftCard.last4} ` : ''}paid {formatPrice(order.giftCard.applied)}.
+                  Gift card {order.giftCard.last4 ? `•••• ${order.giftCard.last4} ` : ''}paid {formatBasePrice(order.giftCard.applied)}.
                 </p>
               )}
+              {/* Phase 11: reward points used on the order, and earned once it was paid. */}
+              {order.rewardPointsSpent > 0 && (
+                <p className="order-view__muted">
+                  {formatPoints(order.rewardPointsSpent)} paid {formatBasePrice(order.rewardPointsAmount ?? order.totals.rewardPoints ?? 0)}.
+                </p>
+              )}
+              {order.rewardPointsEarned > 0 && <p className="order-view__muted">You earned {formatPoints(order.rewardPointsEarned)} with this order.</p>}
               {payAction && <div className="order-view__pay">{payAction}</div>}
             </>
           ) : (
@@ -208,11 +216,12 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
           appliedRules={order.appliedRules}
           shippingLabel={order.shippingMethod?.label}
           requiresShipping={order.requiresShipping !== false}
+          rewardPointsSpent={order.rewardPointsSpent ?? null}
         />
         {order.verification && (
           <p className="cart-summary__note">
             Prices verified with the server (DummyJSON cart #{order.verification.cartId}). Its own discounted total was{' '}
-            {formatPrice(order.verification.serverDiscountedTotal)}, rounded to whole dollars, before coupons and shipping.
+            {formatBasePrice(order.verification.serverDiscountedTotal)}, rounded to whole dollars, before coupons and shipping.
           </p>
         )}
       </section>

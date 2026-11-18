@@ -13,7 +13,7 @@ import { ordersQuery } from '../queries/orderQueries'
 import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, formatPrice } from '../utils/formatters'
+import { formatDate, formatBasePrice } from '../utils/formatters'
 import './OrderPages.css'
 
 function NoOrders() {
@@ -43,7 +43,7 @@ function OrderRow({ order }) {
         </span>
       </div>
       <OrderStatusBadge status={order.status} />
-      <span className="orders__total">{formatPrice(order.totals.total)}</span>
+      <span className="orders__total">{formatBasePrice(order.totals.total)}</span>
     </li>
   )
 }

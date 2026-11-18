@@ -5,6 +5,7 @@ import Logo from '../common/Logo'
 import SearchBar from '../common/SearchBar'
 import MainNavigation from './MainNavigation'
 import MobileNavigation from './MobileNavigation'
+import CurrencyPicker from './CurrencyPicker'
 import { ROUTES } from '../../constants/routes'
 import { useCart } from '../../hooks/useCart'
 import { useWishlist } from '../../hooks/useWishlist'
@@ -42,6 +43,11 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
 
         <div className="site-header__search">
           <SearchBar />
+        </div>
+
+        {/* Phase 11: "show prices in" another currency, when the store offers one. */}
+        <div className="site-header__currency">
+          <CurrencyPicker />
         </div>
 
         <nav className="site-header__actions" aria-label="Account and shopping">

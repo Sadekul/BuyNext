@@ -39,6 +39,8 @@ final class Permissions
             'customers.create' => 'Create customer accounts',
             'customers.delete' => 'Delete customer accounts',
             'customer_groups.manage' => 'Manage customer groups',
+            // Phase 11: reward points (seeing them needs customers.view).
+            'rewards.manage' => 'Adjust customers\' reward point balances',
         ]],
         'marketing' => ['label' => 'Marketing', 'permissions' => [
             'coupons.view' => 'View coupons',
@@ -116,7 +118,8 @@ final class Permissions
                 'permissions' => ['coupons.view', 'coupons.edit', 'content.view', 'content.edit',
                     'newsletter.view', 'newsletter.send', 'seo.manage', // phase 7 (part B)
                     'price_rules.manage', // phase 7 (part A)
-                    'gift_cards.view', 'gift_cards.manage']], // phase 10 (part B)
+                    'gift_cards.view', 'gift_cards.manage', // phase 10 (part B)
+                    'rewards.manage']], // phase 11
             ['name' => 'Viewer', 'description' => 'Can look at everything, change nothing.', 'is_system' => false, 'permissions' => $views],
         ];
     }

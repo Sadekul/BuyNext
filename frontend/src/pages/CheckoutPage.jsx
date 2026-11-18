@@ -30,7 +30,7 @@ import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { calculateCartTotals } from '../utils/cartTotals'
-import { formatPrice } from '../utils/formatters'
+import { formatBasePrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
 import { cartLineKey } from '../reducers/cartReducer'
 import { MAX_SAVED_ADDRESSES, defaultAddress, isSameAddress, toOrderAddress } from '../utils/addresses'
@@ -38,6 +38,8 @@ import { rememberGuestPayment } from '../utils/payment'
 import SavedAddressPicker from '../components/checkout/SavedAddressPicker'
 import GroupDiscountNote from '../components/cart/GroupDiscountNote'
 import GiftCardRedeem from '../components/checkout/GiftCardRedeem'
+import RewardPointsRedeem from '../components/checkout/RewardPointsRedeem'
+import ChargedInBaseNote from '../components/cart/ChargedInBaseNote'
 import { trackBeginCheckout } from '../utils/analytics'
 import './CheckoutPage.css'
 
@@ -64,6 +66,9 @@ const SERVER_FIELD_MAP = {
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
 
 const GUEST_CHECKOUT_OFF = "Please sign in to place your order: guest checkout isn't available right now."
+
+// Phase 11: the payment method sent when reward points alone pay the whole order (a gift card's path otherwise).
+const FULLY_COVERED_BY_POINTS = 'reward_points'
 
 const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
 
@@ -249,6 +254,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   )
   // Phase 10: the gift card applied at checkout (one per order). The server decides what it pays.
   const [giftCardCode, setGiftCardCode] = useState(null)
+  // Phase 11: reward points to spend (signed in, when the store has points on). The server decides what they pay.
+  const [rewardPoints, setRewardPoints] = useState(0)
 
   // A MUTATION: a request that changes something on the server (here: the
   // server prices the cart). Unlike queries, mutations run only when called.
@@ -314,6 +321,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     email: looksLikeEmail(guestEmail) ? guestEmail : undefined,
     country: REAL_SHOP && requiresShipping ? shippingCountry : undefined,
     giftCardCode: REAL_SHOP ? (giftCardCode ?? undefined) : undefined,
+    rewardPoints: REAL_SHOP && isAuthenticated && rewardPoints > 0 ? rewardPoints : undefined,
   }
   const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
   const serverCart = REAL_SHOP ? pricing.data : null
@@ -332,7 +340,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const shippingOptions = (offered ?? settings.shippingMethods.map((method) => ({ ...method, price: calculateCartTotals(cart.items, localCoupon, method.id, settings).shipping }))).map((option) => {
     const known = settings.shippingMethods.find((method) => method.id === option.id)
     const price = option.price ?? 0
-    return { id: option.id, label: option.label ?? known?.label ?? option.id, description: option.eta ?? known?.eta, aside: price === 0 ? 'Free' : formatPrice(price) }
+    return { id: option.id, label: option.label ?? known?.label ?? option.id, description: option.eta ?? known?.eta, aside: price === 0 ? 'Free' : formatBasePrice(price) }
   })
   const shippingLabel = shippingOptions.find((option) => option.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
   // The chosen method isn't offered for this cart (any more): switch to the first that is.
@@ -347,9 +355,14 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   // Phase 10: what the gift card pays, and whether it pays everything (no other payment needed).
   const giftCardError = giftCardCode ? (serverCart?.giftCardError ?? null) : null
   const giftCardPays = giftCardCode && !giftCardError ? (serverCart?.totals.giftCard ?? 0) : 0
-  const amountDue = serverCart?.totals.amountDue ?? Math.max(0, Math.round((totals.total - giftCardPays) * 100) / 100)
-  const fullyCovered = REAL_SHOP && giftCardPays > 0 && amountDue === 0
-  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0 || noDelivery || !chosenIsOffered || Boolean(giftCardError))
+  // Phase 11: what reward points pay (after tax, before the gift card), and why they can't be used.
+  const rewardPointsError = rewardPoints > 0 ? (serverCart?.rewardPointsError ?? null) : null
+  const pointsPay = rewardPoints > 0 && !rewardPointsError ? (serverCart?.totals.rewardPoints ?? 0) : 0
+  const pointsSpent = pointsPay > 0 ? (serverCart?.rewardPoints?.points ?? rewardPoints) : 0
+  const prepaid = giftCardPays + pointsPay
+  const amountDue = serverCart?.totals.amountDue ?? Math.max(0, Math.round((totals.total - prepaid) * 100) / 100)
+  const fullyCovered = REAL_SHOP && prepaid > 0 && amountDue === 0
+  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0 || noDelivery || !chosenIsOffered || Boolean(giftCardError) || Boolean(rewardPointsError))
   // Phase 8: a card order is paid on Stripe's page right after it is created.
   const payByStripe = REAL_SHOP && !fullyCovered && settings.cardPayments === 'stripe' && paymentMethod === 'card'
   // Phase 10: a PayPal order is approved on PayPal's site right after it is created.
@@ -389,13 +402,16 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     // "Save this address" only when it is offered (an address already in the book isn't saved twice).
     const saveAddress = requiresShipping && offerToSave && values.saveAddress === true
     // Phase 10: a gift card that pays everything is the payment method; otherwise the chosen one pays the rest.
-    const paymentChoice = fullyCovered ? 'gift_card' : values.paymentMethod === 'gift_card' ? defaultValues.paymentMethod : values.paymentMethod
+    // Phase 11: points (and/or a gift card) that pay everything take the same path ("gift_card" without a card: "reward_points").
+    const coveredBy = giftCardPays > 0 ? 'gift_card' : FULLY_COVERED_BY_POINTS
+    const paymentChoice = fullyCovered ? coveredBy : ['gift_card', FULLY_COVERED_BY_POINTS].includes(values.paymentMethod) ? defaultValues.paymentMethod : values.paymentMethod
     const order = await orderMutation.mutateAsync({
       items: cart.items,
       couponCode: cart.couponCode,
       values: { ...values, paymentMethod: paymentChoice, saveAddress },
       expectedTotal: totals.total,
       giftCardCode: giftCardCode && !giftCardError ? giftCardCode : undefined,
+      rewardPoints: pointsSpent > 0 ? pointsSpent : undefined,
       requiresShipping,
     })
     queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
@@ -439,6 +455,13 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       // to use this code", "This code applies to Shoes only"): re-price, so the
       // summary and the code box show the server's answer too.
       // Phase 10: the gift card stopped working (spent elsewhere, disabled, expired): re-price and say why.
+      // Phase 11: the points can't be used any more (spent elsewhere, the total changed): re-price and say why.
+      const pointsMessage = error.fieldErrors?.rewardPoints?.[0]
+      if (pointsMessage) {
+        pricing.refetch()
+        setError('root.server', { message: `Reward points: ${pointsMessage}` })
+        return
+      }
       const giftCardMessage = error.fieldErrors?.giftCardCode?.[0]
       if (giftCardMessage) {
         pricing.refetch()
@@ -466,11 +489,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       ? 'Continue to secure payment'
       : payByPaypal
         ? 'Continue to PayPal'
-        : `Place order · ${formatPrice(giftCardPays > 0 ? amountDue : totals.total)}`
+        : `Place order · ${formatBasePrice(prepaid > 0 ? amountDue : totals.total)}`
   let paymentNote = null
   if (REAL_SHOP) {
     paymentNote = paymentMethod === 'cod' ? PAYMENT_NOTES.cod : payByStripe ? PAYMENT_NOTES.stripe : payByPaypal ? PAYMENT_NOTES.paypal : PAYMENT_NOTES.online
-    if (giftCardPays > 0) paymentNote = `Your gift card pays ${formatPrice(giftCardPays)}; the remaining ${formatPrice(amountDue)} is paid as chosen above. ${paymentNote}`
+    if (giftCardPays > 0) paymentNote = `Your gift card pays ${formatBasePrice(giftCardPays)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
+    else if (pointsPay > 0) paymentNote = `Your reward points pay ${formatBasePrice(pointsPay)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
   }
 
   return (
@@ -570,7 +594,9 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             {fullyCovered ? (
               <fieldset className="choice-cards">
                 <legend className="choice-cards__legend">Payment</legend>
-                <p className="checkout__note">Your gift card pays for the whole order: no other payment is needed.</p>
+                <p className="checkout__note">
+                  {giftCardPays > 0 ? 'Your gift card pays for the whole order: no other payment is needed.' : 'Your reward points pay for the whole order: no other payment is needed.'}
+                </p>
               </fieldset>
             ) : (
               <ChoiceCards
@@ -599,9 +625,10 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             Order summary
           </h2>
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
-          {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} />}
+          {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} format={formatBasePrice} />}
           <OrderTotals
-            totals={giftCardPays > 0 ? { ...totals, giftCard: giftCardPays, amountDue } : totals}
+            totals={prepaid > 0 ? { ...totals, giftCard: giftCardPays, rewardPoints: pointsPay, amountDue } : totals}
+            rewardPointsSpent={pointsSpent}
             couponCode={cart.couponCode}
             appliedRules={serverCart?.appliedRules}
             shippingLabel={shippingLabel}
@@ -617,6 +644,19 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             disabled={isSubmitting}
             checking={isPricing}
           />
+          {/* Phase 11: reward points (signed in, when the store has them on); paid before a gift card. */}
+          {REAL_SHOP && isAuthenticated && (
+            <RewardPointsRedeem
+              rewards={serverCart?.rewards}
+              appliedPoints={rewardPoints}
+              applied={rewardPoints > 0 && !rewardPointsError ? serverCart?.rewardPoints : null}
+              error={rewardPointsError}
+              onApply={setRewardPoints}
+              onRemove={() => setRewardPoints(0)}
+              disabled={isSubmitting}
+              checking={isPricing}
+            />
+          )}
           {REAL_SHOP && (
             <GiftCardRedeem
               appliedCode={giftCardCode}
@@ -666,6 +706,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isBusy || cannotPlace}>
             {placeLabel}
           </Button>
+          {/* Phase 11: prices shown in another currency elsewhere; the order is charged in USD. */}
+          <ChargedInBaseNote amount={prepaid > 0 ? amountDue : totals.total} />
           <p className="cart-summary__note">
             {REAL_SHOP
               ? 'Prices, stock, discounts, and shipping are checked again by our server when you place the order.'

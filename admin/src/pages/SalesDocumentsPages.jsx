@@ -10,6 +10,8 @@ import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime, formatMoney } from '../utils/format'
+// Phase 11 §4: points on credit memos.
+import { formatPoints } from '../utils/rewards'
 
 /*
  * Sales → Invoices and Credit memos (real orders only, docs/backend/PHASE3_CONTRACT.md).
@@ -400,22 +402,39 @@ export function CreditMemoDetailPage() {
                   <strong>{formatMoney(data.total)}</strong>
                 </td>
               </tr>
+              {/* Phase 11 §4: points went back first; earned points were taken back. */}
+              {data.rewardPointsReturned > 0 && (
+                <tr>
+                  <th scope="row" colSpan={2}>
+                    Returned as reward points ({formatPoints(data.rewardPointsReturned)})
+                  </th>
+                  <td className="num">{formatMoney(data.rewardPointsRefund ?? 0)}</td>
+                </tr>
+              )}
+              {data.rewardPointsReversed > 0 && (
+                <tr>
+                  <th scope="row" colSpan={2}>
+                    Earned points taken back
+                  </th>
+                  <td className="num">{formatPoints(data.rewardPointsReversed)}</td>
+                </tr>
+              )}
               {/* Phase 10 §5: the part that went back to a gift card first, and the rest. */}
               {data.giftCardRefund > 0 && (
-                <>
-                  <tr>
-                    <th scope="row" colSpan={2}>
-                      Returned to gift card
-                    </th>
-                    <td className="num">{formatMoney(data.giftCardRefund)}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row" colSpan={2}>
-                      Refunded by the other payment method
-                    </th>
-                    <td className="num">{formatMoney(data.otherRefund ?? data.total - data.giftCardRefund)}</td>
-                  </tr>
-                </>
+                <tr>
+                  <th scope="row" colSpan={2}>
+                    Returned to gift card
+                  </th>
+                  <td className="num">{formatMoney(data.giftCardRefund)}</td>
+                </tr>
+              )}
+              {(data.giftCardRefund > 0 || data.rewardPointsRefund > 0) && (
+                <tr>
+                  <th scope="row" colSpan={2}>
+                    Refunded by the other payment method
+                  </th>
+                  <td className="num">{formatMoney(data.otherRefund ?? Math.round((data.total - (data.giftCardRefund ?? 0) - (data.rewardPointsRefund ?? 0)) * 100) / 100)}</td>
+                </tr>
               )}
             </tfoot>
           </table>

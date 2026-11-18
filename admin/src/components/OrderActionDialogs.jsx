@@ -6,7 +6,9 @@ import Field from './Field'
 import FormDialog from './FormDialog'
 import { ErrorState, Loading } from './States'
 import { formatMoney } from '../utils/format'
-import { CARRIERS, giftCardSplit, paidThroughProvider } from '../utils/orders'
+import { CARRIERS, paidThroughProvider } from '../utils/orders'
+// Phase 11 §4: refunds settle reward points first, then the gift card, then the payment method.
+import { formatPoints, refundSplit } from '../utils/rewards'
 
 /*
  * The actions on a real order, each in its own dialog with its own note and
@@ -170,18 +172,29 @@ const GIFT_CARD_REFUND_NOTE = ' Money goes back to the gift card first, up to wh
 // Phase 10 §5: a gift card paid the whole order.
 const GIFT_CARD_ONLY_REFUND_DESCRIPTION = 'Records a refund (credit memo). The money goes back to the gift card the order was paid with.'
 
+// Phase 11 §4: points paid part of it, or the order earned points.
+const POINTS_REFUND_NOTE = ' Reward points that paid for it go back first, in proportion, then the gift card, then the payment method.'
+const EARNED_POINTS_NOTE = ' Points the order earned are taken back in proportion (never below a zero balance).'
+
 function refundDescription(order) {
-  if (order.paymentMethod === 'gift_card') return GIFT_CARD_ONLY_REFUND_DESCRIPTION
+  const points = order.rewardPoints?.spent > 0
+  const earned = order.rewardPoints?.earned > 0 ? EARNED_POINTS_NOTE : ''
+  if (order.paymentMethod === 'gift_card' && !points) return `${GIFT_CARD_ONLY_REFUND_DESCRIPTION}${earned}`
+  if (order.paymentMethod === 'gift_card' || order.paymentMethod === 'reward_points') return `Records a refund (credit memo).${POINTS_REFUND_NOTE}${earned}`
   const provider = paidThroughProvider(order)
   const base = provider === 'stripe' ? STRIPE_REFUND_DESCRIPTION : provider === 'paypal' ? PAYPAL_REFUND_DESCRIPTION : REFUND_DESCRIPTION
-  return order.giftCardPayment?.amount > 0 ? `${base}${GIFT_CARD_REFUND_NOTE}` : base
+  const note = points ? POINTS_REFUND_NOTE : order.giftCardPayment?.amount > 0 ? GIFT_CARD_REFUND_NOTE : ''
+  return `${base}${note}${earned}`
 }
 /** After the refund: where the money is going (phase 8 Stripe, phase 10 PayPal and gift cards). */
 function refundDestination(order, creditMemo) {
   const parts = []
+  // Phase 11 §4: points given back first, and earned points taken back.
+  if (creditMemo.rewardPointsReturned > 0) parts.push(` ${formatPoints(creditMemo.rewardPointsReturned)} (${formatMoney(creditMemo.rewardPointsRefund ?? 0)}) went back to the customer's balance.`)
+  if (creditMemo.rewardPointsReversed > 0) parts.push(` ${formatPoints(creditMemo.rewardPointsReversed)} earned on the order were taken back.`)
   if (creditMemo.giftCardRefund > 0) parts.push(` ${formatMoney(creditMemo.giftCardRefund)} went back to the gift card.`)
-  const other = creditMemo.giftCardRefund > 0 ? toCents(creditMemo.total) - toCents(creditMemo.giftCardRefund) : toCents(creditMemo.total)
-  if (other <= 0 && parts.length > 0) return parts.join('')
+  const other = toCents(creditMemo.total) - toCents(creditMemo.giftCardRefund ?? 0) - toCents(creditMemo.rewardPointsRefund ?? 0)
+  if (other <= 0 && (creditMemo.giftCardRefund > 0 || creditMemo.rewardPointsRefund > 0)) return parts.join('')
   const provider = paidThroughProvider(order)
   if (provider === 'paypal') parts.push(' PayPal is returning the money to the customer.')
   else if (creditMemo.refundReference || provider === 'stripe') parts.push(" Stripe is returning the money to the customer's card.")
@@ -281,8 +294,8 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
   }
 
   const totalError = errors.total?.[0] ?? errors.items?.[0]
-  // Phase 10 §5: how the refund divides between the gift card and the other method.
-  const split = giftCardSplit(order, totalCents, limits)
+  // Phase 10 §5 and 11 §4: how the refund divides between points, the gift card, and the other method.
+  const split = refundSplit(order, totalCents, limits)
   return (
     <FormDialog
       isOpen
@@ -390,7 +403,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
   )
 }
 
-/** Phase 10 §5: the refund's split, as the server will make it (announced as it changes). */
+/** Phase 10 §5 and 11 §4: the refund's split, as the server will make it (announced as it changes). */
 function RefundSplit({ split, order }) {
   const provider = paidThroughProvider(order)
   const other = provider === 'paypal' ? 'Through PayPal' : provider === 'stripe' ? 'To the card through Stripe' : 'By the other payment method'
@@ -398,11 +411,19 @@ function RefundSplit({ split, order }) {
     <div className="refund-split" aria-live="polite">
       <p className="refund-split__title">How the refund is split</p>
       <dl>
-        <div>
-          <dt>Back to the gift card{split.last4 && ` ending ${split.last4}`}</dt>
-          <dd>{formatMoney(split.toCardCents / 100)}</dd>
-        </div>
-        {order.paymentMethod !== 'gift_card' && (
+        {split.usedPoints && (
+          <div>
+            <dt>Back as reward points (about {formatPoints(split.points)})</dt>
+            <dd>{formatMoney(split.toPointsCents / 100)}</dd>
+          </div>
+        )}
+        {split.usedGiftCard && (
+          <div>
+            <dt>Back to the gift card{split.last4 && ` ending ${split.last4}`}</dt>
+            <dd>{formatMoney(split.toCardCents / 100)}</dd>
+          </div>
+        )}
+        {!['gift_card', 'reward_points'].includes(order.paymentMethod) && (
           <div>
             <dt>{other}</dt>
             <dd>{formatMoney(split.otherCents / 100)}</dd>

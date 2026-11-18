@@ -29,7 +29,8 @@ use Illuminate\Validation\ValidationException;
  */
 class Refunds
 {
-    public function __construct(private Audit $audit, private Inventory $inventory, private OnlinePayments $payments, private GiftCards $giftCards) {}
+    public function __construct(private Audit $audit, private Inventory $inventory, private OnlinePayments $payments, private GiftCards $giftCards,
+        private RewardPoints $rewardPoints) {}
 
     /**
      * The limits for the admin's refund form (GET .../refundable), in cents:
@@ -102,6 +103,13 @@ class Refunds
             'max_total' => Pricing::format($limits['max_cents']),
             // Phase 10 (part B): a refund goes back to the redeemed gift card first, up to this much.
             'gift_card_refundable' => Pricing::format(min($limits['max_cents'], $this->giftCards->refundableCents($order))),
+            // Phase 11: refunds settle reward points first (money returned as points), then the gift card, then the payment method.
+            'reward_points_refundable' => Pricing::format(min($limits['max_cents'], $this->rewardPoints->refundableCents($order))),
+            'reward_points' => [
+                'spent' => (int) $order->reward_points_spent,
+                'earned' => $order->reward_points_earned,
+                'reversed' => (int) $order->creditMemos->sum('reward_points_reversed'),
+            ],
         ];
     }
 
@@ -166,9 +174,10 @@ class Refunds
         }
         $stockLines = array_filter($lines, fn ($line) => ! $line['item']->isGiftCard());
         $restock = (bool) ($data['restock'] ?? false) && $stockLines !== [];
-        // Phase 10 (part B): the redeemed gift card gets its part back first; only the rest goes to the card / PayPal.
-        $giftCardRefund = min($total, $this->giftCards->refundableCents($order));
-        $otherRefund = $total - $giftCardRefund;
+        // Phase 11: reward points are settled first, then (phase 10, part B) the redeemed gift card; only the rest goes to the card / PayPal.
+        $pointsRefund = min($total, $this->rewardPoints->refundableCents($order));
+        $giftCardRefund = min($total - $pointsRefund, $this->giftCards->refundableCents($order));
+        $otherRefund = $total - $pointsRefund - $giftCardRefund;
         // Phase 8: an order paid through Stripe (phase 10: or PayPal) gets the money back BEFORE the memo is
         // saved: the provider refusing throws a 422 and the transaction keeps nothing. Others: refunded by hand.
         $refundReference = $otherRefund > 0 ? $this->payments->refund($order, $otherRefund, $order->creditMemos->count() + 1) : null;
@@ -179,6 +188,7 @@ class Refunds
             'adjustment' => Pricing::format($adjustment),
             'total' => Pricing::format($total),
             'gift_card_refund' => Pricing::format($giftCardRefund),
+            'reward_points_refund' => Pricing::format($pointsRefund),
             'refund_reference' => $refundReference,
             'restocked' => $restock,
             'admin_id' => $admin->id,
@@ -193,6 +203,8 @@ class Refunds
             $this->restock($stockLines);
         }
         $this->giftCards->refundTo($order, $giftCardRefund, $memo);
+        // Phase 11: spent points come back in proportion; earned points are taken back in proportion (never below 0).
+        $shortfall = $this->rewardPoints->refund($order, $memo);
 
         // Full refund: the money is all back, or nothing is left to refund but
         // a fee the shop kept (negative adjustment). Then the order is closed.
@@ -208,12 +220,15 @@ class Refunds
             'status' => $order->status,
             'payment_status' => $order->payment_status,
             'note' => "Credit memo {$memo->number} created; \${$memo->total} refunded"
+                .($pointsRefund > 0 ? ' ($'.Pricing::format($pointsRefund).' as '.number_format($memo->reward_points_returned).' reward points)' : '')
                 .($giftCardRefund > 0 ? ' ($'.Pricing::format($giftCardRefund).' to the gift card)' : '')
                 .match (true) {
                     $refundReference && $order->payment_provider === 'paypal' => ' through PayPal.',
                     (bool) $refundReference => ' to the card through Stripe.',
                     default => '.',
-                }.($restock ? ' Items returned to stock.' : ''),
+                }.($restock ? ' Items returned to stock.' : '')
+                .($memo->reward_points_reversed > 0 ? ' '.number_format($memo->reward_points_reversed).' earned reward points taken back.' : '')
+                .($shortfall > 0 ? " {$shortfall} earned reward ".($shortfall === 1 ? 'point' : 'points').' could not be taken back (balance too low).' : ''),
             'admin_id' => $admin->id,
             'customer_notified' => $notify,
         ]);
@@ -224,6 +239,8 @@ class Refunds
                 'adjustment' => $memo->adjustment, 'total' => $memo->total, 'restocked' => $restock, 'payment_status' => $order->payment_status,
                 ...($refundReference ? ['refund_reference' => $refundReference] : []),
                 ...($giftCardRefund > 0 ? ['gift_card_refund' => $memo->gift_card_refund] : []),
+                ...($pointsRefund > 0 || $memo->reward_points_reversed > 0 ? ['reward_points_refund' => $memo->reward_points_refund,
+                    'reward_points_returned' => $memo->reward_points_returned, 'reward_points_reversed' => $memo->reward_points_reversed] : []),
             ]], $admin);
 
         return $memo;

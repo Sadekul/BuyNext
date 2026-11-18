@@ -8,6 +8,8 @@ import ScrollToTop from '../components/common/ScrollToTop'
 import ErrorBoundary from '../components/common/ErrorBoundary'
 import CartDrawer from '../components/cart/CartDrawer'
 import CookieConsent from '../components/layout/CookieConsent'
+import CompareBar from '../components/layout/CompareBar'
+import WishlistSyncNotice from '../components/layout/WishlistSyncNotice'
 import Loader from '../components/ui/Loader'
 import { ANNOUNCEMENTS } from '../constants/site'
 import { useNavLinks } from '../hooks/useNavLinks'
@@ -44,8 +46,12 @@ function MainLayout() {
           </Suspense>
         </ErrorBoundary>
       </main>
+      {/* Phase 11: "Compare (3) · Clear", while products are picked for comparison. */}
+      <CompareBar />
       <Footer />
       <CartDrawer />
+      {/* Phase 11: why a wishlist change didn't stick (the account's wishlist is on the server). */}
+      <WishlistSyncNotice />
     </>
   )
 }

@@ -173,7 +173,7 @@ function CreateOrderPage() {
   const shippingOptions = quote.data?.shippingOptions?.length ? quote.data.shippingOptions : SHIPPING_FALLBACK
   const storeMethods = quote.data?.paymentMethods ?? settings.data?.checkout?.enabledPaymentMethods ?? STORE_PAYMENT_METHODS
   // Phase 10: "Gift card" is only for a card that pays a whole storefront order, never a choice here.
-  const paymentChoices = [...new Set([...storeMethods.filter((id) => PAYMENT_METHODS[id] && id !== 'gift_card'), ...ADMIN_ONLY_PAYMENT_METHODS])]
+  const paymentChoices = [...new Set([...storeMethods.filter((id) => PAYMENT_METHODS[id] && id !== 'gift_card' && id !== 'reward_points'), ...ADMIN_ONLY_PAYMENT_METHODS])]
 
   return (
     <>

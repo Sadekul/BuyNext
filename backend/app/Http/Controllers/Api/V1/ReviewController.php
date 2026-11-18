@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
 use App\Services\Reviews;
+use App\Services\RewardPoints;
 use App\Services\Settings;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -72,6 +73,7 @@ class ReviewController extends Controller
                 ]);
                 if ($status === 'approved') {
                     $reviews->refresh($product->id);
+                    app(RewardPoints::class)->review($review); // phase 11: the review bonus
                 }
 
                 return $review;

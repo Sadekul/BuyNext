@@ -5,6 +5,8 @@ import Breadcrumb from '../components/common/Breadcrumb'
 import PageMeta from '../components/common/PageMeta'
 import ProductGallery from '../components/product/ProductGallery'
 import WishlistButton from '../components/product/WishlistButton'
+import CompareButton from '../components/product/CompareButton'
+import RecentlyViewed from '../components/product/RecentlyViewed'
 import ProductBadge from '../components/product/ProductBadge'
 import ProductGrid from '../components/product/ProductGrid'
 import ProductGridSkeleton from '../components/product/ProductGridSkeleton'
@@ -21,6 +23,8 @@ import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { useCart } from '../hooks/useCart'
+import { useAuth } from '../hooks/useAuth'
+import { useStoreSettings } from '../hooks/useStoreSettings'
 import { useStoreRedirect } from '../hooks/useStoreRedirect'
 import { categoriesQuery, productQuery, relatedProductsQuery } from '../queries/productQueries'
 import { HAS_CATEGORY_TREE } from '../services/categoryService'
@@ -34,6 +38,8 @@ import { categoryAncestors } from '../utils/categories'
 import { chooseValue, findVariant, hasVariants, initialSelection, variantPriceRange, withVariant } from '../utils/variants'
 import { isGiftCardProduct } from '../utils/giftCards'
 import { trackViewItem } from '../utils/analytics'
+import { recordRecentlyViewed } from '../utils/recentlyViewed'
+import { earnEstimate } from '../utils/rewards'
 import './ProductDetailsPage.css'
 
 const RELATED_LIMIT = 4
@@ -100,6 +106,10 @@ function ProductDetails({ product }) {
   const { addItem } = useCart()
   // Phase 10: statistics (only after the visitor accepted them; no personal data).
   useEffect(() => trackViewItem(product), [product])
+  // Phase 11: "Recently viewed" (this browser only).
+  useEffect(() => recordRecentlyViewed(product), [product])
+  const { isAuthenticated } = useAuth()
+  const { settings } = useStoreSettings()
   // Phase 10: gift cards are bought by amount, for a recipient (GiftCardForm), not by quantity.
   const isGiftCard = isGiftCardProduct(product)
   // The category tree (BuyNest's API) names the breadcrumb's parents; the demo needs no extra request.
@@ -261,7 +271,13 @@ function ProductDetails({ product }) {
               {canBuy || needsChoice ? 'Add to cart' : 'Unavailable'}
             </Button>
             <WishlistButton product={product} variant="button" />
+            {/* Phase 11: add to the compare list (max 4). */}
+            <CompareButton product={product} variant="button" />
           </div>
+          {/* Phase 11: reward points this purchase would earn (signed in, when the store has points on). */}
+          {isAuthenticated && settings.rewards && !needsChoice && earnEstimate(salePrice, settings.rewards) > 0 && (
+            <p className="product-details__note product-details__points">Earn about {earnEstimate(salePrice, settings.rewards)} reward points with this purchase.</p>
+          )}
           {canBuy && minQuantity > 1 && (
             <p className="product-details__note">Minimum order quantity: {minQuantity}</p>
           )}
@@ -292,8 +308,11 @@ function ProductDetails({ product }) {
         </div>
       </div>
 
-      <section className="product-details__section" aria-labelledby="specs-title">
-        <h2 id="specs-title">Specifications</h2>
+      {/* Phase 11: the admin's specifications table ("Screen size: 6.1 in"), when there are any. */}
+      {product.specifications?.length > 0 && <SpecificationsTable rows={product.specifications} />}
+
+      <section className="product-details__section" aria-labelledby="details-title">
+        <h2 id="details-title">Product details</h2>
         <dl className="product-details__specs">
           {specifications.map(([label, value]) => (
             <div key={label}>
@@ -304,6 +323,9 @@ function ProductDetails({ product }) {
         </dl>
       </section>
 
+      {/* Phase 11: the admin's up-sells (BuyNest's API; the demo has none). */}
+      {product.upsells?.length > 0 && <LinkedProducts id="upsells-title" title="You may also like" products={product.upsells} />}
+
       <section className="product-details__section" id="reviews" aria-labelledby="reviews-title">
         <h2 id="reviews-title">Customer reviews</h2>
         <ProductReviews reviews={product.reviews} />
@@ -311,9 +333,16 @@ function ProductDetails({ product }) {
         {REAL_SHOP && <ReviewForm productId={product.id} productTitle={product.title} />}
       </section>
 
-      {product.category && (
-        <RelatedProducts productId={product.id} categorySlug={product.category} categoryName={categoryName} />
+      {/* Phase 11: BuyNest's API answers the related products itself (the admin's links, or the same
+          automatic choice as before); the demo keeps picking them from the category. */}
+      {Array.isArray(product.related) ? (
+        product.related.length > 0 && <LinkedProducts id="related-title" title="Related products" products={product.related} />
+      ) : (
+        product.category && <RelatedProducts productId={product.id} categorySlug={product.category} categoryName={categoryName} />
       )}
+
+      {/* Phase 11: what this browser opened before (not this product). */}
+      <RecentlyViewed excludeId={product.id} className="product-details__section recently-viewed" />
 
     </div>
   )
@@ -337,6 +366,35 @@ function StockStatus({ product, canBuy }) {
     return <p className="product-details__stock product-details__stock--low">Low stock — only {product.stock} left</p>
   }
   return <p className="product-details__stock">In stock</p>
+}
+
+/** Phase 11: the product's specifications as a two-column table (row headers name each value). */
+function SpecificationsTable({ rows }) {
+  return (
+    <section className="product-details__section" aria-labelledby="specs-title">
+      <h2 id="specs-title">Specifications</h2>
+      <table className="product-details__spec-table">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <th scope="row">{row.label}</th>
+              <td>{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+/** Phase 11: linked products from the API (up-sells, related), already chosen and ordered by the server. */
+function LinkedProducts({ id, title, products }) {
+  return (
+    <section className="product-details__section" aria-labelledby={id}>
+      <h2 id={id}>{title}</h2>
+      <ProductGrid products={products} />
+    </section>
+  )
 }
 
 /** Other products from the same category (server-side category request). */

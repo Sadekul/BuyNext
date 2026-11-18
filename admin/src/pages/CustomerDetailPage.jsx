@@ -30,11 +30,16 @@ import { accountStatus, isEmail } from '../utils/customers'
 import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
 import { orderSource, orderStatus, paymentStatus } from '../utils/orders'
 import { actionErrorMessage } from '../utils/permissions'
+// Phase 11: the saved wishlist and reward points.
+import { RewardsTab, WishlistTab } from '../components/CustomerLoyaltyTabs'
 
 const TABS = [
   { id: 'account', label: 'Account' },
   { id: 'addresses', label: 'Addresses' },
   { id: 'orders', label: 'Orders' },
+  // Phase 11 §1 and §4.
+  { id: 'wishlist', label: 'Wishlist' },
+  { id: 'rewards', label: 'Reward points' },
   { id: 'notes', label: 'Notes' },
 ]
 
@@ -159,6 +164,8 @@ function CustomerDetailPage() {
             addresses: <AddressesTab customer={data} onChanged={(text) => (refresh(), say(text))} />,
             orders: <OrdersTab customer={data} />,
             notes: <NotesTab customer={data} onAdded={(text) => (refresh(), say(text))} />,
+            wishlist: <WishlistTab customer={data} />,
+            rewards: <RewardsTab customer={data} onChanged={say} />,
           })[selected]
         }
       </Tabs>

@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\Invoice;
+use App\Models\Order;
 use App\Services\DocumentPdfs;
 use App\Services\Settings;
 use App\Support\EmailBlocks;
@@ -36,6 +37,10 @@ class InvoiceMail extends Mailable
             'invoice_number' => $this->invoice->number,
             'invoice_amount' => $this->invoice->amount,
             'note' => EmailBlocks::note($this->invoice->note, self::storeName()),
+            // Phase 11: "You earned 120 reward points with this order." (empty when none). Read fresh: points are earned after the invoice is made.
+            'reward_points_earned' => ($earned = (int) Order::whereKey($order->id)->value('reward_points_earned')) > 0
+                ? EmailBlocks::paragraph('You earned '.number_format($earned).' reward '.($earned === 1 ? 'point' : 'points').' with this order.')
+                : '',
         ];
     }
 

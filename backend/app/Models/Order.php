@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'shipping_label', 'shipping_eta', 'coupon_code', 'applied_rules', 'subtotal', 'discount_total', 'shipping_total',
     'tax_total', 'grand_total', 'shipping_address', 'billing_address', 'placed_at',
     'gift_card_id', 'gift_card_amount', // phase 10 (part B)
+    'reward_points_spent', 'reward_points_amount', 'reward_points_earned', // phase 11
 ])]
 class Order extends Model
 {
@@ -70,6 +71,10 @@ class Order extends Model
             'payment_expires_at' => 'datetime',
             'paid_at' => 'datetime',
             'gift_card_amount' => 'decimal:2', // phase 10 (part B): paid with the redeemed gift card
+            // Phase 11: reward points spent on the order (and their money value), and earned when it was invoiced (null before / guests / off).
+            'reward_points_spent' => 'integer',
+            'reward_points_amount' => 'decimal:2',
+            'reward_points_earned' => 'integer',
         ];
     }
 
@@ -109,10 +114,11 @@ class Order extends Model
         return $this->belongsTo(GiftCard::class);
     }
 
-    /** Phase 10 (part B): what is left to pay after the gift card (what Stripe or PayPal charge), in cents. */
+    /** Phase 10 (part B): what is left to pay after the gift card (what Stripe or PayPal charge), in cents. Phase 11: and the reward points. */
     public function dueCents(): int
     {
-        return max(0, Pricing::toCents($this->grand_total) - Pricing::toCents($this->gift_card_amount ?? 0));
+        return max(0, Pricing::toCents($this->grand_total) - Pricing::toCents($this->gift_card_amount ?? 0)
+            - Pricing::toCents($this->reward_points_amount ?? 0));
     }
 
     public function returns(): HasMany

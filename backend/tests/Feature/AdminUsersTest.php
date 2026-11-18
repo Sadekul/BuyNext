@@ -39,8 +39,8 @@ class AdminUsersTest extends TestCase
         $this->assertSame(Permissions::all(), $roles[0]['permissions']);
         $this->assertSame(1, $roles[0]['admins_count']);
         // Phase 7: Marketing also gets price rules (part A), newsletter and SEO (part B).
-        // Phase 10 (part B): and gift cards.
-        $this->assertSame(['coupons.view', 'coupons.edit', 'price_rules.manage', 'newsletter.view', 'newsletter.send', 'gift_cards.view', 'gift_cards.manage',
+        // Phase 10 (part B): and gift cards. Phase 11: and reward point adjustments (a Customers key, so listed first).
+        $this->assertSame(['rewards.manage', 'coupons.view', 'coupons.edit', 'price_rules.manage', 'newsletter.view', 'newsletter.send', 'gift_cards.view', 'gift_cards.manage',
             'content.view', 'content.edit', 'seo.manage'], $roles[2]['permissions']);
         $viewer = $roles[4]['permissions'];
         $this->assertContains('reports.view', $viewer);

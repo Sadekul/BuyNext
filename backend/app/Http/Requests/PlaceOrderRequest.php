@@ -70,8 +70,8 @@ class PlaceOrderRequest extends FormRequest
             // Phase 10 (part B): not needed when every item is a gift card (nothing to ship).
             'shipping_method' => [Rule::requiredIf(fn () => ! self::onlyGiftCards($this->input('items'))), 'nullable', 'string',
                 Rule::in(array_keys($settings->shippingMethods()))],
-            // Phase 10 (part B): "gift_card" when the gift card pays the whole total (see Checkout).
-            'payment_method' => ['required', 'string', Rule::in([...$settings->paymentMethods(), 'gift_card'])],
+            // Phase 10 (part B): "gift_card" when the gift card pays the whole total (see Checkout). Phase 11: "reward_points" likewise.
+            'payment_method' => ['required', 'string', Rule::in([...$settings->paymentMethods(), 'gift_card', 'reward_points'])],
             'gift_card_code' => ['nullable', 'string', 'max:40'],
             'email' => ['required', 'string', 'email', 'max:190'],
             'phone' => ['required', 'string', PhoneNumber::RULE],

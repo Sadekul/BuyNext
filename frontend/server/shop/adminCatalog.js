@@ -183,7 +183,7 @@ export function bulkResult(raw) {
   }
 }
 
-/** Import report: { dryRun, rows, created, updated, unchanged, errors: [{ row, column, message }] }. */
+/** Import report: { dryRun, rows, created, updated, unchanged, errors: [{ row, column, message }], warnings (phase 11: same shape, nothing blocked) }. */
 export function importReport(raw) {
   return {
     dryRun: raw?.dry_run !== false,
@@ -192,6 +192,7 @@ export function importReport(raw) {
     updated: raw?.updated ?? 0,
     unchanged: raw?.unchanged ?? 0,
     errors: list(raw?.errors).map((entry) => ({ row: entry.row ?? null, column: entry.column ?? null, message: text(entry.message) })),
+    warnings: list(raw?.warnings).map((entry) => ({ row: entry.row ?? null, column: entry.column ?? null, message: text(entry.message) })),
   }
 }
 

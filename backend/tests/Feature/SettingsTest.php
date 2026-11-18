@@ -80,6 +80,9 @@ class SettingsTest extends TestCase
             'card_payments' => 'manual',
             'paypal_payments' => 'manual', // phase 10 (part B)
             'ga4_measurement_id' => null, // phase 10 (part A)
+            // Phase 11.
+            'rewards' => ['enabled' => false, 'earn_rate' => '1.00', 'point_value' => '0.0100', 'min_redeem' => 100],
+            'currencies' => ['base' => 'USD', 'display' => []],
         ]]);
     }
 

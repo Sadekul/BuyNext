@@ -225,6 +225,21 @@ Built against [backend/PHASE10_CONTRACT.md](backend/PHASE10_CONTRACT.md), then v
 
 Checks: backend 451 feature tests (Pint clean); frontend 568 unit tests; admin 143; browser checks 1,203 on the dev server and 1,196 on the production build, all passing (new `extras.mjs`: 164). Not automated: the PDF attached to the invoice email (the test inbox keeps no attachments; backend tests cover it), and PayPal's unpaid-order expiry and amount-mismatch cases (backend tests cover both).
 
+## Phase 11 (wishlists, comparison, linked products, reward points, display currencies) — 2026-11-18
+
+Built by three agents in parallel (backend; storefront with its sign-in service routes; admin with its proxy routes) against [backend/PHASE11_CONTRACT.md](backend/PHASE11_CONTRACT.md), then reviewed and verified with the new `loyalty.mjs` browser suite (130 checks). Free features only: no outside service or paid account. Security points checked: a shared wishlist link is a 32-character random token stored only as a hash, can be regenerated or turned off, and the shared page and its API answer never show the owner's email, last name or ids. Reward point balances change in one service with the customer row locked, never go below 0, and each earning (per order, sign-up, review) can only happen once, enforced by a unique key. Spending is checked on the server (balance, minimum, maximum share of the order, signed-in only). Balance adjustments need `rewards.manage` and a reason and are audited. Display currencies only change what shoppers see: orders, invoices, PDFs and emails stay in USD, and the cart and checkout say so. No new packages.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| Y1 | Low | The mini cart (drawer) showed prices in the chosen currency without saying the shopper pays in USD (the cart page and checkout did) | The drawer shows "Prices in BDT are approximate. You'll be charged in USD." (no amount there, because shipping isn't known yet) |
+| Y2 | Low | The API could duplicate a product, but the admin had no button for it | "Duplicate" on the product page (`products.edit`) opens the draft copy and says what wasn't copied; unit and browser tests |
+| Y3 | Low | Product CSV import reported skipped values (for example an unknown SKU in a related-products column) but the admin didn't show them | Listed on Import / Export as "Skipped values"; they don't block the import; unit tests |
+| Y4 | Test | The wishlist now lives on the server, so items one browser run saved for the demo customer were still there in the next run (the production-build run found 4 instead of 1) | The browser suites' setup now empties the demo customers' server wishlists (and turns sharing off) along with their saved carts |
+| Y5 | Test | The customers suite sometimes stopped early under load: the admin's address form shows a text box for Country until the country list loads, and the check chose from it before the list arrived | The check waits for the Country list (a combobox) before choosing; passed on the dev server and the production build |
+| Y6 | Test | Phase 11 added fields to several answers that older backend tests compared exactly (cart and order totals, refunds, credit memos, import report, store settings, the Marketing role) | Expectations updated to include the new fields; behaviour with rewards off is unchanged |
+
+Checks: backend 474 feature tests (Pint clean, `composer audit` clean); frontend 641 unit tests plus 297 sign-in service tests; admin 164; browser checks 1,333 on the dev server and 1,326 on the production build, all passing (new `loyalty.mjs`: 130). Not automated in the browser (covered by unit or backend tests): the customers grid Points column and the two new reports, points plus gift card on one order, full cover by points, sign-up and review bonuses, and CSV import/export of specifications and links.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

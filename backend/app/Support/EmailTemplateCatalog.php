@@ -114,6 +114,8 @@ final class EmailTemplateCatalog
                     'next_steps' => ['What happens next (depends on the payment method)', 'text'],
                     'items_table' => ['Items and totals table', 'block'],
                     'address' => ['Shipping address', 'block'],
+                    // Phase 11.
+                    'reward_points_spent' => ['Reward points used on the order, empty without', 'block'],
                 ],
                 'required' => [['order_number']],
                 'subject' => 'Your {{ store_name }} order {{ order_number }}',
@@ -121,6 +123,7 @@ final class EmailTemplateCatalog
                     .'<p>Hi {{ customer_first_name }},</p>'
                     .'<p>We received your order <strong>{{ order_number }}</strong>.</p>'
                     .'{{ items_table }}'
+                    .'{{ reward_points_spent }}'
                     .'<p><strong>Shipping to</strong></p>{{ address }}'
                     .'<p><strong>Delivery</strong><br />{{ shipping_method }}: {{ delivery_estimate }}</p>'
                     .'<p><strong>Payment: {{ payment_method }}</strong><br />{{ next_steps }}</p>'
@@ -242,6 +245,8 @@ final class EmailTemplateCatalog
                     'invoice_number' => ['Invoice number', 'text'],
                     'invoice_amount' => ['Invoice amount ($)', 'text'],
                     'note' => ['Staff note, empty without one', 'block'],
+                    // Phase 11.
+                    'reward_points_earned' => ['Reward points earned with the order, empty without', 'block'],
                 ],
                 'required' => [['order_number']],
                 'subject' => 'Payment received for order {{ order_number }}',
@@ -250,6 +255,7 @@ final class EmailTemplateCatalog
                     .'<p>Thank you: we received your payment for order <strong>{{ order_number }}</strong>.</p>'
                     .'<blockquote>Invoice <strong>{{ invoice_number }}</strong> · ${{ invoice_amount }}</blockquote>'
                     .'<p>You can view and print the invoice from your order details.</p>'
+                    .'{{ reward_points_earned }}'
                     .'{{ note }}'
                     .self::QUESTIONS,
             ],
@@ -439,6 +445,7 @@ final class EmailTemplateCatalog
                     [['Subtotal', '$119.97'], ['Shipping (Standard)', '$4.99'], ['Tax', '$0.00'], ['Total', '$124.96', true]],
                 ),
                 'address' => EmailBlocks::address($address),
+                'reward_points_spent' => EmailBlocks::paragraph('You used 500 reward points ($5.00) on this order.'),
             ],
             'order_status' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96', 'status' => 'shipped',
@@ -465,6 +472,7 @@ final class EmailTemplateCatalog
             'invoice' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'invoice_number' => 'INV-100001',
                 'invoice_amount' => '124.96', 'note' => $note,
+                'reward_points_earned' => EmailBlocks::paragraph('You earned 119 reward points with this order.'),
             ],
             'shipment' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'carrier' => 'UPS', 'tracking_number' => '1Z999AA10123456784',

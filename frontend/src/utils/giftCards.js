@@ -1,4 +1,4 @@
-import { formatPrice } from './formatters'
+import { formatBasePrice } from './formatters'
 import { storedNumber, storedText } from './storedValues'
 
 /*
@@ -90,7 +90,7 @@ export function customAmountError(value, custom) {
   const amount = Number(value)
   if (value === '' || !Number.isFinite(amount)) return 'Enter an amount.'
   if (Math.round(amount * 100) !== amount * 100) return 'Use whole cents, like 40 or 42.50.'
-  if (amount < custom.min || amount > custom.max) return `Choose an amount from ${formatPrice(custom.min)} to ${formatPrice(custom.max)}.`
+  if (amount < custom.min || amount > custom.max) return `Choose an amount from ${formatBasePrice(custom.min)} to ${formatBasePrice(custom.max)}.`
   return null
 }
 

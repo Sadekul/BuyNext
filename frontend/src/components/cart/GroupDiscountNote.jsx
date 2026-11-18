@@ -10,8 +10,9 @@ const percent = (value) => `${Number(value.toFixed(2))}%`
  * price: 10% off". The server has already taken it off every line's price;
  * `amount` (the server's total saving), when known, says how much that was.
  * Nothing is shown for groups without a discount (General, guests).
+ * `format`: formatPrice (cart) or formatBasePrice (checkout: the charged amounts).
  */
-function GroupDiscountNote({ group, amount }) {
+function GroupDiscountNote({ group, amount, format = formatPrice }) {
   if (!group || !(group.discountPercent > 0)) return null
   return (
     <p className="group-discount">
@@ -20,7 +21,7 @@ function GroupDiscountNote({ group, amount }) {
         <strong>
           {group.name} price: {percent(group.discountPercent)} off
         </strong>
-        {amount > 0 ? `. You save ${formatPrice(amount)}; it's already included in your prices.` : ". It's already included in your prices."}
+        {amount > 0 ? `. You save ${format(amount)}; it's already included in your prices.` : ". It's already included in your prices."}
       </span>
     </p>
   )

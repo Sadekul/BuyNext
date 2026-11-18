@@ -57,7 +57,29 @@ export function normalizeProduct(raw) {
     hasVariants: raw.has_variants === true || (raw.variants?.length ?? 0) > 0,
     ...(raw.options !== undefined && { options: normalizeOptions(raw.options) }),
     ...(raw.variants !== undefined && { variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant, raw)) }),
+    // Phase 11: the category's name (compare table), the product's specifications table,
+    // its weight, review count and short description (compare), and its linked products.
+    ...(typeof raw.category?.name === 'string' && { categoryName: raw.category.name }),
+    ...(raw.specifications !== undefined && { specifications: normalizeSpecifications(raw.specifications) }),
+    ...(raw.weight !== undefined && { weight: toNumberOrNull(raw.weight) }),
+    ...(raw.review_count !== undefined && { reviewCount: Number(raw.review_count) || 0 }),
+    ...(raw.description_short !== undefined && { shortDescription: typeof raw.description_short === 'string' && raw.description_short.trim() ? raw.description_short.trim() : null }),
+    ...(Array.isArray(raw.related) && { related: raw.related.slice(0, 8).map(normalizeProduct) }),
+    ...(Array.isArray(raw.upsells) && { upsells: raw.upsells.slice(0, 4).map(normalizeProduct) }),
   }
+}
+
+/** Phase 11: `specifications: [{ label, value }]` in the admin's order; empty or broken rows are dropped. */
+export function normalizeSpecifications(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((row) => row && typeof row.label === 'string' && row.label.trim() && (typeof row.value === 'string' || typeof row.value === 'number'))
+    .slice(0, 40)
+    .map((row) => ({ label: row.label.trim(), value: String(row.value).trim() }))
+}
+
+/** Phase 11: GET /products/compare `{ data: [...] }` → products, in the order asked for. */
+export function normalizeCompareList(raw) {
+  return (Array.isArray(raw?.data) ? raw.data : []).map(normalizeProduct)
 }
 
 /**
@@ -102,7 +124,8 @@ function normalizeOptions(raw) {
   return (raw ?? []).map((option) => ({
     id: option.id,
     name: option.name,
-    values: (option.values ?? []).map((value) => ({ id: value.id, value: value.value })),
+    // The compare list (phase 11) may name the values only: ["S", "M"].
+    values: (option.values ?? []).map((value) => (typeof value === 'string' ? { id: null, value } : { id: value.id, value: value.value })),
   }))
 }
 

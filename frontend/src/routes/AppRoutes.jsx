@@ -38,6 +38,9 @@ const PrivacyPage = lazy(() => import('../pages/PrivacyPage'))
 const AccountDeletedPage = lazy(() => import('../pages/AccountDeletedPage'))
 const StockAlertUnsubscribePage = lazy(() => import('../pages/StockAlertUnsubscribePage'))
 const GiftCardBalancePage = lazy(() => import('../pages/GiftCardBalancePage'))
+const ComparePage = lazy(() => import('../pages/ComparePage'))
+const SharedWishlistPage = lazy(() => import('../pages/SharedWishlistPage'))
+const RewardsPage = lazy(() => import('../pages/RewardsPage'))
 // The learning lab (and Axios) is left out of production builds entirely:
 // with the condition written inline, Vite replaces it with `false` and the
 // bundler drops the import. SHOW_LEARNING_LAB (constants/site.js) mirrors it.
@@ -70,6 +73,9 @@ function AppRoutes() {
         <Route path="deals" element={<ProductListingPage title="Deals" defaultSort="discount-desc" />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="wishlist" element={<WishlistPage />} />
+        {/* Phase 11: compare up to 4 products (demo too), and a wishlist someone shared (no sign-in). */}
+        <Route path="compare" element={<ComparePage />} />
+        {REAL_SHOP && <Route path="wishlist/shared/:token" element={<SharedWishlistPage />} />}
         <Route element={<GuestOnlyRoute />}>
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
@@ -104,6 +110,8 @@ function AppRoutes() {
             {/* Phase 9: back-in-stock alerts, and the privacy page (my data, delete my account). */}
             {REAL_SHOP && <Route path="stock-alerts" element={<StockAlertsPage />} />}
             {REAL_SHOP && <Route path="privacy" element={<PrivacyPage />} />}
+            {/* Phase 11: reward points balance and history. */}
+            {REAL_SHOP && <Route path="rewards" element={<RewardsPage />} />}
           </Route>
           {/* Outside the account layout: the invoice prints on its own. */}
           {REAL_SHOP && <Route path="account/orders/:orderId/invoices/:invoiceNumber" element={<InvoicePage />} />}

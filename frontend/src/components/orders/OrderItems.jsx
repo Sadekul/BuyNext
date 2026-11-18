@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { ROUTES } from '../../constants/routes'
-import { formatPrice } from '../../utils/formatters'
+import { formatBasePrice } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { recipientLabel } from '../../utils/giftCards'
 import './OrderItems.css'
@@ -35,10 +35,10 @@ function OrderItems({ items }) {
               {/* Phase 7: the catalog price rule that set the price ("VIP price", "Black Friday"). */}
               {item.priceLabel && <span className="order-items__price-label">{item.priceLabel}</span>}
               <span className="order-items__meta">
-                {item.quantity} × {formatPrice(salePrice)}
+                {item.quantity} × {formatBasePrice(salePrice)}
               </span>
             </span>
-            <span className="order-items__total">{formatPrice(lineTotal)}</span>
+            <span className="order-items__total">{formatBasePrice(lineTotal)}</span>
           </li>
         )
       })}

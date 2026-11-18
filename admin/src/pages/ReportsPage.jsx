@@ -7,8 +7,10 @@ import StatTile from '../components/StatTile'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
-import { formatCount, formatDate, formatMoney, formatMoneyCompact } from '../utils/format'
+import { formatCount, formatCountCompact, formatDate, formatMoney, formatMoneyCompact } from '../utils/format'
 import Pagination from '../components/Pagination'
+// Phase 11 §1 and §4.
+import { formatPoints } from '../utils/rewards'
 
 const GROUPS = [
   { value: 'day', label: 'Day' },
@@ -98,6 +100,11 @@ function ReportsPage() {
       <div className="panels">
         <CouponsReport range={range} />
         <LowStockReport />
+      </div>
+      {/* Phase 11 §1 and §4: wishlists and reward points, for the same period. */}
+      <div className="panels">
+        <WishlistReport range={range} />
+        <RewardPointsReport range={range} />
       </div>
       {/* Phase 9 §7. */}
       <StockAlertsReport />
@@ -491,6 +498,109 @@ function StockAlertsReport() {
           </table>
           <Pagination total={data.total} limit={ALERTS_PAGE} skip={skip} onChange={setSkip} />
         </div>
+      )}
+    </section>
+  )
+}
+
+/** Phase 11 §1: the products most customers saved to their wishlist in the period. */
+function WishlistReport({ range }) {
+  const report = useReport('wishlist', { from: range.from, to: range.to, limit: 10 })
+  // An API without wishlists (before phase 11): no panel.
+  if (report.error?.status === 404) return null
+  return (
+    <section className="panel" aria-labelledby="wishlist-report-title" aria-busy={report.isFetching} tabIndex={0}>
+      <header className="panel__header">
+        <h2 id="wishlist-report-title">Most wished-for products</h2>
+      </header>
+      {report.isPending && <Loading />}
+      {report.error && <ErrorState error={report.error} onRetry={report.refetch} />}
+      {report.data && report.data.products.length === 0 && <Empty>No products were saved to a wishlist in this period.</Empty>}
+      {report.data && report.data.products.length > 0 && (
+        <table className="table">
+          <caption className="visually-hidden">Products saved to the most wishlists in this period</caption>
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col" className="num">
+                Customers
+              </th>
+              <th scope="col">In stock?</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.data.products.map((row) => (
+              <tr key={row.productId ?? row.sku ?? row.name}>
+                <th scope="row">
+                  {row.productId ? <Link to={`/products/${row.productId}`}>{row.name}</Link> : row.name}
+                  {row.sku && <small className="muted"> · {row.sku}</small>}
+                </th>
+                <td className="num">{formatCount(row.customers)}</td>
+                <td>{row.inStock === null ? '—' : <StatusBadge {...(row.inStock ? { tone: 'success', label: 'In stock' } : { tone: 'danger', label: 'Out of stock' })} />}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  )
+}
+
+/** Phase 11 §4: points issued and spent in the period, and what customers hold now (the store's liability). */
+function RewardPointsReport({ range }) {
+  const report = useReport('rewards', range)
+  if (report.error?.status === 404) return null
+  const data = report.data
+  return (
+    <section className="panel" aria-labelledby="rewards-report-title" aria-busy={report.isFetching} tabIndex={0}>
+      <header className="panel__header">
+        <h2 id="rewards-report-title">Reward points</h2>
+      </header>
+      {report.isPending && <Loading />}
+      {report.error && <ErrorState error={report.error} onRetry={report.refetch} />}
+      {data && (
+        <>
+          <dl className="stats stats--compact">
+            <StatTile label="Issued" value={formatCountCompact(data.totals.issued)} note="Earned, sign-up and review bonuses" />
+            <StatTile label="Spent" value={formatCountCompact(data.totals.spent)} note={`${formatCount(data.totals.returned)} returned by cancels and refunds`} />
+            <StatTile
+              label="Outstanding liability"
+              value={formatMoneyCompact(data.outstandingValue)}
+              note={`${formatPoints(data.outstandingPoints)} held by customers now${data.pointValue ? ` at ${formatMoney(data.pointValue)} each` : ''}`}
+            />
+          </dl>
+          <p className="muted page-note">
+            {formatPoints(data.totals.reversed)} taken back by refunds; staff adjustments {data.totals.adjusted < 0 ? '−' : '+'}
+            {formatCount(Math.abs(data.totals.adjusted))} in this period.
+          </p>
+          {data.series.length === 0 ? (
+            <Empty>No points issued or spent in this period.</Empty>
+          ) : (
+            <table className="table">
+              <caption className="visually-hidden">Reward points by {range.groupBy}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Period</th>
+                  <th scope="col" className="num">
+                    Issued
+                  </th>
+                  <th scope="col" className="num">
+                    Spent
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.series.map((point) => (
+                  <tr key={point.period}>
+                    <th scope="row">{periodLabel(point.period, range.groupBy)}</th>
+                    <td className="num">{formatCount(point.issued)}</td>
+                    <td className="num">{formatCount(point.spent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </section>
   )

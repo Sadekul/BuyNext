@@ -1,0 +1,27 @@
+.recently-viewed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.recently-viewed__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.recently-viewed__header h2 {
+  font-size: var(--text-2xl);
+}
+
+.recently-viewed__clear {
+  min-height: 2.75rem;
+  padding-inline: var(--space-2);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}

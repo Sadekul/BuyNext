@@ -39,7 +39,28 @@ class Settings
         // Phase 10 (part A): Settings → Documents (PDF invoices and credit memos) and Settings → Analytics.
         'documents' => ['paper_size', 'attach_pdf_to_emails'],
         'analytics' => ['ga4_measurement_id'],
+        // Phase 11: Settings → Reward points. The API names (enabled, ...) are stored as rewards_enabled, ... (STORAGE_KEYS).
+        'rewards' => ['enabled', 'earn_rate', 'point_value', 'min_redeem', 'max_percent', 'signup_bonus', 'review_bonus'],
     ];
+
+    /** Phase 11: group key → stored key, for groups whose API names would clash with other keys. */
+    public const STORAGE_KEYS = [
+        'rewards' => [
+            'enabled' => 'rewards_enabled',
+            'earn_rate' => 'rewards_earn_rate',
+            'point_value' => 'rewards_point_value',
+            'min_redeem' => 'rewards_min_redeem',
+            'max_percent' => 'rewards_max_percent',
+            'signup_bonus' => 'rewards_signup_bonus',
+            'review_bonus' => 'rewards_review_bonus',
+        ],
+    ];
+
+    /** Phase 11: the stored key of a group's key ("rewards", "enabled" → "rewards_enabled"). */
+    public static function storageKey(string $group, string $key): string
+    {
+        return self::STORAGE_KEYS[$group][$key] ?? $key;
+    }
 
     public const DEFAULTS = [
         'store_name' => 'BuyNest',
@@ -69,6 +90,15 @@ class Settings
         'paper_size' => 'a4',
         'attach_pdf_to_emails' => true,
         'ga4_measurement_id' => null,
+        // Phase 11: reward points (off by default). earn_rate: points per 1.00 of eligible spend; point_value: money per point;
+        // max_percent: the share of the grand total points may pay.
+        'rewards_enabled' => false,
+        'rewards_earn_rate' => '1.00',
+        'rewards_point_value' => '0.0100',
+        'rewards_min_redeem' => 100,
+        'rewards_max_percent' => 50,
+        'rewards_signup_bonus' => 0,
+        'rewards_review_bonus' => 0,
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price'];
@@ -100,7 +130,12 @@ class Settings
     /** The settings groups, as GET /api/admin/v1/settings answers them. */
     public function grouped(): array
     {
-        return array_map(fn (array $keys) => array_combine($keys, array_map(fn ($key) => $this->get($key), $keys)), self::GROUPS);
+        $grouped = [];
+        foreach (self::GROUPS as $group => $keys) {
+            $grouped[$group] = array_combine($keys, array_map(fn ($key) => $this->get(self::storageKey($group, $key)), $keys));
+        }
+
+        return $grouped;
     }
 
     /** Saves key => value pairs (already validated and normalized) and clears the cache. */
@@ -226,6 +261,14 @@ class Settings
             'documents.paper_size' => ['string', Rule::in(['a4', 'letter'])],
             'documents.attach_pdf_to_emails' => ['boolean'],
             'analytics.ga4_measurement_id' => ['nullable', 'string', 'regex:/^G-[A-Z0-9]{4,12}$/'],
+            // Phase 11.
+            'rewards.enabled' => ['boolean'],
+            'rewards.earn_rate' => ['numeric', 'decimal:0,2', 'min:0', 'max:1000'],
+            'rewards.point_value' => ['numeric', 'decimal:0,4', 'min:0.0001', 'max:100'],
+            'rewards.min_redeem' => ['integer', 'min:0', 'max:1000000'],
+            'rewards.max_percent' => ['integer', 'min:1', 'max:100'],
+            'rewards.signup_bonus' => ['integer', 'min:0', 'max:1000000'],
+            'rewards.review_bonus' => ['integer', 'min:0', 'max:1000000'],
         ];
     }
 
@@ -234,6 +277,11 @@ class Settings
     {
         return match (true) {
             $key === 'attach_pdf_to_emails' => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 10 (part A)
+            // Phase 11.
+            $key === 'rewards_enabled' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            $key === 'rewards_earn_rate' => Pricing::format(Pricing::toCents((string) $value)),
+            $key === 'rewards_point_value' => number_format(round((float) $value, 4), 4, '.', ''),
+            in_array($key, ['rewards_min_redeem', 'rewards_max_percent', 'rewards_signup_bonus', 'rewards_review_bonus'], true) => (int) $value,
             in_array($key, self::MONEY_KEYS, true) => Pricing::format(Pricing::toCents((string) $value)),
             in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval', 'returns_enabled',
                 'require_admin_two_factor'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 9 (part A): the last one

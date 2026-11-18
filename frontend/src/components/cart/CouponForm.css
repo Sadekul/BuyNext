@@ -82,3 +82,12 @@
   padding: 0;
   border: 0;
 }
+
+/* Phase 11: reward points ("Apply" and "Use all" wrap under the field on narrow screens). */
+.reward-points-redeem .coupon-form__row {
+  flex-wrap: wrap;
+}
+
+.reward-points-redeem .coupon-form__row input {
+  flex: 1 1 6rem;
+}

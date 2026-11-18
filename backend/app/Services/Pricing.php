@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -20,7 +21,7 @@ use Illuminate\Support\Collection;
 class Pricing
 {
     public function __construct(private Settings $settings, private CatalogRules $catalogRules, private CartRules $cartRules,
-        private ShippingRates $shippingRates, private GiftCards $giftCards) {}
+        private ShippingRates $shippingRates, private GiftCards $giftCards, private RewardPoints $rewardPoints) {}
 
     /** "9.99" → 999. Decimal strings from the database have 2 places, so this is exact. */
     public static function toCents(string|int|float $amount): int
@@ -80,9 +81,12 @@ class Pricing
      * $group (phase 6): the shopper's customer group; null = General (guests).
      * Its discount comes off every line's sale price, after the product's own
      * discount and before coupons.
+     * Phase 11: $rewardsCustomer (the signed-in shopper) may pay with
+     * $rewardPoints, after tax and before a gift card.
      */
     public function quote(array $items, ?string $couponCode, ?string $shippingMethod, bool $lock = false, ?int $customerId = null,
-        ?string $email = null, ?string $country = null, ?CustomerGroup $group = null, ?string $giftCardCode = null): CartQuote
+        ?string $email = null, ?string $country = null, ?CustomerGroup $group = null, ?string $giftCardCode = null,
+        ?Customer $rewardsCustomer = null, ?int $rewardPoints = null): CartQuote
     {
         $group ??= CustomerGroup::general();
         $groupBasisPoints = $group?->discountBasisPoints() ?? 0;
@@ -189,8 +193,13 @@ class Pricing
         // Prices that already include tax: the tax is shown, but not added again.
         $total = $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax);
 
-        // Phase 10 (part B): a gift card pays up to the total, but never for other gift cards.
-        [$giftCard, $giftCardCents, $giftCardError] = $this->giftCard($giftCardCode, $lock, $total, $giftLines);
+        // Phase 11: reward points pay first (up to max_percent of the total, never for gift card lines), with the customer row locked at checkout.
+        [$rewards, $points, $pointsCents, $pointsError] = $itemCount > 0
+            ? $this->rewardPoints->quote($rewardsCustomer, $rewardPoints, $total, max(0, $total - $giftLines), max(0, $merchandise - $discount), $lock)
+            : [null, 0, 0, null];
+
+        // Phase 10 (part B): a gift card pays up to the total, but never for other gift cards. Phase 11: what points left.
+        [$giftCard, $giftCardCents, $giftCardError] = $this->giftCard($giftCardCode, $lock, $total - $pointsCents, $giftLines);
 
         return new CartQuote(
             lines: $lines,
@@ -217,6 +226,10 @@ class Pricing
             giftCard: $giftCard,
             giftCardCents: $giftCardCents,
             giftCardError: $giftCardError,
+            rewards: $rewards,
+            rewardPoints: $points,
+            rewardPointsCents: $pointsCents,
+            rewardPointsError: $pointsError,
         );
     }
 

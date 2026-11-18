@@ -10,6 +10,8 @@ export const ROUTES = {
   orderConfirmation: (orderId) => `/order-confirmation/${orderId}`,
   trackOrder: '/track-order',
   wishlist: '/wishlist',
+  sharedWishlist: (token) => `/wishlist/shared/${token}`, // a customer's shared wishlist (REAL_SHOP, phase 11)
+  compare: '/compare', // compare up to 4 products (phase 11; demo too)
   account: '/account',
   orders: '/account/orders',
   orderDetails: (orderId) => `/account/orders/${orderId}`,
@@ -18,6 +20,7 @@ export const ROUTES = {
   returns: '/account/returns', // returns (REAL_SHOP)
   returnDetails: (returnNumber) => `/account/returns/${returnNumber}`,
   stockAlerts: '/account/stock-alerts', // "email me when it's back" (REAL_SHOP)
+  rewards: '/account/rewards', // reward points balance and history (REAL_SHOP, phase 11)
   privacy: '/account/privacy', // download my data, delete my account (REAL_SHOP)
   accountDeleted: '/goodbye', // after deleting the account (REAL_SHOP)
   stockAlertsUnsubscribe: '/stock-alerts/unsubscribe', // the link in back-in-stock emails (REAL_SHOP)

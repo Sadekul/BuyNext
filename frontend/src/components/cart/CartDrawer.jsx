@@ -4,6 +4,7 @@ import Button from '../ui/Button'
 import EmptyState from '../ui/EmptyState'
 import CartLineItem from './CartLineItem'
 import FreeShippingProgress from './FreeShippingProgress'
+import ChargedInBaseNote from './ChargedInBaseNote'
 import { useCart } from '../../hooks/useCart'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice } from '../../utils/formatters'
@@ -20,6 +21,7 @@ function CartDrawer() {
         <span>Subtotal</span>
         <strong>{formatPrice(totals.subtotal)}</strong>
       </p>
+      <ChargedInBaseNote className="cart-drawer__note" />
       {totals.unavailableCount > 0 && (
         <p className="cart-drawer__blocker">Remove unavailable items to check out.</p>
       )}

@@ -27,6 +27,10 @@ class Reviews
         if ($before === 'approved' || $status === 'approved') {
             $this->refresh($review->product_id);
         }
+        // Phase 11: the review bonus (once per customer and product).
+        if ($status === 'approved') {
+            app(RewardPoints::class)->review($review);
+        }
 
         return true;
     }

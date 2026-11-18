@@ -5,6 +5,7 @@ import AuthProvider from '../context/AuthProvider'
 import CartProvider from '../context/CartProvider'
 import WishlistProvider from '../context/WishlistProvider'
 import OrdersProvider from '../context/OrdersProvider'
+import CompareProvider from '../context/CompareProvider'
 
 /**
  * Renders UI inside the same providers the app uses, with a fresh
@@ -34,7 +35,9 @@ export function renderWithProviders(ui, { route = '/', path, extraRoutes = null 
           <AuthProvider>
             <CartProvider>
               <WishlistProvider>
-                <OrdersProvider>{content}</OrdersProvider>
+                <OrdersProvider>
+                  <CompareProvider>{content}</CompareProvider>
+                </OrdersProvider>
               </WishlistProvider>
             </CartProvider>
           </AuthProvider>

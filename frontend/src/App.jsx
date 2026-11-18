@@ -4,6 +4,8 @@ import AuthProvider from './context/AuthProvider'
 import CartProvider from './context/CartProvider'
 import WishlistProvider from './context/WishlistProvider'
 import OrdersProvider from './context/OrdersProvider'
+import CompareProvider from './context/CompareProvider'
+import { useDisplayCurrency } from './utils/displayCurrency'
 import { createQueryClient } from './lib/queryClient'
 
 // Created once, outside the component, so re-renders never reset the cache.
@@ -18,13 +20,18 @@ const queryClient = createQueryClient()
  * all server data, and AuthProvider clears cached profiles on sign-out.
  */
 function App() {
+  // Phase 11: a new display currency re-renders the whole app, so every price
+  // (formatPrice, utils/formatters.js) shows in it at once.
+  useDisplayCurrency()
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
             <OrdersProvider>
-              <AppRoutes />
+              <CompareProvider>
+                <AppRoutes />
+              </CompareProvider>
             </OrdersProvider>
           </WishlistProvider>
         </CartProvider>

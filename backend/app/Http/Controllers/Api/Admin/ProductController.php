@@ -7,8 +7,10 @@ use App\Http\Resources\AdminProductResource;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductLink;
 use App\Services\Audit;
 use App\Services\Pricing;
+use App\Services\ProductLinks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,9 +26,10 @@ class ProductController extends Controller
     // What the audit log records about a product (not counters like ratings).
     private const AUDITED = ['name', 'sku', 'status', 'price', 'discount_percent', 'stock_quantity', 'min_order_quantity',
         'category_id', 'brand_id', 'description', 'thumbnail_url', 'meta_title', 'meta_description',
-        'type', 'weight', 'gift_card_amounts', 'gift_card_min_amount', 'gift_card_max_amount']; // phase 10 (part B): the last five
+        'type', 'weight', 'gift_card_amounts', 'gift_card_min_amount', 'gift_card_max_amount', // phase 10 (part B)
+        'specifications']; // phase 11
 
-    public function __construct(private Audit $audit) {}
+    public function __construct(private Audit $audit, private ProductLinks $links) {}
 
     /** GET /api/admin/v1/products?search&category&status&sort=name|price|stock|rating|newest&direction&page&per_page */
     public function index(Request $request): AnonymousResourceCollection
@@ -103,6 +106,10 @@ class ProductController extends Controller
                 $product->forceFill(['sku' => $this->generatedSku($product)])->save();
             }
             $this->syncImages($product, $data);
+            // Phase 11: related products, up-sells, cross-sells.
+            if (is_array($data['links'] ?? null)) {
+                $this->links->sync($product, $data['links']);
+            }
             $this->audit->record('product.created', "Product {$product->sku} \"{$product->name}\" created.", 'product', $product->id,
                 Audit::created(Audit::fieldsOf($product, self::AUDITED)));
 
@@ -122,9 +129,11 @@ class ProductController extends Controller
         }
         $data = $request->validate($this->rules($product), $this->messages());
         $this->checkGiftCard($product, $data);
+        $this->checkLinks($product, $data);
 
         DB::transaction(function () use ($product, $data) {
             $before = Audit::fieldsOf($product, self::AUDITED);
+            $linksBefore = $this->links->idsByType($product);
             $imagesBefore = $product->images()->pluck('url')->all();
             $product->fill(collect($data)->only(['name', 'status', 'discount_percent', 'min_order_quantity'])->filter(fn ($v) => $v !== null)->all());
             if (! empty($data['sku'])) {
@@ -137,8 +146,16 @@ class ProductController extends Controller
             $this->fill($product, $data);
             $product->save();
             $this->syncImages($product, $data);
+            // Phase 11: the lists sent replace those types (left out: unchanged).
+            if (is_array($data['links'] ?? null)) {
+                $this->links->sync($product, $data['links']);
+                $linksAfter = $this->links->idsByType($product);
+                if ($linksAfter !== $linksBefore) {
+                    [$before['links'], $after['links']] = [$linksBefore, $linksAfter];
+                }
+            }
 
-            $after = Audit::fieldsOf($product, self::AUDITED);
+            $after = [...Audit::fieldsOf($product, self::AUDITED), ...(isset($after['links']) ? ['links' => $after['links']] : [])];
             if (array_key_exists('images', $data) && $data['images'] !== null) {
                 [$before['images'], $after['images']] = [$imagesBefore, array_values($data['images'])];
             }
@@ -198,6 +215,16 @@ class ProductController extends Controller
             'gift_card_amounts.*' => ['numeric', 'decimal:0,2', 'min:1', 'max:10000', 'distinct'],
             'gift_card_min_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:1', 'max:10000', 'required_with:gift_card_max_amount'],
             'gift_card_max_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:1', 'max:10000', 'required_with:gift_card_min_amount', 'gte:gift_card_min_amount'],
+            // Phase 11: specifications ([{ label, value }], null/[] clears) and product links (each list replaces its type).
+            'specifications' => ['nullable', 'array', 'max:40'],
+            'specifications.*' => ['array'],
+            'specifications.*.label' => ['required', 'string', 'max:60', 'distinct:ignore_case'],
+            'specifications.*.value' => ['required', 'string', 'max:255'],
+            'links' => ['nullable', 'array'],
+            ...collect(ProductLink::TYPES)->flatMap(fn ($type) => [
+                "links.{$type}" => ['nullable', 'array', 'max:'.ProductLink::MAX_PER_TYPE],
+                "links.{$type}.*" => ['integer', 'distinct', Rule::exists('products', 'id')->whereNull('deleted_at')],
+            ])->all(),
         ];
     }
 
@@ -228,6 +255,17 @@ class ProductController extends Controller
             'thumbnail_url.url' => 'The thumbnail must be a web address (https://…).',
             'images.max' => 'A product can have at most '.Product::MAX_IMAGES.' images.',
             'images.*.regex' => 'Each image must be a web address (https://…).',
+            // Phase 11.
+            'specifications.max' => 'At most 40 specification rows.',
+            'specifications.*.label.required' => 'Enter a label.',
+            'specifications.*.label.max' => 'The label can be at most 60 characters.',
+            'specifications.*.label.distinct' => 'This label is used twice.',
+            'specifications.*.value.required' => 'Enter a value.',
+            'specifications.*.value.max' => 'The value can be at most 255 characters.',
+            'links.*.max' => 'At most '.ProductLink::MAX_PER_TYPE.' products per list.',
+            'links.*.*.exists' => 'This product doesn\'t exist.',
+            'links.*.*.distinct' => 'This product is listed twice.',
+            'links.*.*.integer' => 'This product doesn\'t exist.',
         ];
     }
 
@@ -252,6 +290,77 @@ class ProductController extends Controller
         }
     }
 
+    /** Phase 11: a product can't be linked to itself (422 on links.{type}.N). */
+    private function checkLinks(Product $product, array $data): void
+    {
+        $errors = [];
+        foreach (ProductLink::TYPES as $type) {
+            foreach (array_values($data['links'][$type] ?? []) as $index => $id) {
+                if ((int) $id === $product->id) {
+                    $errors["links.{$type}.{$index}"] = 'A product can\'t be linked to itself.';
+                }
+            }
+        }
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /** Phase 11: [{ label, value }] trimmed, or null for none. */
+    public static function cleanSpecifications(?array $rows): ?array
+    {
+        $rows = array_values(array_map(fn ($row) => ['label' => trim((string) $row['label']), 'value' => trim((string) $row['value'])], $rows ?? []));
+
+        return $rows === [] ? null : $rows;
+    }
+
+    /**
+     * POST /api/admin/v1/products/{id}/duplicate → 201 the copy (draft, "<name> (copy)", SKU "<sku>-COPY"): its fields,
+     * specifications, links, and external images; not its options, variants, or uploaded images.
+     */
+    public function duplicate(int $id): JsonResponse
+    {
+        $source = Product::with(['images'])->find($id);
+        if (! $source) {
+            return $this->notFound();
+        }
+        $copy = DB::transaction(function () use ($source) {
+            $name = Str::limit($source->name, 113, '').' (copy)';
+            $base = substr($source->sku, 0, 54).'-COPY';
+            $sku = $base;
+            for ($n = 2; Product::skuTaken($sku); $n++) {
+                $sku = "{$base}-{$n}";
+            }
+            $copy = $source->replicate(['slug', 'sku', 'name', 'status', 'has_variants', 'review_count', 'rating_average', 'thumbnail_variants']);
+            $copy->forceFill([
+                'name' => $name,
+                'slug' => Product::uniqueSlug($name),
+                'sku' => $sku,
+                'status' => 'draft',
+                'has_variants' => false,
+                'review_count' => 0,
+                'rating_average' => 0,
+            ]);
+            if ($copy->thumbnail_url && str_starts_with($copy->thumbnail_url, '/media/')) {
+                $copy->thumbnail_url = null;
+            }
+            $copy->save();
+            foreach ($source->images->whereNull('path')->values() as $position => $image) {
+                $copy->images()->create(['url' => $image->url, 'alt' => $image->alt, 'position' => $position]);
+            }
+            if (! $copy->thumbnail_url) {
+                $copy->syncThumbnail();
+            }
+            $this->links->sync($copy, $this->links->idsByType($source));
+            $this->audit->record('product.duplicated', "Product {$copy->sku} \"{$copy->name}\" created as a copy of {$source->sku}.", 'product', $copy->id,
+                Audit::created([...Audit::fieldsOf($copy, self::AUDITED), 'copied_from' => $source->sku]));
+
+            return $copy;
+        });
+
+        return (new AdminProductResource($copy->load(self::DETAIL)))->withDetail()->response()->setStatusCode(201);
+    }
+
     /** The fields shared by create and update (only those present in $data). */
     private function fill(Product $product, array $data): void
     {
@@ -270,6 +379,9 @@ class ProductController extends Controller
             if (array_key_exists($field, $data)) {
                 $product->{$field} = $data[$field] ?? ($field === 'type' ? 'simple' : null);
             }
+        }
+        if (array_key_exists('specifications', $data)) {
+            $product->specifications = self::cleanSpecifications($data['specifications']); // phase 11
         }
         if (array_key_exists('gift_card_amounts', $data)) {
             $amounts = array_map(fn ($amount) => Pricing::format(Pricing::toCents((string) $amount)), $data['gift_card_amounts'] ?? []);

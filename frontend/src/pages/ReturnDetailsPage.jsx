@@ -12,7 +12,7 @@ import { orderQuery } from '../queries/orderQueries'
 import { returnStatus } from '../constants/orders'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, formatDateTime, formatPrice } from '../utils/formatters'
+import { formatDate, formatDateTime, formatBasePrice } from '../utils/formatters'
 import '../components/orders/OrderDetailsView.css'
 import '../components/orders/OrderHistory.css'
 import '../components/orders/OrderItems.css'
@@ -123,7 +123,7 @@ function ReturnDetailsPage() {
               <div>
                 <dt>Refund</dt>
                 <dd>
-                  {formatPrice(entry.refund.total)} ({entry.refund.number}
+                  {formatBasePrice(entry.refund.total)} ({entry.refund.number}
                   {entry.refund.createdAt && `, ${formatDate(entry.refund.createdAt)}`})
                 </dd>
               </div>

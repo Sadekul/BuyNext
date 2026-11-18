@@ -305,13 +305,25 @@ const SETTINGS = {
   // Phase 10 §2: invoice and credit memo PDFs; §6: Google Analytics 4 (null = off).
   documents: { paper_size: 'paperSize', attach_pdf_to_emails: 'attachPdfToEmails' },
   analytics: { ga4_measurement_id: 'ga4MeasurementId' },
+  // Phase 11 §4: reward points (Settings → Reward points).
+  rewards: {
+    enabled: 'enabled',
+    earn_rate: 'earnRate',
+    point_value: 'pointValue',
+    min_redeem: 'minRedeem',
+    max_percent: 'maxPercent',
+    signup_bonus: 'signupBonus',
+    review_bonus: 'reviewBonus',
+  },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']
+// Phase 11 §4: decimal settings the API may send as strings ("1.00", "0.0100").
+const NUMBER_SETTINGS = ['earnRate', 'pointValue']
 
 export function storeSettings(raw = {}) {
   const fromValue = (key, value) => {
-    if (MONEY_SETTINGS.includes(key)) return money(value)
+    if (MONEY_SETTINGS.includes(key) || NUMBER_SETTINGS.includes(key)) return money(value)
     if (key === 'taxRates') return (Array.isArray(value) ? value : []).map((rate) => ({ country: text(rate?.country), rate: money(rate?.rate) ?? 0 }))
     return value ?? null
   }
@@ -328,6 +340,9 @@ export function toSettingsBody(changes) {
   const apiName = (group, key) => Object.entries(SETTINGS[group]).find(([, name]) => name === key)?.[0]
   const toValue = (key, value) => {
     if (MONEY_SETTINGS.includes(key)) return value.toFixed(2)
+    // Phase 11 §4: like the API answers them ("1.00", "0.0100").
+    if (key === 'earnRate') return value.toFixed(2)
+    if (key === 'pointValue') return value.toFixed(4)
     if (key === 'taxRates') return value.map((rate) => ({ country: rate.country, rate: rate.rate.toFixed(2) }))
     return value
   }

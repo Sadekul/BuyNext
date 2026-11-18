@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\ProductVariant;
 use App\Services\Pricing;
+use App\Services\ProductLinks;
 use App\Services\StockAlerts;
 use App\Support\ImageVariants;
 use Illuminate\Http\Request;
@@ -24,6 +25,8 @@ class AdminProductResource extends ProductResource
         if ($this->detail) {
             // Phase 9 (part B): people waiting for "back in stock" emails.
             $base['stock_alerts_waiting'] = app(StockAlerts::class)->waitingCount($this->id);
+            // Phase 11: { related, upsell, crosssell: [{ id, name, sku, image, status }] }.
+            $base['links'] = app(ProductLinks::class)->forAdmin($this->resource);
             $base['images'] = $this->when($this->relationLoaded('images'), fn () => $this->images->map(fn ($image) => self::image($image))->values());
             $base['options'] = $this->when($this->relationLoaded('options'), fn () => $this->options->map(fn ($option) => [
                 'id' => $option->id,

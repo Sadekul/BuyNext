@@ -1,6 +1,7 @@
 import CouponForm from './CouponForm'
 import DiscountRows from './DiscountRows'
 import FreeShippingProgress from './FreeShippingProgress'
+import ChargedInBaseNote from './ChargedInBaseNote'
 import { formatPrice } from '../../utils/formatters'
 import './CartSummary.css'
 
@@ -46,6 +47,8 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
           <dd>{formatPrice(totals.total)}</dd>
         </div>
       </dl>
+      {/* Phase 11: prices shown in another currency are approximate; the order is charged in USD. */}
+      <ChargedInBaseNote amount={totals.total} />
 
       <CouponForm
         appliedCode={couponCode}

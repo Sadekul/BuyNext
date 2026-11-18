@@ -9,9 +9,11 @@ use App\Http\Controllers\Api\Admin\CatalogRuleController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CouponController;
 use App\Http\Controllers\Api\Admin\CreditMemoController;
+use App\Http\Controllers\Api\Admin\CurrencyController;
 use App\Http\Controllers\Api\Admin\CustomerAddressController;
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Api\Admin\CustomerGroupController;
+use App\Http\Controllers\Api\Admin\CustomerLoyaltyController;
 use App\Http\Controllers\Api\Admin\CustomerNoteController;
 use App\Http\Controllers\Api\Admin\DocumentPdfController;
 use App\Http\Controllers\Api\Admin\EmailTemplateController;
@@ -59,9 +61,11 @@ use App\Http\Controllers\Api\V1\PayPalWebhookController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
+use App\Http\Controllers\Api\V1\RewardController;
 use App\Http\Controllers\Api\V1\SeoController;
 use App\Http\Controllers\Api\V1\StockAlertController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
+use App\Http\Controllers\Api\V1\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -109,6 +113,15 @@ Route::prefix('v1')->group(function () {
         // Phase 9 (part B): the account's "back in stock" alerts.
         Route::get('me/stock-alerts', [StockAlertController::class, 'index']);
         Route::delete('me/stock-alerts/{id}', [StockAlertController::class, 'destroy'])->whereNumber('id');
+        // Phase 11: the wishlist kept on the server, its share link, and reward points.
+        Route::get('me/wishlist', [WishlistController::class, 'index']);
+        Route::post('me/wishlist', [WishlistController::class, 'store']);
+        Route::post('me/wishlist/merge', [WishlistController::class, 'merge']);
+        Route::post('me/wishlist/share', [WishlistController::class, 'share']);
+        Route::delete('me/wishlist/share', [WishlistController::class, 'unshare']);
+        Route::patch('me/wishlist/{id}', [WishlistController::class, 'update'])->whereNumber('id');
+        Route::delete('me/wishlist/{id}', [WishlistController::class, 'destroy'])->whereNumber('id');
+        Route::get('me/rewards', [RewardController::class, 'show']);
         // End of phase 9 part B store routes (signed in).
     });
 
@@ -131,6 +144,7 @@ Route::prefix('v1')->group(function () {
     // Public: the catalog and cart pricing (no sign-in).
     Route::middleware('throttle:api')->group(function () {
         Route::get('products', [CatalogController::class, 'index']);
+        Route::get('products/compare', [CatalogController::class, 'compare']); // phase 11
         Route::get('products/{id}', [CatalogController::class, 'show'])->whereNumber('id');
         Route::get('categories', [CatalogController::class, 'categories']);
         // Phase 4: the home page, content pages, and the store's rules (shipping, countries, payment, tax).
@@ -160,6 +174,8 @@ Route::prefix('v1')->group(function () {
     Route::post('orders/{number}/paypal/capture', [OrderController::class, 'paypalCapture'])->middleware(['customer.optional', 'throttle:auth']);
     Route::post('payments/paypal/webhook', PayPalWebhookController::class)->middleware('throttle:paypal-webhooks');
     Route::post('gift-cards/check', [GiftCardController::class, 'check'])->middleware('throttle:gift-card-check');
+    // Phase 11: a shared wishlist (public, no personal data).
+    Route::get('wishlists/{token}', [WishlistController::class, 'shared'])->where('token', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:wishlist-share');
     // End of phase 10 part B store routes.
 
     // Phase 9 (part B): "email me when it's back" (guests and customers), its "stop these alerts" link,
@@ -216,6 +232,10 @@ Route::prefix('admin/v1')->group(function () {
             Route::delete('customers/{id}/addresses/{address}', [CustomerAddressController::class, 'destroy'])->middleware('can.admin:customers.edit');
             Route::get('customers/{id}/notes', [CustomerNoteController::class, 'index'])->middleware('can.admin:customers.view');
             Route::post('customers/{id}/notes', [CustomerNoteController::class, 'store'])->middleware('can.admin:customers.edit');
+            // Phase 11: the customer page's Wishlist and Reward points tabs.
+            Route::get('customers/{id}/wishlist', [CustomerLoyaltyController::class, 'wishlist'])->middleware('can.admin:customers.view');
+            Route::get('customers/{id}/rewards', [CustomerLoyaltyController::class, 'rewards'])->middleware('can.admin:customers.view');
+            Route::post('customers/{id}/rewards/adjust', [CustomerLoyaltyController::class, 'adjust'])->middleware('can.admin:rewards.manage');
         });
         Route::get('customer-groups', [CustomerGroupController::class, 'index'])->middleware('can.admin:customers.view|coupons.view|price_rules.manage');
         Route::post('customer-groups', [CustomerGroupController::class, 'store'])->middleware('can.admin:customer_groups.manage');
@@ -239,6 +259,7 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('products/{id}', [AdminProductController::class, 'show'])->whereNumber('id')->middleware('can.admin:products.view');
         Route::patch('products/{id}', [AdminProductController::class, 'update'])->whereNumber('id')->middleware('can.admin:products.edit');
         Route::delete('products/{id}', [AdminProductController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:products.delete');
+        Route::post('products/{id}/duplicate', [AdminProductController::class, 'duplicate'])->whereNumber('id')->middleware('can.admin:products.edit'); // phase 11
 
         // Phase 5: uploaded images, options and variants.
         Route::middleware('can.admin:products.edit')->whereNumber(['id', 'image', 'variant'])->group(function () {
@@ -385,6 +406,8 @@ Route::prefix('admin/v1')->group(function () {
             Route::get('customers', 'customers');
             Route::get('coupons', 'coupons');
             Route::get('low-stock', 'lowStock');
+            Route::get('wishlist', 'wishlist'); // phase 11
+            Route::get('rewards', 'rewards'); // phase 11
         });
 
         Route::get('settings', [SettingsController::class, 'show'])->middleware('can.admin:settings.view');
@@ -407,6 +430,14 @@ Route::prefix('admin/v1')->group(function () {
         Route::patch('gift-cards/{id}', [AdminGiftCardController::class, 'update'])->whereNumber('id')->middleware('can.admin:gift_cards.manage');
         Route::post('gift-cards/{id}/adjust', [AdminGiftCardController::class, 'adjust'])->whereNumber('id')->middleware('can.admin:gift_cards.manage');
         Route::get('reports/gift-cards', [AdminGiftCardController::class, 'report'])->middleware('can.admin:reports.view');
+        // Phase 11: Settings → Currencies (display currencies).
+        Route::get('currencies', [CurrencyController::class, 'index'])->middleware('can.admin:settings.view');
+        Route::middleware('can.admin:settings.edit')->controller(CurrencyController::class)->group(function () {
+            Route::post('currencies', 'store');
+            Route::post('currencies/reorder', 'reorder');
+            Route::patch('currencies/{id}', 'update')->whereNumber('id');
+            Route::delete('currencies/{id}', 'destroy')->whereNumber('id');
+        });
         // End of phase 10 part B admin routes.
 
         // Phase 9 (part B): Reports → Stock alerts, and System → Backups (Owner only by default).

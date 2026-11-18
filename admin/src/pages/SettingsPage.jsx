@@ -7,6 +7,9 @@ import { useAdminAuth } from '../auth/useAdminAuth'
 import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import { ErrorState, Loading } from '../components/States'
+// Phase 11 §4 and §5: reward points and display currencies.
+import CurrenciesEditor from '../components/CurrenciesEditor'
+import { rewardSettingsValues } from '../utils/rewards'
 
 const SHIPPING_METHODS = [
   { id: 'standard', label: 'Standard' },
@@ -53,6 +56,9 @@ function SettingsPage() {
           {/* Phase 10 §2 and §6: PDF documents and visitor statistics. */}
           {settings.data.documents && <DocumentsForm saved={settings.data.documents} />}
           {settings.data.analytics && <AnalyticsForm saved={settings.data.analytics} />}
+          {/* Phase 11 §4 and §5. */}
+          {settings.data.rewards && <RewardsForm saved={settings.data.rewards} />}
+          <CurrenciesEditor />
         </div>
       )}
     </>
@@ -559,6 +565,68 @@ function AnalyticsForm({ saved }) {
       >
         {(a11y) => <input {...a11y} value={id} maxLength={30} placeholder="G-XXXXXXXXXX" autoComplete="off" spellCheck={false} onChange={(event) => setId(event.target.value)} />}
       </Field>
+    </SettingsGroup>
+  )
+}
+
+/** Phase 11 §4: reward points (loyalty). Nothing is earned or spent while it's off. */
+function RewardsForm({ saved }) {
+  const [values, setValues] = useState(() => ({
+    enabled: saved.enabled === true,
+    earnRate: toText(saved.earnRate ?? 1),
+    pointValue: toText(saved.pointValue ?? 0.01),
+    minRedeem: toText(saved.minRedeem ?? 100),
+    maxPercent: toText(saved.maxPercent ?? 50),
+    signupBonus: toText(saved.signupBonus ?? 0),
+    reviewBonus: toText(saved.reviewBonus ?? 0),
+  }))
+  const [errors, setErrors] = useState({})
+  const set = (key) => (event) => setValues({ ...values, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value })
+  const rate = Number(values.earnRate)
+  const worth = Number(values.pointValue)
+  // "Spend $100 → 100 points, worth $1.00": the two rates together, in words.
+  const example =
+    Number.isFinite(rate) && Number.isFinite(worth) && rate >= 0 && worth > 0
+      ? `Example: $100.00 of eligible spend earns ${Math.floor(100 * rate).toLocaleString('en-US')} points, worth ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.floor(100 * rate) * worth)} on a later order.`
+      : ''
+  return (
+    <SettingsGroup
+      group="rewards"
+      title="Reward points"
+      description="Signed-in customers earn points when an order is invoiced (item subtotal after discounts; not shipping, tax, gift cards, or what points paid) and spend them at checkout, after tax and before a gift card."
+      toValues={() => rewardSettingsValues(values)}
+      setErrors={setErrors}
+    >
+      <label className="checkbox">
+        <input type="checkbox" checked={values.enabled} aria-describedby="rewards-enabled-hint" onChange={set('enabled')} />
+        Reward points are on
+      </label>
+      <p id="rewards-enabled-hint" className="field__hint">
+        When off, nothing is earned or spent and shoppers don't see points. Balances are kept.
+      </p>
+      <div className="form__grid">
+        <Field label="Points per $1.00 spent" error={err(errors, 'earnRate')} hint="Rounded down per order. 0 = no points for orders.">
+          {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.earnRate} onChange={set('earnRate')} />}
+        </Field>
+        <Field label="Value of 1 point (USD)" error={err(errors, 'pointValue')} hint="What a point takes off at checkout, like 0.01.">
+          {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.0001" value={values.pointValue} onChange={set('pointValue')} />}
+        </Field>
+        <Field label="Fewest points to use at once" error={err(errors, 'minRedeem')} hint="0 = any amount.">
+          {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.minRedeem} onChange={set('minRedeem')} />}
+        </Field>
+        <Field label="Most of an order points may pay (%)" error={err(errors, 'maxPercent')} hint="Of the total after discounts, shipping, and tax. 1 to 100.">
+          {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="1" max="100" step="1" value={values.maxPercent} onChange={set('maxPercent')} />}
+        </Field>
+        <Field label="Sign-up bonus (points)" error={err(errors, 'signupBonus')} hint="Once, when the account is confirmed.">
+          {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.signupBonus} onChange={set('signupBonus')} />}
+        </Field>
+        <Field label="Review bonus (points)" error={err(errors, 'reviewBonus')} hint="When a review is approved; once per product.">
+          {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.reviewBonus} onChange={set('reviewBonus')} />}
+        </Field>
+      </div>
+      <p className="field__hint" aria-live="polite">
+        {example}
+      </p>
     </SettingsGroup>
   )
 }

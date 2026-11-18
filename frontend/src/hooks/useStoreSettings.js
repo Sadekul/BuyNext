@@ -26,6 +26,9 @@ export const DEFAULT_STORE_SETTINGS = {
   // Phase 10: no PayPal connection and no statistics in the demo (or while the real settings load).
   paypalPayments: 'manual',
   ga4MeasurementId: null,
+  // Phase 11: no display currencies and no reward points in the demo (or while the real settings load).
+  currencies: { base: 'USD', display: [] },
+  rewards: null,
 }
 
 /**

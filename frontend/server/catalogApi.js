@@ -13,6 +13,7 @@ import { json, laravel, pick } from './http.js'
  *   GET /api/catalog/store          → GET /api/v1/store        ({ data }: shipping, countries, payment, tax rules)
  *   GET /api/catalog/redirects?path=/old → GET /api/v1/redirects?path=/old ({ data: { from_path, to_path, status_code } }, or 404)
  *                                        the admin's URL redirects, checked by the storefront's "not found" page (phase 7)
+ *   GET /api/catalog/products/compare?ids=1,2,3 → GET /api/v1/products/compare?ids=1,2,3 (phase 11: 2–4 products side by side)
  * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
  * Phase 10: a search the API corrected ("ihpone" → "iphone") says so in `meta.corrected_query`.
  *
@@ -45,10 +46,18 @@ function redirectLookup(url) {
   return `/api/v1/redirects?${new URLSearchParams({ path })}`
 }
 
+/** Phase 11: ?ids=1,2,3 (2 to 4 product ids; the API checks the count and says so) → the compare path, or null. */
+function compareLookup(url) {
+  const ids = (url.searchParams.get('ids') ?? '').split(',').map((id) => id.trim()).filter(Boolean)
+  if (ids.length === 0 || ids.length > 4 || !ids.every(isId)) return null
+  return `/api/v1/products/compare?${new URLSearchParams({ ids: ids.join(',') })}`
+}
+
 /** /api/catalog/<segments> → the Laravel path, or null. */
 function upstreamPath(segments, url) {
   const [resource, id, ...rest] = segments
   if (rest.length > 0) return null
+  if (resource === 'products' && id === 'compare') return compareLookup(url)
   if (resource === 'products' && id === undefined) return `/api/v1/products${forwardedQuery(url)}`
   if (resource === 'products' && isId(id)) return `/api/v1/products/${id}`
   if (resource === 'categories' && id === undefined) return '/api/v1/categories'

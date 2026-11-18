@@ -83,6 +83,8 @@ export const PERMISSION_LABELS = {
   // Phase 10.
   'gift_cards.view': 'View gift cards and their history',
   'gift_cards.manage': 'Create gift cards, adjust their balance, and disable them',
+  // Phase 11.
+  'rewards.manage': "Adjust customers' reward point balances",
 }
 export const permissionLabel = (key) => PERMISSION_LABELS[key] ?? key
 

@@ -1,6 +1,7 @@
 import { ApiError, apiClient } from './apiClient'
 import { normalizePhone } from '../utils/validation'
 import { giftCardPayload } from '../utils/giftCards'
+import { normalizeProduct } from './adapters/laravelAdapter'
 
 /*
  * Carts and orders with BuyNest's Laravel API, through the shop service on
@@ -40,14 +41,15 @@ export function submitReview(productId, { rating, title, comment }) {
 }
 
 /**
- * POST /api/shop/cart/validate → { lines, problems, coupon, couponError, shippingOptions, totals }.
+ * POST /api/shop/cart/validate → { lines, problems, coupon, couponError, shippingOptions, totals,
+ * crossSells (phase 11: BuyNest products), rewards, rewardPoints, rewardPointsError }.
  * `problems`: [{ productId, code: unavailable | insufficient_stock | below_minimum, message }].
  * The server decides whether the coupon applies (`coupon` or `couponError`). A
  * guest's `email` lets it check "one use per customer" before checkout; a
  * signed-in customer is recognised by the session cookie. The shipping
  * `country` (sent only when the store charges tax) lets the server work out the tax.
  */
-export function validateCart({ items, couponCode, shippingMethod, email, country, giftCardCode }, { signal } = {}) {
+export async function validateCart({ items, couponCode, shippingMethod, email, country, giftCardCode, rewardPoints }, { signal } = {}) {
   const body = {
     items: cartLines(items),
     couponCode: couponCode || null,
@@ -56,8 +58,12 @@ export function validateCart({ items, couponCode, shippingMethod, email, country
     ...(email && { email }),
     ...(country && { country }),
     ...(giftCardCode && { giftCardCode }),
+    // Phase 11: reward points to spend (signed-in customers; the server checks every limit).
+    ...(rewardPoints > 0 && { rewardPoints }),
   }
-  return apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
+  const cart = await apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
+  // Phase 11: "Customers also bought" arrive as the API's product cards (like the catalog's).
+  return { ...cart, crossSells: (Array.isArray(cart?.crossSells) ? cart.crossSells : []).filter((product) => product?.id).map(normalizeProduct) }
 }
 
 /**
@@ -67,7 +73,7 @@ export function validateCart({ items, couponCode, shippingMethod, email, country
  * `values.saveAddress` (signed in) keeps the shipping address in the address
  * book; the server skips it when the book is full or already has it.
  */
-export function placeOrder({ items, couponCode, values, expectedTotal, giftCardCode, requiresShipping = true }) {
+export function placeOrder({ items, couponCode, values, expectedTotal, giftCardCode, rewardPoints, requiresShipping = true }) {
   const { shipping, billingSameAsShipping, billing } = values
   return apiClient.post(
     '/api/shop/orders',
@@ -84,6 +90,8 @@ export function placeOrder({ items, couponCode, values, expectedTotal, giftCardC
       billingAddress: requiresShipping && !billingSameAsShipping ? billing : null,
       expectedTotal,
       ...(giftCardCode && { giftCardCode }),
+      // Phase 11: reward points spent on this order (signed in), paid before a gift card.
+      ...(rewardPoints > 0 && { rewardPoints }),
       // Signed-in customers (phase 6): add the shipping address to the address book afterwards.
       ...(values.saveAddress === true && { saveAddress: true }),
     },

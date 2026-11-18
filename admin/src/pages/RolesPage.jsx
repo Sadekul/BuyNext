@@ -9,6 +9,7 @@ import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount } from '../utils/format'
+import { permissionLabel } from '../utils/permissions'
 
 /**
  * Roles (System → Roles): what each kind of admin may do, as permission
@@ -199,7 +200,8 @@ function RoleDialog({ role, permissions, onDone, onCancel }) {
               {group.permissions.map((permission) => (
                 <label key={permission.key} className="checkbox">
                   <input type="checkbox" checked={readOnly || chosen.has(permission.key)} disabled={readOnly} onChange={(event) => toggle(permission.key, event.target.checked)} />
-                  {permission.label}
+                  {/* Phase 11: a key the API sends without words (rewards.manage) gets this app's label. */}
+                  {permission.label && permission.label !== permission.key ? permission.label : permissionLabel(permission.key)}
                 </label>
               ))}
             </fieldset>

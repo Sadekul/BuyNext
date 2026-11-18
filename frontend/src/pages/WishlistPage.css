@@ -130,3 +130,46 @@
   color: var(--color-sale);
   border-color: var(--color-sale);
 }
+
+/* Phase 11: server wishlist (notes, sync problems, the saved variant). */
+.wishlist-item__variant {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wishlist-item__note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.wishlist-item__note label {
+  font-weight: 600;
+}
+
+.wishlist-item__note-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.wishlist-item__note-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.wishlist-item__note-status {
+  min-height: 1.25em;
+  font-size: var(--text-xs);
+  color: var(--color-success);
+}
+
+.wishlist-item__shared-note {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-muted);
+}

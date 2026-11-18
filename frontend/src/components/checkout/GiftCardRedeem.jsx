@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { LuGift, LuX } from 'react-icons/lu'
 import Button from '../ui/Button'
 import { checkGiftCard } from '../../services/shopService'
-import { formatPrice } from '../../utils/formatters'
+import { formatBasePrice } from '../../utils/formatters'
 import { normalizeGiftCardCode } from '../../utils/giftCards'
 import '../cart/CouponForm.css'
 
@@ -46,7 +46,7 @@ function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabl
   if (appliedCode && checking && !applied && !error) message = 'Checking your gift card…'
   else if (appliedCode && error) message = `Gift card ending ${last4}: ${error}`
   else if (appliedCode && applied) {
-    message = `Gift card ending ${last4} pays ${formatPrice(applied.applied)}.${applied.remaining !== null ? ` ${formatPrice(applied.remaining)} stays on the card.` : ''}`
+    message = `Gift card ending ${last4} pays ${formatBasePrice(applied.applied)}.${applied.remaining !== null ? ` ${formatBasePrice(applied.remaining)} stays on the card.` : ''}`
   } else if (checkError) message = checkError
 
   return (
@@ -57,9 +57,9 @@ function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabl
             <LuGift aria-hidden="true" />
             <span>
               Gift card <strong>•••• {last4}</strong>
-              {error ? ` — ${error}` : applied ? ` — pays ${formatPrice(applied.applied)}` : checking && ' — checking…'}
+              {error ? ` — ${error}` : applied ? ` — pays ${formatBasePrice(applied.applied)}` : checking && ' — checking…'}
               {!error && applied?.remaining !== null && applied?.remaining !== undefined && (
-                <span className="coupon-form__hint"> ({formatPrice(applied.remaining)} left on the card after this order)</span>
+                <span className="coupon-form__hint"> ({formatBasePrice(applied.remaining)} left on the card after this order)</span>
               )}
             </span>
           </p>

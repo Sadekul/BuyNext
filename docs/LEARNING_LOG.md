@@ -249,3 +249,14 @@
 - Stored value done safely: gift card codes stored as hashes, balances changed only under row locks, every movement recorded, refunds returned to the card first
 - Privacy-first analytics: consent before any tracking script loads, Consent Mode v2, events without personal data, a CSP that only allows the analytics hosts when analytics is built in
 - Testing lessons: wait for the app's own "busy" signals (a debounced price check) instead of clicking a briefly disabled button; compare counts with the API instead of hard-coding them
+
+## Phase 11 (backend): Wishlists, comparison, linked products, reward points, display currencies
+
+- Moving client state to the server without losing it: optimistic updates with rollback, and merging a guest's browser list into the account exactly once per sign-in
+- Shareable links done privately: a random token shown once and stored only as a hash, revocable and regenerable, with a public view that shows nothing personal
+- Many-to-many self-relations (product links by type), with ordering, limits, no self-links, and a sensible fallback when nothing is set
+- A points ledger: one service changes balances under a row lock, every change is recorded with the balance after it, and a unique key makes "earn once per order" hold even when two requests race
+- Payment order and refunds across several tenders (points, then gift card, then the card) with proportional give-back and rounding rules
+- Display currency vs charged currency: converting only at the formatter, keeping documents and totals in the base currency, and telling the shopper which amount they'll pay
+- Comparison tables that stay accessible: a real `<table>` with row headers and a focusable scroll region on phones
+- Splitting a phase across parallel agents against one written contract, with each side writing down its exact answer shapes for the others

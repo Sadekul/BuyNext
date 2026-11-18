@@ -75,7 +75,9 @@ function GridPreferences({ prefs, current, onApply, onPageSize, noun }) {
             type="button"
             className="link-button"
             onClick={() => {
-              saving(prefs.update({ columns: null }), 'All columns shown.')
+              // null = the defaults; a grid with `optional` columns (phase 11) lists every one instead.
+              const all = prefs.columns.some((column) => column.optional) ? prefs.columns.map((column) => column.id) : null
+              saving(prefs.update({ columns: all }), 'All columns shown.')
               menuRef.current?.querySelector('summary')?.focus()
             }}
           >

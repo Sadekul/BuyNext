@@ -33,7 +33,7 @@ import {
   paginate,
   sortProducts,
 } from '../utils/catalog'
-import { formatPrice } from '../utils/formatters'
+import { formatBasePrice } from '../utils/formatters'
 import { toDescription } from '../utils/pageMeta'
 import { followRedirect } from '../utils/safeRedirect'
 import { readCatalogParams, withFilters, withParam } from '../utils/catalogParams'
@@ -262,10 +262,10 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
     })
   }
   if (effectiveFilters.minPrice !== '') {
-    chips.push({ id: 'min', label: `From ${formatPrice(Number(filters.minPrice))}`, onRemove: () => handleFiltersChange({ ...filters, minPrice: '' }) })
+    chips.push({ id: 'min', label: `From ${formatBasePrice(Number(filters.minPrice))}`, onRemove: () => handleFiltersChange({ ...filters, minPrice: '' }) })
   }
   if (effectiveFilters.maxPrice !== '') {
-    chips.push({ id: 'max', label: `Up to ${formatPrice(Number(filters.maxPrice))}`, onRemove: () => handleFiltersChange({ ...filters, maxPrice: '' }) })
+    chips.push({ id: 'max', label: `Up to ${formatBasePrice(Number(filters.maxPrice))}`, onRemove: () => handleFiltersChange({ ...filters, maxPrice: '' }) })
   }
   if (filters.minRating > 0) {
     chips.push({ id: 'rating', label: `${filters.minRating}★ & up`, onRemove: () => handleFiltersChange({ ...filters, minRating: 0 }) })

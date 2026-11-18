@@ -5,6 +5,7 @@ import {
   getProductsByCategory,
   getSearchSuggestions,
   searchProducts,
+  getCompareProducts,
 } from '../services/productService'
 import { getCategories } from '../services/categoryService'
 
@@ -21,6 +22,7 @@ export const productKeys = {
   detail: (id) => [...productKeys.all, 'detail', String(id)],
   related: (categorySlug) => [...productKeys.all, 'related', categorySlug],
   suggestions: (query) => [...productKeys.all, 'suggestions', query],
+  compare: (ids) => [...productKeys.all, 'compare', ids.join(',')],
 }
 
 export const categoryKeys = { all: ['categories'] }
@@ -87,4 +89,13 @@ export const categoriesQuery = () =>
     queryKey: categoryKeys.all,
     queryFn: ({ signal }) => getCategories({ signal }),
     staleTime: 60 * 60_000,
+  })
+
+/** Phase 11: the compare page's products (ids in the order they were picked). */
+export const compareProductsQuery = (ids) =>
+  queryOptions({
+    queryKey: productKeys.compare(ids),
+    queryFn: ({ signal }) => getCompareProducts(ids, { signal }),
+    enabled: ids.length > 0,
+    placeholderData: (previous) => previous, // removing a column keeps the table on screen
   })

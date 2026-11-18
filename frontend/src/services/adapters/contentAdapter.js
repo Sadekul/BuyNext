@@ -121,6 +121,37 @@ export function normalizeStoreSettings(raw) {
     paypalPayments: data.paypal_payments === 'paypal' ? 'paypal' : 'manual',
     // Phase 10: the store's Google Analytics 4 measurement id (null = no statistics, no consent banner).
     ga4MeasurementId: measurementId(data.analytics?.ga4_measurement_id ?? data.ga4_measurement_id),
+    // Phase 11: the currencies shoppers may SEE prices in (enabled, with a rate); orders are charged in `base`.
+    currencies: normalizeCurrencies(data.currencies),
+    // Phase 11: reward points, when the store has them on (null = off: nothing about points is shown).
+    rewards: normalizeRewardSettings(data.rewards),
+  }
+}
+
+/** `currencies: { base: "USD", display: [{ code, symbol, rate, decimals }] }` → numbers, bad entries dropped. */
+export function normalizeCurrencies(raw) {
+  const base = typeof raw?.base === 'string' && /^[A-Z]{3}$/.test(raw.base) ? raw.base : 'USD'
+  const display = (Array.isArray(raw?.display) ? raw.display : [])
+    .map((currency) => ({
+      code: typeof currency?.code === 'string' ? currency.code.toUpperCase() : '',
+      symbol: typeof currency?.symbol === 'string' ? currency.symbol : '',
+      rate: Number(currency?.rate),
+      decimals: Number.isInteger(Number(currency?.decimals)) ? Number(currency.decimals) : 2,
+    }))
+    .filter((currency) => /^[A-Z]{3}$/.test(currency.code) && currency.code !== base && Number.isFinite(currency.rate) && currency.rate > 0)
+  return { base, display }
+}
+
+/** The store's public reward settings (`rewards: { enabled, earn_rate, point_value, min_redeem }`), or null when off. */
+export function normalizeRewardSettings(raw) {
+  if (!raw || typeof raw !== 'object' || raw.enabled !== true) return null
+  const earnRate = Number(raw.earn_rate)
+  const pointValue = Number(raw.point_value)
+  return {
+    enabled: true,
+    earnRate: Number.isFinite(earnRate) && earnRate >= 0 ? earnRate : 0,
+    pointValue: Number.isFinite(pointValue) && pointValue >= 0 ? pointValue : 0,
+    minRedeem: Number.isInteger(Number(raw.min_redeem)) ? Number(raw.min_redeem) : 0,
   }
 }
 

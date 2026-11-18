@@ -1,0 +1,49 @@
+.compare-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.compare-button:hover {
+  color: var(--color-primary);
+}
+
+.compare-button--picked {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.compare-button--picked:hover {
+  color: var(--color-text-inverse);
+  background: var(--color-primary-hover);
+}
+
+.compare-button--icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: var(--text-lg);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+
+.compare-button--button {
+  min-height: 3.5rem;
+  padding-inline: var(--space-5);
+  font-size: var(--text-base);
+  font-weight: 600;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+.compare-button--button.compare-button--picked {
+  border-color: var(--color-primary);
+}

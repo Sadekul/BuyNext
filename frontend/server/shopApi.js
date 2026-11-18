@@ -4,6 +4,7 @@ import { laravelCustomer } from './shop/customer.js'
 import { laravelNewsletter } from './shop/newsletter.js'
 import { laravelCart } from './shop/cart.js'
 import { laravelAccount } from './shop/account.js'
+import { isShareToken, laravelRewards, laravelWishlist } from './shop/phase11.js'
 import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
 
 /*
@@ -81,6 +82,22 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  * `requiresShipping`, `giftCard: { last4, applied, balance, remaining }`, `giftCardError`, and
  * `totals.giftCard` / `totals.amountDue`; `shippingOptions` lists only the methods offered for this cart.
  *
+ * Phase 11 (docs/backend/PHASE11_CONTRACT.md; shop/phase11.js), customer session unless noted:
+ *   GET    /api/shop/me/wishlist               → { items: [{ id, product (the API's product card), variant, note, addedAt }], shared }
+ *   POST   /api/shop/me/wishlist               { productId, variantId?, note? } → 201 item (200 when it was already there;
+ *                                              422 code wishlist_full at 100 items)
+ *   PATCH  /api/shop/me/wishlist/:id           { note } → item
+ *   DELETE /api/shop/me/wishlist/:id           → { ok: true }
+ *   POST   /api/shop/me/wishlist/merge         { items: [{ productId, variantId? }] } → { items, shared, skipped } (once, after signing in)
+ *   POST   /api/shop/me/wishlist/share         { regenerate? } → { shared, token (null when already shared), sharedAt }
+ *   DELETE /api/shop/me/wishlist/share         → { ok: true } (the link stops working)
+ *   GET    /api/shop/wishlists/:token          → { ownerFirstName, items: [{ product, variantLabel, note }] } (no sign-in; 404 when not shared)
+ *   GET    /api/shop/me/rewards?page           → { enabled, balance, value, pointValue, transactions, total, page, perPage, lastPage }
+ * cart/validate and orders also take `rewardPoints` (signed in). Priced carts carry `crossSells` (product
+ * cards), `rewards` ({ balance, maxPoints, minRedeem, pointValue, earnEstimate, … } or null), `rewardPoints`
+ * ({ points, amount } applied, or null), `rewardPointsError`, and `totals.rewardPoints`; orders carry
+ * `rewardPointsSpent`, `rewardPointsAmount`, `rewardPointsEarned` and `totals.rewardPoints`.
+ *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */
@@ -92,6 +109,7 @@ const isInvoiceNumber = (value) => /^INV-\d{1,12}$/.test(value ?? '')
 const isInvoicePdf = (value) => /^INV-\d{1,12}\.pdf$/.test(value ?? '')
 const isReturnNumber = (value) => /^RMA-\d{1,12}$/.test(value ?? '')
 const isAlertId = isProductId
+const isWishlistId = isProductId
 const pageOf = (url) => Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
 const reply = (result, status) => (result.ok ? json(result.data, status ?? result.status) : json(result.body, result.status))
 
@@ -273,6 +291,53 @@ const ROUTES = {
   async 'POST gift-cards/check'({ request }) {
     return reply(await laravelShop.checkGiftCard(await readBody(request), request))
   },
+
+  // ---- phase 11: the account's wishlist (and sharing it), shared wishlists, reward points ----
+
+  async 'GET me/wishlist'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.list(cookies[CUSTOMER.access], request))
+  },
+
+  async 'POST me/wishlist'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.add(cookies[CUSTOMER.access], await readBody(request), request))
+  },
+
+  async 'PATCH me/wishlist/:id'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.update(cookies[CUSTOMER.access], param, await readBody(request), request))
+  },
+
+  async 'DELETE me/wishlist/:id'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.remove(cookies[CUSTOMER.access], param, request), 200)
+  },
+
+  async 'POST me/wishlist/merge'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.merge(cookies[CUSTOMER.access], await readBody(request), request))
+  },
+
+  async 'POST me/wishlist/share'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.share(cookies[CUSTOMER.access], await readBody(request), request))
+  },
+
+  async 'DELETE me/wishlist/share'({ request, cookies }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelWishlist.stopSharing(cookies[CUSTOMER.access], request), 200)
+  },
+
+  // No sign-in: the link's token is the key. Never cached (a link turned off must stop working at once).
+  async 'GET wishlists/:token'({ request, param }) {
+    return reply(await laravelWishlist.shared(param, request))
+  },
+
+  async 'GET me/rewards'({ request, cookies, url }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    return reply(await laravelRewards.get(cookies[CUSTOMER.access], pageOf(url), request))
+  },
 }
 
 /** The API's PDF, passed on as it streams in: never parsed or rebuilt here. */
@@ -301,6 +366,12 @@ function matchRoute(method, segments) {
   }
   if (segments.length === 3 && segments[0] === 'orders' && isOrderNumber(segments[1]) && ['pay', 'cancel'].includes(segments[2])) {
     return { route: ROUTES[`${method} orders/:number/${segments[2]}`], param: segments[1] }
+  }
+  if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'wishlist' && isWishlistId(segments[2])) {
+    return { route: ROUTES[`${method} me/wishlist/:id`], param: segments[2] }
+  }
+  if (segments.length === 2 && segments[0] === 'wishlists' && isShareToken(segments[1])) {
+    return { route: ROUTES[`${method} wishlists/:token`], param: segments[1] }
   }
   if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'stock-alerts' && isAlertId(segments[2])) {
     return { route: ROUTES[`${method} me/stock-alerts/:id`], param: segments[2] }

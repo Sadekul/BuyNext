@@ -35,9 +35,9 @@ export function useGridPreferences(key, columns) {
   const value = saved.data ?? {}
   const known = new Set(columns.map((column) => column.id))
   const required = columns.filter((column) => column.required).map((column) => column.id)
-  // null = every column (the default); unknown ids from an older layout are ignored.
+  // null = every column but the `optional` ones (the default); unknown ids from an older layout are ignored.
   const chosen = Array.isArray(value.columns) ? value.columns.filter((id) => known.has(id)) : null
-  const visible = chosen === null ? columns.map((column) => column.id) : [...new Set([...required, ...chosen])]
+  const visible = chosen === null ? columns.filter((column) => !column.optional).map((column) => column.id) : [...new Set([...required, ...chosen])]
   const pageSize = PAGE_SIZES.includes(value.pageSize) ? value.pageSize : PAGE_SIZES[0]
   const filters = Array.isArray(value.filters) ? value.filters : []
 

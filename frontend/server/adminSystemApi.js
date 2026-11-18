@@ -1,5 +1,7 @@
 import { json, laravelFile, readBody } from './http.js'
 import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from './shop/adminSystem.js'
+// Phase 11 §4: Settings → Reward points.
+import { REWARD_SETTING_RULES } from './adminPhase11Api.js'
 
 /*
  * Phase 4 admin routes (docs/backend/PHASE4_CONTRACT.md), Laravel only:
@@ -248,6 +250,8 @@ const SETTING_RULES = {
     // "" or null turns statistics off; otherwise a GA4 measurement id (G-ABC123XYZ).
     ga4MeasurementId: (value) => (value === null || value === '' || (typeof value === 'string' && /^G-[A-Z0-9]{4,12}$/.test(value)) ? null : 'Enter a GA4 measurement ID like G-ABC123XYZ, or leave it empty.'),
   },
+  // Phase 11 §4.
+  rewards: REWARD_SETTING_RULES,
 }
 
 /** PATCH /settings: { group: { key: value } }, known groups and keys only; errors as "group.key". */

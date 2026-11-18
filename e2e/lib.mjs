@@ -45,8 +45,9 @@ export async function launch() {
 }
 
 /**
- * Empties an account's cart saved on the server (phase 7 restores it at sign-in on any device),
- * so each suite starts from a known cart however the previous run ended.
+ * Empties an account's cart saved on the server (phase 7 restores it at sign-in on any device)
+ * and, since phase 11, its wishlist saved on the server (also restored on any device), with
+ * sharing off, so each suite starts from a known cart and wishlist however the previous run ended.
  */
 export async function clearSavedCart(account) {
   const call = async (path, init = {}) => {
@@ -55,14 +56,18 @@ export async function clearSavedCart(account) {
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
     })
     if (!response.ok) throw new Error(`clearSavedCart: ${path} answered ${response.status}`)
-    return response.json()
+    return response.status === 204 ? null : response.json()
   }
   const login = await call('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: account.email, password: account.password }) })
-  await call('/api/v1/cart/validate', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${login.data.tokens.access_token}` },
-    body: JSON.stringify({ items: [] }),
-  })
+  const auth = { Authorization: `Bearer ${login.data.tokens.access_token}` }
+  await call('/api/v1/cart/validate', { method: 'POST', headers: auth, body: JSON.stringify({ items: [] }) })
+  // Phase 11: the wishlist lives on the server too. (Older API without the route: nothing to clear.)
+  const listed = await fetch(`${LARAVEL_URL}/api/v1/me/wishlist`, { headers: { Accept: 'application/json', ...auth } })
+  if (listed.status === 404) return
+  if (!listed.ok) throw new Error(`clearSavedCart: /api/v1/me/wishlist answered ${listed.status}`)
+  const { data = [], meta = {} } = await listed.json()
+  for (const item of data) await call(`/api/v1/me/wishlist/${item.id}`, { method: 'DELETE', headers: auth })
+  if (meta.shared) await call('/api/v1/me/wishlist/share', { method: 'DELETE', headers: auth })
 }
 
 /** PASS/FAIL lines, printed at the end; any FAIL makes the process exit with 1. */

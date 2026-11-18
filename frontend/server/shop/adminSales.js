@@ -1,6 +1,8 @@
 import { laravel } from '../http.js'
 import { camelPath, fromAddress, fromCart, fromLine, fromPayment, fromShipment, fromTotals } from './laravel.js'
 import { failed } from './adminSystem.js'
+// Phase 11 §4: the customer's points balance.
+import { customerPoints } from './adminPhase11.js'
 
 /*
  * Phase 6 of the admin (docs/backend/PHASE6_CONTRACT.md) from BuyNest's
@@ -118,6 +120,8 @@ export function customerRow(raw) {
     createdByAdmin: raw.created_by_admin === true,
     createdAt: raw.created_at ?? null,
     lastLoginAt: raw.last_login_at ?? null,
+    // Phase 11 §4: the points balance (the grid's optional Points column).
+    ...customerPoints(raw),
   }
 }
 

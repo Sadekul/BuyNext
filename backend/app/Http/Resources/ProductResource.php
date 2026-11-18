@@ -7,6 +7,7 @@ use App\Models\ProductVariant;
 use App\Models\Review;
 use App\Services\CatalogRules;
 use App\Services\Pricing;
+use App\Services\ProductLinks;
 use App\Support\ImageVariants;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -31,9 +32,19 @@ class ProductResource extends JsonResource
 {
     protected bool $detail = false;
 
+    /** Phase 11: the storefront product page adds related products and up-sells. */
+    protected bool $recommendations = false;
+
     public function withDetail(): static
     {
         $this->detail = true;
+
+        return $this;
+    }
+
+    public function withRecommendations(): static
+    {
+        $this->recommendations = true;
 
         return $this;
     }
@@ -78,6 +89,10 @@ class ProductResource extends JsonResource
             // Phase 10 (part B): "simple" or "gift_card"; a gift card's amounts ({ amounts, custom: { min, max } | null }, else null).
             'type' => $this->type ?? 'simple',
             'gift_card' => $this->resource->giftCardOptions(),
+            // Phase 11: [{ label, value }] ([] when none).
+            'specifications' => $this->resource->specificationList(),
+            'related' => $this->when($this->recommendations, fn () => app(ProductLinks::class)->related($this->resource, $request)),
+            'upsells' => $this->when($this->recommendations, fn () => app(ProductLinks::class)->upsells($this->resource, $request)),
             'reviews' => $this->when($this->detail && $this->relationLoaded('reviews'), fn () => $this->reviews
                 ->filter(fn (Review $review) => $review->status === 'approved')
                 ->map(fn (Review $review) => self::publicReview($review))->values()),

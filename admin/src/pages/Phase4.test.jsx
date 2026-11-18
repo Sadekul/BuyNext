@@ -50,6 +50,9 @@ describe('permissions in the admin app', () => {
       'GET /api/admin/reports/low-stock': { body: { products: [] } },
       // Phase 9.
       'GET /api/admin/reports/stock-alerts': { body: { products: [], total: 0, waitingTotal: 0, notifiedLast30Days: 0 } },
+      // Phase 11.
+      'GET /api/admin/reports/wishlist': { body: { products: [] } },
+      'GET /api/admin/reports/rewards': { body: { totals: { issued: 0, spent: 0, returned: 0, reversed: 0, adjusted: 0 }, series: [], outstandingPoints: 0, outstandingValue: 0 } },
     })
     renderApp('/reports')
     expect(await screen.findByRole('heading', { name: "You don't have access" })).toBeInTheDocument()

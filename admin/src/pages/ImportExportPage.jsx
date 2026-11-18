@@ -142,6 +142,8 @@ function ImportPanel() {
   }
 
   const errors = report?.errors ?? []
+  // Phase 11: notes that don't stop the import (e.g. an unknown SKU in a related-products column, which is skipped).
+  const warnings = report?.warnings ?? []
   const canImport = report?.dryRun && errors.length === 0 && report.created + report.updated > 0
   return (
     <section className="panel form panel--padded" aria-labelledby="import-title">
@@ -217,6 +219,11 @@ function ImportPanel() {
               {errors.length > 0 ? `, ${formatCount(errors.length)} ${errors.length === 1 ? 'error' : 'errors'}.` : '.'}
             </p>
             {errors.length > 0 && <p>Fix the rows below and check the file again.</p>}
+            {warnings.length > 0 && (
+              <p>
+                {formatCount(warnings.length)} {warnings.length === 1 ? 'note' : 'notes'}: some values were skipped (listed below).
+              </p>
+            )}
             {canImport && <p>Ready: choose “Import now” to save these changes.</p>}
           </div>
         )}
@@ -237,6 +244,32 @@ function ImportPanel() {
             </thead>
             <tbody>
               {errors.map((entry, index) => (
+                <tr key={`${entry.row}-${entry.column}-${index}`}>
+                  <td className="num">{entry.row ?? '—'}</td>
+                  <td>{entry.column ? <code>{entry.column}</code> : '—'}</td>
+                  <td>{entry.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="table-wrap">
+          <table className="table">
+            <caption>Skipped values (the rest of each row is still imported)</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="num">
+                  Row
+                </th>
+                <th scope="col">Column</th>
+                <th scope="col">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {warnings.map((entry, index) => (
                 <tr key={`${entry.row}-${entry.column}-${index}`}>
                   <td className="num">{entry.row ?? '—'}</td>
                   <td>{entry.column ? <code>{entry.column}</code> : '—'}</td>

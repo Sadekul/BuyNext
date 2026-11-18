@@ -41,12 +41,17 @@ final readonly class CartQuote
         public ?GiftCard $giftCard = null,         // the redeemed card (locked at checkout)
         public int $giftCardCents = 0,             // what it pays
         public ?string $giftCardError = null,
+        // Phase 11: reward points (the cart's `rewards`, null for guests / when off), the points used, their value, and why not.
+        public ?array $rewards = null,
+        public int $rewardPoints = 0,
+        public int $rewardPointsCents = 0,
+        public ?string $rewardPointsError = null,
     ) {}
 
-    /** Phase 10 (part B): what is left to pay after the gift card. */
+    /** Phase 10 (part B): what is left to pay after the gift card. Phase 11: and the reward points. */
     public function amountDueCents(): int
     {
-        return max(0, $this->totalCents - $this->giftCardCents);
+        return max(0, $this->totalCents - $this->giftCardCents - $this->rewardPointsCents);
     }
 
     /** The applied rules as the cart and orders show them. */
@@ -117,6 +122,9 @@ final readonly class CartQuote
                 'expires_at' => $this->giftCard->expires_at?->toIso8601ZuluString(),
             ] : null,
             'gift_card_error' => $this->giftCardError,
+            // Phase 11.
+            'rewards' => $this->rewards,
+            'reward_points_error' => $this->rewardPointsError,
             'totals' => $this->totals(),
             'tax_estimated' => $this->taxEstimated,
             'customer_group' => $this->group?->summary(),
@@ -136,6 +144,7 @@ final readonly class CartQuote
             'total' => Pricing::format($this->totalCents),
             // Phase 10 (part B): paid with a gift card, and what is left to pay.
             'gift_card' => Pricing::format($this->giftCardCents),
+            'reward_points' => Pricing::format($this->rewardPointsCents), // phase 11: paid with reward points
             'amount_due' => Pricing::format($this->amountDueCents()),
         ];
     }

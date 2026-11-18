@@ -28,6 +28,20 @@
   margin-left: auto;
 }
 
+/* Phase 11: the currency picker sits just before the account actions. */
+.site-header__currency {
+  display: flex;
+  margin-left: auto;
+}
+
+.site-header__currency:empty {
+  display: none;
+}
+
+.site-header__currency:not(:empty) + .site-header__actions {
+  margin-left: 0;
+}
+
 .site-header__icon-button {
   position: relative;
   display: inline-flex;

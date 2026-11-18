@@ -149,7 +149,7 @@ try {
     await form.getByLabel('City').fill(address.city)
     await form.getByLabel('State / region').fill(address.state)
     await form.getByLabel('Postal code').fill(address.postalCode)
-    await form.getByLabel('Country').selectOption('United States')
+    await form.getByRole('combobox', { name: 'Country' }).selectOption('United States') // the list loads after the form opens (a text box until then)
   }
   const addAddress = async (address, { makeDefault = false } = {}) => {
     const first = book.getByRole('button', { name: 'Add your first address' })
@@ -574,7 +574,7 @@ try {
   await addressDialog.getByLabel('City').fill('Albany')
   await addressDialog.getByLabel('State or region (optional)').fill('New York')
   await addressDialog.getByLabel('Postal code').fill('12207')
-  await addressDialog.getByLabel('Country').selectOption('United States')
+  await addressDialog.getByRole('combobox', { name: 'Country' }).selectOption('United States') // the list loads after the form opens (a text box until then)
   await axe(admin, 'customer address dialog')
   await addressDialog.getByRole('button', { name: 'Add address' }).click()
   await notice(admin, 'Address added.').waitFor({ timeout: 15000 }).catch(() => {})

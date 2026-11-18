@@ -48,6 +48,8 @@ class OrderResource extends JsonResource
             'totals' => self::totalsOf($this->resource),
             // Phase 10 (part B): the gift card that paid part (or all) of the order.
             'gift_card' => self::giftCardOf($this->resource),
+            // Phase 11: { spent, amount, earned } | null.
+            'reward_points' => self::rewardPointsOf($this->resource),
             'placed_at' => $this->placed_at?->toIso8601ZuluString(),
             // Phase 8: { provider, paid_at, url, expires_at, can_pay } (+ error after a failed attempt; staff: reference, dashboard_url).
             'payment' => $this->payment(),
@@ -140,6 +142,7 @@ class OrderResource extends JsonResource
             'total' => $order->grand_total,
             // Phase 10 (part B): paid with a gift card, and what is left for the other payment method.
             'gift_card' => Pricing::format(Pricing::toCents($order->gift_card_amount ?? 0)),
+            'reward_points' => Pricing::format(Pricing::toCents($order->reward_points_amount ?? 0)), // phase 11: paid with reward points
             'amount_due' => Pricing::format($order->dueCents()),
             'paid' => Pricing::format($order->paidCents()),
             'refunded' => Pricing::format($order->refundedCents()),
@@ -151,6 +154,16 @@ class OrderResource extends JsonResource
     {
         return $order->gift_card_id && Pricing::toCents($order->gift_card_amount ?? 0) > 0
             ? ['last4' => $order->giftCard?->last4, 'amount' => Pricing::format(Pricing::toCents($order->gift_card_amount))]
+            : null;
+    }
+
+    /** Phase 11: reward points spent on the order (and their value) and earned with it, or null when neither. */
+    public static function rewardPointsOf(Order $order): ?array
+    {
+        $spent = (int) $order->reward_points_spent;
+
+        return $spent > 0 || $order->reward_points_earned !== null
+            ? ['spent' => $spent, 'amount' => Pricing::format(Pricing::toCents($order->reward_points_amount ?? 0)), 'earned' => $order->reward_points_earned]
             : null;
     }
 

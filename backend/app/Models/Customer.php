@@ -18,7 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
  * customer tokens (EnsureTokenKind).
  */
 #[Fillable(['first_name', 'last_name', 'email', 'phone', 'password', 'group_id'])]
-#[Hidden(['password'])]
+#[Hidden(['password', 'wishlist_share_hash'])]
 class Customer extends Authenticatable
 {
     /** @use HasFactory<CustomerFactory> */
@@ -30,6 +30,8 @@ class Customer extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
+            'reward_points' => 'integer', // phase 11: the reward point balance (changed only by App\Services\RewardPoints)
+            'wishlist_shared_at' => 'datetime', // phase 11
             'password' => 'hashed',
         ];
     }
@@ -66,6 +68,18 @@ class Customer extends Authenticatable
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /** Phase 11: the wishlist kept on the server (newest first). */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class)->orderByDesc('id');
+    }
+
+    /** Phase 11: the reward point history (newest first). */
+    public function rewardTransactions(): HasMany
+    {
+        return $this->hasMany(RewardTransaction::class)->orderByDesc('id');
     }
 
     public function reviews(): HasMany

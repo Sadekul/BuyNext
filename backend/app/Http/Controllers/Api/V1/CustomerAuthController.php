@@ -8,6 +8,7 @@ use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
 use App\Models\OneTimeCode;
 use App\Services\OneTimeCodes;
+use App\Services\RewardPoints;
 use App\Services\TokenPairs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,7 +64,8 @@ class CustomerAuthController extends Controller
         $customer = Customer::where('email', OneTimeCodes::normalize($data['email']))->first();
         $this->checkCode($data['email'], OneTimeCode::VERIFY_EMAIL, $data['code'], $customer !== null);
 
-        if (! $customer->hasVerifiedEmail()) {
+        $firstVerification = ! $customer->hasVerifiedEmail();
+        if ($firstVerification) {
             $customer->email_verified_at = now();
         }
         if (! $customer->is_active) {
@@ -71,6 +73,10 @@ class CustomerAuthController extends Controller
         }
         $customer->last_login_at = now();
         $customer->save();
+        // Phase 11: the signup bonus once the email is verified (once per account; nothing while rewards are off).
+        if ($firstVerification) {
+            app(RewardPoints::class)->signup($customer);
+        }
 
         return $this->signedIn($customer, $request->boolean('remember'));
     }
@@ -179,8 +185,12 @@ class CustomerAuthController extends Controller
 
         $customer->password = $data['password'];
         // Reading the code proves they own the inbox.
+        $firstVerification = $customer->email_verified_at === null;
         $customer->email_verified_at ??= now();
         $customer->save();
+        if ($firstVerification) {
+            app(RewardPoints::class)->signup($customer); // phase 11: once per account
+        }
         $this->tokens->revokeAll($customer); // every other device is signed out
 
         return response()->json(['message' => 'Your password has been changed. Sign in with the new password.']);

@@ -15,12 +15,15 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
+use App\Models\RewardTransaction;
+use App\Models\WishlistItem;
 use App\Services\Audit;
 use App\Services\CustomerAccounts;
 use App\Services\Newsletter;
 use App\Services\OneTimeCodes;
 use App\Services\Pricing;
 use App\Services\TokenPairs;
+use App\Services\Wishlists;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -142,6 +145,7 @@ class MyAccountController extends Controller
                 'created_at' => self::date($customer->created_at),
                 'last_login_at' => self::date($customer->last_login_at),
                 'group' => $group,
+                'reward_points' => (int) $customer->reward_points, // phase 11
             ],
             'newsletter' => [
                 'status' => $subscriber?->status ?? 'not_subscribed',
@@ -166,6 +170,23 @@ class MyAccountController extends Controller
             ])->values(),
             'saved_cart' => $this->exportCart($customer),
             'stock_alerts' => $this->exportStockAlerts($customer),
+            // Phase 11: the wishlist kept on the server and the reward point history.
+            'wishlist' => WishlistItem::where('customer_id', $customer->id)->with(['product' => fn ($q) => $q->withTrashed(), 'product.options.values', 'variant'])
+                ->orderBy('id')->get()->map(fn (WishlistItem $item) => [
+                    'product' => $item->product?->name,
+                    'variant' => Wishlists::variant($item)['label'] ?? null,
+                    'note' => $item->note,
+                    'added_at' => self::date($item->created_at),
+                ])->values(),
+            'reward_transactions' => RewardTransaction::where('customer_id', $customer->id)->with('order:id,number')->orderBy('id')->get()
+                ->map(fn (RewardTransaction $tx) => [
+                    'points' => $tx->points,
+                    'balance_after' => $tx->balance_after,
+                    'type' => $tx->type,
+                    'order_number' => $tx->order?->number,
+                    'note' => $tx->note,
+                    'created_at' => self::date($tx->created_at),
+                ])->values(),
         ];
 
         return response()->json($data, 200, [

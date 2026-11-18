@@ -53,6 +53,8 @@ export function paymentNote(order, { stripe = false, paypal = false } = {}) {
   // Phase 10: PayPal orders approved on PayPal's site, and orders paid in full by a gift card.
   const byPaypal = order.paymentMethod === 'paypal' && (order.paymentProvider === 'paypal' || paypal)
   if (order.paymentMethod === 'gift_card' && order.paymentStatus === 'paid') return 'Paid in full with a gift card. Thank you.'
+  // Phase 11: reward points paid the whole order.
+  if (order.paymentMethod === 'reward_points' && order.paymentStatus === 'paid') return 'Paid in full with reward points. Thank you.'
   if (order.paymentStatus === 'refunded') return 'Your payment was refunded in full, by the same method you paid with.'
   if (order.paymentStatus === 'partially_refunded') return 'Part of your payment was refunded, by the same method you paid with. See the refunds below.'
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'card' && order.paymentProvider === 'stripe') {

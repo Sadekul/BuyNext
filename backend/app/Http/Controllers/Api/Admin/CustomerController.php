@@ -14,6 +14,7 @@ use App\Services\Audit;
 use App\Services\CustomerAccounts;
 use App\Services\OneTimeCodes;
 use App\Services\Pricing;
+use App\Services\RewardPoints;
 use App\Services\TokenPairs;
 use App\Support\Csv;
 use Illuminate\Database\Eloquent\Builder;
@@ -97,6 +98,8 @@ class CustomerController extends Controller
             ]);
             $customer->created_by_admin_id = $request->user()->id;
             $customer->save();
+            // Phase 11: accounts made by staff get the signup bonus at once (once per account).
+            app(RewardPoints::class)->signup($customer);
             $this->audit->record('customer.created', "Customer {$customer->email} created.", 'customer', $customer->id,
                 Audit::created(Audit::fieldsOf($customer, ['first_name', 'last_name', 'email', 'phone', 'group_id'])));
 

@@ -32,6 +32,7 @@ class AdminCustomerResource extends JsonResource
             'status' => ! $this->is_active ? 'blocked' : ($this->email_verified_at ? 'active' : 'unverified'),
             'group' => $group ? ['id' => $group->id, 'name' => $group->name, 'code' => $group->code, 'discount_percent' => $group->discount_percent] : null,
             'orders_count' => $this->whenCounted('orders'),
+            'reward_points' => (int) ($this->reward_points ?? 0), // phase 11: the reward point balance
             'created_by_admin' => $this->created_by_admin_id !== null,
             'last_login_at' => $this->last_login_at?->toIso8601ZuluString(),
             'created_at' => $this->created_at?->toIso8601ZuluString(),

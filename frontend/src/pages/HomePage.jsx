@@ -5,6 +5,8 @@ import ProductSection from '../components/home/ProductSection'
 import PromoBanner from '../components/home/PromoBanner'
 import BenefitsSection from '../components/home/BenefitsSection'
 import Newsletter from '../components/forms/Newsletter'
+import RecentlyViewed from '../components/product/RecentlyViewed'
+import { useRecentlyViewed } from '../utils/recentlyViewed'
 import ErrorMessage from '../components/ui/ErrorMessage'
 import Loader from '../components/ui/Loader'
 import { useQuery } from '@tanstack/react-query'
@@ -172,8 +174,22 @@ function HomePage() {
         </>
       )}
 
+      {/* Phase 11: products this browser opened before (nothing when there are none). */}
+      <RecentlyViewedSection onAddToCart={handleAddToCart} />
+
       <Newsletter />
     </>
+  )
+}
+
+function RecentlyViewedSection({ onAddToCart }) {
+  if (useRecentlyViewed().length === 0) return null
+  return (
+    <div className="section">
+      <div className="container">
+        <RecentlyViewed onAddToCart={onAddToCart} />
+      </div>
+    </div>
   )
 }
 

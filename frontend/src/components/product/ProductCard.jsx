@@ -5,10 +5,12 @@ import Button from '../ui/Button'
 import ProductBadge from './ProductBadge'
 import RatingStars from './RatingStars'
 import WishlistButton from './WishlistButton'
+import CompareButton from './CompareButton'
 import { ROUTES } from '../../constants/routes'
 import { STORE_SETTINGS } from '../../constants/store'
 import { cn } from '../../utils/classNames'
 import { formatPrice, formatSlug } from '../../utils/formatters'
+import { useDisplayCurrency } from '../../utils/displayCurrency'
 import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { IMAGE_SIZES, responsiveImageProps } from '../../utils/images'
@@ -24,7 +26,9 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
  * only when its handler is provided. The wishlist heart is self-contained
  * (WishlistButton reads the wishlist context), shown unless showWishlist={false}.
  */
-function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true }) {
+function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true, showCompare = true }) {
+  // Phase 11: memo() skips re-renders from the parent, so the card follows the display currency itself.
+  useDisplayCurrency()
   const { id, title, brand, category, thumbnail, rating, stock, availabilityStatus } = product
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
   const isOutOfStock = stock === 0
@@ -67,7 +71,13 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
         {availabilityStatus === 'Low Stock' && <ProductBadge variant="warning">Low stock</ProductBadge>}
       </div>
 
-      {showWishlist && <WishlistButton product={product} className="product-card__wishlist" />}
+      {(showWishlist || showCompare) && (
+        <div className="product-card__toggles">
+          {showWishlist && <WishlistButton product={product} />}
+          {/* Phase 11: add to the compare list (max 4). */}
+          {showCompare && <CompareButton product={product} />}
+        </div>
+      )}
 
       <div className="product-card__body">
         <p className="product-card__meta">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Reports;
+use App\Services\RewardPoints;
 use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -65,6 +66,22 @@ class ReportController extends Controller
         [$from, $to] = $this->range($request);
 
         return response()->json(['data' => $this->reports->coupons($from, $to), 'meta' => $this->meta($from, $to)]);
+    }
+
+    /** Phase 11: GET /reports/wishlist?from&to&limit → most wished-for products (rows added within the dates). */
+    public function wishlist(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        return response()->json(['data' => $this->reports->wishlist($from, $to, $this->limit($request)), 'meta' => $this->meta($from, $to)]);
+    }
+
+    /** Phase 11: GET /reports/rewards?from&to&group_by → points issued / spent by period, and the outstanding liability. */
+    public function rewards(Request $request, RewardPoints $points): JsonResponse
+    {
+        [$from, $to, $groupBy] = $this->range($request);
+
+        return response()->json(['data' => $this->reports->rewards($from, $to, $groupBy, $points), 'meta' => $this->meta($from, $to, $groupBy)]);
     }
 
     /** Not limited to dates: what is low right now. */

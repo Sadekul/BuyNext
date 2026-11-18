@@ -6,7 +6,7 @@ import Button from '../components/ui/Button'
 import { checkGiftCard } from '../services/shopService'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, formatPrice } from '../utils/formatters'
+import { formatDate, formatBasePrice } from '../utils/formatters'
 import { normalizeGiftCardCode } from '../utils/giftCards'
 import './OrderPages.css'
 
@@ -41,7 +41,7 @@ function GiftCardBalancePage() {
   if (card) {
     result =
       card.status === 'active'
-        ? `Balance: ${formatPrice(card.balance)}.${card.expiresAt ? ` Use it by ${formatDate(card.expiresAt)}.` : ' It never expires.'}`
+        ? `Balance: ${formatBasePrice(card.balance)}.${card.expiresAt ? ` Use it by ${formatDate(card.expiresAt)}.` : ' It never expires.'}`
         : (STATUS_TEXT[card.status] ?? STATUS_TEXT.disabled)
   }
 

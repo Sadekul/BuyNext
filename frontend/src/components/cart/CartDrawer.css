@@ -34,3 +34,9 @@
   font-weight: 600;
   color: var(--color-sale);
 }
+
+.cart-drawer__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

@@ -272,11 +272,17 @@ describe('CSV export and import', () => {
   })
 
   it('imports as a dry run unless told otherwise, and maps the report', async () => {
-    const report = { dry_run: true, rows: 3, created: 1, updated: 1, unchanged: 0, errors: [{ row: 4, column: 'price', message: 'Enter a price.' }] }
+    const report = {
+      dry_run: true, rows: 3, created: 1, updated: 1, unchanged: 0, errors: [{ row: 4, column: 'price', message: 'Enter a price.' }],
+      warnings: [{ row: 2, column: 'related_skus', message: 'Unknown SKU "NOPE" skipped.' }],
+    }
     const calls = fakeLaravel({ 'POST /api/admin/v1/products/import': { body: { data: report } } })
     const body = multipartBody('file', 'products.csv', 'text/csv', 'sku,name\nA,B\n')
     const dry = await (await admin('products/import', { method: 'POST', headers: { 'Content-Type': MULTIPART }, raw: body })).json()
-    expect(dry).toEqual({ dryRun: true, rows: 3, created: 1, updated: 1, unchanged: 0, errors: [{ row: 4, column: 'price', message: 'Enter a price.' }], live: true })
+    expect(dry).toEqual({
+      dryRun: true, rows: 3, created: 1, updated: 1, unchanged: 0, errors: [{ row: 4, column: 'price', message: 'Enter a price.' }],
+      warnings: [{ row: 2, column: 'related_skus', message: 'Unknown SKU "NOPE" skipped.' }], live: true,
+    })
     expect(toApi(calls)[0].search).toBe('?dry_run=1')
     expect(new TextDecoder().decode(toApi(calls)[0].body)).toBe(body)
     await admin('products/import?dryRun=false', { method: 'POST', headers: { 'Content-Type': MULTIPART }, raw: body })
