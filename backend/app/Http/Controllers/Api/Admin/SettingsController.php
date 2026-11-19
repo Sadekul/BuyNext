@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Audit;
+use App\Services\Payments\PayPalPayments;
+use App\Services\Payments\SslCommerzPayments;
+use App\Services\Payments\StripePayments;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -119,7 +123,15 @@ class SettingsController extends Controller
                 // Phase 6: always available to staff creating an order, never to shoppers.
                 'admin_payment_methods' => collect(config('buynest.store.admin_payment_methods'))
                     ->map(fn ($label, $id) => ['id' => $id, 'label' => $label])->values(),
-                'currency' => config('buynest.store.currency'),
+                'currency' => Currency::store(),
+                // Phase 12: the store currency (read-only: BUYNEST_CURRENCY, see docs/CURRENCY.md) and each online provider's state.
+                'store_currency' => Currency::api(),
+                'currency_docs' => 'docs/CURRENCY.md',
+                'payment_providers' => [
+                    'stripe' => app(StripePayments::class)->status(),
+                    'paypal' => app(PayPalPayments::class)->status(),
+                    'sslcommerz' => app(SslCommerzPayments::class)->status(),
+                ],
             ],
         ]);
     }

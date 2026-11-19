@@ -151,7 +151,7 @@ class OrderCreateController extends Controller
             'customer_id.required_without' => 'Choose a customer, or enter the guest\'s details.',
             'guest.required_without' => 'Choose a customer, or enter the guest\'s details.',
             'customer_id.prohibits' => 'Choose a customer or enter a guest, not both.',
-            'payment_method.in' => 'Choose a payment method.',
+            'payment_method.in' => PlaceOrderRequest::paymentMethodMessage($request->input('payment_method')),
             'guest.phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',
             '*.postal_code.regex' => 'The postal code is invalid.',
             '*.country.in' => 'We don\'t deliver to that country yet.',

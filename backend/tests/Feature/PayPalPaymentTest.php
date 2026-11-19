@@ -159,7 +159,7 @@ class PayPalPaymentTest extends TestCase
         $this->getJson('/api/v1/store')->assertOk()->assertJsonPath('data.paypal_payments', 'manual');
         $order = $this->paypalOrder()->assertCreated()
             ->assertJsonPath('data.status', 'pending_payment')
-            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false]);
+            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false, 'method_label' => null]);
         $this->postJson('/api/v1/orders/'.$order->json('data.number').'/pay', ['email' => 'guest@example.com'])
             ->assertStatus(422)->assertJsonPath('errors.order.0', 'Online PayPal payments aren\'t available right now. We\'ll contact you about the payment.');
         Http::assertNothingSent();

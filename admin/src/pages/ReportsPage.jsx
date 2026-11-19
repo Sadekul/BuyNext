@@ -129,6 +129,9 @@ function SalesReport({ range }) {
   if (sales.isPending) return <Loading label="Loading sales…" />
   if (sales.error) return <ErrorState error={sales.error} onRetry={sales.refetch} />
   const { totals, series } = sales.data
+  // Phase 12 §5: the totals are in the store currency only; orders in other currencies are listed on their own, never added in.
+  const currency = sales.data.currency ?? undefined
+  const others = sales.data.otherCurrencies ?? []
   return (
     <section aria-labelledby="sales-title" aria-busy={sales.isFetching}>
       <header className="panel__header report__header">
@@ -137,20 +140,72 @@ function SalesReport({ range }) {
       </header>
       {/* One hero number, then the parts it's made of. No deltas: there is no comparison period. */}
       <dl className="stats">
-        <StatTile hero label="Net revenue" value={formatMoneyCompact(totals.net)} note={`${formatCount(totals.orders)} orders · after discounts and refunds`} />
-        <StatTile label="Gross sales" value={formatMoneyCompact(totals.gross)} />
-        <StatTile label="Discounts" value={formatMoneyCompact(totals.discounts)} />
-        <StatTile label="Refunds" value={formatMoneyCompact(totals.refunds)} />
-        <StatTile label="Shipping" value={formatMoneyCompact(totals.shipping)} />
-        <StatTile label="Average order" value={formatMoney(totals.averageOrder)} />
+        <StatTile
+          hero
+          label="Net revenue"
+          value={formatMoneyCompact(totals.net, currency)}
+          note={`${formatCount(totals.orders)} orders · after discounts and refunds${others.length > 0 ? ` · ${currency ?? 'store currency'} orders only` : ''}`}
+        />
+        <StatTile label="Gross sales" value={formatMoneyCompact(totals.gross, currency)} />
+        <StatTile label="Discounts" value={formatMoneyCompact(totals.discounts, currency)} />
+        <StatTile label="Refunds" value={formatMoneyCompact(totals.refunds, currency)} />
+        <StatTile label="Shipping" value={formatMoneyCompact(totals.shipping, currency)} />
+        <StatTile label="Average order" value={formatMoney(totals.averageOrder, currency)} />
         <StatTile label="Units sold" value={formatCount(totals.units)} />
       </dl>
+      {others.length > 0 && <OtherCurrencies rows={others} currency={currency} />}
       <section className="panel panel--spaced" aria-labelledby="net-chart-title">
         <header className="panel__header">
           <h3 id="net-chart-title">Net revenue by {range.groupBy}</h3>
         </header>
         {series.length === 0 ? <Empty>No sales in this period.</Empty> : <NetChart series={series} groupBy={range.groupBy} />}
       </section>
+    </section>
+  )
+}
+
+/** Phase 12 §5: orders of the period in other currencies (placed before the store switched), per currency. */
+function OtherCurrencies({ rows, currency }) {
+  return (
+    <section className="panel panel--spaced" aria-labelledby="other-currencies-title">
+      <header className="panel__header">
+        <h3 id="other-currencies-title">Orders in other currencies</h3>
+      </header>
+      <p className="field__hint panel__note">
+        Not in the totals above{currency ? ` (${currency})` : ''}: amounts in different currencies are never added together.
+      </p>
+      <div className="table-wrap" role="region" aria-label="Amounts by currency" tabIndex={0}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Currency</th>
+              <th scope="col" className="num">
+                Orders
+              </th>
+              <th scope="col" className="num">
+                Gross
+              </th>
+              <th scope="col" className="num">
+                Refunds
+              </th>
+              <th scope="col" className="num">
+                Net
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.currency}>
+                <th scope="row">{row.currency}</th>
+                <td className="num">{formatCount(row.orders)}</td>
+                <td className="num">{formatMoney(row.gross, row.currency)}</td>
+                <td className="num">{formatMoney(row.refunds, row.currency)}</td>
+                <td className="num">{formatMoney(row.net, row.currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }

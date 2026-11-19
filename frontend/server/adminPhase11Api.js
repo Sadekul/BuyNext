@@ -87,7 +87,7 @@ const isBoolean = (message) => (value) => (typeof value === 'boolean' ? null : m
 const wholeNumber = (min, max, message) => (value) => (Number.isInteger(value) && value >= min && value <= max ? null : message)
 export const REWARD_SETTING_RULES = {
   enabled: isBoolean('Choose whether reward points are on.'),
-  earnRate: (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1000 && decimals(value, 2) ? null : 'Enter the points per $1.00 from 0 to 1,000, with at most 2 decimals.'),
+  earnRate: (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1000 && decimals(value, 2) ? null : 'Enter the points per 1.00 of the store currency from 0 to 1,000, with at most 2 decimals.'),
   pointValue: (value) => (typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 100 && decimals(value, 4) ? null : 'Enter the value of one point, above 0 and up to 100, with at most 4 decimals.'),
   minRedeem: wholeNumber(0, 1_000_000, 'Enter a whole number of points from 0 to 1,000,000.'),
   maxPercent: wholeNumber(1, 100, 'Enter a whole percentage from 1 to 100.'),
@@ -123,7 +123,7 @@ export function validateCurrency(body, { partial }) {
   }
   if (need('rate')) {
     if (typeof body.rate === 'number' && Number.isFinite(body.rate) && body.rate >= 0 && body.rate <= 1_000_000_000 && decimals(body.rate, 8)) values.rate = body.rate
-    else errors.rate = ['Enter how many units make 1 USD (0 or more, at most 8 decimals).']
+    else errors.rate = ['Enter how many units make 1 of the store currency (0 or more, at most 8 decimals).']
   }
   if (need('decimals')) {
     if (Number.isInteger(body.decimals) && body.decimals >= 0 && body.decimals <= 3) values.decimals = body.decimals

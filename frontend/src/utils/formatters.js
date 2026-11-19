@@ -1,10 +1,5 @@
 import { STORE_SETTINGS } from '../constants/store'
-import { getDisplayCurrency } from './displayCurrency'
-
-const currencyFormatter = new Intl.NumberFormat(STORE_SETTINGS.locale, {
-  style: 'currency',
-  currency: STORE_SETTINGS.currency,
-})
+import { getDisplayCurrency, getStoreCurrency, sanitizeStoreCurrency } from './displayCurrency'
 
 /*
  * Prices: ONE formatter for every shopper-facing price (phase 11 §5).
@@ -13,12 +8,37 @@ const currencyFormatter = new Intl.NumberFormat(STORE_SETTINGS.locale, {
  *   formatBasePrice(amount)  always the base currency: what is CHARGED. Used
  *                            by checkout, orders, invoices, and gift cards.
  * With no display currency chosen (the default, and always in the demo) the two are the same.
+ *
+ * Phase 12: the base currency is the STORE currency (GET /store `currency`:
+ * USD, or BDT → "৳1,250.00"), USD until the settings load. Money that
+ * belongs to an order (or an invoice, a refund, a gift card) is written in
+ * ITS currency: formatBasePrice(amount, order.currency), so an old USD
+ * order still reads "$" after the store switched to taka.
  */
 
-/** Formats a base-currency amount as a localized price, e.g. 1099.99 → "$1,099.99". */
-export function formatBasePrice(amount) {
-  return currencyFormatter.format(amount)
+/** The currency to write money in: the given one (an order's code), else the store currency. */
+function chargedCurrency(currency) {
+  const own = currency ? sanitizeStoreCurrency(currency) : null
+  const storeCurrency = getStoreCurrency()
+  // The store's own code keeps the store's symbol and decimals from the settings.
+  if (!own || own.code === storeCurrency.code) return storeCurrency
+  return own
 }
+
+/**
+ * Formats an amount in the currency it was charged in, e.g. 1099.99 → "$1,099.99"
+ * (or "৳1,099.99" in a taka store). `currency` (optional): a code or
+ * { code, symbol, decimals }, for an order's own money; the store currency otherwise.
+ */
+export function formatBasePrice(amount, currency) {
+  return formatInCurrency(amount, { ...chargedCurrency(currency), rate: 1 })
+}
+
+/** A formatter bound to one currency (an order's), for components that take `format`. */
+export const moneyFormatter = (currency) => (amount) => formatBasePrice(amount, currency)
+
+/** The code of what is charged: the given currency's, else the store's ("USD" until the settings load). */
+export const chargedCurrencyCode = (currency) => chargedCurrency(currency).code
 
 const displayFormatters = new Map()
 function displayFormatter(currency) {
@@ -56,7 +76,7 @@ export function formatInCurrency(amount, currency) {
 /** Formats a price for display: the shopper's chosen currency, or the base currency, e.g. 1099.99 → "$1,099.99". */
 export function formatPrice(amount) {
   const currency = getDisplayCurrency()
-  return currency ? formatInCurrency(amount, currency) : currencyFormatter.format(amount)
+  return currency ? formatInCurrency(amount, currency) : formatBasePrice(amount)
 }
 
 const dateFormatter = new Intl.DateTimeFormat(STORE_SETTINGS.locale, { dateStyle: 'medium' })

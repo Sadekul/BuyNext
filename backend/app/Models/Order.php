@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Pricing;
+use App\Support\Currency;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'tax_total', 'grand_total', 'shipping_address', 'billing_address', 'placed_at',
     'gift_card_id', 'gift_card_amount', // phase 10 (part B)
     'reward_points_spent', 'reward_points_amount', 'reward_points_earned', // phase 11
+    'currency', // phase 12
 ])]
 class Order extends Model
 {
@@ -30,7 +32,8 @@ class Order extends Model
     /** closed = fully refunded (final); only a credit memo gets an order there. */
     public const STATUSES = ['pending_payment', 'processing', 'shipped', 'delivered', 'cancelled', 'closed'];
 
-    public const PAYMENT_STATUSES = ['unpaid', 'paid', 'partially_refunded', 'refunded'];
+    /** Phase 12: review = an online payment was taken but flagged as risky (SSLCommerz risk level 1): staff approve it (invoice) or cancel. */
+    public const PAYMENT_STATUSES = ['unpaid', 'review', 'paid', 'partially_refunded', 'refunded'];
 
     /** Phase 6: storefront checkout, or staff creating the order in the admin. */
     public const SOURCES = ['storefront', 'admin'];
@@ -75,6 +78,7 @@ class Order extends Model
             'reward_points_spent' => 'integer',
             'reward_points_amount' => 'decimal:2',
             'reward_points_earned' => 'integer',
+            'payment_details' => 'array', // phase 12: SSLCommerz's transaction details
         ];
     }
 
@@ -119,6 +123,18 @@ class Order extends Model
     {
         return max(0, Pricing::toCents($this->grand_total) - Pricing::toCents($this->gift_card_amount ?? 0)
             - Pricing::toCents($this->reward_points_amount ?? 0));
+    }
+
+    /** Phase 12: the order's currency code (USD for orders placed before phase 12). */
+    public function currencyCode(): string
+    {
+        return strtoupper((string) ($this->currency ?: 'USD'));
+    }
+
+    /** Phase 12: an amount of this order as a person reads it ("৳1,250.00"). */
+    public function money(string|int|float|null $amount): string
+    {
+        return Currency::format($amount, $this->currencyCode());
     }
 
     public function returns(): HasMany

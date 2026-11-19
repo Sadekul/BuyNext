@@ -22,6 +22,12 @@ class OrderStatusMail extends Mailable
 
     public function __construct(public Order $order, public ?string $note = null) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->order->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'order_status';

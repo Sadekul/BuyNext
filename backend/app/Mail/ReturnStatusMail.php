@@ -23,6 +23,12 @@ class ReturnStatusMail extends Mailable
 
     public function __construct(public OrderReturn $return) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->return->order?->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'return_status';

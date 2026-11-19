@@ -1,5 +1,5 @@
 @php
-    $money = \App\Services\DocumentPdfs::money(...);
+    $money = fn ($amount) => \App\Services\DocumentPdfs::money($amount, $currency ?? null);
     $positive = \App\Services\DocumentPdfs::positive(...);
     // Keys shown elsewhere in this table, or not money.
     $known = ['item_count', 'subtotal', 'discount', 'shipping', 'tax', 'total', 'gift_card', 'reward_points', 'amount_due', 'paid', 'refunded'];

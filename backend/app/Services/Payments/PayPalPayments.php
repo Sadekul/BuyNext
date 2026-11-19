@@ -12,6 +12,7 @@ use App\Services\Audit;
 use App\Services\OrderDocuments;
 use App\Services\Pricing;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -47,15 +48,31 @@ class PayPalPayments
         private Settings $settings,
     ) {}
 
+    /** New PayPal payments: credentials set, and (phase 12) PayPal accepts the store currency. */
     public function enabled(): bool
     {
-        return $this->gateway->enabled();
+        return $this->gateway->enabled() && Currency::paypalAccepts();
     }
 
-    /** For GET /api/v1/store: "paypal" (pay online) or "manual" (staff invoice PayPal orders). */
+    /** For GET /api/v1/store: "paypal" (pay online), "manual" (staff invoice PayPal orders), or (phase 12) "unavailable" (PayPal doesn't take the store currency). */
     public function paypalPayments(): string
     {
-        return $this->enabled() ? 'paypal' : 'manual';
+        return match (true) {
+            ! Currency::paypalAccepts() => 'unavailable',
+            $this->enabled() => 'paypal',
+            default => 'manual',
+        };
+    }
+
+    /** Phase 12: for Settings → Payment methods: { status: live|sandbox|not_configured|unavailable, message }. */
+    public function status(): array
+    {
+        return match (true) {
+            ! Currency::paypalAccepts() => ['status' => 'unavailable', 'message' => 'Not available in '.Currency::store()],
+            ! $this->gateway->enabled() => ['status' => 'not_configured', 'message' => 'Not configured: set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET'],
+            $this->gateway->live() => ['status' => 'live', 'message' => 'Live'],
+            default => ['status' => 'sandbox', 'message' => 'Sandbox'],
+        };
     }
 
     public function usesPayPal(Order $order): bool
@@ -72,6 +89,7 @@ class PayPalPayments
     public function payProblem(Order $order): ?string
     {
         return match (true) {
+            ! Currency::paypalAccepts() => 'PayPal doesn\'t accept '.Currency::store().', so it isn\'t available in this store.', // phase 12
             ! $this->enabled() => 'Online PayPal payments aren\'t available right now. We\'ll contact you about the payment.',
             $order->payment_method !== 'paypal' => 'This order isn\'t paid with PayPal.',
             $order->payment_status !== 'unpaid' => 'This order has already been paid.',
@@ -109,7 +127,7 @@ class PayPalPayments
                         'reference_id' => $order->number,
                         'custom_id' => $order->number,
                         'description' => mb_substr("{$storeName} order {$order->number}", 0, 127),
-                        'amount' => ['currency_code' => $this->gateway->currency(), 'value' => Pricing::format($order->dueCents())],
+                        'amount' => ['currency_code' => $order->currencyCode(), 'value' => Pricing::format($order->dueCents())],
                     ]],
                     'payment_source' => ['paypal' => ['experience_context' => [
                         'brand_name' => mb_substr($storeName, 0, 127),
@@ -225,13 +243,13 @@ class PayPalPayments
         if ($order->payment_provider !== 'paypal' || ! $order->payment_reference) {
             return null;
         }
-        if (! $this->enabled()) {
+        if (! $this->gateway->enabled()) { // phase 12: old PayPal orders can still be refunded after a currency switch
             throw ValidationException::withMessages(['refund' => 'PayPal refused the refund: PayPal payments are not set up (PAYPAL_CLIENT_ID is empty).']);
         }
 
         try {
             $refund = $this->gateway->refundCapture($order->payment_reference, Pricing::format($cents),
-                "memo-order-{$order->id}-{$memoNumber}-{$cents}", "Refund for order {$order->number}");
+                "memo-order-{$order->id}-{$memoNumber}-{$cents}", "Refund for order {$order->number}", $order->currencyCode());
         } catch (PayPalException $e) {
             throw ValidationException::withMessages(['refund' => 'PayPal refused the refund: '.$e->getMessage()]);
         }
@@ -309,7 +327,7 @@ class PayPalPayments
                 return 'skipped';
             }
 
-            if ($this->enabled() && $order->payment_session_id) {
+            if ($this->gateway->enabled() && $order->payment_session_id) {
                 try {
                     $paypalOrder = $this->gateway->getOrder($order->payment_session_id);
                     if (($paypalOrder['status'] ?? null) === 'COMPLETED' && ($capture = $this->captureOf($paypalOrder))) {
@@ -383,7 +401,7 @@ class PayPalPayments
         $status = $capture['status'] ?? null;
         $amount = Pricing::toCents((string) ($capture['amount']['value'] ?? '-0.01'));
         $currency = strtoupper((string) ($capture['amount']['currency_code'] ?? ''));
-        $paidText = '$'.Pricing::format(max(0, $amount)).' '.$currency;
+        $paidText = Currency::formatCents(max(0, $amount), $currency ?: $order->currencyCode()).' '.$currency;
 
         if ($order->payment_status !== 'unpaid' || $order->invoices()->exists()) {
             if ($order->payment_reference !== null && $order->payment_reference === $captureId) {
@@ -406,13 +424,13 @@ class PayPalPayments
         if ($status !== 'COMPLETED' || $captureId === null) {
             return 'declined';
         }
-        if ($amount !== $order->dueCents() || $currency !== $this->gateway->currency()) {
+        if ($amount !== $order->dueCents() || $currency !== $order->currencyCode()) { // phase 12: the order's currency
             Log::warning('PayPal payment does not match the order.', [
                 'order' => $order->number, 'capture' => $captureId, 'amount' => $amount, 'currency' => $currency,
-                'expected_amount' => $order->dueCents(), 'expected_currency' => $this->gateway->currency(),
+                'expected_amount' => $order->dueCents(), 'expected_currency' => $order->currencyCode(),
             ]);
             $this->problem($order, "Payment amount mismatch on order {$order->number}",
-                "PayPal reported {$paidText} (capture {$captureId}) but the amount due is \$".Pricing::format($order->dueCents()).' '.$this->gateway->currency()
+                "PayPal reported {$paidText} (capture {$captureId}) but the amount due is ".$order->money(Pricing::format($order->dueCents())).' '.$order->currencyCode()
                 .'. The order was left unpaid: check the payment in the PayPal dashboard.');
             $order->history()->create([
                 'status' => $order->status,
@@ -493,7 +511,7 @@ class PayPalPayments
         }
 
         $what = $type === 'PAYMENT.CAPTURE.REVERSED' ? 'reversed' : 'refunded';
-        $amount = isset($refund['amount']['value']) ? '$'.$refund['amount']['value'].' '.($refund['amount']['currency_code'] ?? '') : 'Money';
+        $amount = isset($refund['amount']['value']) ? Currency::format($refund['amount']['value'], $refund['amount']['currency_code'] ?? $order->currencyCode()).' '.($refund['amount']['currency_code'] ?? '') : 'Money';
         $this->problem($order, "PayPal payment {$what} for order {$order->number}",
             "{$amount} was {$what} in PayPal outside BuyNest (".($refund['id'] ?? 'no id').'). '
             .'If the money went back to the customer, record a credit memo (refund) on the order so the books match.');

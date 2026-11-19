@@ -32,7 +32,8 @@ export function PdfLink({ href, name, small = false }) {
   )
 }
 
-const invoiceAuthor = (invoice) => invoice.adminName ?? (/Stripe/.test(invoice.note ?? '') ? 'Stripe' : 'System')
+// Phase 10 and 12: PayPal and SSLCommerz record theirs the same way.
+const invoiceAuthor = (invoice) => invoice.adminName ?? (['SSLCommerz', 'PayPal', 'Stripe'].find((provider) => (invoice.note ?? '').includes(provider)) ?? 'System')
 
 function useListParams() {
   const [params, setParams] = useSearchParams()
@@ -108,7 +109,7 @@ export function InvoicesPage() {
                   <td>{invoice.orderNumber && <Link to={`/orders/${invoice.orderNumber}`}>{invoice.orderNumber}</Link>}</td>
                   <td>{formatDate(invoice.createdAt)}</td>
                   <td className="muted">{invoiceAuthor(invoice)}</td>
-                  <td className="num">{formatMoney(invoice.amount)}</td>
+                  <td className="num">{formatMoney(invoice.amount, invoice.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -155,7 +156,7 @@ export function InvoiceDetailPage() {
       </Link>
       <PageHeader
         title={`Invoice ${data.number}`}
-        description={`${formatMoney(data.amount)} · ${formatDateTime(data.createdAt)} · by ${invoiceAuthor(data)}`}
+        description={`${formatMoney(data.amount, data.currency)} · ${formatDateTime(data.createdAt)} · by ${invoiceAuthor(data)}`}
         actions={
           <>
             <PdfLink href={invoicePdfUrl(data.number)} name={`invoice ${data.number}`} />
@@ -193,9 +194,9 @@ export function InvoiceDetailPage() {
                   <td>
                     {item.title} {item.variantLabel && `(${item.variantLabel}) `}<small className="muted">· {item.sku}</small>
                   </td>
-                  <td className="num">{formatMoney(item.salePrice)}</td>
+                  <td className="num">{formatMoney(item.salePrice, data.currency)}</td>
                   <td className="num">{formatCount(item.quantity)}</td>
-                  <td className="num">{formatMoney(item.lineTotal)}</td>
+                  <td className="num">{formatMoney(item.lineTotal, data.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -205,34 +206,34 @@ export function InvoiceDetailPage() {
                   <th scope="row" colSpan={3}>
                     Subtotal
                   </th>
-                  <td className="num">{formatMoney(data.totals.subtotal)}</td>
+                  <td className="num">{formatMoney(data.totals.subtotal, data.currency)}</td>
                 </tr>
                 {data.totals.discount > 0 && (
                   <tr>
                     <th scope="row" colSpan={3}>
                       Discount
                     </th>
-                    <td className="num">−{formatMoney(data.totals.discount)}</td>
+                    <td className="num">−{formatMoney(data.totals.discount, data.currency)}</td>
                   </tr>
                 )}
                 <tr>
                   <th scope="row" colSpan={3}>
                     Shipping
                   </th>
-                  <td className="num">{formatMoney(data.totals.shipping)}</td>
+                  <td className="num">{formatMoney(data.totals.shipping, data.currency)}</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={3}>
                     Tax
                   </th>
-                  <td className="num">{formatMoney(data.totals.tax)}</td>
+                  <td className="num">{formatMoney(data.totals.tax, data.currency)}</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={3}>
                     Invoiced
                   </th>
                   <td className="num">
-                    <strong>{formatMoney(data.amount)}</strong>
+                    <strong>{formatMoney(data.amount, data.currency)}</strong>
                   </td>
                 </tr>
               </tfoot>
@@ -301,7 +302,7 @@ export function CreditMemosPage() {
                   <td>
                     <StatusBadge {...restockBadge(memo.restocked)} />
                   </td>
-                  <td className="num">{formatMoney(memo.total)}</td>
+                  <td className="num">{formatMoney(memo.total, memo.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -327,7 +328,7 @@ export function CreditMemoDetailPage() {
       </Link>
       <PageHeader
         title={`Credit memo ${data.number}`}
-        description={`${formatMoney(data.total)} refunded · ${formatDateTime(data.createdAt)}${data.adminName ? ` · by ${data.adminName}` : ''}`}
+        description={`${formatMoney(data.total, data.currency)} refunded · ${formatDateTime(data.createdAt)}${data.adminName ? ` · by ${data.adminName}` : ''}`}
         actions={
           <>
             <StatusBadge {...restockBadge(data.restocked)} />
@@ -371,7 +372,7 @@ export function CreditMemoDetailPage() {
                     {item.name} {item.variantLabel && `(${item.variantLabel}) `}{item.sku && <small className="muted">· {item.sku}</small>}
                   </td>
                   <td className="num">{formatCount(item.quantity)}</td>
-                  <td className="num">{formatMoney(item.amount)}</td>
+                  <td className="num">{formatMoney(item.amount, data.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -380,26 +381,26 @@ export function CreditMemoDetailPage() {
                 <th scope="row" colSpan={2}>
                   Items
                 </th>
-                <td className="num">{formatMoney(data.subtotal ?? 0)}</td>
+                <td className="num">{formatMoney(data.subtotal ?? 0, data.currency)}</td>
               </tr>
               <tr>
                 <th scope="row" colSpan={2}>
                   Shipping refund
                 </th>
-                <td className="num">{formatMoney(data.shippingRefund)}</td>
+                <td className="num">{formatMoney(data.shippingRefund, data.currency)}</td>
               </tr>
               <tr>
                 <th scope="row" colSpan={2}>
                   Adjustment
                 </th>
-                <td className="num">{data.adjustment < 0 ? `−${formatMoney(-data.adjustment)} (fee kept)` : formatMoney(data.adjustment)}</td>
+                <td className="num">{data.adjustment < 0 ? `−${formatMoney(-data.adjustment, data.currency)} (fee kept)` : formatMoney(data.adjustment, data.currency)}</td>
               </tr>
               <tr>
                 <th scope="row" colSpan={2}>
                   Total refunded
                 </th>
                 <td className="num">
-                  <strong>{formatMoney(data.total)}</strong>
+                  <strong>{formatMoney(data.total, data.currency)}</strong>
                 </td>
               </tr>
               {/* Phase 11 §4: points went back first; earned points were taken back. */}
@@ -408,7 +409,7 @@ export function CreditMemoDetailPage() {
                   <th scope="row" colSpan={2}>
                     Returned as reward points ({formatPoints(data.rewardPointsReturned)})
                   </th>
-                  <td className="num">{formatMoney(data.rewardPointsRefund ?? 0)}</td>
+                  <td className="num">{formatMoney(data.rewardPointsRefund ?? 0, data.currency)}</td>
                 </tr>
               )}
               {data.rewardPointsReversed > 0 && (
@@ -425,7 +426,7 @@ export function CreditMemoDetailPage() {
                   <th scope="row" colSpan={2}>
                     Returned to gift card
                   </th>
-                  <td className="num">{formatMoney(data.giftCardRefund)}</td>
+                  <td className="num">{formatMoney(data.giftCardRefund, data.currency)}</td>
                 </tr>
               )}
               {(data.giftCardRefund > 0 || data.rewardPointsRefund > 0) && (
@@ -433,7 +434,7 @@ export function CreditMemoDetailPage() {
                   <th scope="row" colSpan={2}>
                     Refunded by the other payment method
                   </th>
-                  <td className="num">{formatMoney(data.otherRefund ?? Math.round((data.total - (data.giftCardRefund ?? 0) - (data.rewardPointsRefund ?? 0)) * 100) / 100)}</td>
+                  <td className="num">{formatMoney(data.otherRefund ?? Math.round((data.total - (data.giftCardRefund ?? 0) - (data.rewardPointsRefund ?? 0)) * 100) / 100, data.currency)}</td>
                 </tr>
               )}
             </tfoot>

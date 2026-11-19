@@ -455,7 +455,7 @@ function OrdersTab({ customer }) {
                 </td>
                 <td>{order.paymentStatus && <StatusBadge {...paymentStatus(order.paymentStatus)} />}</td>
                 <td>{orderSource(order.source).label}</td>
-                <td className="num">{formatMoney(order.total ?? 0)}</td>
+                <td className="num">{formatMoney(order.total ?? 0, order.currency)}</td>
               </tr>
             ))}
           </tbody>

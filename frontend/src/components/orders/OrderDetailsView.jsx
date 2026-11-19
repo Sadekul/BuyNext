@@ -6,9 +6,9 @@ import OrderStatus from './OrderStatus'
 import OrderStatusBadge from './OrderStatusBadge'
 import OrderTotals from './OrderTotals'
 import InvoicePdfButton from './InvoicePdfButton'
-import { PAYMENT_METHODS } from '../../constants/store'
+import { ALL_PAYMENT_METHODS } from '../../constants/store'
 import { paymentNote } from '../../constants/orders'
-import { formatDate, formatBasePrice } from '../../utils/formatters'
+import { formatDate, moneyFormatter } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import './OrderDetailsView.css'
@@ -66,7 +66,7 @@ function Shipments({ shipments }) {
  * may open it (customers, not guests). `invoicePdf` (phase 10): the order's
  * proof for the PDF download ({ email } for a guest, {} for the customer).
  */
-function Invoices({ invoices, invoiceLink, invoicePdf }) {
+function Invoices({ invoices, invoiceLink, invoicePdf, formatBasePrice }) {
   if (!invoices?.length) return null
   return (
     <>
@@ -93,7 +93,7 @@ function Invoices({ invoices, invoiceLink, invoicePdf }) {
   )
 }
 
-function Refunds({ creditMemos }) {
+function Refunds({ creditMemos, formatBasePrice }) {
   if (!creditMemos?.length) return null
   return (
     <>
@@ -129,7 +129,9 @@ function Refunds({ creditMemos }) {
 const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card', reward_points: 'Reward points' }
 
 function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = null }) {
-  const payment = PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
+  const payment = ALL_PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
+  // Phase 12: the order's money in the currency it was charged in (older orders: USD), not today's store currency.
+  const formatBasePrice = moneyFormatter(order.currency)
   // Phase 8: whether card orders are paid through Stripe (cached store settings only: no extra request).
   const { settings } = useStoreSettings({ enabled: false })
   const contact = order.contact ?? { email: order.email, phone: order.phone }
@@ -177,7 +179,7 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
                 <strong>{payment?.label ?? order.paymentMethod}</strong>
                 <OrderStatusBadge status={order.paymentStatus} payment />
               </p>
-              <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe', paypal: settings.paypalPayments === 'paypal' })}</p>
+              <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe', paypal: settings.paypalPayments === 'paypal', sslcommerz: settings.sslcommerzPayments === 'sslcommerz' })}</p>
               {/* Phase 10: the gift card that paid part (or all) of it: its last 4 characters only. */}
               {order.giftCard?.applied > 0 && (
                 <p className="order-view__muted">
@@ -200,8 +202,8 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
           )}
           <h3 className="order-view__subheading">Billing address</h3>
           <AddressBlock address={order.billingAddress} />
-          <Invoices invoices={order.invoices} invoiceLink={invoiceLink} invoicePdf={invoicePdf} />
-          <Refunds creditMemos={order.creditMemos} />
+          <Invoices invoices={order.invoices} invoiceLink={invoiceLink} invoicePdf={invoicePdf} formatBasePrice={formatBasePrice} />
+          <Refunds creditMemos={order.creditMemos} formatBasePrice={formatBasePrice} />
         </section>
       </div>
 
@@ -209,7 +211,7 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
         <h2 id="order-items-title" className="cart-summary__title">
           Items
         </h2>
-        <OrderItems items={order.items} />
+        <OrderItems items={order.items} currency={order.currency} />
         <OrderTotals
           totals={order.totals}
           couponCode={order.couponCode ?? order.totals.couponCode}
@@ -217,6 +219,7 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
           shippingLabel={order.shippingMethod?.label}
           requiresShipping={order.requiresShipping !== false}
           rewardPointsSpent={order.rewardPointsSpent ?? null}
+          currency={order.currency}
         />
         {order.verification && (
           <p className="cart-summary__note">

@@ -32,6 +32,7 @@ class InvoiceResource extends JsonResource
             'number' => $this->number,
             'order_number' => $order->number,
             'amount' => $this->amount,
+            'currency' => $order->currencyCode(), // phase 12
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'admin_name' => $this->forCustomer ? null : $this->admin?->name,
             'note' => $this->forCustomer && ! $this->customer_notified ? null : $this->note,

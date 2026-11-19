@@ -25,6 +25,8 @@ import { TWO_STEP_SESSION_ROUTES, matchSecurityRoute } from './adminSecurityApi.
 import { matchPhase10Route } from './adminPhase10Api.js'
 // Phase 11: a customer's wishlist and points, reports, currencies; product specifications and links (adminPhase11Api.js).
 import { cleanSpecifications, linksProblem, matchPhase11Route, specificationsProblem } from './adminPhase11Api.js'
+// Phase 12: Check payment on an SSLCommerz order (adminPhase12Api.js).
+import { matchPhase12Route } from './adminPhase12Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -630,6 +632,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 12: orders/:number/payment/check.
+  const phase12 = matchPhase12Route(method, segments)
+  if (phase12 !== undefined) return phase12
   // Phase 11: customers/:id/wishlist, customers/:id/rewards[/adjust], reports/wishlist|reward-points, currencies[/…].
   const phase11 = matchPhase11Route(method, segments)
   if (phase11 !== undefined) return phase11

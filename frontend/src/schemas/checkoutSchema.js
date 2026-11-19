@@ -31,6 +31,22 @@ export const createAddressSchema = (countries) => z.object({
 
 export const addressSchema = createAddressSchema(COUNTRIES)
 
+const PHONE = /^\+?[0-9 ()-]{7,20}$/
+
+/** Phase 12: what a shopper paying through SSLCommerz is told without a phone number. */
+export const SSLCOMMERZ_PHONE_MESSAGE = 'Enter a phone number: SSLCommerz needs one for bKash, Nagad, and card payments.'
+
+/**
+ * The phone number is needed for delivery updates; with SSLCommerz (phase 12)
+ * the payment page needs it as well, and an empty field says so.
+ */
+function checkPhone(data, ctx) {
+  const phone = typeof data.phone === 'string' ? data.phone : ''
+  if (PHONE.test(phone)) return
+  const message = phone === '' && data.paymentMethod === 'sslcommerz' ? SSLCOMMERZ_PHONE_MESSAGE : 'Enter a valid phone number.'
+  ctx.addIssue({ code: 'custom', message, path: ['phone'] })
+}
+
 /**
  * The checkout rules for one store's settings: only its countries, delivery
  * options, and payment methods are accepted (REAL_SHOP: the server's
@@ -45,27 +61,25 @@ export function createCheckoutSchema({
 } = {}) {
   const storeAddressSchema = createAddressSchema(countries)
   if (!requiresShipping) {
-    return z.object({
-      email: z.email('Enter a valid email address.'),
-      phone: z
-        .string({ error: 'Enter a valid phone number.' })
-        .trim()
-        .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a valid phone number.'),
-      shipping: z.any(),
-      billingSameAsShipping: z.any(),
-      billing: storeAddressSchema,
-      shippingMethod: z.any(),
-      paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
-      saveAddress: z.boolean().optional(),
-    })
+    return z
+      .object({
+        email: z.email('Enter a valid email address.'),
+        // Checked with the payment method below (phase 12: SSLCommerz says why it needs one).
+        phone: z.string({ error: 'Enter a valid phone number.' }).trim(),
+        shipping: z.any(),
+        billingSameAsShipping: z.any(),
+        billing: storeAddressSchema,
+        shippingMethod: z.any(),
+        paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
+        saveAddress: z.boolean().optional(),
+      })
+      .superRefine(checkPhone)
   }
   return z
     .object({
       email: z.email('Enter a valid email address.'),
-      phone: z
-        .string({ error: 'Enter a valid phone number.' })
-        .trim()
-        .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a valid phone number.'),
+      // Checked with the payment method below (phase 12: SSLCommerz says why it needs one).
+      phone: z.string({ error: 'Enter a valid phone number.' }).trim(),
       shipping: storeAddressSchema,
       billingSameAsShipping: z.boolean(),
       billing: z.any(), // validated below, only when it's a separate address
@@ -76,6 +90,7 @@ export function createCheckoutSchema({
     })
     // Conditional rule: the billing address is required only when it differs.
     .superRefine((data, ctx) => {
+      checkPhone(data, ctx)
       if (data.billingSameAsShipping) return
       const result = storeAddressSchema.safeParse(data.billing)
       if (result.success) return

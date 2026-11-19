@@ -183,9 +183,9 @@ export function InvoicesPrintPage() {
                     {item.variantLabel && <small className="muted"> · {item.variantLabel}</small>}
                     <small className="muted"> · {item.sku}</small>
                   </td>
-                  <td className="num">{formatMoney(item.salePrice)}</td>
+                  <td className="num">{formatMoney(item.salePrice, data.currency)}</td>
                   <td className="num">{formatCount(item.quantity)}</td>
-                  <td className="num">{formatMoney(item.lineTotal)}</td>
+                  <td className="num">{formatMoney(item.lineTotal, data.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -195,34 +195,34 @@ export function InvoicesPrintPage() {
                   <th scope="row" colSpan={3}>
                     Subtotal
                   </th>
-                  <td className="num">{formatMoney(data.totals.subtotal)}</td>
+                  <td className="num">{formatMoney(data.totals.subtotal, data.currency)}</td>
                 </tr>
                 {data.totals.discount > 0 && (
                   <tr>
                     <th scope="row" colSpan={3}>
                       Discount
                     </th>
-                    <td className="num">−{formatMoney(data.totals.discount)}</td>
+                    <td className="num">−{formatMoney(data.totals.discount, data.currency)}</td>
                   </tr>
                 )}
                 <tr>
                   <th scope="row" colSpan={3}>
                     Shipping
                   </th>
-                  <td className="num">{formatMoney(data.totals.shipping)}</td>
+                  <td className="num">{formatMoney(data.totals.shipping, data.currency)}</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={3}>
                     Tax
                   </th>
-                  <td className="num">{formatMoney(data.totals.tax)}</td>
+                  <td className="num">{formatMoney(data.totals.tax, data.currency)}</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={3}>
                     Total paid
                   </th>
                   <td className="num">
-                    <strong>{formatMoney(data.amount)}</strong>
+                    <strong>{formatMoney(data.amount, data.currency)}</strong>
                   </td>
                 </tr>
               </tfoot>

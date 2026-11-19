@@ -15,7 +15,8 @@ import { handleClientErrorRequest } from './clientErrorsApi.js'
  *   /api/admin/*    admin service, admins only (adminApi.js)
  *   /api/catalog/*  public product catalog, read-only (catalogApi.js)
  *   /api/shop/*     cart pricing and orders, guests too (shopApi.js)
- *   /api/payments/* payment provider webhooks (Stripe, PayPal), server to server (paymentsApi.js)
+ *   /api/payments/* payment provider webhooks (Stripe, PayPal, SSLCommerz IPN), server to server, and
+ *                   SSLCommerz's return trip (a cross-site form POST from the shopper's browser → 303) (paymentsApi.js)
  *   /api/client-errors  browser error reports from the store and the admin (clientErrorsApi.js)
  */
 export async function handleApiRequest(request) {
@@ -23,7 +24,9 @@ export async function handleApiRequest(request) {
   const segments = url.pathname.split('/').filter(Boolean) // ["api", "auth", "login"]
 
   // Stripe and PayPal call their webhooks from their own servers: no browser, no cookies, no
-  // Fetch Metadata. Their signatures (checked by the API) are the protection.
+  // Fetch Metadata. Their signatures (checked by the API) are the protection. Phase 12:
+  // SSLCommerz's return is a cross-site form POST from the shopper's browser, so it must get
+  // past the cross-site check below too; it uses no cookies, and the API validates the payment.
   if (segments[0] === 'api' && segments[1] === 'payments') return handlePaymentsRequest(request, segments.slice(2))
 
   // Only BuyNest's own pages may call these services. Browsers label requests

@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\CouponRedemption;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Support\Currency;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -49,6 +50,10 @@ class Checkout
      */
     public function place(array $data, ?Customer $customer, ?Admin $admin = null, bool $notify = true): Order
     {
+        // Phase 12: SSLCommerz needs the shopper's phone number to open its payment page.
+        if (($data['payment_method'] ?? null) === 'sslcommerz' && blank($data['phone'] ?? null)) {
+            throw ValidationException::withMessages(['phone' => 'SSLCommerz needs a phone number for the payment. Add one to place this order.']);
+        }
         $order = DB::transaction(function () use ($data, $customer, $admin) {
             $quote = $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
                 lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null,
@@ -148,6 +153,7 @@ class Checkout
             'shipping_total' => Pricing::format($quote->shippingCents),
             'tax_total' => Pricing::format($quote->taxCents),
             'grand_total' => Pricing::format($quote->totalCents),
+            'currency' => Currency::store(), // phase 12: what the prices above are in
             // Phase 10 (part B): the gift card's part of the payment (taken below).
             'gift_card_id' => $quote->giftCard?->id,
             'gift_card_amount' => Pricing::format($quote->giftCardCents),
@@ -246,7 +252,7 @@ class Checkout
                     'customer_notified' => false,
                 ]);
             }
-            $this->audit->record('order.created', "Order {$order->number} created in the admin for {$order->email} (\${$order->grand_total}).",
+            $this->audit->record('order.created', "Order {$order->number} created in the admin for {$order->email} ({$order->money($order->grand_total)}).",
                 'order', $order->id, ['before' => [], 'after' => [
                     'number' => $order->number, 'email' => $order->email, 'customer_id' => $order->customer_id,
                     'payment_method' => $order->payment_method, 'grand_total' => $order->grand_total, 'source' => 'admin',

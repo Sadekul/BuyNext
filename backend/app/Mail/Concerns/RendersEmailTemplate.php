@@ -4,6 +4,7 @@ namespace App\Mail\Concerns;
 
 use App\Services\EmailTemplates;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
@@ -43,7 +44,8 @@ trait RendersEmailTemplate
 
     protected function renderedTemplate(): array
     {
-        return $this->renderedTemplate ??= app(EmailTemplates::class)->render($this->templateKey(), $this->templateValues(), layout: $this->templateLayout());
+        return $this->renderedTemplate ??= app(EmailTemplates::class)->render($this->templateKey(), $this->templateValues(),
+            layout: $this->templateLayout(), currency: $this->templateCurrency());
     }
 
     protected static function storeName(): string
@@ -51,8 +53,15 @@ trait RendersEmailTemplate
         return (string) app(Settings::class)->get('store_name');
     }
 
-    protected static function money(string|int|float|null $amount): string
+    /** Phase 12: the currency the email's amounts are in (the order's); null = the store currency. */
+    protected function templateCurrency(): ?string
     {
-        return '$'.$amount;
+        return null;
+    }
+
+    /** An amount in the email's currency ("$59.97", "৳1,250.00"). */
+    protected function money(string|int|float|null $amount): string
+    {
+        return Currency::format($amount, $this->templateCurrency());
     }
 }

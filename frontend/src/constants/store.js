@@ -2,7 +2,7 @@
 // are display-only on the frontend; the backend stays the source of truth.
 export const STORE_SETTINGS = {
   locale: 'en-US',
-  currency: 'USD',
+  currency: 'USD', // phase 12: only the fallback until the store settings load (GET /store `currency`)
   // A product shows a "sale" badge when its discount is at least this percentage.
   saleBadgeMinDiscount: 10,
 }
@@ -42,5 +42,21 @@ export const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal', description: "You'll confirm the payment in your PayPal account." },
   { id: 'cod', label: 'Cash on delivery', description: 'Pay the courier when your order arrives.' },
 ]
+
+/*
+ * Phase 12: SSLCommerz's hosted page (bKash, Nagad, Rocket, cards, internet
+ * banking). Only offered by a real store charging in taka, never in the demo
+ * (so it isn't in PAYMENT_METHODS). `badges`: the methods as plain text
+ * marks (no third-party logos fetched from elsewhere).
+ */
+export const SSLCOMMERZ_METHOD = {
+  id: 'sslcommerz',
+  label: 'bKash, Nagad or card (SSLCommerz)',
+  description: "You'll finish paying on SSLCommerz's secure page.",
+  badges: ['bKash', 'Nagad', 'Card'],
+}
+
+/** Every payment method BuyNest knows (labels for the server's ids and for orders). */
+export const ALL_PAYMENT_METHODS = [...PAYMENT_METHODS, SSLCOMMERZ_METHOD]
 
 export const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India']

@@ -12,7 +12,7 @@ import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { CategoryChecklist, GroupChecklist, ProductPicker } from '../components/RuleScope'
 import { APPLIES_TO, CART_RULE_TYPES, EMPTY_COUPON, couponName, couponSchema, couponToForm, toCouponPayload } from '../utils/couponSchema'
-import { formatCount } from '../utils/format'
+import { formatCount, storeCode } from '../utils/format'
 import { couponStatus } from '../utils/orders'
 
 /** /coupons/new and /coupons/:couponId: one form for adding and editing a code. */
@@ -154,7 +154,7 @@ function CouponForm({ couponId, initial }) {
             )}
           </Field>
           {(type === 'percent' || type === 'fixed') && (
-            <Field label={type === 'percent' ? 'Percent off' : 'Amount off (USD)'} error={errors.value?.message} hint={type === 'percent' ? '1 to 100, off the eligible products.' : 'Off the eligible products, never more than they cost.'}>
+            <Field label={type === 'percent' ? 'Percent off' : `Amount off (${storeCode()})`} error={errors.value?.message} hint={type === 'percent' ? '1 to 100, off the eligible products.' : 'Off the eligible products, never more than they cost.'}>
               {(a11y) => <input {...a11y} type="number" inputMode="decimal" min={type === 'percent' ? 1 : 0.01} max={type === 'percent' ? 100 : undefined} step={type === 'percent' ? 1 : 0.01} {...register('value')} />}
             </Field>
           )}

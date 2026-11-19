@@ -36,6 +36,7 @@ class OrderResource extends JsonResource
             'status' => $this->status,
             'payment_status' => $this->payment_status,
             'payment_method' => $this->payment_method,
+            'currency' => $this->resource->currencyCode(), // phase 12: every amount of this order is in it
             'shipping_method' => ['id' => $this->shipping_method, 'label' => $this->shipping_label, 'eta' => $this->shipping_eta],
             'email' => $this->email,
             'phone' => $this->phone,

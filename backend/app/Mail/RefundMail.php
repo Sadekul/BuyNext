@@ -14,6 +14,12 @@ class RefundMail extends Mailable
 
     public function __construct(public CreditMemo $memo) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->memo->order?->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'credit_memo';
@@ -25,12 +31,12 @@ class RefundMail extends Mailable
         $order = $memo->order;
         $totals = [];
         if ((float) $memo->shipping_refund > 0) {
-            $totals[] = ['Shipping', self::money($memo->shipping_refund)];
+            $totals[] = ['Shipping', $this->money($memo->shipping_refund)];
         }
         if ((float) $memo->adjustment != 0) {
-            $totals[] = ['Adjustment', (float) $memo->adjustment < 0 ? '-$'.ltrim($memo->adjustment, '-') : self::money($memo->adjustment)];
+            $totals[] = ['Adjustment', $this->money($memo->adjustment)];
         }
-        $totals[] = ['Refund total', self::money($memo->total), true];
+        $totals[] = ['Refund total', $this->money($memo->total), true];
 
         return [
             'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
@@ -44,7 +50,7 @@ class RefundMail extends Mailable
                 // Phase 10 (part B): what went back to the gift card first.
                 .((float) $memo->gift_card_refund > 0 ? '; $'.$memo->gift_card_refund.' back to your gift card' : ''),
             'items_table' => EmailBlocks::itemsTable(
-                $memo->items->map(fn ($item) => ["{$item->orderItem->displayName()} × {$item->quantity}", self::money($item->amount)])->all(),
+                $memo->items->map(fn ($item) => ["{$item->orderItem->displayName()} × {$item->quantity}", $this->money($item->amount)])->all(),
                 $totals,
             ),
             'note' => EmailBlocks::note($memo->note, self::storeName()),

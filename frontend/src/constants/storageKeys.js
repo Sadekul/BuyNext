@@ -20,7 +20,7 @@ export const STORAGE_KEYS = {
   // Phase 11, per browser (not per account, works in the demo too):
   compare: 'buynest.compare.v1', // the products picked for comparison (max 4)
   recentlyViewed: 'buynest.recentlyViewed.v1', // the last 12 products opened, newest first
-  currency: 'buynest.currency.v1', // the display currency the shopper chose (prices are still charged in USD)
+  currency: 'buynest.currency.v1', // the display currency the shopper chose (prices are still charged in the store currency)
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */

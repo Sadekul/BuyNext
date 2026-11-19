@@ -5,7 +5,7 @@ import { useAdminAuth } from '../auth/useAdminAuth'
 import Field from './Field'
 import FormDialog from './FormDialog'
 import { ErrorState, Loading } from './States'
-import { formatMoney } from '../utils/format'
+import { formatMoney, storeCode } from '../utils/format'
 import { CARRIERS, paidThroughProvider } from '../utils/orders'
 // Phase 11 §4: refunds settle reward points first, then the gift card, then the payment method.
 import { formatPoints, refundSplit } from '../utils/rewards'
@@ -50,7 +50,7 @@ export function InvoiceDialog({ order, onDone, onCancel }) {
     mutationFn: () => createInvoice(order.number, { note: note.trim() || undefined, notifyCustomer: notify }),
     onSuccess: ({ invoice }) => {
       const moved = order.status === 'pending_payment' ? ' The order is now processing.' : ''
-      onDone(`Invoice ${invoice.number} created: payment of ${formatMoney(invoice.amount)} recorded.${moved}${notify ? ' The customer was emailed.' : ''}`)
+      onDone(`Invoice ${invoice.number} created: payment of ${formatMoney(invoice.amount, order.currency)} recorded.${moved}${notify ? ' The customer was emailed.' : ''}`)
     },
   })
   return (
@@ -58,11 +58,14 @@ export function InvoiceDialog({ order, onDone, onCancel }) {
       isOpen
       title={`Invoice order ${order.number}`}
       description={
-        order.payment?.canPay && order.payment.provider === 'paypal'
-          ? `Records a payment of ${formatMoney(order.totals.total)}, the order total. PayPal payments are recorded by themselves when PayPal confirms them: invoice by hand only if the customer paid another way.`
+        // Phase 12 §3: SSLCommerz (bKash, Nagad, cards) records its payments too.
+        order.payment?.canPay && order.payment.provider === 'sslcommerz'
+          ? `Records a payment of ${formatMoney(order.totals.total, order.currency)}, the order total. SSLCommerz payments (bKash, Nagad, cards) are recorded by themselves when SSLCommerz confirms them (use Check payment if one seems missing): invoice by hand only if the customer paid another way.`
+          : order.payment?.canPay && order.payment.provider === 'paypal'
+          ? `Records a payment of ${formatMoney(order.totals.total, order.currency)}, the order total. PayPal payments are recorded by themselves when PayPal confirms them: invoice by hand only if the customer paid another way.`
           : order.payment?.canPay
-          ? `Records a payment of ${formatMoney(order.totals.total)}, the order total. Card payments through Stripe are recorded by themselves when Stripe confirms them: invoice by hand only if the customer paid another way.`
-          : `Records a payment of ${formatMoney(order.totals.total)}, the order total. No payment provider is connected yet: invoice once the money has arrived.`
+          ? `Records a payment of ${formatMoney(order.totals.total, order.currency)}, the order total. Card payments through Stripe are recorded by themselves when Stripe confirms them: invoice by hand only if the customer paid another way.`
+          : `Records a payment of ${formatMoney(order.totals.total, order.currency)}, the order total. No payment provider is connected yet: invoice once the money has arrived.`
       }
       submitLabel="Create invoice"
       busy={create.isPending}
@@ -166,6 +169,9 @@ const REFUND_DESCRIPTION = 'Records a refund (credit memo). No payment provider 
 const STRIPE_REFUND_DESCRIPTION = "Records a refund (credit memo). The refund goes back to the customer's card through Stripe; if Stripe refuses it, nothing is saved."
 // Phase 10 §3: the same through PayPal.
 const PAYPAL_REFUND_DESCRIPTION = "Records a refund (credit memo). The refund goes back through PayPal to the customer's PayPal account; if PayPal refuses it, nothing is saved and PayPal's reason is shown here."
+// Phase 12 §3: the same through SSLCommerz (bKash, Nagad, or the card the customer paid with).
+const SSLCOMMERZ_REFUND_DESCRIPTION =
+  "Records a refund (credit memo). The refund goes back through SSLCommerz to the customer's bKash, Nagad, or card; if SSLCommerz refuses it, nothing is saved and its reason is shown here. Refunds can take a few days to reach the customer."
 // Phase 10 §5: part (or all) of it was paid by gift card.
 const GIFT_CARD_REFUND_NOTE = ' Money goes back to the gift card first, up to what it paid; the rest by the other payment method.'
 
@@ -182,7 +188,7 @@ function refundDescription(order) {
   if (order.paymentMethod === 'gift_card' && !points) return `${GIFT_CARD_ONLY_REFUND_DESCRIPTION}${earned}`
   if (order.paymentMethod === 'gift_card' || order.paymentMethod === 'reward_points') return `Records a refund (credit memo).${POINTS_REFUND_NOTE}${earned}`
   const provider = paidThroughProvider(order)
-  const base = provider === 'stripe' ? STRIPE_REFUND_DESCRIPTION : provider === 'paypal' ? PAYPAL_REFUND_DESCRIPTION : REFUND_DESCRIPTION
+  const base = provider === 'stripe' ? STRIPE_REFUND_DESCRIPTION : provider === 'paypal' ? PAYPAL_REFUND_DESCRIPTION : provider === 'sslcommerz' ? SSLCOMMERZ_REFUND_DESCRIPTION : REFUND_DESCRIPTION
   const note = points ? POINTS_REFUND_NOTE : order.giftCardPayment?.amount > 0 ? GIFT_CARD_REFUND_NOTE : ''
   return `${base}${note}${earned}`
 }
@@ -190,13 +196,15 @@ function refundDescription(order) {
 function refundDestination(order, creditMemo) {
   const parts = []
   // Phase 11 §4: points given back first, and earned points taken back.
-  if (creditMemo.rewardPointsReturned > 0) parts.push(` ${formatPoints(creditMemo.rewardPointsReturned)} (${formatMoney(creditMemo.rewardPointsRefund ?? 0)}) went back to the customer's balance.`)
+  if (creditMemo.rewardPointsReturned > 0) parts.push(` ${formatPoints(creditMemo.rewardPointsReturned)} (${formatMoney(creditMemo.rewardPointsRefund ?? 0, order.currency)}) went back to the customer's balance.`)
   if (creditMemo.rewardPointsReversed > 0) parts.push(` ${formatPoints(creditMemo.rewardPointsReversed)} earned on the order were taken back.`)
-  if (creditMemo.giftCardRefund > 0) parts.push(` ${formatMoney(creditMemo.giftCardRefund)} went back to the gift card.`)
+  if (creditMemo.giftCardRefund > 0) parts.push(` ${formatMoney(creditMemo.giftCardRefund, order.currency)} went back to the gift card.`)
   const other = toCents(creditMemo.total) - toCents(creditMemo.giftCardRefund ?? 0) - toCents(creditMemo.rewardPointsRefund ?? 0)
   if (other <= 0 && (creditMemo.giftCardRefund > 0 || creditMemo.rewardPointsRefund > 0)) return parts.join('')
   const provider = paidThroughProvider(order)
   if (provider === 'paypal') parts.push(' PayPal is returning the money to the customer.')
+  // Phase 12 §3: SSLCommerz may answer "processing" (accepted, still on its way).
+  else if (provider === 'sslcommerz') parts.push(creditMemo.refundStatus === 'processing' ? ' SSLCommerz accepted the refund and is still processing it.' : ' SSLCommerz is returning the money to the customer.')
   else if (creditMemo.refundReference || provider === 'stripe') parts.push(" Stripe is returning the money to the customer's card.")
   else if (order.paymentMethod !== 'gift_card') parts.push(' Return the money by the original payment method.')
   return parts.join('')
@@ -250,7 +258,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
     onSuccess: ({ creditMemo }) => {
       const full = toCents(creditMemo.total) >= toCents(limits.maxTotal)
       onDone(
-        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''}${refundDestination(order, creditMemo)}`,
+        `Credit memo ${creditMemo.number} created: ${formatMoney(creditMemo.total, order.currency)} refunded${creditMemo.restocked ? ' and the items returned to stock' : ''}.${prefill?.returnNumber ? ` Return ${prefill.returnNumber} is now refunded.` : ''}${full ? ' The order is now closed.' : ''}${notify ? ' The customer was emailed.' : ''}${refundDestination(order, creditMemo)}`,
       )
     },
     onError: (error, sent) => {
@@ -273,11 +281,11 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
       else if (quantity > item.refundable) found[`item-${item.orderItemId}`] = [item.refundable === 0 ? 'Already refunded in full.' : `At most ${item.refundable} can be refunded.`]
     }
     if (!Number.isFinite(shippingValue) || shippingValue < 0 || !hasCents(shippingValue)) found.shippingRefund = ['Enter an amount of 0 or more, with at most 2 decimals.']
-    else if (toCents(shippingValue) > toCents(limits.shippingRefundable)) found.shippingRefund = [`At most ${formatMoney(limits.shippingRefundable)} of shipping can be refunded.`]
+    else if (toCents(shippingValue) > toCents(limits.shippingRefundable)) found.shippingRefund = [`At most ${formatMoney(limits.shippingRefundable, order.currency)} of shipping can be refunded.`]
     if (!Number.isFinite(adjustmentValue) || !hasCents(adjustmentValue)) found.adjustment = ['Enter an amount with at most 2 decimals.']
     if (Object.keys(found).length === 0) {
-      if (totalCents <= 0) found.total = ['Choose something to refund: the total must be above $0.00.']
-      else if (totalCents > toCents(limits.maxTotal)) found.total = [`The total can't be more than ${formatMoney(limits.maxTotal)}, what is left to refund.`]
+      if (totalCents <= 0) found.total = [`Choose something to refund: the total must be above ${formatMoney(0, order.currency)}.`]
+      else if (totalCents > toCents(limits.maxTotal)) found.total = [`The total can't be more than ${formatMoney(limits.maxTotal, order.currency)}, what is left to refund.`]
     }
     setErrors(found)
     if (Object.keys(found).length > 0) return
@@ -302,7 +310,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
       wide
       title={prefill?.returnNumber ? `Refund return ${prefill.returnNumber}` : `Refund order ${order.number}`}
       description={prefill?.returnNumber ? `${refundDescription(order)} Filled in with the returned items of order ${order.number}.` : refundDescription(order)}
-      submitLabel={`Refund ${formatMoney(Math.max(totalCents, 0) / 100)}`}
+      submitLabel={`Refund ${formatMoney(Math.max(totalCents, 0) / 100, order.currency)}`}
       busy={create.isPending}
       error={formError(create.error, ['items', 'shippingRefund', 'adjustment', 'restock', 'note', 'total'])}
       onSubmit={submit}
@@ -346,7 +354,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
                 </th>
                 <td className="num">{item.ordered}</td>
                 <td className="num">{item.refunded}</td>
-                <td className="num">{formatMoney(item.unitRefund)}</td>
+                <td className="num">{formatMoney(item.unitRefund, order.currency)}</td>
                 <td className="num">
                   <label htmlFor={id} className="visually-hidden">
                     Quantity of {item.variantLabel ? `${item.name} (${item.variantLabel})` : item.name} to refund (up to {item.refundable})
@@ -372,10 +380,10 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
         </tbody>
       </table>
       <div className="form__grid">
-        <Field label="Shipping refund (USD)" error={errors.shippingRefund?.[0]} hint={`Up to ${formatMoney(limits.shippingRefundable)}.`}>
+        <Field label={`Shipping refund (${order.currency ?? storeCode()})`} error={errors.shippingRefund?.[0]} hint={`Up to ${formatMoney(limits.shippingRefundable, order.currency)}.`}>
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" step="0.01" min="0" max={limits.shippingRefundable} placeholder="0.00" value={shipping} onChange={(event) => setShipping(event.target.value)} />}
         </Field>
-        <Field label="Adjustment (USD)" error={errors.adjustment?.[0]} hint="Extra amount to refund; negative to keep a fee (e.g. -5.00).">
+        <Field label={`Adjustment (${order.currency ?? storeCode()})`} error={errors.adjustment?.[0]} hint="Extra amount to refund; negative to keep a fee (e.g. -5.00).">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" step="0.01" placeholder="0.00" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} />}
         </Field>
       </div>
@@ -389,7 +397,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
       <p className="refund-total" aria-live="polite">
         <span>Estimated total to refund</span>
         <span>
-          {formatMoney(totalCents / 100)} <span className="muted">of {formatMoney(limits.maxTotal)} left</span>
+          {formatMoney(totalCents / 100, order.currency)} <span className="muted">of {formatMoney(limits.maxTotal, order.currency)} left</span>
         </span>
       </p>
       <p className="field__hint">{ESTIMATE_NOTE}</p>
@@ -406,7 +414,7 @@ function RefundForm({ order, limits, prefill, onDone, onCancel }) {
 /** Phase 10 §5 and 11 §4: the refund's split, as the server will make it (announced as it changes). */
 function RefundSplit({ split, order }) {
   const provider = paidThroughProvider(order)
-  const other = provider === 'paypal' ? 'Through PayPal' : provider === 'stripe' ? 'To the card through Stripe' : 'By the other payment method'
+  const other = provider === 'paypal' ? 'Through PayPal' : provider === 'stripe' ? 'To the card through Stripe' : provider === 'sslcommerz' ? 'Through SSLCommerz' : 'By the other payment method'
   return (
     <div className="refund-split" aria-live="polite">
       <p className="refund-split__title">How the refund is split</p>
@@ -414,19 +422,19 @@ function RefundSplit({ split, order }) {
         {split.usedPoints && (
           <div>
             <dt>Back as reward points (about {formatPoints(split.points)})</dt>
-            <dd>{formatMoney(split.toPointsCents / 100)}</dd>
+            <dd>{formatMoney(split.toPointsCents / 100, order.currency)}</dd>
           </div>
         )}
         {split.usedGiftCard && (
           <div>
             <dt>Back to the gift card{split.last4 && ` ending ${split.last4}`}</dt>
-            <dd>{formatMoney(split.toCardCents / 100)}</dd>
+            <dd>{formatMoney(split.toCardCents / 100, order.currency)}</dd>
           </div>
         )}
         {!['gift_card', 'reward_points'].includes(order.paymentMethod) && (
           <div>
             <dt>{other}</dt>
-            <dd>{formatMoney(split.otherCents / 100)}</dd>
+            <dd>{formatMoney(split.otherCents / 100, order.currency)}</dd>
           </div>
         )}
       </dl>

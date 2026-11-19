@@ -17,6 +17,12 @@ class PaymentNotCompletedMail extends Mailable
 
     public function __construct(public Order $order) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->order->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'payment_not_completed';

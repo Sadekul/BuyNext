@@ -10,6 +10,10 @@ import { ErrorState, Loading } from '../components/States'
 // Phase 11 §4 and §5: reward points and display currencies.
 import CurrenciesEditor from '../components/CurrenciesEditor'
 import { rewardSettingsValues } from '../utils/rewards'
+// Phase 12 §5: the store currency (read-only) and SSLCommerz.
+import { formatMoney, getStoreCurrency, storeCode } from '../utils/format'
+import { paymentProviderNote } from '../utils/payments'
+import StatusBadge from '../components/StatusBadge'
 
 const SHIPPING_METHODS = [
   { id: 'standard', label: 'Standard' },
@@ -19,6 +23,8 @@ const SHIPPING_METHODS = [
 const PAYMENT_METHODS = [
   { id: 'card', label: 'Credit or debit card' },
   { id: 'paypal', label: 'PayPal' },
+  // Phase 12 §3: one hosted page with bKash, Nagad, Rocket, Upay, cards, and internet banking.
+  { id: 'sslcommerz', label: 'bKash, Nagad, cards (SSLCommerz)' },
   { id: 'cod', label: 'Cash on delivery' },
 ]
 const KNOWN_COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India']
@@ -46,9 +52,11 @@ function SettingsPage() {
       {settings.data && (
         <div className="settings">
           <GeneralForm saved={settings.data.general} />
+          {/* Phase 12 §1 and §5: read-only, set on the server. */}
+          <StoreCurrencyPanel store={settings.data.store} />
           <ShippingForm saved={settings.data.shipping} />
           <TaxForm saved={settings.data.tax} />
-          <CheckoutForm saved={settings.data.checkout} />
+          <CheckoutForm saved={settings.data.checkout} providers={settings.data.store?.paymentProviders} />
           <InventoryForm saved={settings.data.inventory} />
           <CatalogForm saved={settings.data.catalog ?? {}} />
           {settings.data.returns && <ReturnsForm saved={settings.data.returns} />}
@@ -165,20 +173,30 @@ function GeneralForm({ saved }) {
 }
 
 /** Checkbox list → the chosen ids, in the list's order. */
+/** Checkboxes; an option's `note` ({ tone, label, text }, phase 12: a payment provider's status) shows under it and is read with it. */
 function Choices({ legend, options, chosen, onChange, error, hint }) {
   return (
     <fieldset className="form__fieldset choices">
       <legend>{legend}</legend>
       {hint && <p className="field__hint">{hint}</p>}
       {options.map((option) => (
-        <label key={option.id} className="checkbox">
-          <input
-            type="checkbox"
-            checked={chosen.includes(option.id)}
-            onChange={(event) => onChange(options.map((item) => item.id).filter((id) => (id === option.id ? event.target.checked : chosen.includes(id))))}
-          />
-          {option.label}
-        </label>
+        <div key={option.id} className="choices__option">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={chosen.includes(option.id)}
+              aria-describedby={option.note ? `choice-note-${option.id}` : undefined}
+              onChange={(event) => onChange(options.map((item) => item.id).filter((id) => (id === option.id ? event.target.checked : chosen.includes(id))))}
+            />
+            {option.label}
+          </label>
+          {option.note && (
+            <p id={`choice-note-${option.id}`} className="field__hint choices__note">
+              <StatusBadge tone={option.note.tone} label={option.note.label} />
+              {option.note.text && <span> {option.note.text}</span>}
+            </p>
+          )}
+        </div>
       ))}
       {error && <p className="field__error">{error}</p>}
     </fieldset>
@@ -217,7 +235,7 @@ function ShippingForm({ saved }) {
     </Field>
   )
   return (
-    <SettingsGroup group="shipping" title="Shipping" description="Prices in USD." toValues={toValues} errors={errors} setErrors={setErrors}>
+    <SettingsGroup group="shipping" title="Shipping" description={`Prices in ${storeCode()}.`} toValues={toValues} errors={errors} setErrors={setErrors}>
       <div className="form__grid">
         {money('standardPrice', 'Standard shipping price')}
         {money('freeShippingThreshold', 'Free standard shipping from', 'Order value after discounts.')}
@@ -389,7 +407,7 @@ function TaxForm({ saved }) {
   )
 }
 
-function CheckoutForm({ saved }) {
+function CheckoutForm({ saved, providers }) {
   const [countries, setCountries] = useState(saved.allowedCountries ?? [])
   const [options, setOptions] = useState(() => [...new Set([...KNOWN_COUNTRIES, ...(saved.allowedCountries ?? [])])])
   const [newCountry, setNewCountry] = useState('')
@@ -441,8 +459,55 @@ function CheckoutForm({ saved }) {
         <input type="checkbox" checked={guest} onChange={(event) => setGuest(event.target.checked)} />
         Guests can check out without an account
       </label>
-      <Choices legend="Payment methods offered" options={PAYMENT_METHODS} chosen={payments} onChange={setPayments} error={err(errors, 'enabledPaymentMethods')} />
+      {/* Phase 12 §5: each online method with its provider's status (live, sandbox, not configured, not available in the store currency). */}
+      <Choices
+        legend="Payment methods offered"
+        hint="Online payments need their keys on the server; without them, staff invoice those orders by hand once the money arrives."
+        options={PAYMENT_METHODS.map((method) => ({ ...method, note: paymentProviderNote(method.id, providers) }))}
+        chosen={payments}
+        onChange={setPayments}
+        error={err(errors, 'enabledPaymentMethods')}
+      />
     </SettingsGroup>
+  )
+}
+
+/**
+ * Phase 12 §1 and §5: the store currency, read-only. It is a deployment
+ * setting (BUYNEST_CURRENCY on the server): changing it changes what every
+ * stored price means, so prices are converted with a command, step by step
+ * in docs/CURRENCY.md.
+ */
+function StoreCurrencyPanel({ store }) {
+  const currency = store?.currency ?? getStoreCurrency()
+  const docs = store?.currencyDocs ?? 'docs/CURRENCY.md'
+  return (
+    <section className="panel settings__group" aria-labelledby="settings-store-currency">
+      <h2 id="settings-store-currency" className="panel__title">
+        Store currency
+      </h2>
+      <dl className="details store-currency">
+        <dt>Currency</dt>
+        <dd>
+          <strong>
+            {currency.code} <span aria-hidden="true">({currency.symbol})</span>
+          </strong>{' '}
+          <span className="muted">· for example {formatMoney(1250, currency.code)}</span>
+        </dd>
+      </dl>
+      <p className="field__hint">
+        Prices, carts, orders, and payments are in this currency. Orders keep the currency they were placed in. It is set on the server (<code>BUYNEST_CURRENCY</code>), not
+        here, because changing it changes what every saved price means. To switch, follow{' '}
+        {docs.startsWith('https://') ? (
+          <a href={docs} target="_blank" rel="noopener noreferrer">
+            the currency guide<span className="visually-hidden"> (opens in a new tab)</span>
+          </a>
+        ) : (
+          <code>{docs}</code>
+        )}{' '}
+        in the project: back up, set the new currency, then convert the prices with <code>buynest:currency:convert</code>.
+      </p>
+    </section>
   )
 }
 
@@ -584,10 +649,10 @@ function RewardsForm({ saved }) {
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value })
   const rate = Number(values.earnRate)
   const worth = Number(values.pointValue)
-  // "Spend $100 → 100 points, worth $1.00": the two rates together, in words.
+  // "Spend $100 → 100 points, worth $1.00" (phase 12: in the store currency): the two rates together, in words.
   const example =
     Number.isFinite(rate) && Number.isFinite(worth) && rate >= 0 && worth > 0
-      ? `Example: $100.00 of eligible spend earns ${Math.floor(100 * rate).toLocaleString('en-US')} points, worth ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.floor(100 * rate) * worth)} on a later order.`
+      ? `Example: ${formatMoney(100)} of eligible spend earns ${Math.floor(100 * rate).toLocaleString('en-US')} points, worth ${formatMoney(Math.floor(100 * rate) * worth)} on a later order.`
       : ''
   return (
     <SettingsGroup
@@ -605,10 +670,10 @@ function RewardsForm({ saved }) {
         When off, nothing is earned or spent and shoppers don't see points. Balances are kept.
       </p>
       <div className="form__grid">
-        <Field label="Points per $1.00 spent" error={err(errors, 'earnRate')} hint="Rounded down per order. 0 = no points for orders.">
+        <Field label={`Points per ${formatMoney(1)} spent`} error={err(errors, 'earnRate')} hint="Rounded down per order. 0 = no points for orders.">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.earnRate} onChange={set('earnRate')} />}
         </Field>
-        <Field label="Value of 1 point (USD)" error={err(errors, 'pointValue')} hint="What a point takes off at checkout, like 0.01.">
+        <Field label={`Value of 1 point (${storeCode()})`} error={err(errors, 'pointValue')} hint="What a point takes off at checkout, like 0.01.">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.0001" value={values.pointValue} onChange={set('pointValue')} />}
         </Field>
         <Field label="Fewest points to use at once" error={err(errors, 'minRedeem')} hint="0 = any amount.">

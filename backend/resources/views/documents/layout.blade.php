@@ -3,6 +3,9 @@
     dompdf understands CSS 2.1 and tables, not flexbox or grid, so the layout
     is tables. No images or web fonts: nothing is loaded from anywhere
     (remote resources are off); DejaVu Sans ships with dompdf.
+    Phase 12: DejaVu Sans has no taka sign (৳, U+09F3), so Noto Sans Bengali
+    (resources/fonts, OFL) follows it in the font list: dompdf takes each
+    character from the first font that has it. Loaded from the local disk.
 --}}
 <!DOCTYPE html>
 <html lang="en">
@@ -11,7 +14,9 @@
 <title>@yield('title')</title>
 <style>
     @page { margin: 18mm 16mm; }
-    * { font-family: "DejaVu Sans", sans-serif; }
+    @font-face { font-family: "Noto Sans Bengali"; font-style: normal; font-weight: normal; src: url("{{ resource_path('fonts/NotoSansBengali-Regular.ttf') }}") format("truetype"); }
+    @font-face { font-family: "Noto Sans Bengali"; font-style: normal; font-weight: bold; src: url("{{ resource_path('fonts/NotoSansBengali-Bold.ttf') }}") format("truetype"); }
+    * { font-family: "DejaVu Sans", "Noto Sans Bengali", sans-serif; }
     body { font-size: 9.5pt; color: #1f2933; line-height: 1.4; margin: 0; }
     h1 { font-size: 17pt; margin: 0 0 4pt; color: #111827; }
     h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #52606d; margin: 0 0 4pt; }

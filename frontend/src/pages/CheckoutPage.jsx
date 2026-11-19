@@ -58,6 +58,9 @@ const SERVER_FIELD_MAP = {
   paymentMethod: 'paymentMethod',
   shippingAddress: 'shipping.line1',
   billingAddress: 'billing.line1',
+  // Phase 12: SSLCommerz needs a phone; the API may name the address's phone.
+  'shippingAddress.phone': 'phone',
+  'billingAddress.phone': 'phone',
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`shippingAddress.${field}`, `shipping.${field}`])),
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`billingAddress.${field}`, `billing.${field}`])),
 }
@@ -81,6 +84,9 @@ const PAYMENT_NOTES = {
   // Phase 10: PayPal orders are approved on PayPal's site (a redirect, no PayPal script on this page).
   paypal:
     "Next you'll approve the payment on PayPal's site, then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
+  // Phase 12: bKash, Nagad, Rocket, cards, and internet banking on SSLCommerz's hosted page (a redirect, no script here).
+  sslcommerz:
+    "You'll finish paying on SSLCommerz's secure page (bKash, Nagad, Rocket, cards, or internet banking), then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
   online:
     "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers.",
 }
@@ -277,6 +283,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     setError,
     clearErrors,
     setValue,
+    trigger,
     formState: { errors, isSubmitting, isSubmitted },
   } = useForm({
     resolver: zodResolver(schema),
@@ -293,6 +300,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     control,
     name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email', 'shipping.country', 'shipping', 'billing'],
   })
+
+  // Phase 12: the phone's message depends on the payment method (SSLCommerz says why it needs one):
+  // after a first submit, check it again when the method changes.
+  useEffect(() => {
+    if (isSubmitted) trigger('phone')
+  }, [paymentMethod, isSubmitted, trigger])
 
   // Signed-in customers (REAL_SHOP): which saved address the fields match (if any), and the address-book option.
   const canUseAddressBook = REAL_SHOP && isAuthenticated
@@ -367,6 +380,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const payByStripe = REAL_SHOP && !fullyCovered && settings.cardPayments === 'stripe' && paymentMethod === 'card'
   // Phase 10: a PayPal order is approved on PayPal's site right after it is created.
   const payByPaypal = REAL_SHOP && !fullyCovered && settings.paypalPayments === 'paypal' && paymentMethod === 'paypal'
+  // Phase 12: an SSLCommerz order is paid on SSLCommerz's page right after it is created.
+  const payBySslcommerz = REAL_SHOP && !fullyCovered && settings.sslcommerzPayments === 'sslcommerz' && paymentMethod === 'sslcommerz'
 
   // Phase 10 statistics: the shopper started checking out (once; only with their consent, no personal data).
   const beganCheckout = useRef(false)
@@ -422,8 +437,9 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     // then leaves for Stripe's page (`payNow`), or shows why it couldn't with
     // "Pay now" to retry. A guest's number and email are kept in this tab for
     // the way back from Stripe.
-    // Phase 10: PayPal works the same way (its approval page instead of Stripe's).
-    const payNow = ['stripe', 'paypal'].includes(order.payment?.provider) && order.paymentStatus !== 'paid' ? true : undefined
+    // Phase 10: PayPal works the same way (its approval page instead of Stripe's); phase 12: SSLCommerz too
+    // (its GatewayPageURL; it sends the shopper back with a form POST to the sign-in service, then a 303 here).
+    const payNow = ['stripe', 'paypal', 'sslcommerz'].includes(order.payment?.provider) && order.paymentStatus !== 'paid' ? true : undefined
     if (payNow && !isAuthenticated) rememberGuestPayment(order.number, order.email)
     // The confirmation page shows the order the server returned (guests can't fetch it again by number alone).
     navigate(ROUTES.orderConfirmation(order.number), { replace: true, state: { order, ...(payNow && { payNow }) } })
@@ -489,10 +505,21 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       ? 'Continue to secure payment'
       : payByPaypal
         ? 'Continue to PayPal'
-        : `Place order · ${formatBasePrice(prepaid > 0 ? amountDue : totals.total)}`
+        : payBySslcommerz
+          ? 'Continue to SSLCommerz'
+          : `Place order · ${formatBasePrice(prepaid > 0 ? amountDue : totals.total)}`
   let paymentNote = null
   if (REAL_SHOP) {
-    paymentNote = paymentMethod === 'cod' ? PAYMENT_NOTES.cod : payByStripe ? PAYMENT_NOTES.stripe : payByPaypal ? PAYMENT_NOTES.paypal : PAYMENT_NOTES.online
+    paymentNote =
+      paymentMethod === 'cod'
+        ? PAYMENT_NOTES.cod
+        : payByStripe
+          ? PAYMENT_NOTES.stripe
+          : payByPaypal
+            ? PAYMENT_NOTES.paypal
+            : payBySslcommerz
+              ? PAYMENT_NOTES.sslcommerz
+              : PAYMENT_NOTES.online
     if (giftCardPays > 0) paymentNote = `Your gift card pays ${formatBasePrice(giftCardPays)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
     else if (pointsPay > 0) paymentNote = `Your reward points pay ${formatBasePrice(pointsPay)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
   }
@@ -533,7 +560,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
                 {...register('email')}
                 error={errors.email?.message}
               />
-              <FormField label="Phone" type="tel" autoComplete="tel" hint="For delivery updates only." {...register('phone')} error={errors.phone?.message} />
+              {/* Phase 12: SSLCommerz needs a phone number for the payment page: the hint says so when it's chosen. */}
+              <FormField
+                label="Phone"
+                type="tel"
+                autoComplete="tel"
+                hint={paymentMethod === 'sslcommerz' && !fullyCovered ? 'Needed for paying through SSLCommerz, and for delivery updates.' : 'For delivery updates only.'}
+                {...register('phone')}
+                error={errors.phone?.message}
+              />
             </div>
           </section>
 
@@ -706,7 +741,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           <Button type="submit" form="checkout-form" size="lg" fullWidth disabled={isBusy || cannotPlace}>
             {placeLabel}
           </Button>
-          {/* Phase 11: prices shown in another currency elsewhere; the order is charged in USD. */}
+          {/* Phase 11: prices shown in another currency elsewhere; the order is charged in the store currency. */}
           <ChargedInBaseNote amount={prepaid > 0 ? amountDue : totals.total} />
           <p className="cart-summary__note">
             {REAL_SHOP

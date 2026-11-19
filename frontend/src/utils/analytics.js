@@ -1,4 +1,4 @@
-import { STORE_SETTINGS } from '../constants/store'
+import { getStoreCurrency } from './displayCurrency'
 
 /*
  * Visitor statistics with Google Analytics 4, ONLY with the visitor's
@@ -114,7 +114,8 @@ export function track(name, params = {}) {
 
 // ---- e-commerce events (GA4's recommended names), without personal data ----
 
-const currency = STORE_SETTINGS.currency
+// Phase 12: the store currency (USD or BDT) at the time of the event.
+const storeCode = () => getStoreCurrency().code
 const round = (value) => Math.round((Number(value) || 0) * 100) / 100
 
 /** A cart line, order line, or product → a GA4 item. Gift cards are "Gift card", never with their recipient. */
@@ -138,16 +139,16 @@ export function trackPageView(pathname) {
 
 export function trackViewItem(product) {
   const item = toAnalyticsItem(product, 1)
-  track('view_item', { currency, value: item.price, items: [item] })
+  track('view_item', { currency: storeCode(), value: item.price, items: [item] })
 }
 
 export function trackAddToCart(product, quantity) {
   const item = toAnalyticsItem(product, quantity)
-  track('add_to_cart', { currency, value: round(item.price * quantity), items: [item] })
+  track('add_to_cart', { currency: storeCode(), value: round(item.price * quantity), items: [item] })
 }
 
 export function trackBeginCheckout(items, total) {
-  track('begin_checkout', { currency, value: round(total), items: items.filter((item) => !item.isUnavailable).map((item) => toAnalyticsItem(item)) })
+  track('begin_checkout', { currency: storeCode(), value: round(total), items: items.filter((item) => !item.isUnavailable).map((item) => toAnalyticsItem(item)) })
 }
 
 /** purchase: once per order on this device (a reload or a revisit doesn't count it again). */
@@ -163,7 +164,8 @@ export function trackPurchase(order) {
   if (sent.includes(order.number)) return
   track('purchase', {
     transaction_id: order.number,
-    currency,
+    // The order's own currency (phase 12), else the store's.
+    currency: typeof order.currency === 'string' && /^[A-Z]{3}$/.test(order.currency) ? order.currency : storeCode(),
     value: round(order.totals?.total),
     tax: round(order.totals?.tax),
     shipping: round(order.totals?.shipping),

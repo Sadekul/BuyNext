@@ -123,7 +123,7 @@ function ReturnDetailsPage() {
               <div>
                 <dt>Refund</dt>
                 <dd>
-                  {formatBasePrice(entry.refund.total)} ({entry.refund.number}
+                  {formatBasePrice(entry.refund.total, entry.refund.currency)} ({entry.refund.number}
                   {entry.refund.createdAt && `, ${formatDate(entry.refund.createdAt)}`})
                 </dd>
               </div>

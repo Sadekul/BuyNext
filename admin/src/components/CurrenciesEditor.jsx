@@ -7,13 +7,14 @@ import Field from './Field'
 import FormDialog from './FormDialog'
 import StatusBadge from './StatusBadge'
 import { ErrorState, Loading } from './States'
-import { formatDate } from '../utils/format'
+import { formatDate, formatMoney, storeCode } from '../utils/format'
 import { STALE_DAYS, ageLabel, currencyErrors, currencyFormValues, isStale, rateAgeDays, rateExample, toCurrencyValues } from '../utils/currencies'
 import { actionErrorMessage } from '../utils/permissions'
 
 /**
  * Settings → Currencies (phase 11 §5): the currencies shoppers may choose to
- * see prices in. The store keeps charging in USD; staff type the rates in
+ * see prices in. The store keeps charging in its own currency (phase 12:
+ * USD or BDT, a deployment setting); staff type the rates in
  * (no paid rate service). Add, edit, turn off or on, and reorder with
  * buttons (no dragging). Rates older than 30 days get a warning. There is no
  * delete: a currency is turned off instead. Read with settings.view, change
@@ -61,6 +62,8 @@ function CurrenciesEditor() {
   // An API without display currencies (before phase 11): no panel.
   if (list.error?.status === 404) return null
   const currencies = list.data?.currencies ?? []
+  // Phase 12: the store currency (the API's base, else the one the admin loaded).
+  const base = list.data?.base ?? storeCode()
   const shown = order ? order.map((id) => currencies.find((currency) => currency.id === id)).filter(Boolean) : currencies
   const stale = shown.filter((currency) => isStale(currency))
 
@@ -96,8 +99,8 @@ function CurrenciesEditor() {
         )}
       </div>
       <p className="field__hint">
-        The store charges in {list.data?.base ?? 'USD'}. Shoppers can choose to see prices in these currencies instead, in this order; the rates are typed in here. A currency is offered only when it is on
-        and its rate is above 0. The admin always shows {list.data?.base ?? 'USD'}.
+        The store charges in {base}. Shoppers can choose to see prices in these currencies instead, in this order; the rates are typed in here. A currency is offered only when it is on
+        and its rate is above 0. The admin always shows {base}.
       </p>
       <div role={notice?.tone === 'error' ? 'alert' : 'status'}>
         {notice && (
@@ -120,7 +123,7 @@ function CurrenciesEditor() {
           </span>
         </p>
       )}
-      {list.data && shown.length === 0 && <p className="muted">No display currencies yet. Shoppers see prices in {list.data.base ?? 'USD'} only.</p>}
+      {list.data && shown.length === 0 && <p className="muted">No display currencies yet. Shoppers see prices in {base} only.</p>}
       {shown.length > 0 && (
         // Focusable, so keyboard users can scroll it sideways on a phone.
         <div className="table-wrap" role="region" aria-label="Display currencies" tabIndex={0}>
@@ -150,7 +153,7 @@ function CurrenciesEditor() {
                     <th scope="row">
                       {currency.code} <span className="muted">{currency.symbol}</span>
                     </th>
-                    <td>{currency.rate > 0 ? rateExample(currency) : <span className="muted">No rate yet</span>}</td>
+                    <td>{currency.rate > 0 ? rateExample(currency, base) : <span className="muted">No rate yet</span>}</td>
                     <td className="num">{currency.decimals}</td>
                     <td>
                       {currency.enabled && currency.rate > 0 ? (
@@ -214,6 +217,7 @@ function CurrenciesEditor() {
         <CurrencyDialog
           currency={editing.id ? editing : null}
           codes={currencies.map((currency) => currency.code)}
+          base={base}
           onDone={(text) => {
             setEditing(null)
             queryClient.invalidateQueries({ queryKey: phase11Keys.currencies })
@@ -229,7 +233,7 @@ function CurrenciesEditor() {
   )
 }
 
-function CurrencyDialog({ currency, codes, onDone, onCancel }) {
+function CurrencyDialog({ currency, codes, base, onDone, onCancel }) {
   const [values, setValues] = useState(() => currencyFormValues(currency))
   const [errors, setErrors] = useState({})
   const save = useMutation({
@@ -244,7 +248,7 @@ function CurrencyDialog({ currency, codes, onDone, onCancel }) {
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value })
 
   function submit() {
-    const found = currencyErrors(values, { isNew: !currency, codes })
+    const found = currencyErrors(values, { isNew: !currency, codes, base })
     setErrors(found)
     if (Object.keys(found).length > 0) return
     const sent = toCurrencyValues(values, currency)
@@ -257,7 +261,7 @@ function CurrencyDialog({ currency, codes, onDone, onCancel }) {
     <FormDialog
       isOpen
       title={currency ? `Edit ${currency.code}` : 'Add a display currency'}
-      description="Rates are units of this currency per 1 USD, typed in by staff. Saving a new rate updates its “last updated” date."
+      description={`Rates are units of this currency per 1 ${base}, typed in by staff. Saving a new rate updates its “last updated” date.`}
       submitLabel={currency ? 'Save currency' : 'Add currency'}
       busy={save.isPending}
       error={other}
@@ -272,7 +276,7 @@ function CurrencyDialog({ currency, codes, onDone, onCancel }) {
       <Field label="Symbol" error={errors.symbol?.[0]} hint="Up to 5 characters, like ৳ or €.">
         {(a11y) => <input {...a11y} value={values.symbol} maxLength={5} autoComplete="off" onChange={set('symbol')} />}
       </Field>
-      <Field label="Rate (units per 1 USD)" error={errors.rate?.[0]} hint="For example 110.5 for BDT. Up to 8 decimals.">
+      <Field label={`Rate (units per 1 ${base})`} error={errors.rate?.[0]} hint={`For example ${base === 'BDT' ? '0.0091 for USD' : '110.5 for BDT'}. Up to 8 decimals.`}>
         {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="any" value={values.rate} onChange={set('rate')} />}
       </Field>
       <Field label="Decimals shown" error={errors.decimals?.[0]}>
@@ -292,7 +296,7 @@ function CurrencyDialog({ currency, codes, onDone, onCancel }) {
       </label>
       <p className="field__hint" aria-live="polite">
         {values.rate.trim() !== '' && Number.isFinite(preview) && preview > 0 && values.symbol.trim()
-          ? `${rateExample({ symbol: values.symbol.trim(), rate: preview, decimals: Number(values.decimals) })}. A $10.00 product shows as about ${values.symbol.trim()} ${(10 * preview).toFixed(Number(values.decimals))}.`
+          ? `${rateExample({ symbol: values.symbol.trim(), rate: preview, decimals: Number(values.decimals) }, base)}. A ${formatMoney(10)} product shows as about ${values.symbol.trim()} ${(10 * preview).toFixed(Number(values.decimals))}.`
           : ''}
       </p>
     </FormDialog>

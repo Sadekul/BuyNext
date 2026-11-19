@@ -14,11 +14,19 @@ export const SITE = {
 }
 
 // Sample store-policy copy for the learning build; confirm with the business before launch.
-export const ANNOUNCEMENTS = [
-  'Free standard shipping on orders over $50',
-  '30-day hassle-free returns',
-  'Members get early access to seasonal sales',
-]
+export const ANNOUNCEMENTS = ['30-day hassle-free returns', 'Members get early access to seasonal sales']
+
+/**
+ * The announcement strip: the free-shipping line follows the store's own threshold and currency
+ * (phase 12: "৳5,000" in a taka store, not a hard-coded "$50"); no threshold, no line.
+ * `format` writes an amount in the store currency (formatBasePrice); whole amounts drop ".00".
+ */
+export function storeAnnouncements(freeShippingThreshold, format) {
+  const threshold = Number(freeShippingThreshold)
+  if (!(freeShippingThreshold != null && Number.isFinite(threshold) && threshold > 0)) return ANNOUNCEMENTS
+  const amount = format(threshold).replace(/\.00$/, '')
+  return [`Free standard shipping on orders over ${amount}`, ...ANNOUNCEMENTS]
+}
 
 export const MAIN_NAV_LINKS = [
   { label: 'Home', to: ROUTES.home },

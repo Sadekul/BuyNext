@@ -63,6 +63,7 @@ use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewardController;
 use App\Http\Controllers\Api\V1\SeoController;
+use App\Http\Controllers\Api\V1\SslCommerzController;
 use App\Http\Controllers\Api\V1\StockAlertController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
 use App\Http\Controllers\Api\V1\WishlistController;
@@ -173,6 +174,9 @@ Route::prefix('v1')->group(function () {
     // Phase 10 (part B): PayPal (capture after the approval, its webhook) and gift card balance checks.
     Route::post('orders/{number}/paypal/capture', [OrderController::class, 'paypalCapture'])->middleware(['customer.optional', 'throttle:auth']);
     Route::post('payments/paypal/webhook', PayPalWebhookController::class)->middleware('throttle:paypal-webhooks');
+    // Phase 12: SSLCommerz's return trip (forwarded by the sign-in service) and its IPN. No sign-in: val_id is validated with SSLCommerz.
+    Route::post('payments/sslcommerz/return', [SslCommerzController::class, 'return'])->middleware('throttle:sslcommerz');
+    Route::post('payments/sslcommerz/ipn', [SslCommerzController::class, 'ipn'])->middleware('throttle:sslcommerz');
     Route::post('gift-cards/check', [GiftCardController::class, 'check'])->middleware('throttle:gift-card-check');
     // Phase 11: a shared wishlist (public, no personal data).
     Route::get('wishlists/{token}', [WishlistController::class, 'shared'])->where('token', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:wishlist-share');
@@ -288,6 +292,8 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('orders/{number}', [AdminOrderController::class, 'show'])->middleware('can.admin:orders.view');
         // Phase 8: a (new) Stripe payment link for an unpaid card order, to copy and send.
         Route::post('orders/{number}/payment-link', [AdminOrderController::class, 'paymentLink'])->middleware('can.admin:orders.edit');
+        // Phase 12: ask SSLCommerz about the order's attempts and record a payment that went through.
+        Route::post('orders/{number}/payment/check', [AdminOrderController::class, 'checkPayment'])->middleware('can.admin:orders.edit');
         Route::patch('orders/{number}', [AdminOrderController::class, 'update'])->middleware('can.admin:orders.edit');
 
         // Phase 3: order documents (invoice = payment, shipment = tracking, credit memo = refund).

@@ -3,6 +3,7 @@ import { LuGift } from 'react-icons/lu'
 import FormField from '../forms/FormField'
 import Button from '../ui/Button'
 import { formatBasePrice } from '../../utils/formatters'
+import { useDisplayCurrency } from '../../utils/displayCurrency'
 import { GIFT_CARD_MESSAGE_MAX, GIFT_CARD_NAME_MAX, customAmountError, withGiftCard } from '../../utils/giftCards'
 import { validateEmail } from '../../utils/validation'
 import './GiftCardForm.css'
@@ -20,6 +21,8 @@ const OTHER = 'other'
  */
 function GiftCardForm({ product, onAdd }) {
   const id = useId()
+  // Phase 12: gift cards are sold in the store currency (USD or BDT).
+  const { store } = useDisplayCurrency()
   const { amounts, custom } = product.giftCard ?? { amounts: [], custom: null }
   const [values, setValues] = useState(() => ({
     choice: amounts.length > 0 ? String(amounts[Math.min(1, amounts.length - 1)]) : custom ? OTHER : '',
@@ -104,7 +107,7 @@ function GiftCardForm({ product, onAdd }) {
 
       {isOther && custom && (
         <FormField
-          label="Your amount (USD)"
+          label={`Your amount (${store.code})`}
           type="number"
           inputMode="decimal"
           min={custom.min}

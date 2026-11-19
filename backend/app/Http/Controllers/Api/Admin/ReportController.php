@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Reports;
 use App\Services\RewardPoints;
 use App\Support\Csv;
+use App\Support\Currency;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -123,7 +124,8 @@ class ReportController extends Controller
 
     private function meta(CarbonImmutable $from, CarbonImmutable $to, ?string $groupBy = null): array
     {
-        return array_filter(['from' => $from->toDateString(), 'to' => $to->toDateString(), 'group_by' => $groupBy]);
+        // Phase 12: currency = what the money in the answer is in (the store currency).
+        return array_filter(['from' => $from->toDateString(), 'to' => $to->toDateString(), 'group_by' => $groupBy, 'currency' => Currency::store()]);
     }
 
     private function csv(string $filename, array $header, array $rows): Response

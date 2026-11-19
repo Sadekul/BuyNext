@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Support\Currency;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +31,8 @@ class StripeGateway
 
     public function currency(): string
     {
-        return (string) config('buynest.stripe.currency');
+        // Phase 12: always the store currency (STRIPE_CURRENCY is gone), lower case as Stripe writes it.
+        return strtolower(Currency::store());
     }
 
     /** A Checkout Session (Stripe's answer: id, url, expires_at, ...). */

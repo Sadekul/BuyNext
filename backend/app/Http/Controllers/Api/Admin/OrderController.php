@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Services\Audit;
 use App\Services\OrderDocuments;
 use App\Services\Payments\OnlinePayments;
+use App\Services\Payments\SslCommerzPayments;
 use App\Services\Pricing;
 use App\Services\Settings;
 use App\Support\Csv;
@@ -48,14 +49,14 @@ class OrderController extends Controller
         return Csv::download('orders-'.now()->format('Y-m-d').'.csv', [
             'number', 'placed_at', 'status', 'payment_status', 'source', 'customer_name', 'email', 'phone', 'customer_group', 'items',
             'subtotal', 'discount', 'shipping', 'tax', 'total', 'paid', 'refunded', 'payment_method', 'shipping_method', 'coupon_code',
-            'ship_to_city', 'ship_to_country',
+            'ship_to_city', 'ship_to_country', 'currency', // phase 12: the currency of the money columns
         ], $orders->map(fn (Order $order) => [
             $order->number, $order->placed_at?->toIso8601ZuluString(), $order->status, $order->payment_status, $order->source,
             trim(($order->shipping_address['first_name'] ?? '').' '.($order->shipping_address['last_name'] ?? '')),
             $order->email, $order->phone, $order->customer_group, $order->itemCount(),
             $order->subtotal, $order->discount_total, $order->shipping_total, $order->tax_total, $order->grand_total,
             Pricing::format($order->paidCents()), Pricing::format($order->refundedCents()), $order->payment_method, $order->shipping_method,
-            $order->coupon_code, $order->shipping_address['city'] ?? null, $order->shipping_address['country'] ?? null,
+            $order->coupon_code, $order->shipping_address['city'] ?? null, $order->shipping_address['country'] ?? null, $order->currencyCode(),
         ]));
     }
 
@@ -234,6 +235,23 @@ class OrderController extends Controller
         $payments->recordLink($order, $request->user(), $payment);
 
         return (new AdminOrderResource($this->find($order->number)))->withPayment($payment);
+    }
+
+    /**
+     * POST /api/admin/v1/orders/{number}/payment/check → 200 { data: AdminOrderResource, result: { found, status, message } }
+     * Phase 12: asks SSLCommerz about every attempt of an SSLCommerz order and
+     * records a payment that went through (invoice, or "review" when risky).
+     * 422 { errors: { order } } when the order can't be checked.
+     */
+    public function checkPayment(Request $request, string $number, SslCommerzPayments $sslcommerz): JsonResponse
+    {
+        $order = Order::where('number', strtoupper($number))->first();
+        if (! $order) {
+            return $this->notFound();
+        }
+        $result = $sslcommerz->check($order, $request->user());
+
+        return (new AdminOrderResource($this->find($order->number)))->additional(['result' => $result])->response();
     }
 
     private function transitionError(string $from, string $to): string

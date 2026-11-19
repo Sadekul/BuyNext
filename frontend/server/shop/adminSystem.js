@@ -1,5 +1,7 @@
 import { laravel, pick } from '../http.js'
 import { camelPath } from './laravel.js'
+// Phase 12 §5: the store currency and payment providers (settings), other currencies (sales report).
+import { salesCurrencies, settingsStore } from './adminPhase12.js'
 
 /*
  * Phase 4 of the admin (docs/backend/PHASE4_CONTRACT.md) from BuyNest's
@@ -241,6 +243,8 @@ const REPORT_MAPS = {
       averageOrder: money(data?.totals?.average_order) ?? 0,
     },
     series: (data?.series ?? []).map((point) => ({ period: point.period, orders: point.orders ?? 0, gross: money(point.gross) ?? 0, refunds: money(point.refunds) ?? 0, net: money(point.net) ?? 0 })),
+    // Phase 12 §5: the totals count the store currency only; other currencies of the period on their own.
+    ...salesCurrencies(data),
   }),
   products: (data) => ({
     products: (Array.isArray(data) ? data : []).map((row) => ({ productId: row.product_id ?? null, name: row.name ?? '', sku: row.sku ?? null, units: row.units ?? 0, revenue: money(row.revenue) ?? 0 })),
@@ -431,12 +435,13 @@ export const laravelSystemData = {
   },
 
   async getSettings(token, request) {
-    return answer(await call('/settings', token, request), [200], (data) => ({ ...storeSettings(data.data), live: true }))
+    // Phase 12 §5: + the store currency and the payment providers' status (read-only, from meta).
+    return answer(await call('/settings', token, request), [200], (data) => ({ ...storeSettings(data.data), ...settingsStore(data.meta), live: true }))
   },
   async updateSettings(token, changes, request) {
     const result = await call('/settings', token, request, { method: 'PATCH', body: toSettingsBody(changes) })
     if (result.status !== 200) return failed(result, settingsFieldName)
-    return { ok: true, status: 200, data: { ...storeSettings(result.data?.data), live: true } }
+    return { ok: true, status: 200, data: { ...storeSettings(result.data?.data), ...settingsStore(result.data?.meta), live: true } }
   },
 }
 

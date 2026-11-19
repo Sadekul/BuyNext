@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Support\Currency;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -37,7 +38,7 @@ class PayPalGateway
 
     public function currency(): string
     {
-        return strtoupper((string) config('buynest.store.currency', 'USD'));
+        return Currency::store();
     }
 
     /** POST /v2/checkout/orders → PayPal's order (id, status, links, ...). */
@@ -59,10 +60,10 @@ class PayPalGateway
     }
 
     /** POST /v2/payments/captures/{id}/refund → the refund (id, status). */
-    public function refundCapture(string $captureId, string $amount, string $requestId, ?string $note = null): array
+    public function refundCapture(string $captureId, string $amount, string $requestId, ?string $note = null, ?string $currency = null): array
     {
         return $this->send('post', '/v2/payments/captures/'.rawurlencode($captureId).'/refund', array_filter([
-            'amount' => ['value' => $amount, 'currency_code' => $this->currency()],
+            'amount' => ['value' => $amount, 'currency_code' => $currency ?? $this->currency()], // phase 12: the order's currency
             'note_to_payer' => $note,
         ]), $requestId);
     }

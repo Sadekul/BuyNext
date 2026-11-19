@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Admin;
 use App\Models\EmailTemplate;
+use App\Support\Currency;
 use App\Support\EmailTemplateCatalog;
 use Illuminate\Support\Facades\Cache;
 
@@ -44,14 +45,14 @@ class EmailTemplates
      * $subject/$body: a draft to render instead of the current template (preview).
      * $layout: extra bits for the frame ({ preheader, footer_html, footer_text }).
      */
-    public function render(string $key, array $values, ?string $subject = null, ?string $body = null, array $layout = []): array
+    public function render(string $key, array $values, ?string $subject = null, ?string $body = null, array $layout = [], ?string $currency = null): array
     {
         $template = $this->current($key);
         $definition = EmailTemplateCatalog::get($key);
         $values = [...$this->commonValues(), ...$values];
 
-        $renderedSubject = $this->fill($subject ?? $template['subject'], $definition['variables'], $values, html: false);
-        $renderedBody = $this->fill($body ?? $template['body'], $definition['variables'], $values, html: true);
+        $renderedSubject = $this->fill($subject ?? $template['subject'], $definition['variables'], $values, html: false, currency: $currency);
+        $renderedBody = $this->fill($body ?? $template['body'], $definition['variables'], $values, html: true, currency: $currency);
 
         return $this->wrap(trim(preg_replace('/\s+/u', ' ', $renderedSubject)), $renderedBody, $layout);
     }
@@ -162,8 +163,22 @@ class EmailTemplates
         return array_values(array_unique($matches[1]));
     }
 
-    private function fill(string $text, array $variables, array $values, bool $html): string
+    private function fill(string $text, array $variables, array $values, bool $html, ?string $currency = null): string
     {
+        // Phase 12: "${{ order_total }}" (how every template writes a money variable, saved ones included) means
+        // "this amount in the email's currency": "$59.97" in a dollar store, "৳1,250.00" in taka. The order's
+        // emails use the order's currency. A money variable written without the "$" stays a plain number.
+        $text = preg_replace_callback('/\$'.substr(self::TOKEN, 1, -2).'/u', function (array $match) use ($variables, $values, $html, $currency) {
+            $name = $match[1];
+            if (! in_array($name, EmailTemplateCatalog::MONEY_VARIABLES, true) || ! array_key_exists($name, $variables)
+                || ! is_numeric($values[$name] ?? null)) {
+                return $match[0];
+            }
+            $value = Currency::format($values[$name], $currency);
+
+            return $html ? e($value) : $value;
+        }, $text);
+
         return preg_replace_callback(self::TOKEN, function (array $match) use ($variables, $values, $html) {
             $name = $match[1];
             if (! array_key_exists($name, $variables)) {

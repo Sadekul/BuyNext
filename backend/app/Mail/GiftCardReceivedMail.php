@@ -19,6 +19,12 @@ class GiftCardReceivedMail extends Mailable
 
     public function __construct(public GiftCard $card, public string $code, public ?string $senderName = null) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->card->currency;
+    }
+
     protected function templateKey(): string
     {
         return 'gift_card_received';

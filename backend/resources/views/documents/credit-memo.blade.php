@@ -1,5 +1,5 @@
 @php
-    $money = \App\Services\DocumentPdfs::money(...);
+    $money = fn ($amount) => \App\Services\DocumentPdfs::money($amount, $currency ?? null);
     $positive = \App\Services\DocumentPdfs::positive(...);
 @endphp
 @extends('documents.layout')

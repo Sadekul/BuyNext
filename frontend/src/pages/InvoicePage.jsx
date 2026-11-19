@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 import { invoiceQuery } from '../queries/orderQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, formatBasePrice } from '../utils/formatters'
+import { formatDate, moneyFormatter } from '../utils/formatters'
 import './InvoicePage.css'
 
 function Address({ address }) {
@@ -76,6 +76,8 @@ function InvoicePage() {
 
   const invoice = request.data
   const { totals } = invoice
+  // Phase 12: the invoice in its order's currency (older orders: USD), not today's store currency.
+  const formatBasePrice = moneyFormatter(invoice.currency)
   return (
     <div className="invoice-page section container">
       <title>{`Invoice ${invoice.number} | ${SITE.name}`}</title>

@@ -1,12 +1,14 @@
 import DiscountRows from '../cart/DiscountRows'
-import { formatBasePrice } from '../../utils/formatters'
+import { moneyFormatter } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
 
 /** Totals rows shared by checkout, confirmation, and order details. Reuses CartSummary's styles. */
 /** `appliedRules` (phase 7): the cart price rules the server applied, one row each. */
 /** Phase 10: `totals.giftCard` (what a gift card pays) and `totals.amountDue` (what is left to pay); `requiresShipping: false` for gift cards only. */
 /** Phase 11: `totals.rewardPoints` (what points pay, paid before a gift card) and `rewardPointsSpent` (how many points). */
-function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax = true, requiresShipping = true, rewardPointsSpent = null }) {
+/** Phase 12: `currency`: the order's own currency code (its money is written in it); the store currency otherwise. */
+function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax = true, requiresShipping = true, rewardPointsSpent = null, currency = null }) {
+  const formatBasePrice = moneyFormatter(currency)
   const giftCard = totals.giftCard ?? 0
   const points = totals.rewardPoints ?? 0
   const amountDue = totals.amountDue ?? Math.max(0, Math.round((totals.total - points - giftCard) * 100) / 100)

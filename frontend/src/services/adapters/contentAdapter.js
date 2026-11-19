@@ -1,5 +1,6 @@
 import { normalizeProduct } from './laravelAdapter'
-import { PAYMENT_METHODS, SHIPPING_RULES } from '../../constants/store'
+import { ALL_PAYMENT_METHODS, SHIPPING_RULES } from '../../constants/store'
+import { DEFAULT_STORE_CURRENCY, sanitizeStoreCurrency } from '../../utils/displayCurrency'
 
 /*
  * Adapter for the CMS and store settings of BuyNest's Laravel API
@@ -95,6 +96,12 @@ export function normalizeStoreSettings(raw) {
   const data = raw.data
   const methods = data.shipping_methods ?? []
   const standard = methods.find((method) => method.id === 'standard')
+  // Phase 10/12: "paypal" (approved on PayPal's site), "manual", or "unavailable" (PayPal doesn't take the store currency).
+  const paypalPayments = ['paypal', 'unavailable'].includes(data.paypal_payments) ? data.paypal_payments : 'manual'
+  // Phase 12: "sslcommerz" (paid on SSLCommerz's page), "manual", or "unavailable" (the store currency isn't BDT).
+  const sslcommerzPayments = ['sslcommerz', 'unavailable'].includes(data.sslcommerz_payments) ? data.sslcommerz_payments : 'manual'
+  const unavailable = new Set([...(paypalPayments === 'unavailable' ? ['paypal'] : []), ...(sslcommerzPayments === 'unavailable' ? ['sslcommerz'] : [])])
+  const currency = normalizeStoreCurrency(data.currency, data.currencies?.base)
   return {
     storeName: data.store_name || null,
     supportEmail: data.support_email || null,
@@ -110,27 +117,41 @@ export function normalizeStoreSettings(raw) {
     // Country names, as the order's address stores them (objects tolerated: { name }).
     countries: (data.allowed_countries ?? []).map((country) => (typeof country === 'string' ? country : country?.name)).filter(Boolean),
     // The server sends ids; labels and the "never asks for card numbers" copy stay ours.
-    paymentMethods: (data.payment_methods ?? []).map(
-      (id) => PAYMENT_METHODS.find((method) => method.id === id) ?? { id, label: id, description: '' },
-    ),
+    // Phase 12: a method its provider can't take in the store currency is never offered.
+    paymentMethods: (data.payment_methods ?? [])
+      .filter((id) => !unavailable.has(id))
+      .map((id) => ALL_PAYMENT_METHODS.find((method) => method.id === id) ?? { id, label: id, description: '' }),
     guestCheckout: data.guest_checkout !== false,
     taxEnabled: data.tax_enabled === true,
     // Phase 8: "stripe" when card orders are paid on Stripe's page right away, "manual" otherwise.
     cardPayments: data.card_payments === 'stripe' ? 'stripe' : 'manual',
-    // Phase 10: "paypal" when PayPal orders are approved on PayPal's site right away, "manual" otherwise.
-    paypalPayments: data.paypal_payments === 'paypal' ? 'paypal' : 'manual',
+    // Phase 10: "paypal" when PayPal orders are approved on PayPal's site right away, "manual" otherwise
+    // (phase 12: "unavailable" when PayPal doesn't take the store currency, e.g. BDT).
+    paypalPayments,
+    // Phase 12: SSLCommerz (bKash, Nagad, cards) the same way.
+    sslcommerzPayments,
+    // Phase 12: the currency the store charges in ({ code, symbol, decimals }); USD when not given.
+    currency,
     // Phase 10: the store's Google Analytics 4 measurement id (null = no statistics, no consent banner).
     ga4MeasurementId: measurementId(data.analytics?.ga4_measurement_id ?? data.ga4_measurement_id),
     // Phase 11: the currencies shoppers may SEE prices in (enabled, with a rate); orders are charged in `base`.
-    currencies: normalizeCurrencies(data.currencies),
+    currencies: normalizeCurrencies(data.currencies, currency.code),
     // Phase 11: reward points, when the store has them on (null = off: nothing about points is shown).
     rewards: normalizeRewardSettings(data.rewards),
   }
 }
 
-/** `currencies: { base: "USD", display: [{ code, symbol, rate, decimals }] }` → numbers, bad entries dropped. */
-export function normalizeCurrencies(raw) {
-  const base = typeof raw?.base === 'string' && /^[A-Z]{3}$/.test(raw.base) ? raw.base : 'USD'
+/** Phase 12: GET /store `currency: { code, symbol, decimals }` (or phase 11's `currencies.base` alone) → the store currency. */
+export function normalizeStoreCurrency(raw, base) {
+  return sanitizeStoreCurrency(raw) ?? sanitizeStoreCurrency(base) ?? DEFAULT_STORE_CURRENCY
+}
+
+/**
+ * `currencies: { base: "USD", display: [{ code, symbol, rate, decimals }] }` → numbers, bad entries dropped.
+ * Phase 12: `storeCode` (the store currency) is the base when the answer names none.
+ */
+export function normalizeCurrencies(raw, storeCode = 'USD') {
+  const base = typeof raw?.base === 'string' && /^[A-Z]{3}$/.test(raw.base) ? raw.base : storeCode
   const display = (Array.isArray(raw?.display) ? raw.display : [])
     .map((currency) => ({
       code: typeof currency?.code === 'string' ? currency.code.toUpperCase() : '',

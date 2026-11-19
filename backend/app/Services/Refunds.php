@@ -219,11 +219,12 @@ class Refunds
         $order->history()->create([
             'status' => $order->status,
             'payment_status' => $order->payment_status,
-            'note' => "Credit memo {$memo->number} created; \${$memo->total} refunded"
-                .($pointsRefund > 0 ? ' ($'.Pricing::format($pointsRefund).' as '.number_format($memo->reward_points_returned).' reward points)' : '')
-                .($giftCardRefund > 0 ? ' ($'.Pricing::format($giftCardRefund).' to the gift card)' : '')
+            'note' => "Credit memo {$memo->number} created; {$order->money($memo->total)} refunded"
+                .($pointsRefund > 0 ? ' ('.$order->money(Pricing::format($pointsRefund)).' as '.number_format($memo->reward_points_returned).' reward points)' : '')
+                .($giftCardRefund > 0 ? ' ('.$order->money(Pricing::format($giftCardRefund)).' to the gift card)' : '')
                 .match (true) {
                     $refundReference && $order->payment_provider === 'paypal' => ' through PayPal.',
+                    $refundReference && $order->payment_provider === 'sslcommerz' => ' through SSLCommerz.', // phase 12
                     (bool) $refundReference => ' to the card through Stripe.',
                     default => '.',
                 }.($restock ? ' Items returned to stock.' : '')
@@ -233,7 +234,7 @@ class Refunds
             'customer_notified' => $notify,
         ]);
 
-        $this->audit->record('credit_memo.created', "Credit memo {$memo->number} created for order {$order->number}: \${$memo->total} refunded.",
+        $this->audit->record('credit_memo.created', "Credit memo {$memo->number} created for order {$order->number}: {$order->money($memo->total)} refunded.",
             'credit_memo', $memo->id, ['before' => [], 'after' => [
                 'order' => $order->number, 'subtotal' => $memo->subtotal, 'shipping_refund' => $memo->shipping_refund,
                 'adjustment' => $memo->adjustment, 'total' => $memo->total, 'restocked' => $restock, 'payment_status' => $order->payment_status,

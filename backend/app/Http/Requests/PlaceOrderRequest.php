@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
@@ -91,7 +92,7 @@ class PlaceOrderRequest extends FormRequest
             ...CartController::messages(),
             'items.required' => 'Your cart is empty.',
             'items.min' => 'Your cart is empty.',
-            'payment_method.in' => 'Choose a payment method.',
+            'payment_method.in' => self::paymentMethodMessage($this->input('payment_method')),
             'phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',
             '*.postal_code.regex' => 'The postal code is invalid.',
             '*.country.in' => 'We don\'t deliver to that country yet.',
@@ -109,6 +110,16 @@ class PlaceOrderRequest extends FormRequest
         }
 
         return $attributes;
+    }
+
+    /** Phase 12: why a payment method was refused: the store currency rules some out (PayPal in taka, SSLCommerz outside taka). */
+    public static function paymentMethodMessage(mixed $method): string
+    {
+        return match (true) {
+            $method === 'paypal' && ! Currency::paypalAccepts() => 'PayPal doesn\'t accept '.Currency::store().', so it isn\'t available in this store.',
+            $method === 'sslcommerz' && ! Currency::sslcommerzAccepts() => 'bKash, Nagad and cards (SSLCommerz) need the store currency BDT.',
+            default => 'Choose a payment method.',
+        };
     }
 
     /** Phase 10 (part B): are all $items (as sent) gift card products? Then no shipping method is needed. */

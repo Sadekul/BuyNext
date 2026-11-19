@@ -14,6 +14,12 @@ class ShipmentMail extends Mailable
 
     public function __construct(public Shipment $shipment) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->shipment->order?->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'shipment';

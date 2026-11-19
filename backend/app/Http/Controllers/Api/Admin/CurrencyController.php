@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\CurrencyRate;
 use App\Services\Audit;
+use App\Support\Currency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,7 +110,7 @@ class CurrencyController extends Controller
     /** The store's base currency ("USD"). */
     public static function base(): string
     {
-        return strtoupper((string) config('buynest.store.currency', 'USD'));
+        return Currency::store();
     }
 
     private function validated(Request $request, ?CurrencyRate $rate): array

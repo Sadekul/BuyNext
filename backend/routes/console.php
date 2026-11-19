@@ -22,6 +22,10 @@ if (config('buynest.backups.schedule')) {
 // (PayPal is asked first, so a payment that went through is recorded instead).
 Schedule::command('buynest:payments:expire-paypal')->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
 
+// Phase 12: unpaid SSLCommerz orders are cancelled once their payment window has passed
+// (SSLCommerz is asked about every attempt first, so a payment that went through is recorded instead).
+Schedule::command('buynest:payments:expire-sslcommerz')->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
+
 // Phase 10 (part A): the search vocabulary follows catalog changes on its own; this daily
 // run also catches anything changed with plain SQL.
 Schedule::command('buynest:search:reindex')->dailyAt('04:10')->withoutOverlapping(30)->onOneServer();

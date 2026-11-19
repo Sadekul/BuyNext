@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\Pricing;
 use App\Support\CategoryTree;
+use App\Support\Currency;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -267,7 +268,7 @@ class Coupon extends Model
     {
         $text = match ($type) {
             'percent' => rtrim(rtrim(Pricing::format($valueCents), '0'), '.').'% off your order',
-            'fixed' => '$'.self::money($valueCents).' off your order',
+            'fixed' => Currency::symbol().self::money($valueCents).' off your order',
             'buy_x_get_y' => "Buy {$buy}, get {$get} free",
             default => 'Free shipping',
         };
@@ -276,7 +277,7 @@ class Coupon extends Model
                 'free_shipping' => 'Free shipping on orders',
                 'buy_x_get_y' => $text.' on orders',
                 default => str_replace('your order', 'orders', $text),
-            }.' of $'.self::money($minSubtotalCents).' or more';
+            }.' of '.Currency::symbol().self::money($minSubtotalCents).' or more';
         }
 
         return $text;

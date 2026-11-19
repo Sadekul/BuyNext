@@ -1,4 +1,5 @@
 import { formatDate } from '../utils/formatters'
+import { sslcommerzMethodName } from '../utils/payment'
 import { LuBan, LuCircleCheck, LuCircleX, LuClock, LuLock, LuPackage, LuPackageCheck, LuPackageOpen, LuUndo2, LuTruck } from 'react-icons/lu'
 
 /*
@@ -21,6 +22,8 @@ export const PAYMENT_STATUSES = {
   paid: { label: 'Paid', icon: LuCircleCheck },
   partially_refunded: { label: 'Partly refunded', icon: LuUndo2 },
   refunded: { label: 'Refunded', icon: LuUndo2 },
+  // Phase 12: SSLCommerz flagged the payment (risk level 1): the store checks it before confirming.
+  review: { label: 'Being checked', icon: LuClock },
 }
 
 /*
@@ -48,10 +51,12 @@ export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: st
  * orders wait until the store records the payment (nothing was charged).
  * `stripe`: the store takes card payments through Stripe (store settings).
  */
-export function paymentNote(order, { stripe = false, paypal = false } = {}) {
+export function paymentNote(order, { stripe = false, paypal = false, sslcommerz = false } = {}) {
   const byStripe = order.paymentMethod === 'card' && (order.paymentProvider === 'stripe' || stripe)
   // Phase 10: PayPal orders approved on PayPal's site, and orders paid in full by a gift card.
   const byPaypal = order.paymentMethod === 'paypal' && (order.paymentProvider === 'paypal' || paypal)
+  // Phase 12: bKash, Nagad, and cards on SSLCommerz's page.
+  const bySslcommerz = order.paymentMethod === 'sslcommerz' && (order.paymentProvider === 'sslcommerz' || sslcommerz)
   if (order.paymentMethod === 'gift_card' && order.paymentStatus === 'paid') return 'Paid in full with a gift card. Thank you.'
   // Phase 11: reward points paid the whole order.
   if (order.paymentMethod === 'reward_points' && order.paymentStatus === 'paid') return 'Paid in full with reward points. Thank you.'
@@ -63,10 +68,19 @@ export function paymentNote(order, { stripe = false, paypal = false } = {}) {
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'paypal' && order.paymentProvider === 'paypal') {
     return order.paidAt ? `Paid with PayPal on ${formatDate(order.paidAt)}. Thank you.` : 'Paid with PayPal. Thank you.'
   }
+  if (order.paymentStatus === 'paid' && order.paymentMethod === 'sslcommerz' && order.paymentProvider === 'sslcommerz') {
+    // "Paid with bKash (SSLCommerz) on Nov 19, 2026."
+    const method = sslcommerzMethodName(order.payment)
+    const how = method ? `Paid with ${method} (SSLCommerz)` : 'Paid through SSLCommerz'
+    return order.paidAt ? `${how} on ${formatDate(order.paidAt)}. Thank you.` : `${how}. Thank you.`
+  }
+  // Phase 12: held for a check (SSLCommerz flagged the payment as risky): nothing to do for the shopper.
+  if (order.paymentStatus === 'review') return "We've received your payment and are checking it. We'll email you as soon as your order is confirmed."
   if (order.paymentStatus === 'paid') return 'Payment received. Thank you.'
   if (order.status === 'cancelled') return 'This order was cancelled, so nothing will be charged.'
   if (order.paymentMethod === 'cod') return 'Pay the courier when your order arrives.'
   if (byPaypal) return "Awaiting payment: nothing has been charged yet. Approve the payment on PayPal's site with Pay now. If it isn't completed in time, the order is cancelled and the items are released."
+  if (bySslcommerz) return "Awaiting payment: nothing has been charged yet. Pay with bKash, Nagad, Rocket, or a card on SSLCommerz's secure page with Pay now. If it isn't completed in time, the order is cancelled and the items are released."
   if (byStripe) return "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released."
-  return "Nothing has been charged. Card and PayPal payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
+  return "Nothing has been charged. Online payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
 }

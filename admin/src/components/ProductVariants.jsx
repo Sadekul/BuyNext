@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LuPlus, LuTrash2, LuWand } from 'react-icons/lu'
 import { adminKeys, generateVariants, saveProductOptions, updateVariant } from '../api/admin'
-import { formatMoney } from '../utils/format'
+import { formatMoney, storeCode } from '../utils/format'
 import { actionErrorMessage } from '../utils/permissions'
 
 const MAX_OPTIONS = 3
@@ -214,7 +214,7 @@ function ProductVariants({ productId, product, editable }) {
               <tr>
                 <th scope="col">Variant</th>
                 <th scope="col">SKU</th>
-                <th scope="col">Price (USD)</th>
+                <th scope="col">Price ({storeCode()})</th>
                 <th scope="col">Stock</th>
                 <th scope="col">Sold</th>
                 <th scope="col">

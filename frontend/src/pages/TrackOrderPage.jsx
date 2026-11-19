@@ -87,7 +87,7 @@ function TrackOrderPage() {
             order={order}
             // Phase 10: the invoices as PDFs, with the email the order was found with as the proof.
             invoicePdf={lookup.variables?.email ? { orderNumber: order.number, email: lookup.variables.email } : null}
-            payAction={canPayOrder(order, settings.cardPayments, settings.paypalPayments) ? <PayNowButton order={order} email={lookup.variables?.email} /> : null}
+            payAction={canPayOrder(order, settings.cardPayments, settings.paypalPayments, settings.sslcommerzPayments) ? <PayNowButton order={order} email={lookup.variables?.email} /> : null}
           />
         </section>
       )}

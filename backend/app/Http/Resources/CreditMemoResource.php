@@ -33,6 +33,7 @@ class CreditMemoResource extends JsonResource
             'shipping_refund' => $this->shipping_refund,
             'adjustment' => $this->adjustment,
             'total' => $this->total,
+            'currency' => $this->order?->currencyCode() ?? 'USD', // phase 12: the order's currency
             'refund_reference' => $this->refund_reference, // phase 8: the Stripe refund id (null: refunded by hand); phase 10: or PayPal's
             // Phase 10 (part B): returned to the redeemed gift card first, the rest by the payment method.
             'gift_card_refund' => $this->gift_card_refund ?? '0.00',

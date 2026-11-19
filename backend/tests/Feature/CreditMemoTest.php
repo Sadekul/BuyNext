@@ -93,7 +93,7 @@ class CreditMemoTest extends TestCase
         $first->assertJsonPath('data', [
             'number' => 'CM-'.(100000 + $memo->id), 'order_number' => $number, 'return_number' => null,
             'items' => [['order_item_id' => $tea, 'name' => $this->tea->name, 'variant_label' => null, 'sku' => $this->tea->sku, 'quantity' => 1, 'amount' => '2.99']],
-            'subtotal' => '2.99', 'shipping_refund' => '0.00', 'adjustment' => '0.00', 'total' => '2.99', 'refund_reference' => null, 'gift_card_refund' => '0.00', 'reward_points_refund' => '0.00', 'reward_points_returned' => 0, 'reward_points_reversed' => 0, 'other_refund' => '2.99', 'restocked' => true,
+            'subtotal' => '2.99', 'shipping_refund' => '0.00', 'adjustment' => '0.00', 'total' => '2.99', 'currency' => 'USD', 'refund_reference' => null, 'gift_card_refund' => '0.00', 'reward_points_refund' => '0.00', 'reward_points_returned' => 0, 'reward_points_reversed' => 0, 'other_refund' => '2.99', 'restocked' => true,
             'created_at' => $memo->created_at->toIso8601ZuluString(), 'admin_name' => 'Store Admin', 'note' => 'Damaged box.',
         ]);
         $this->assertSame(8, $this->tea->fresh()->stock_quantity); // 10 − 3 + 1

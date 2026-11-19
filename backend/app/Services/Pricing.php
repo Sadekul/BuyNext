@@ -7,6 +7,7 @@ use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CategoryTree;
+use App\Support\Currency;
 use Illuminate\Support\Collection;
 
 /**
@@ -251,6 +252,11 @@ class Pricing
         if (! $card) {
             return [null, 0, GiftCards::INVALID];
         }
+        // Phase 12: a card pays only for orders in its own currency.
+        $cardCurrency = strtoupper((string) ($card->currency ?: 'USD'));
+        if ($cardCurrency !== Currency::store()) {
+            return [null, 0, "This gift card is in {$cardCurrency}, so it can't pay for an order in ".Currency::store().'.'];
+        }
         $balance = self::toCents($card->balance);
         if ($balance <= 0) {
             return [null, 0, 'This gift card has no balance left.'];
@@ -452,7 +458,7 @@ class Pricing
             $options = $product->giftCardOptions();
 
             return ['code' => 'gift_card_amount_invalid', 'message' => $options['custom']
-                ? "Choose an amount for {$product->name} between \${$options['custom']['min']} and \${$options['custom']['max']}"
+                ? "Choose an amount for {$product->name} between ".Currency::format($options['custom']['min']).' and '.Currency::format($options['custom']['max'])
                     .($options['amounts'] ? ', or one of the listed amounts.' : '.')
                 : "Choose one of the amounts for {$product->name}."];
         }

@@ -154,7 +154,7 @@ class AdminCatalogTest extends TestCase
         $this->assertSame([0, 1], array_column($data['low_stock_products'], 'stock_quantity'));
         $this->assertSame('beauty', $data['low_stock_products'][1]['category']);
         $this->assertSame([$cancelled->number, Order::where('status', 'processing')->value('number')], array_column($data['latest_orders'], 'number'));
-        $this->assertSame(['number', 'customer_name', 'email', 'items', 'total', 'status', 'placed_at'], array_keys($data['latest_orders'][1]));
+        $this->assertSame(['number', 'customer_name', 'email', 'items', 'total', 'currency', 'status', 'placed_at'], array_keys($data['latest_orders'][1]));
         $this->assertSame('Ava Customer', $data['latest_orders'][1]['customer_name']);
         $this->assertSame(2, $data['latest_orders'][1]['items']);
     }

@@ -47,7 +47,7 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
           <dd>{formatPrice(totals.total)}</dd>
         </div>
       </dl>
-      {/* Phase 11: prices shown in another currency are approximate; the order is charged in USD. */}
+      {/* Phase 11: prices shown in another currency are approximate; the order is charged in the store currency. */}
       <ChargedInBaseNote amount={totals.total} />
 
       <CouponForm

@@ -79,6 +79,8 @@ class SettingsTest extends TestCase
             'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
             'card_payments' => 'manual',
             'paypal_payments' => 'manual', // phase 10 (part B)
+            'sslcommerz_payments' => 'unavailable', // phase 12: the store currency isn't BDT
+            'currency' => ['code' => 'USD', 'symbol' => '$', 'decimals' => 2], // phase 12
             'ga4_measurement_id' => null, // phase 10 (part A)
             // Phase 11.
             'rewards' => ['enabled' => false, 'earn_rate' => '1.00', 'point_value' => '0.0100', 'min_redeem' => 100],

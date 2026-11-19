@@ -11,6 +11,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\RewardTransaction;
 use App\Models\WishlistItem;
+use App\Support\Currency;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -35,13 +36,29 @@ class Reports
      */
     public function sales(CarbonImmutable $from, CarbonImmutable $to, string $groupBy): array
     {
-        $days = $this->orders($from, $to)
+        // Phase 12: money is added up per currency, never across currencies: the totals and series are the
+        // store currency's; other_currencies lists the rest (orders placed before a currency switch).
+        $store = Currency::store();
+        $days = $this->orders($from, $to)->where('currency', $store)
             ->selectRaw('date(placed_at) as day, count(*) as orders, sum(discount_total) as discounts, '
                 .'sum(shipping_total) as shipping, sum(tax_total) as tax, sum(grand_total) as gross')
             ->groupBy('day')->get();
         $units = (int) OrderItem::whereIn('order_id', $this->orders($from, $to)->select('id'))->sum('quantity');
-        $refundDays = CreditMemo::whereBetween('created_at', $this->bounds($from, $to))
-            ->selectRaw('date(created_at) as day, sum(total) as refunds')->groupBy('day')->pluck('refunds', 'day');
+        $memos = fn () => CreditMemo::whereBetween('credit_memos.created_at', $this->bounds($from, $to))
+            ->join('orders', 'orders.id', '=', 'credit_memos.order_id');
+        $refundDays = $memos()->where('orders.currency', $store)
+            ->selectRaw('date(credit_memos.created_at) as day, sum(credit_memos.total) as refunds')->groupBy('day')->pluck('refunds', 'day');
+        $otherOrders = $this->orders($from, $to)->where('currency', '!=', $store)
+            ->selectRaw('currency, count(*) as orders, sum(grand_total) as gross')->groupBy('currency')->get()->keyBy('currency');
+        $otherRefunds = $memos()->where('orders.currency', '!=', $store)
+            ->selectRaw('orders.currency as currency, sum(credit_memos.total) as refunds')->groupBy('orders.currency')->pluck('refunds', 'currency');
+        $others = [];
+        foreach ($otherOrders->keys()->merge($otherRefunds->keys())->unique()->sort()->values() as $code) {
+            $gross = Pricing::toCents((string) ($otherOrders[$code]->gross ?? 0));
+            $refunds = Pricing::toCents((string) ($otherRefunds[$code] ?? 0));
+            $others[] = ['currency' => $code, 'orders' => (int) ($otherOrders[$code]->orders ?? 0), 'gross' => Pricing::format($gross),
+                'refunds' => Pricing::format($refunds), 'net' => Pricing::format($gross - $refunds)];
+        }
 
         $series = [];
         foreach ($this->periods($from, $to, $groupBy) as $period) {
@@ -65,6 +82,8 @@ class Reports
         $net = $totals['gross'] - $totals['refunds'];
 
         return [
+            'currency' => $store, // phase 12
+            'other_currencies' => $others,
             'totals' => [
                 'orders' => $totals['orders'],
                 'units' => $units,
@@ -93,7 +112,9 @@ class Reports
     public function products(CarbonImmutable $from, CarbonImmutable $to, int $limit): array
     {
         return OrderItem::whereIn('order_id', $this->orders($from, $to)->select('id'))
-            ->selectRaw('product_id, max(name) as name, max(sku) as sku, sum(quantity) as units, sum(line_total) as revenue')
+            // Phase 12: revenue in the store currency only (units count every order).
+            ->selectRaw('product_id, max(name) as name, max(sku) as sku, sum(quantity) as units, '
+                .'sum(case when order_id in (select id from orders where currency = ?) then line_total else 0 end) as revenue', [Currency::store()])
             ->groupBy('product_id')
             ->orderByDesc('units')->orderByDesc('revenue')->orderBy('product_id')
             ->limit($limit)->get()
@@ -123,7 +144,8 @@ class Reports
         )->count();
 
         $top = $this->orders($from, $to)->whereNotNull('customer_id')
-            ->selectRaw('customer_id, count(*) as orders, sum(grand_total) as spent')
+            // Phase 12: spent in the store currency only.
+            ->selectRaw('customer_id, count(*) as orders, sum(case when currency = ? then grand_total else 0 end) as spent', [Currency::store()])
             ->groupBy('customer_id')->orderByDesc('spent')->orderBy('customer_id')->limit(10)->get();
         $customers = Customer::whereIn('id', $top->pluck('customer_id'))->get()->keyBy('id');
 
@@ -150,7 +172,9 @@ class Reports
     {
         $rows = CouponRedemption::query()
             ->whereIn('order_id', $this->orders($from, $to)->select('id'))
-            ->selectRaw('coupon_id, count(*) as uses, sum(discount) as discount_total')
+            // Phase 12: discounts in the store currency only.
+            ->selectRaw('coupon_id, count(*) as uses, sum(case when order_id in (select id from orders where currency = ?) then discount else 0 end) as discount_total',
+                [Currency::store()])
             ->groupBy('coupon_id')->get();
         $coupons = Coupon::whereIn('id', $rows->pluck('coupon_id'))->get()->keyBy('id');
 

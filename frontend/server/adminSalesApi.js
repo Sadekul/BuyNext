@@ -165,7 +165,8 @@ function orderAddress(prefix, address, errors) {
 
 export const SHIPPING_METHODS = ['standard', 'express', 'nextDay']
 // The settings' methods, plus the two only admins may choose (the API decides which are on).
-export const ADMIN_PAYMENT_METHODS = ['card', 'paypal', 'cod', 'bank_transfer', 'cash']
+// Phase 12: + sslcommerz (the customer pays through the payment link; needs a phone number).
+export const ADMIN_PAYMENT_METHODS = ['card', 'paypal', 'sslcommerz', 'cod', 'bank_transfer', 'cash']
 export const MAX_ORDER_LINES = 50
 
 /**

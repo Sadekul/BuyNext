@@ -3,6 +3,8 @@ import { camelPath, fromAddress, fromCart, fromLine, fromPayment, fromShipment, 
 import { failed } from './adminSystem.js'
 // Phase 11 §4: the customer's points balance.
 import { customerPoints } from './adminPhase11.js'
+// Phase 12 §1: each order's currency.
+import { withCurrency } from './adminPhase12.js'
 
 /*
  * Phase 6 of the admin (docs/backend/PHASE6_CONTRACT.md) from BuyNest's
@@ -101,6 +103,8 @@ const orderSummary = (raw) => ({
   total: money(raw.total ?? raw.totals?.total),
   items: int(raw.item_count ?? raw.items_count ?? raw.totals?.item_count),
   placedAt: raw.placed_at ?? null,
+  // Phase 12 §1: the order's own currency.
+  ...withCurrency(raw),
 })
 
 /** AdminCustomerResource → a row of the customer list (the fields the list always had, plus the group). */

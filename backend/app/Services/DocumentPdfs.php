@@ -6,8 +6,11 @@ use App\Http\Resources\OrderResource;
 use App\Models\CreditMemo;
 use App\Models\Invoice;
 use App\Models\Order;
+use App\Services\Payments\SslCommerzPayments;
+use App\Support\Currency;
 use Barryvdh\DomPDF\PDF;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\File;
 
 /**
  * Phase 10 (part A): invoices and credit memos as PDF files.
@@ -33,15 +36,18 @@ class DocumentPdfs
 
     public function __construct(private Settings $settings) {}
 
-    /** "12.5" → "$12.50", "-5" → "−$5.00", null → "—" (the API's money strings, as a person reads them). */
-    public static function money(string|int|float|null $amount): string
+    /**
+     * "12.5" → "$12.50", "-5" → "−$5.00", null → "—" (the API's money strings, as a person reads them).
+     * Phase 12: in $currency (the order's: "৳1,250.00"); the store currency when null.
+     */
+    public static function money(string|int|float|null $amount, ?string $currency = null): string
     {
         if ($amount === null || $amount === '' || ! is_numeric($amount)) {
             return '—';
         }
         $cents = Pricing::toCents((string) $amount);
 
-        return ($cents < 0 ? '−' : '').'$'.number_format(abs($cents) / 100, 2);
+        return ($cents < 0 ? '−' : '').Currency::formatCents(abs($cents), $currency);
     }
 
     /** Is this money string above zero? */
@@ -70,8 +76,14 @@ class DocumentPdfs
 
         /** @var PDF $pdf a new wrapper each time (the container binds it, not a singleton) */
         $pdf = app('dompdf.wrapper');
+        // Phase 12: the font for the taka sign (resources/fonts) is registered from the local disk; dompdf keeps its metrics here.
+        $fontCache = storage_path('framework/cache/dompdf-fonts');
+        File::ensureDirectoryExists($fontCache);
 
         return $pdf->setOption([
+            'fontDir' => $fontCache,
+            'fontCache' => $fontCache,
+            'chroot' => [base_path()],
             'isRemoteEnabled' => false,
             'isPhpEnabled' => false,
             'isJavascriptEnabled' => false,
@@ -157,6 +169,7 @@ class DocumentPdfs
         $methods = [...config('buynest.store.payment_methods', []), ...config('buynest.store.admin_payment_methods', [])];
 
         return [
+            'currency' => $order->currencyCode(), // phase 12: every amount of the document is in it
             'store' => [
                 'name' => $this->settings->get('store_name'),
                 'address' => $this->settings->get('address'),
@@ -168,7 +181,12 @@ class DocumentPdfs
                 'date' => $order->placed_at?->format('M j, Y'),
                 'email' => $order->email,
                 'payment_method' => $methods[$order->payment_method] ?? ucfirst(str_replace('_', ' ', (string) $order->payment_method)),
-                'payment_provider' => $order->payment_provider ? ucfirst((string) $order->payment_provider) : null,
+                'payment_provider' => match ($order->payment_provider) {
+                    null, '' => null,
+                    'paypal' => 'PayPal',
+                    'sslcommerz' => SslCommerzPayments::methodLabel($order) ?? 'SSLCommerz', // phase 12: "bKash", "Visa card", ...
+                    default => ucfirst(str_replace('_', ' ', (string) $order->payment_provider)),
+                },
                 'payment_status' => ucfirst(str_replace('_', ' ', (string) $order->payment_status)),
                 'shipping_method' => $order->shipping_label,
                 'coupon_code' => $order->coupon_code,

@@ -32,9 +32,9 @@ class AbandonedCartMail extends Mailable
             'items_table' => EmailBlocks::itemsTable(
                 array_map(fn (array $line) => [
                     $line['name'].($line['variant_label'] ? " ({$line['variant_label']})" : '')." × {$line['quantity']}",
-                    '$'.Pricing::format($line['sale_cents'] * $line['quantity']),
+                    $this->money(Pricing::format($line['sale_cents'] * $line['quantity'])),
                 ], $this->lines),
-                [['Subtotal', '$'.$this->subtotal, true]],
+                [['Subtotal', $this->money($this->subtotal), true]],
             ),
             'button' => EmailBlocks::button($cartUrl, 'Back to your cart'),
         ];

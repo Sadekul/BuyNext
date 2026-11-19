@@ -78,10 +78,12 @@ class OrderDocuments
             throw ValidationException::withMessages([$errorKey => 'A cancelled order can\'t be invoiced.']);
         }
         // Also refuse when the payment is already recorded (e.g. a paid order without an invoice): never invoice twice.
-        if ($order->invoices()->exists() || $order->payment_status !== 'unpaid') {
+        // Phase 12: "review" (an SSLCommerz payment held for a risk check) is approved by invoicing it.
+        if ($order->invoices()->exists() || ! in_array($order->payment_status, ['unpaid', 'review'], true)) {
             throw ValidationException::withMessages([$errorKey => 'This order has already been invoiced.']);
         }
 
+        $paymentBefore = $order->payment_status;
         $invoice = $order->invoices()->create([
             'amount' => $order->grand_total,
             'admin_id' => $admin?->id,
@@ -99,14 +101,14 @@ class OrderDocuments
         $order->history()->create([
             'status' => $order->status,
             'payment_status' => 'paid',
-            'note' => "Invoice {$invoice->number} created; payment of \${$invoice->amount} recorded."
+            'note' => "Invoice {$invoice->number} created; payment of {$order->money($invoice->amount)} recorded."
                 // Phase 10 (part B): the payment's own note ("Paid by card through Stripe.", "Paid through PayPal.", "Paid with gift card ••••ABCD.").
                 .($admin ? '' : ' '.($note ?? 'Paid online.')),
             'admin_id' => $admin?->id,
             'customer_notified' => $notify,
         ]);
-        $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} (\${$invoice->amount}).",
-            'invoice', $invoice->id, ['before' => ['payment_status' => 'unpaid'], 'after' => ['payment_status' => 'paid', 'amount' => $invoice->amount]], $admin);
+        $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} ({$order->money($invoice->amount)}).",
+            'invoice', $invoice->id, ['before' => ['payment_status' => $paymentBefore], 'after' => ['payment_status' => 'paid', 'amount' => $invoice->amount]], $admin);
 
         // Phase 10 (part B): gift cards bought with the order are made (and emailed after the commit) once it is paid.
         app(GiftCards::class)->issueFor($order);

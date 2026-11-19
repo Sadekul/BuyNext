@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { ROUTES } from '../../constants/routes'
-import { formatBasePrice } from '../../utils/formatters'
+import { moneyFormatter } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { recipientLabel } from '../../utils/giftCards'
 import './OrderItems.css'
@@ -9,9 +9,11 @@ import './OrderItems.css'
  * Compact list of order or checkout lines. `items` use cart/order item shape.
  * Lines priced by the server bring their own `salePrice` and `lineTotal`;
  * those win over the local calculation. Variant lines show their label
- * ("Size: M / Color: Red").
+ * ("Size: M / Color: Red"). `currency` (phase 12): the order's currency code.
  */
-function OrderItems({ items }) {
+function OrderItems({ items, currency = null }) {
+  // Phase 12: an order's lines in the order's own currency; checkout's in the store currency.
+  const formatBasePrice = moneyFormatter(currency)
   return (
     <ul className="order-items">
       {items.map((item, index) => {

@@ -9,7 +9,7 @@ import OrderPayment from '../components/OrderPayment'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
-import { formatCount, formatDate, formatDateTime, formatMoney, fullName } from '../utils/format'
+import { formatCount, formatDate, formatDateTime, formatMoney, fullName, storeCode } from '../utils/format'
 import { PAYMENT_METHODS, orderActions, orderSource, orderStatus, paymentStatus, providerName, returnStatus } from '../utils/orders'
 // Phase 10 §2 and §5: PDFs of the documents, gift card lines.
 import { creditMemoPdfUrl, invoicePdfUrl } from '../api/phase10'
@@ -157,7 +157,7 @@ function Documents({ order }) {
           <ul>
             {invoices.map((invoice) => (
               <li key={invoice.number}>
-                <Link to={`/invoices/${invoice.number}`}>{invoice.number}</Link> · {formatMoney(invoice.amount)} · {formatDate(invoice.createdAt)}
+                <Link to={`/invoices/${invoice.number}`}>{invoice.number}</Link> · {formatMoney(invoice.amount, order.currency)} · {formatDate(invoice.createdAt)}
                 {/* Phase 8: an invoice no admin created was recorded by Stripe's webhook (phase 10: or PayPal's capture). */}
                 <span className="muted"> · by {invoice.adminName ?? (['stripe', 'paypal', 'gift_card'].includes(order.payment?.provider) ? providerName(order.payment.provider) : 'System')}</span>
               </li>
@@ -209,7 +209,7 @@ function Documents({ order }) {
           <ul>
             {creditMemos.map((memo) => (
               <li key={memo.number}>
-                <Link to={`/credit-memos/${memo.number}`}>{memo.number}</Link> · {formatMoney(memo.total)} · {formatDate(memo.createdAt)} ·{' '}
+                <Link to={`/credit-memos/${memo.number}`}>{memo.number}</Link> · {formatMoney(memo.total, order.currency)} · {formatDate(memo.createdAt)} ·{' '}
                 {/* Phase 10 §2. */}
                 <a href={creditMemoPdfUrl(memo.number)} download>
                   PDF <span className="visually-hidden">of credit memo {memo.number}</span>
@@ -264,7 +264,9 @@ function GiftCardLine({ giftCard, cards, canView }) {
 
 // Phase 8: history entries written by Stripe's webhook (payment recorded, payment page expired) have no admin.
 // Phase 10: PayPal's capture and webhooks write the same kind of entries.
+// Phase 12: and SSLCommerz's return trip, IPN, and expiry job.
 const byProvider = (entry) => {
+  if (/SSLCommerz/i.test(entry.note ?? '')) return 'SSLCommerz'
   if (/through PayPal|PayPal/i.test(entry.note ?? '')) return 'PayPal'
   return /through Stripe|secure payment page expired/i.test(entry.note ?? '') ? 'Stripe' : null
 }
@@ -407,9 +409,9 @@ function LiveOrderDetailPage() {
                     {/* Phase 10 §5: a gift card bought for someone: who receives it, and the cards made once paid. */}
                     {line.giftCard && <GiftCardLine giftCard={line.giftCard} cards={cardsFor(data, line.giftCard)} canView={can('gift_cards.view')} />}
                   </td>
-                  <td className="num">{formatMoney(line.price)}</td>
+                  <td className="num">{formatMoney(line.price, data.currency)}</td>
                   <td className="num">{formatCount(line.quantity)}</td>
-                  <td className="num">{formatMoney(line.discountedTotal)}</td>
+                  <td className="num">{formatMoney(line.discountedTotal, data.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -418,34 +420,34 @@ function LiveOrderDetailPage() {
                 <th scope="row" colSpan={3}>
                   Subtotal
                 </th>
-                <td className="num">{formatMoney(data.totals.subtotal)}</td>
+                <td className="num">{formatMoney(data.totals.subtotal, data.currency)}</td>
               </tr>
               {data.totals.discount > 0 && (
                 <tr>
                   <th scope="row" colSpan={3}>
                     Discount{data.couponCode && ` (${data.couponCode})`}
                   </th>
-                  <td className="num">−{formatMoney(data.totals.discount)}</td>
+                  <td className="num">−{formatMoney(data.totals.discount, data.currency)}</td>
                 </tr>
               )}
               <tr>
                 <th scope="row" colSpan={3}>
                   Shipping{data.shippingMethod && ` (${data.shippingMethod.label})`}
                 </th>
-                <td className="num">{formatMoney(data.totals.shipping)}</td>
+                <td className="num">{formatMoney(data.totals.shipping, data.currency)}</td>
               </tr>
               <tr>
                 <th scope="row" colSpan={3}>
                   Tax
                 </th>
-                <td className="num">{formatMoney(data.totals.tax)}</td>
+                <td className="num">{formatMoney(data.totals.tax, data.currency)}</td>
               </tr>
               <tr>
                 <th scope="row" colSpan={3}>
                   Total
                 </th>
                 <td className="num">
-                  <strong>{formatMoney(data.totals.total)}</strong>
+                  <strong>{formatMoney(data.totals.total, data.currency)}</strong>
                 </td>
               </tr>
               {/* Phase 11 §4: points paid first (after tax), then (phase 10 §5) a gift card; the rest by the order's payment method. */}
@@ -454,7 +456,7 @@ function LiveOrderDetailPage() {
                   <th scope="row" colSpan={3}>
                     Paid with reward points ({formatPoints(data.rewardPoints.spent)})
                   </th>
-                  <td className="num">−{formatMoney(pointsPaid)}</td>
+                  <td className="num">−{formatMoney(pointsPaid, data.currency)}</td>
                 </tr>
               )}
               {data.giftCardPayment?.amount > 0 && (
@@ -462,7 +464,7 @@ function LiveOrderDetailPage() {
                   <th scope="row" colSpan={3}>
                     Paid by gift card{data.giftCardPayment.last4 && ` (ending ${data.giftCardPayment.last4})`}
                   </th>
-                  <td className="num">−{formatMoney(data.giftCardPayment.amount)}</td>
+                  <td className="num">−{formatMoney(data.giftCardPayment.amount, data.currency)}</td>
                 </tr>
               )}
               {(pointsPaid > 0 || data.giftCardPayment?.amount > 0) && (
@@ -470,7 +472,7 @@ function LiveOrderDetailPage() {
                   <th scope="row" colSpan={3}>
                     {COVERED_METHODS.includes(data.paymentMethod) ? 'Left to pay' : `Paid by ${PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}`}
                   </th>
-                  <td className="num">{formatMoney(Math.max(Math.round((data.totals.total - pointsPaid - (data.giftCardPayment?.amount ?? 0)) * 100), 0) / 100)}</td>
+                  <td className="num">{formatMoney(Math.max(Math.round((data.totals.total - pointsPaid - (data.giftCardPayment?.amount ?? 0)) * 100), 0) / 100, data.currency)}</td>
                 </tr>
               )}
               {Number.isInteger(data.rewardPoints?.earned) && (
@@ -486,7 +488,7 @@ function LiveOrderDetailPage() {
                   <th scope="row" colSpan={3}>
                     Paid (invoiced)
                   </th>
-                  <td className="num">{formatMoney(data.totals.paid)}</td>
+                  <td className="num">{formatMoney(data.totals.paid, data.currency)}</td>
                 </tr>
               )}
               {data.totals.refunded > 0 && (
@@ -494,7 +496,7 @@ function LiveOrderDetailPage() {
                   <th scope="row" colSpan={3}>
                     Refunded
                   </th>
-                  <td className="num">−{formatMoney(data.totals.refunded)}</td>
+                  <td className="num">−{formatMoney(data.totals.refunded, data.currency)}</td>
                 </tr>
               )}
             </tfoot>
@@ -545,7 +547,18 @@ function LiveOrderDetailPage() {
                   )}
                 </div>
                 {data.status === 'pending_payment' &&
-                  (data.payment?.canPay && data.payment.provider === 'paypal' ? (
+                  (data.paymentStatus === 'review' ? (
+                    // Phase 12 §3: SSLCommerz took the money but flagged it (risk level 1).
+                    <p className="field__hint">
+                      SSLCommerz took this payment but flagged it as risky, so the order is on hold. Check it in SSLCommerz's panel: Invoice accepts it and the order moves to
+                      Processing; Cancel order stops it (then refund the customer in SSLCommerz's panel).
+                    </p>
+                  ) : data.payment?.canPay && data.payment.provider === 'sslcommerz' ? (
+                    <p className="field__hint">
+                      The customer pays with bKash, Nagad, or a card on SSLCommerz's page: the order moves to Processing by itself once SSLCommerz confirms the payment. Send them
+                      the payment link under Delivery and payment if they need it, or use Check payment there if they say they paid.
+                    </p>
+                  ) : data.payment?.canPay && data.payment.provider === 'paypal' ? (
                     <p className="field__hint">
                       The customer pays on PayPal's page: the order moves to Processing by itself once PayPal confirms the payment. Send them the payment link under
                       Delivery and payment if they need it.
@@ -637,6 +650,15 @@ function LiveOrderDetailPage() {
             </dd>
             <dt>Payment</dt>
             <dd>{PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}</dd>
+            {/* Phase 12 §1: an order keeps the currency it was placed in (shown when the store's is different now). */}
+            {data.currency && data.currency !== storeCode() && (
+              <>
+                <dt>Currency</dt>
+                <dd>
+                  {data.currency} <span className="muted">· the store charges in {storeCode()} now</span>
+                </dd>
+              </>
+            )}
             {/* Phase 8: Stripe provider, reference, paid at, and the payment link of an unpaid card order. */}
             <OrderPayment order={data} canEdit={can('orders.edit')} />
             <dt>Bill to</dt>

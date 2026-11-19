@@ -3,6 +3,7 @@ import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS, SHIPPING_RULES } from '..
 import { SITE } from '../constants/site'
 import { REAL_SHOP } from '../constants/shop'
 import { storeSettingsQuery } from '../queries/contentQueries'
+import { DEFAULT_STORE_CURRENCY } from '../utils/displayCurrency'
 
 /**
  * The demo's rules (constants/store.js), in the same shape as the server's
@@ -29,6 +30,9 @@ export const DEFAULT_STORE_SETTINGS = {
   // Phase 11: no display currencies and no reward points in the demo (or while the real settings load).
   currencies: { base: 'USD', display: [] },
   rewards: null,
+  // Phase 12: the demo charges in USD and has no SSLCommerz (never offered; see constants/store.js).
+  currency: DEFAULT_STORE_CURRENCY,
+  sslcommerzPayments: 'manual',
 }
 
 /**

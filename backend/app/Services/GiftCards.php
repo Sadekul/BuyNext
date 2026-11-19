@@ -10,6 +10,7 @@ use App\Models\GiftCard;
 use App\Models\GiftCardTransaction;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Support\Currency;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -102,7 +103,7 @@ class GiftCards
             'last4' => substr($code, -4),
             'initial_balance' => Pricing::format($cents),
             'balance' => Pricing::format($cents),
-            'currency' => strtoupper((string) config('buynest.store.currency', 'USD')),
+            'currency' => Currency::store(),
             'status' => 'active',
             'expires_at' => $attributes['expires_at'] ?? null,
             'purchaser_order_item_id' => $attributes['purchaser_order_item_id'] ?? null,
@@ -173,7 +174,7 @@ class GiftCards
                 throw ValidationException::withMessages(['amount' => 'The balance can\'t go below $0.00 (it is $'.$card->balance.').']);
             }
             $this->change($card, $cents, $note, admin: $admin);
-            $this->audit->record('gift_card.adjusted', "Gift card ••••{$card->last4}: balance \${$before} → \${$card->balance}.", 'gift_card', $card->id,
+            $this->audit->record('gift_card.adjusted', "Gift card ••••{$card->last4}: balance ".Currency::format($before, $card->currency).' → '.Currency::format($card->balance, $card->currency).'.', 'gift_card', $card->id,
                 ['before' => ['balance' => $before], 'after' => ['balance' => $card->balance, 'note' => $note]], $admin);
 
             return $card;

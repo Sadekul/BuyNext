@@ -12,7 +12,7 @@ import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { EMPTY_PRODUCT, GIFT_CARD_FIELDS, LIVE_ONLY_FIELDS, giftCardFormFields, productSchema, toGiftCardValues } from '../utils/productSchema'
-import { formatCount, formatMoney } from '../utils/format'
+import { formatCount, formatMoney, storeCode } from '../utils/format'
 import { PRODUCT_STATUSES } from '../utils/orders'
 import { LIVE_DATA } from '../api/mode'
 import ProductImages from '../components/ProductImages'
@@ -250,7 +250,7 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
           </select>
           )}
         </Field>
-        <Field label="Price (USD)" error={errors.price?.message}>
+        <Field label={`Price (${storeCode()})`} error={errors.price?.message}>
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" step="0.01" min="0" {...register('price', { valueAsNumber: true })} />}
         </Field>
         <Field label="Discount (%)" error={errors.discountPercentage?.message}>
@@ -302,7 +302,7 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
         <fieldset className="form__fieldset seo-fields">
           <legend>Gift card amounts</legend>
           <div className="form__grid">
-            <Field label="Amount choices (USD)" error={errors.giftCardAmounts?.message} hint="Separated by commas, like 25, 50, 100." className="seo-fields__wide">
+            <Field label={`Amount choices (${storeCode()})`} error={errors.giftCardAmounts?.message} hint="Separated by commas, like 25, 50, 100." className="seo-fields__wide">
               {(a11y) => <input {...a11y} inputMode="decimal" autoComplete="off" {...register('giftCardAmounts')} />}
             </Field>
             <Field label="Custom amount from (optional)" error={errors.giftCardMinAmount?.message} hint="With both ends, shoppers can also type an amount in this range.">

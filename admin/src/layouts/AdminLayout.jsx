@@ -10,6 +10,8 @@ import { fullName } from '../utils/format'
 import { allowedNav } from '../utils/permissions'
 import { LIVE_DATA } from '../api/mode'
 import NotificationsBell from '../components/NotificationsBell'
+// Phase 12 §1: money in the store currency.
+import { useStoreCurrency } from '../hooks/useStoreCurrency'
 
 function NavItem({ to, label, icon: Icon, end }) {
   return (
@@ -29,6 +31,7 @@ function NavItem({ to, label, icon: Icon, end }) {
 function AdminLayout() {
   const { status, user, signOut, message, can } = useAdminAuth()
   const location = useLocation()
+  const currency = useStoreCurrency()
 
   if (status === 'checking') {
     return (
@@ -110,7 +113,8 @@ function AdminLayout() {
           </header>
         )}
         <main id="admin-main" className="admin__main" tabIndex={-1}>
-          <Outlet />
+          {/* Keyed by the store currency: when it arrives (once), the page shows its amounts in it. */}
+          <Outlet key={currency} />
         </main>
       </div>
     </div>

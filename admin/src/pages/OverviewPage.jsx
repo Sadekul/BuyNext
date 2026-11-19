@@ -195,7 +195,7 @@ function OverviewPage() {
                         <StatusBadge {...orderStatus(order.status)} />
                       </td>
                     )}
-                    <td className="num">{formatMoney(order.total)}</td>
+                    <td className="num">{formatMoney(order.total, order.currency)}</td>
                   </tr>
                 ))}
               </tbody>

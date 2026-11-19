@@ -19,7 +19,7 @@ import Field from '../components/Field'
 import FormDialog from '../components/FormDialog'
 import PageHeader from '../components/PageHeader'
 import { ErrorState, Loading } from '../components/States'
-import { formatCount, formatMoney } from '../utils/format'
+import { formatCount, formatMoney, storeCode } from '../utils/format'
 import { SHIPPING_METHODS, csvRowProblems, describeRange, methodLabel, rateErrors, rateFormValues, rateName, toRateValues } from '../utils/shippingRates'
 
 /*
@@ -297,7 +297,7 @@ function RateDialog({ rate, method, onDone, onCancel }) {
       isOpen
       wide
       title={rate ? `Edit ${rateName(rate)}` : `Add ${article(methodLabel(method))} ${methodLabel(method).toLowerCase()} rate`}
-      description="A row matches from its minimum up to (not including) its maximum; an empty maximum means no limit. Weights in grams, amounts in USD; the order value is before cart discounts."
+      description={`A row matches from its minimum up to (not including) its maximum; an empty maximum means no limit. Weights in grams, amounts in ${storeCode()}; the order value is before cart discounts.`}
       submitLabel={rate ? 'Save rate' : 'Add rate'}
       busy={save.isPending}
       error={other}
@@ -325,13 +325,13 @@ function RateDialog({ rate, method, onDone, onCancel }) {
         <Field label="Weight up to (g)" error={error('maxWeightGrams')} hint="Empty: no limit.">
           {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.maxWeightGrams} onChange={set('maxWeightGrams')} />}
         </Field>
-        <Field label="Order value from (USD)" error={error('minSubtotal')}>
+        <Field label={`Order value from (${storeCode()})`} error={error('minSubtotal')}>
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.minSubtotal} onChange={set('minSubtotal')} />}
         </Field>
-        <Field label="Order value up to (USD)" error={error('maxSubtotal')} hint="Empty: no limit.">
+        <Field label={`Order value up to (${storeCode()})`} error={error('maxSubtotal')} hint="Empty: no limit.">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.maxSubtotal} onChange={set('maxSubtotal')} />}
         </Field>
-        <Field label="Price (USD)" error={error('price')} hint="0 = free with this row.">
+        <Field label={`Price (${storeCode()})`} error={error('price')} hint="0 = free with this row.">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.price} onChange={set('price')} />}
         </Field>
       </div>
@@ -374,7 +374,7 @@ function CheckCart() {
           <Field label="Cart weight (g)" error={errors.weightGrams?.[0]}>
             {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.weightGrams} onChange={set('weightGrams')} />}
           </Field>
-          <Field label="Order value (USD)" error={errors.subtotal?.[0]}>
+          <Field label={`Order value (${storeCode()})`} error={errors.subtotal?.[0]}>
             {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.subtotal} onChange={set('subtotal')} />}
           </Field>
         </div>

@@ -43,7 +43,7 @@ function OrderRow({ order }) {
         </span>
       </div>
       <OrderStatusBadge status={order.status} />
-      <span className="orders__total">{formatBasePrice(order.totals.total)}</span>
+      <span className="orders__total">{formatBasePrice(order.totals.total, order.currency)}</span>
     </li>
   )
 }

@@ -316,7 +316,7 @@ function LiveOrdersPage() {
                       <StatusBadge {...paymentStatus(order.paymentStatus)} />
                     </td>
                   )}
-                  {grid.isVisible('total') && <td className="num">{formatMoney(order.total)}</td>}
+                  {grid.isVisible('total') && <td className="num">{formatMoney(order.total, order.currency)}</td>}
                 </tr>
               ))}
             </tbody>

@@ -11,7 +11,7 @@ import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
-import { formatCount, formatDate, formatDateTime, formatMoney } from '../utils/format'
+import { formatCount, formatDate, formatDateTime, formatMoney, storeCode } from '../utils/format'
 import { GIFT_CARD_FILTERS, adjustmentErrors, cardName, giftCardErrors, giftCardStatus, signedMoney } from '../utils/giftCards'
 
 /*
@@ -136,9 +136,9 @@ export function GiftCardsPage() {
                     <small className="muted">Created {formatDate(card.createdAt)}</small>
                   </td>
                   <td className="num">
-                    {formatMoney(card.balance)}
+                    {formatMoney(card.balance, card.currency)}
                     <br />
-                    <small className="muted">of {formatMoney(card.initialBalance)}</small>
+                    <small className="muted">of {formatMoney(card.initialBalance, card.currency)}</small>
                   </td>
                   <td>
                     <StatusBadge {...giftCardStatus(card.status)} />
@@ -209,7 +209,7 @@ function CreatedNotice({ result, noticeRef }) {
   return (
     <div ref={noticeRef} tabIndex={-1} className="notice notice--success gift-card-created">
       <p>
-        {cardName(giftCard)} created with {formatMoney(giftCard.initialBalance)}.{emailed ? ` It was emailed to ${giftCard.recipientEmail}.` : ''}
+        {cardName(giftCard)} created with {formatMoney(giftCard.initialBalance, giftCard.currency)}.{emailed ? ` It was emailed to ${giftCard.recipientEmail}.` : ''}
       </p>
       {code && (
         <>
@@ -271,7 +271,7 @@ function CreateGiftCardDialog({ onDone, onCancel }) {
       onCancel={onCancel}
     >
       <div className="form__grid">
-        <Field label="Amount (USD)" error={error('amount')}>
+        <Field label={`Amount (${storeCode()})`} error={error('amount')}>
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="1" step="0.01" value={values.amount} onChange={set('amount')} />}
         </Field>
         <Field label="Expires on (optional)" error={error('expiresAt')} hint="Empty: never expires.">
@@ -349,7 +349,7 @@ export function GiftCardDetailPage() {
       </Link>
       <PageHeader
         title={cardName(data)}
-        description={`${formatMoney(data.balance)} left of ${formatMoney(data.initialBalance)} · created ${formatDate(data.createdAt)}`}
+        description={`${formatMoney(data.balance, data.currency)} left of ${formatMoney(data.initialBalance, data.currency)} · created ${formatDate(data.createdAt)}`}
         actions={
           <>
             <StatusBadge {...giftCardStatus(data.status)} />
@@ -382,10 +382,10 @@ export function GiftCardDetailPage() {
           <dl className="details">
             <dt>Balance</dt>
             <dd>
-              <strong>{formatMoney(data.balance)}</strong> <span className="muted">{data.currency ?? 'USD'}</span>
+              <strong>{formatMoney(data.balance, data.currency)}</strong> <span className="muted">{data.currency ?? storeCode()}</span>
             </dd>
             <dt>First balance</dt>
-            <dd>{formatMoney(data.initialBalance)}</dd>
+            <dd>{formatMoney(data.initialBalance, data.currency)}</dd>
             <dt>Expires</dt>
             <dd>{data.expiresAt ? formatDate(data.expiresAt) : 'Never'}</dd>
             <dt>From</dt>
@@ -437,8 +437,8 @@ export function GiftCardDetailPage() {
                       <td>
                         <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
                       </td>
-                      <td className="num">{signedMoney(entry.amount)}</td>
-                      <td className="num">{entry.balanceAfter === null || entry.balanceAfter === undefined ? '—' : formatMoney(entry.balanceAfter)}</td>
+                      <td className="num">{signedMoney(entry.amount, data.currency)}</td>
+                      <td className="num">{entry.balanceAfter === null || entry.balanceAfter === undefined ? '—' : formatMoney(entry.balanceAfter, data.currency)}</td>
                       <td>
                         {entry.note || (entry.amount < 0 ? 'Spent' : 'Added')}
                         {entry.orderNumber && (
@@ -468,7 +468,7 @@ export function GiftCardDetailPage() {
       <ConfirmDialog
         isOpen={dialog === 'disable'}
         title={`Disable ${cardName(data)}?`}
-        message={`It can no longer be used at checkout; its ${formatMoney(data.balance)} balance stays on record. Gift cards can't be deleted or turned back on.`}
+        message={`It can no longer be used at checkout; its ${formatMoney(data.balance, data.currency)} balance stays on record. Gift cards can't be deleted or turned back on.`}
         confirmLabel="Disable"
         busy={disable.isPending}
         onConfirm={() => disable.mutate()}
@@ -487,12 +487,12 @@ function AdjustDialog({ card, onDone, onCancel }) {
     mutationFn: (values) => adjustGiftCard(card.id, values),
     onSuccess: (data, sent) => {
       const balance = data?.giftCard?.balance ?? Math.round((card.balance + sent.amount) * 100) / 100
-      onDone(`Balance ${sent.amount < 0 ? 'reduced' : 'increased'} by ${formatMoney(Math.abs(sent.amount))}. ${cardName(card)} now has ${formatMoney(balance)}.`)
+      onDone(`Balance ${sent.amount < 0 ? 'reduced' : 'increased'} by ${formatMoney(Math.abs(sent.amount), card.currency)}. ${cardName(card)} now has ${formatMoney(balance, card.currency)}.`)
     },
     onError: (error) => setErrors(error.fieldErrors ?? {}),
   })
   function submit() {
-    const found = adjustmentErrors({ amount, note }, card.balance)
+    const found = adjustmentErrors({ amount, note }, card.balance, card.currency)
     setErrors(found)
     if (Object.keys(found).length === 0) adjust.mutate({ amount: Number(amount), note: note.trim() })
   }
@@ -503,21 +503,21 @@ function AdjustDialog({ card, onDone, onCancel }) {
     <FormDialog
       isOpen
       title={`Adjust ${cardName(card)}`}
-      description={`Now ${formatMoney(card.balance)}. A positive amount adds to the balance, a negative one takes it away.`}
+      description={`Now ${formatMoney(card.balance, card.currency)}. A positive amount adds to the balance, a negative one takes it away.`}
       submitLabel="Save adjustment"
       busy={adjust.isPending}
       error={other}
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <Field label="Amount (USD)" error={errors.amount?.[0]} hint="For example 10.00 or -5.00.">
+      <Field label={`Amount (${card.currency ?? storeCode()})`} error={errors.amount?.[0]} hint="For example 10.00 or -5.00.">
         {(a11y) => <input {...a11y} type="number" inputMode="decimal" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />}
       </Field>
       <Field label="Reason" error={errors.note?.[0]} hint="Kept in the card's history.">
         {(a11y) => <textarea {...a11y} rows={2} maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} />}
       </Field>
       <p className="field__hint" aria-live="polite">
-        {preview !== null && preview >= 0 ? `New balance: ${formatMoney(preview)}` : ''}
+        {preview !== null && preview >= 0 ? `New balance: ${formatMoney(preview, card.currency)}` : ''}
       </p>
     </FormDialog>
   )

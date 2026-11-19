@@ -117,7 +117,7 @@ class OrderGridTest extends TestCase
         $this->assertStringContainsString('attachment; filename="orders-', $csv->headers->get('Content-Disposition'));
         $lines = array_values(array_filter(explode("\n", $csv->getContent())));
         $this->assertSame('number,placed_at,status,payment_status,source,customer_name,email,phone,customer_group,items,subtotal,discount,shipping,tax,total,'
-            .'paid,refunded,payment_method,shipping_method,coupon_code,ship_to_city,ship_to_country', $lines[0]);
+            .'paid,refunded,payment_method,shipping_method,coupon_code,ship_to_city,ship_to_country,currency', $lines[0]); // phase 12: currency
         $this->assertCount(2, $lines);
         $this->assertStringStartsWith("{$evil},", $lines[1]);
         $this->assertStringContainsString('"\'=cmd|""/c calc""!A1 Customer"', $lines[1]);

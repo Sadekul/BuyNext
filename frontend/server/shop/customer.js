@@ -1,5 +1,5 @@
 import { laravel } from '../http.js'
-import { failed } from './laravel.js'
+import { currencyCode, failed } from './laravel.js'
 
 /*
  * A signed-in customer's address book and returns, with BuyNest's Laravel API
@@ -103,7 +103,15 @@ export const fromReturn = (raw = {}) => ({
     comment: str(raw.comment) ?? null,
     message: str(raw.admin_note) ?? null,
     order: raw.order ? { number: raw.order.number, status: raw.order.status, placedAt: raw.order.placed_at ?? null } : null,
-    refund: raw.credit_memo ? { number: raw.credit_memo.number, total: money(raw.credit_memo.total), createdAt: raw.credit_memo.created_at ?? null } : null,
+    refund: raw.credit_memo
+      ? {
+          number: raw.credit_memo.number,
+          total: money(raw.credit_memo.total),
+          createdAt: raw.credit_memo.created_at ?? null,
+          // Phase 12: the refund in its order's currency.
+          ...(currencyCode(raw.credit_memo.currency ?? raw.order?.currency) && { currency: currencyCode(raw.credit_memo.currency ?? raw.order?.currency) }),
+        }
+      : null,
   }),
 })
 

@@ -1,4 +1,4 @@
-@php($money = \App\Services\DocumentPdfs::money(...))
+@php($money = fn ($amount) => \App\Services\DocumentPdfs::money($amount, $currency ?? null))
 <table class="items">
     <thead>
         <tr>

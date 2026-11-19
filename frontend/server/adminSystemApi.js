@@ -190,7 +190,8 @@ export function validateHome(body) {
 }
 
 const SHIPPING_METHODS = ['standard', 'express', 'nextDay']
-const PAYMENT_METHODS = ['card', 'paypal', 'cod']
+// Phase 12: + sslcommerz (bKash, Nagad, cards).
+const PAYMENT_METHODS = ['card', 'paypal', 'sslcommerz', 'cod']
 const someOf = (allowed, message) => (value) => (Array.isArray(value) && value.length > 0 && value.every((entry) => allowed.includes(entry)) ? null : message)
 const isBoolean = (message) => (value) => (typeof value === 'boolean' ? null : message)
 const moneyRule = (value) => (isMoney(value) ? null : 'Enter an amount of 0 or more, with at most 2 decimals.')

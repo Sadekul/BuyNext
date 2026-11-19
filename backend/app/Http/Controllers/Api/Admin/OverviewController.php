@@ -14,6 +14,7 @@ use App\Models\Review;
 use App\Services\Pricing;
 use App\Services\SearchTerms;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,9 +60,10 @@ class OverviewController extends Controller
 
         if ($can('orders.view')) {
             // Cancelled orders aren't revenue, and refunds (credit memos) are taken off it.
-            $counted = Order::where('status', '!=', 'cancelled');
+            // Phase 12: revenue in the store currency only (orders from before a currency switch aren't added in).
+            $counted = Order::where('status', '!=', 'cancelled')->where('currency', Currency::store());
             $revenueCents = Pricing::toCents((string) ($counted->clone()->sum('grand_total') ?? 0))
-                - Pricing::toCents((string) (CreditMemo::sum('total') ?? 0));
+                - Pricing::toCents((string) (CreditMemo::whereHas('order', fn ($q) => $q->where('currency', Currency::store()))->sum('total') ?? 0));
             $countedOrders = $counted->clone()->count();
             $byStatus = Order::selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
@@ -81,6 +83,7 @@ class OverviewController extends Controller
                     'email' => $order->email,
                     'items' => $order->itemCount(),
                     'total' => $order->grand_total,
+                    'currency' => $order->currencyCode(), // phase 12
                     'status' => $order->status,
                     'placed_at' => $order->placed_at?->toIso8601ZuluString(),
                 ]);
@@ -100,7 +103,8 @@ class OverviewController extends Controller
         if ($can('reports.view')) {
             $data['bestsellers'] = OrderItem::query()
                 ->whereHas('order', fn ($q) => $q->where('status', '!=', 'cancelled'))
-                ->selectRaw('product_id, MAX(name) as name, MAX(sku) as sku, SUM(quantity) as units, SUM(line_total) as revenue')
+                ->selectRaw('product_id, MAX(name) as name, MAX(sku) as sku, SUM(quantity) as units, '
+                    .'SUM(CASE WHEN order_id IN (SELECT id FROM orders WHERE currency = ?) THEN line_total ELSE 0 END) as revenue', [Currency::store()])
                 ->groupBy('product_id')->orderByDesc('units')->orderBy('product_id')->limit(5)->get()
                 ->map(fn ($row) => [
                     'product_id' => $row->product_id,
@@ -115,7 +119,8 @@ class OverviewController extends Controller
         // To-do counts, each with the permission of the page it links to.
         $todo = [];
         if ($can('orders.view')) {
-            $todo['orders_to_invoice'] = Order::where('payment_status', 'unpaid')->whereNotIn('status', ['cancelled', 'closed'])->count();
+            // Phase 12: a payment held for review (SSLCommerz risk check) also waits for staff to invoice it.
+            $todo['orders_to_invoice'] = Order::whereIn('payment_status', ['unpaid', 'review'])->whereNotIn('status', ['cancelled', 'closed'])->count();
             $todo['orders_to_ship'] = Order::where('status', 'processing')->doesntHave('shipments')->count();
         }
         if ($can('returns.view')) {
@@ -129,7 +134,8 @@ class OverviewController extends Controller
         }
         $data['todo'] = (object) $todo;
         $data['low_stock_threshold'] = $threshold;
-        $data['blocks'] = array_values(array_diff(array_keys($data), ['todo', 'low_stock_threshold']));
+        $data['currency'] = Currency::api(); // phase 12: the money above is in the store currency
+        $data['blocks'] = array_values(array_diff(array_keys($data), ['todo', 'low_stock_threshold', 'currency']));
 
         return response()->json(['data' => $data]);
     }
@@ -138,7 +144,7 @@ class OverviewController extends Controller
     private function revenueChart(): array
     {
         $from = now()->utc()->startOfDay()->subDays(29);
-        $rows = Order::where('status', '!=', 'cancelled')->where('placed_at', '>=', $from)
+        $rows = Order::where('status', '!=', 'cancelled')->where('currency', Currency::store())->where('placed_at', '>=', $from)
             ->selectRaw('DATE(placed_at) as day, COUNT(*) as orders, SUM(grand_total) as revenue')
             ->groupBy('day')->get()->keyBy(fn ($row) => (string) $row->day);
 

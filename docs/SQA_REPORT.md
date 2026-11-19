@@ -240,6 +240,20 @@ Built by three agents in parallel (backend; storefront with its sign-in service 
 
 Checks: backend 474 feature tests (Pint clean, `composer audit` clean); frontend 641 unit tests plus 297 sign-in service tests; admin 164; browser checks 1,333 on the dev server and 1,326 on the production build, all passing (new `loyalty.mjs`: 130). Not automated in the browser (covered by unit or backend tests): the customers grid Points column and the two new reports, points plus gift card on one order, full cover by points, sign-up and review bonuses, and CSV import/export of specifications and links.
 
+## Phase 12 (taka as the store currency, bKash / Nagad through SSLCommerz) — 2026-11-19
+
+Built by three agents in parallel (backend; storefront with its sign-in service routes; admin with its proxy routes) against [backend/PHASE12_CONTRACT.md](backend/PHASE12_CONTRACT.md), then verified with the new `taka.mjs` browser suite (131 checks). It runs its own API with `BUYNEST_CURRENCY=BDT`, its own store, and a stand-in SSLCommerz with a hosted gateway page on HTTPS, so no real account is used. Security points checked: the status the shopper's browser posts back is never trusted; every payment is validated with SSLCommerz on the server (status, transaction id, currency and amount), and a forged "VALID" with an invalid validation id is refused both on the return trip and as an IPN. IPNs need a correct `verify_sign`, are validated again, and are idempotent. The return trip works without the session cookie (cross-site POST, answered with a 303). Risky payments are held for review instead of invoiced. Expiry asks SSLCommerz before cancelling, and refunds go to SSLCommerz first (a refusal saves nothing). Each order keeps its own currency, a gift card can't pay in another currency, and the price conversion command has a dry run, refuses to run twice or with the wrong setting, and converts gift card balances to the paisa so no customer loses money. New files: the Noto Sans Bengali font (SIL Open Font License, bundled for the PDFs). No new packages; `composer audit` and `npm audit` clean.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| T1 | Medium | The PDF font (DejaVu Sans) has no taka sign, so `৳` amounts would print as empty boxes in invoices and credit memos | Noto Sans Bengali bundled as a fallback font for the PDFs; a test checks it is embedded |
+| T2 | Low | The announcement strip at the top of the store always said "Free standard shipping on orders over $50" (hard-coded), whatever the currency or threshold | It uses the store's free-shipping threshold and currency, and is hidden when there is none; unit test |
+| T3 | Low | A forged SSLCommerz IPN with an invalid validation id was answered "unknown order" instead of "invalid" (nothing was ever marked paid) | Answered "invalid" when SSLCommerz doesn't confirm the payment; backend test |
+| T4 | Test | The extras suite's consent part once timed out loading its first page during a full run (never alone) | That page gets a longer load allowance |
+| T5 | Note | Run by an AI agent, Laravel shortens console output (drops `→` arrows and table padding) | Not a bug: run normally, `buynest:currency:convert` prints the arrows |
+
+Checks: backend 499 feature tests (Pint clean); frontend 692 unit tests (including the sign-in service tests); admin 180; browser checks 1,464 on the dev server (1,438 in the full run plus the extras suite rerun alone after its one timeout) and 1,457 on the production build, all passing (new `taka.mjs`: 131). Not automated in the browser: the PDF attached to the invoice email, admin-created SSLCommerz orders and their payment links, the "processing" refund answer, and a gateway refusal when opening a session. Backend tests cover payment links, the "processing" refund and the gateway refusal; an admin-created SSLCommerz order has no dedicated test (it uses the same payment link path).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

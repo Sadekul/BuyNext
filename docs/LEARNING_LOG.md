@@ -260,3 +260,13 @@
 - Display currency vs charged currency: converting only at the formatter, keeping documents and totals in the base currency, and telling the shopper which amount they'll pay
 - Comparison tables that stay accessible: a real `<table>` with row headers and a focusable scroll region on phones
 - Splitting a phase across parallel agents against one written contract, with each side writing down its exact answer shapes for the others
+
+## Phase 12 (backend): Taka as the store currency, and bKash / Nagad through SSLCommerz
+
+- Money without a currency is a trap: why the store currency is a deployment setting, why each order records its own currency, and why switching means converting every stored price once (with a dry run, rounding rules, and a guard against running twice)
+- Formatting money from one source of truth in three apps (store, admin, emails/PDFs), falling back safely until settings load
+- A hosted payment page that returns with a cross-site form POST: why SameSite cookies aren't sent, answering with a 303 redirect, and never trusting the status the browser posts (validate with the provider on the server)
+- Instant payment notifications (IPN) as the safety net for a missed return trip, made idempotent with a payment events table
+- Fraud signals: holding a risky payment for staff review instead of invoicing it
+- Expiring unpaid orders safely: ask the provider before cancelling
+- Fonts in PDFs: a font only draws the characters it contains, so the taka sign needs a font that has it (Noto Sans Bengali as a fallback)

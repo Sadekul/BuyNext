@@ -22,6 +22,12 @@ class InvoiceMail extends Mailable
 
     public function __construct(public Invoice $invoice) {}
 
+    /** Phase 12: the order's currency. */
+    protected function templateCurrency(): ?string
+    {
+        return $this->invoice->order?->currencyCode();
+    }
+
     protected function templateKey(): string
     {
         return 'invoice';

@@ -269,8 +269,12 @@ export const fromShipment = (raw) => ({
   trackingUrl: httpsUrl(raw.tracking_url),
   createdAt: raw.created_at,
 })
-export const fromInvoiceSummary = (raw) => ({ number: raw.number, amount: money(raw.amount), createdAt: raw.created_at })
-export const fromCreditMemoSummary = (raw) => ({ number: raw.number, total: money(raw.total), createdAt: raw.created_at })
+// Phase 12: a 3-letter currency code (an order's, an invoice's), or nothing.
+export const currencyCode = (value) => (typeof value === 'string' && /^[A-Za-z]{3}$/.test(value.trim()) ? value.trim().toUpperCase() : undefined)
+const withCurrency = (raw) => (currencyCode(raw?.currency) ? { currency: currencyCode(raw.currency) } : {})
+
+export const fromInvoiceSummary = (raw) => ({ number: raw.number, amount: money(raw.amount), createdAt: raw.created_at, ...withCurrency(raw) })
+export const fromCreditMemoSummary = (raw) => ({ number: raw.number, total: money(raw.total), createdAt: raw.created_at, ...withCurrency(raw) })
 
 /** InvoiceResource → the printable invoice (customers: no admin name or internal note). */
 export function fromInvoice(raw) {
@@ -282,6 +286,8 @@ export function fromInvoice(raw) {
     billingAddress: fromAddress(raw.billing_address),
     items: (raw.items ?? []).map(fromLine),
     totals: fromTotals(raw.totals),
+    // Phase 12: the order's currency (the invoice's own, else its order's).
+    ...withCurrency(raw.currency ? raw : raw.order),
   }
 }
 
@@ -328,6 +334,9 @@ export const fromPayment = (raw) =>
         paidAt: str(raw.paid_at) ?? null,
         canPay: raw.can_pay === true,
         ...(str(raw.error) && { error: raw.error.slice(0, 300) }),
+        // Phase 12, SSLCommerz: how it was paid ("BKASH-BKash", "VISA-Dutch Bangla"), for "Paid with bKash".
+        ...(str(raw.card_type) && { cardType: raw.card_type.slice(0, 60) }),
+        ...(str(raw.method_label) && { methodLabel: raw.method_label.slice(0, 60) }),
       }
     : null
 
@@ -364,6 +373,8 @@ export function fromOrder(raw) {
     items: (raw.items ?? []).map(fromLine),
     totals: fromTotals(raw.totals),
     placedAt: raw.placed_at,
+    // Phase 12: what the order was charged in (orders before phase 12 are USD); its money is written in it.
+    ...withCurrency(raw),
     ...(raw.history && { history: raw.history.map(fromHistory) }),
     // Phase 3 documents; older answers have none.
     shipments: (raw.shipments ?? []).map(fromShipment),

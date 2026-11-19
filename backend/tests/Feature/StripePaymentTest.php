@@ -50,7 +50,6 @@ class StripePaymentTest extends TestCase
         config([
             'buynest.stripe.secret_key' => self::SECRET,
             'buynest.stripe.webhook_secret' => self::WEBHOOK_SECRET,
-            'buynest.stripe.currency' => 'usd',
             'buynest.stripe.checkout_minutes' => 30,
             'buynest.storefront_url' => 'https://shop.example.com',
         ]);
@@ -177,7 +176,7 @@ class StripePaymentTest extends TestCase
         $this->fakeStripe();
 
         $this->placeOrder([['product_id' => $this->lamp->id, 'quantity' => 1]])->assertCreated()
-            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false]);
+            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false, 'method_label' => null]);
         Http::assertNothingSent();
     }
 
@@ -571,7 +570,7 @@ class StripePaymentTest extends TestCase
         $this->fakeStripe();
 
         $response = $this->cardOrder()->assertCreated()
-            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false]);
+            ->assertJsonPath('data.payment', ['provider' => null, 'paid_at' => null, 'url' => null, 'expires_at' => null, 'can_pay' => false, 'method_label' => null]);
         $number = $response->json('data.number');
         $this->assertSame(['pending_payment', 'unpaid', 0], [Order::sole()->status, Order::sole()->payment_status, Order::sole()->payment_attempts]);
 

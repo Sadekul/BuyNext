@@ -11,6 +11,7 @@ use App\Services\Audit;
 use App\Services\OrderDocuments;
 use App\Services\Pricing;
 use App\Services\Settings;
+use App\Support\Currency;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,18 @@ class StripePayments
     public function enabled(): bool
     {
         return $this->gateway->enabled();
+    }
+
+    /** Phase 12: for Settings → Payment methods: { status: live|test|not_configured, message }. */
+    public function status(): array
+    {
+        $key = (string) config('buynest.stripe.secret_key');
+
+        return match (true) {
+            ! $this->enabled() => ['status' => 'not_configured', 'message' => 'Not configured: set STRIPE_SECRET_KEY'],
+            str_starts_with($key, 'sk_live_') || str_starts_with($key, 'rk_live_') => ['status' => 'live', 'message' => 'Live'],
+            default => ['status' => 'test', 'message' => 'Test mode'],
+        };
     }
 
     /** For GET /api/v1/store: "stripe" (pay online) or "manual" (staff invoice card orders). */
@@ -114,7 +127,7 @@ class StripePayments
                     'line_items' => [[
                         'quantity' => 1,
                         'price_data' => [
-                            'currency' => $this->gateway->currency(),
+                            'currency' => strtolower($order->currencyCode()), // phase 12: the order's (= store) currency
                             'unit_amount' => $cents,
                             'product_data' => ['name' => $this->settings->get('store_name')." order {$order->number}"],
                         ],
@@ -267,7 +280,7 @@ class StripePayments
         $intent = is_array($session['payment_intent'] ?? null) ? ($session['payment_intent']['id'] ?? null) : ($session['payment_intent'] ?? null);
         $amount = (int) ($session['amount_total'] ?? -1);
         $currency = strtolower((string) ($session['currency'] ?? ''));
-        $paidText = '$'.Pricing::format(max(0, $amount)).' '.strtoupper($currency);
+        $paidText = Currency::formatCents(max(0, $amount), $currency !== '' ? $currency : $order->currencyCode()).' '.strtoupper($currency);
 
         if ($order->payment_status !== 'unpaid' || $order->invoices()->exists()) {
             if ($order->payment_reference !== null && $order->payment_reference === $intent) {
@@ -284,13 +297,13 @@ class StripePayments
 
             return 'cancelled_order';
         }
-        if ($amount !== $order->dueCents() || $currency !== $this->gateway->currency()) {
+        if ($amount !== $order->dueCents() || $currency !== strtolower($order->currencyCode())) {
             Log::warning('Stripe payment does not match the order.', [
                 'order' => $order->number, 'session' => $session['id'] ?? null, 'amount' => $amount, 'currency' => $currency,
-                'expected_amount' => $order->dueCents(), 'expected_currency' => $this->gateway->currency(),
+                'expected_amount' => $order->dueCents(), 'expected_currency' => strtolower($order->currencyCode()),
             ]);
             $this->problem($order, "Payment amount mismatch on order {$order->number}",
-                "Stripe reported {$paidText} ({$intent}) but the amount due is \$".Pricing::format($order->dueCents()).' '.strtoupper($this->gateway->currency())
+                "Stripe reported {$paidText} ({$intent}) but the amount due is ".$order->money(Pricing::format($order->dueCents())).' '.$order->currencyCode()
                 .'. The order was left unpaid: check the payment in the Stripe dashboard.');
             $order->history()->create([
                 'status' => $order->status,

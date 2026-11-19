@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient'
 import { normalizeHome, normalizePage, normalizeStoreSettings } from './adapters/contentAdapter'
+import { setStoreCurrency } from '../utils/displayCurrency'
 
 /*
  * The admin's CMS content and store settings from BuyNest's Laravel API,
@@ -22,5 +23,8 @@ export async function getCmsPage(slug, { signal } = {}) {
 
 /** GET /api/catalog/store → the shipping, payment, country, and checkout rules the server applies. */
 export async function getStoreSettings({ signal } = {}) {
-  return normalizeStoreSettings(await apiClient.get('/api/catalog/store', { ...CATALOG, signal }))
+  const settings = normalizeStoreSettings(await apiClient.get('/api/catalog/store', { ...CATALOG, signal }))
+  // Phase 12: every price is written in the store currency from here on (before any component sees these settings).
+  setStoreCurrency(settings.currency)
+  return settings
 }

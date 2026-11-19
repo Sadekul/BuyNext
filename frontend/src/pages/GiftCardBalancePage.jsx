@@ -41,7 +41,7 @@ function GiftCardBalancePage() {
   if (card) {
     result =
       card.status === 'active'
-        ? `Balance: ${formatBasePrice(card.balance)}.${card.expiresAt ? ` Use it by ${formatDate(card.expiresAt)}.` : ' It never expires.'}`
+        ? `Balance: ${formatBasePrice(card.balance, card.currency)}.${card.expiresAt ? ` Use it by ${formatDate(card.expiresAt)}.` : ' It never expires.'}`
         : (STATUS_TEXT[card.status] ?? STATUS_TEXT.disabled)
   }
 

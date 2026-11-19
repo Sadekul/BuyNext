@@ -30,6 +30,13 @@ final class EmailTemplateCatalog
         'support_email' => ['Support email', 'text'],
     ];
 
+    /**
+     * Phase 12: money variables. Written "${{ name }}" they show the amount
+     * with the email's currency symbol ("৳1,250.00" for an order in taka);
+     * written "{{ name }}" they are the plain number ("1250.00").
+     */
+    public const MONEY_VARIABLES = ['order_total', 'invoice_amount', 'refund_total', 'amount', 'cart_subtotal'];
+
     private const CODE_VARIABLES = [
         'customer_first_name' => ['Customer first name', 'text'],
         'code' => ['The 6-digit code', 'text'],
@@ -107,7 +114,7 @@ final class EmailTemplateCatalog
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
-                    'order_total' => ['Order total ($)', 'text'],
+                    'order_total' => ['Order total (write $ before it to show the currency symbol)', 'text'],
                     'payment_method' => ['Payment method', 'text'],
                     'shipping_method' => ['Shipping method', 'text'],
                     'delivery_estimate' => ['Delivery estimate', 'text'],
@@ -135,7 +142,7 @@ final class EmailTemplateCatalog
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
-                    'order_total' => ['Order total ($)', 'text'],
+                    'order_total' => ['Order total (write $ before it to show the currency symbol)', 'text'],
                     'status' => ['New status (shipped, delivered, cancelled)', 'text'],
                     'status_heading' => ['Heading for the status ("Your order is on its way")', 'text'],
                     'status_message' => ['Sentence for the status', 'text'],
@@ -156,7 +163,7 @@ final class EmailTemplateCatalog
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
-                    'order_total' => ['Order total ($)', 'text'],
+                    'order_total' => ['Order total (write $ before it to show the currency symbol)', 'text'],
                     'shop_url' => ['Link to the store', 'url'],
                     'button' => ['"Shop again" button', 'block'],
                 ],
@@ -207,7 +214,7 @@ final class EmailTemplateCatalog
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
-                    'order_total' => ['Order total ($)', 'text'],
+                    'order_total' => ['Order total (write $ before it to show the currency symbol)', 'text'],
                     'reason' => ['The reason the customer gave, empty without one', 'block'],
                 ],
                 'required' => [['order_number']],
@@ -243,7 +250,7 @@ final class EmailTemplateCatalog
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
                     'invoice_number' => ['Invoice number', 'text'],
-                    'invoice_amount' => ['Invoice amount ($)', 'text'],
+                    'invoice_amount' => ['Invoice amount (write $ before it to show the currency symbol)', 'text'],
                     'note' => ['Staff note, empty without one', 'block'],
                     // Phase 11.
                     'reward_points_earned' => ['Reward points earned with the order, empty without', 'block'],
@@ -287,7 +294,7 @@ final class EmailTemplateCatalog
                     'customer_first_name' => ['Customer first name', 'text'],
                     'order_number' => ['Order number', 'text'],
                     'credit_memo_number' => ['Credit memo number', 'text'],
-                    'refund_total' => ['Refund total ($)', 'text'],
+                    'refund_total' => ['Refund total (write $ before it to show the currency symbol)', 'text'],
                     'payment_method' => ['Payment method', 'text'],
                     'items_table' => ['Refunded items, shipping, adjustment, and total', 'block'],
                     'note' => ['Staff note, empty without one', 'block'],
@@ -344,7 +351,7 @@ final class EmailTemplateCatalog
                 'description' => 'Sent when staff remind a customer about the items left in their cart (Reports → Abandoned carts).',
                 'variables' => [
                     'customer_first_name' => ['Customer first name', 'text'],
-                    'cart_subtotal' => ['Cart subtotal ($)', 'text'],
+                    'cart_subtotal' => ['Cart subtotal (write $ before it to show the currency symbol)', 'text'],
                     'cart_url' => ['Link to the cart', 'url'],
                     'items_table' => ['Items in the cart', 'block'],
                     'button' => ['"Back to your cart" button', 'block'],
@@ -384,7 +391,7 @@ final class EmailTemplateCatalog
                 'variables' => [
                     'recipient_name' => ['Recipient name', 'text'],
                     'sender_name' => ['Who sent it (the buyer, or the store)', 'text'],
-                    'amount' => ['Gift card amount ($)', 'text'],
+                    'amount' => ['Gift card amount (write $ before it to show the currency symbol)', 'text'],
                     'code' => ['The gift card code', 'text'],
                     'message' => ['The buyer’s message, empty without one', 'block'],
                     'expires' => ['“It can be used until …” or “It doesn’t expire.”', 'text'],
@@ -409,7 +416,7 @@ final class EmailTemplateCatalog
                     'order_number' => ['Order number', 'text'],
                     'recipient_name' => ['Recipient name', 'text'],
                     'recipient_email' => ['Recipient email', 'text'],
-                    'amount' => ['Gift card amount ($)', 'text'],
+                    'amount' => ['Gift card amount (write $ before it to show the currency symbol)', 'text'],
                     'last4' => ['Last 4 characters of the code', 'text'],
                 ],
                 'required' => [['recipient_email']],
@@ -441,11 +448,11 @@ final class EmailTemplateCatalog
                 'payment_method' => 'Cash on delivery', 'shipping_method' => 'Standard', 'delivery_estimate' => '3–5 business days',
                 'next_steps' => 'We are preparing your order now. Please pay the courier in cash when it arrives.',
                 'items_table' => EmailBlocks::itemsTable(
-                    array_map(fn ($i) => ["{$i[0]} × {$i[1]}", '$'.$i[2]], $items),
-                    [['Subtotal', '$119.97'], ['Shipping (Standard)', '$4.99'], ['Tax', '$0.00'], ['Total', '$124.96', true]],
+                    array_map(fn ($i) => ["{$i[0]} × {$i[1]}", Currency::format($i[2])], $items),
+                    [['Subtotal', Currency::format('119.97')], ['Shipping (Standard)', Currency::format('4.99')], ['Tax', Currency::format('0.00')], ['Total', Currency::format('124.96'), true]],
                 ),
                 'address' => EmailBlocks::address($address),
-                'reward_points_spent' => EmailBlocks::paragraph('You used 500 reward points ($5.00) on this order.'),
+                'reward_points_spent' => EmailBlocks::paragraph('You used 500 reward points ('.Currency::format('5.00').') on this order.'),
             ],
             'order_status' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96', 'status' => 'shipped',
@@ -484,7 +491,7 @@ final class EmailTemplateCatalog
             'credit_memo' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'credit_memo_number' => 'CM-100001',
                 'refund_total' => '84.98', 'payment_method' => 'Cash on delivery',
-                'items_table' => EmailBlocks::itemsTable([['Wireless Headphones × 1', '$79.99'], ['Shipping', '$4.99']], [['Refund total', '$84.98', true]]),
+                'items_table' => EmailBlocks::itemsTable([['Wireless Headphones × 1', Currency::format('79.99')], ['Shipping', Currency::format('4.99')]], [['Refund total', Currency::format('84.98'), true]]),
                 'note' => $note,
             ],
             'return_status' => [
@@ -500,7 +507,7 @@ final class EmailTemplateCatalog
             ],
             'abandoned_cart' => [
                 'customer_first_name' => 'Ava', 'cart_subtotal' => '119.97', 'cart_url' => config('buynest.storefront_url').'/cart',
-                'items_table' => EmailBlocks::itemsTable(array_map(fn ($i) => ["{$i[0]} × {$i[1]}", '$'.$i[2]], $items), [['Subtotal', '$119.97', true]]),
+                'items_table' => EmailBlocks::itemsTable(array_map(fn ($i) => ["{$i[0]} × {$i[1]}", Currency::format($i[2])], $items), [['Subtotal', Currency::format('119.97'), true]]),
                 'button' => EmailBlocks::button(config('buynest.storefront_url').'/cart', 'Back to your cart'),
             ],
             // Phase 9 (part B).

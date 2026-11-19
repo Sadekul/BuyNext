@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Currency;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -187,10 +188,13 @@ class Settings
         return in_array('standard', $ids, true) ? 'standard' : ($ids[0] ?? 'standard');
     }
 
-    /** @return list<string> ids of the enabled payment methods */
+    /** @return list<string> ids of the enabled payment methods (phase 12: minus those the store currency rules out) */
     public function paymentMethods(): array
     {
-        return array_values(array_intersect(array_keys(config('buynest.store.payment_methods')), $this->get('enabled_payment_methods', [])));
+        return array_values(array_diff(
+            array_intersect(array_keys(config('buynest.store.payment_methods')), $this->get('enabled_payment_methods', [])),
+            Currency::unavailableMethods(),
+        ));
     }
 
     /** Phase 6: what staff may choose for an order they create: the enabled methods, plus bank transfer and cash (admin only). */

@@ -7,6 +7,8 @@ import { dashboardBlocks } from './adminContent.js'
 import { issuedGiftCards, lineGiftCard, orderGiftCardPayment } from './adminPhase10.js'
 // Phase 11: product specifications and links; reward points on orders, refunds, and credit memos.
 import { creditMemoPoints, orderRewardPoints, productPhase11, refundablePoints } from './adminPhase11.js'
+// Phase 12: each order's currency, and SSLCommerz's details on the payment.
+import { paymentPhase12, withCurrency } from './adminPhase12.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -135,15 +137,19 @@ function adminOrderRow(raw) {
     placedAt: raw.placed_at,
     // Phase 6: where the order came from (storefront | admin).
     source: raw.source ?? 'storefront',
+    // Phase 12 §1: the order's own currency.
+    ...withCurrency(raw),
   }
 }
 
 /** AdminOrderResource with history → the admin's order detail (old keys kept, new ones added). */
-function adminOrderDetail(raw) {
+export function adminOrderDetail(raw) {
   const order = fromOrder(raw)
   const [firstName, ...rest] = (customerName(raw) || '').split(' ')
   return {
     ...order,
+    // Phase 12 §1: every amount of the order is in its own currency ("USD" for orders before phase 12).
+    ...withCurrency(raw),
     id: raw.number,
     customer: {
       id: raw.customer?.id ?? null,
@@ -223,7 +229,10 @@ export function adminPayment(raw) {
   const payment = raw && typeof raw === 'object' ? raw : {}
   const reference = stripeId(payment.reference)
   // Phase 10 §3: a PayPal capture links to PayPal's dashboard (the API says sandbox or live); nothing is guessed.
-  if (payment.provider === 'paypal') return { ...paymentFields(payment), ...payPalDashboard(payment, reference) }
+  if (payment.provider === 'paypal') return { ...paymentFields(payment), ...payPalDashboard(payment, reference), ...paymentPhase12(payment) }
+  // Phase 12 §3: SSLCommerz (bKash, Nagad, cards): bank transaction id, validation id, risk, attempts.
+  // (An SSLCommerz order before its first payment page has no provider yet, only its details.)
+  if (payment.provider === 'sslcommerz' || (payment.sslcommerz && typeof payment.sslcommerz === 'object')) return { ...paymentFields(payment), provider: 'sslcommerz', ...paymentPhase12({ ...payment, provider: 'sslcommerz' }) }
   const given = typeof payment.dashboard_url === 'string' && STRIPE_DASHBOARD.test(payment.dashboard_url) ? payment.dashboard_url : null
   const dashboardUrl = given ?? (reference && payment.provider !== 'gift_card' ? `https://dashboard.stripe.com/test/payments/${reference}` : null)
   return {
@@ -231,6 +240,7 @@ export function adminPayment(raw) {
     reference,
     dashboardUrl,
     mode: dashboardUrl?.includes('/test/') ? 'test' : dashboardUrl ? 'live' : null,
+    ...paymentPhase12(payment),
   }
 }
 
@@ -296,6 +306,8 @@ export function adminInvoice(raw) {
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
+    // Phase 12 §1: in the order's currency.
+    ...withCurrency(raw),
     ...(raw.billing_address && { billingAddress: fromAddress(raw.billing_address) }),
     ...(raw.items && { items: raw.items.map(fromLine) }),
     ...(raw.totals && { totals: fromTotals(raw.totals) }),
@@ -320,6 +332,8 @@ export function adminCreditMemo(raw) {
     ...(raw.gift_card_refund !== undefined && { giftCardRefund: money(raw.gift_card_refund) ?? 0, otherRefund: money(raw.other_refund) ?? money(raw.total) - (money(raw.gift_card_refund) ?? 0) }),
     // Phase 11 §4: points given back (and their value) and earned points taken back.
     ...creditMemoPoints(raw),
+    // Phase 12 §1: in the order's currency.
+    ...withCurrency(raw),
     createdAt: raw.created_at,
     adminName: raw.admin_name ?? null,
     note: raw.note ?? null,
@@ -451,6 +465,8 @@ export const laravelAdminData = {
             total: money(order.total),
             status: order.status,
             placedAt: order.placed_at,
+            // Phase 12 §1.
+            ...withCurrency(order),
           }))
         : null,
       ...dashboardBlocks(data),

@@ -49,7 +49,7 @@ return [
     'stripe' => [
         'secret_key' => env('STRIPE_SECRET_KEY') ?: null,
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET') ?: null,
-        'currency' => strtolower((string) (env('STRIPE_CURRENCY') ?: 'usd')),
+        // Phase 12: no STRIPE_CURRENCY any more: Stripe always charges in the store currency (BUYNEST_CURRENCY).
         // How long a storefront payment page stays open. Stripe allows 30 minutes to 24 hours.
         'checkout_minutes' => min(1440, max(30, (int) (env('STRIPE_CHECKOUT_MINUTES') ?: 30))),
         // Payment links staff send for orders created in the admin stay open for Stripe's maximum (24 hours).
@@ -78,6 +78,44 @@ return [
         'approval_minutes' => 180,
         'timeout_seconds' => 15,
         'webhooks_per_minute' => (int) env('BUYNEST_PAYPAL_WEBHOOKS_PER_MINUTE', 300),
+        // Phase 12: the currencies PayPal accepts. In any other store currency (BDT, INR) PayPal is unavailable.
+        'currencies' => ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'NZD',
+            'SGD', 'HKD', 'MXN', 'ILS', 'PHP', 'TWD', 'THB', 'BRL', 'MYR'],
+    ],
+
+    /*
+     * Phase 12: SSLCommerz (bKash, Nagad, Rocket, Upay, cards, internet
+     * banking on SSLCommerz's hosted page). Online only when the store id and
+     * password are set AND the store currency is BDT; never logged.
+     */
+    'sslcommerz' => [
+        'store_id' => env('SSLCOMMERZ_STORE_ID') ?: null,
+        'store_password' => env('SSLCOMMERZ_STORE_PASSWORD') ?: null,
+        'mode' => env('SSLCOMMERZ_MODE') === 'live' ? 'live' : 'sandbox',
+        // Only changed for local tests against a stand-in server.
+        'api_url' => rtrim((string) (env('SSLCOMMERZ_API_URL') ?: (env('SSLCOMMERZ_MODE') === 'live' ? 'https://securepay.sslcommerz.com' : 'https://sandbox.sslcommerz.com')), '/'),
+        // The currencies this integration charges in (SSLCommerz also takes USD, but this phase targets taka).
+        'currencies' => ['BDT'],
+        // Unpaid SSLCommerz orders are cancelled this long after their payment page was opened (staff links: 24 hours).
+        'session_minutes' => 180,
+        'admin_link_minutes' => 1440,
+        'timeout_seconds' => 20,
+        'callbacks_per_minute' => (int) env('BUYNEST_SSLCOMMERZ_CALLBACKS_PER_MINUTE', 300),
+    ],
+
+    /*
+     * Phase 12: the money formats the store knows. The store currency itself
+     * is BUYNEST_CURRENCY (store.currency below): a deployment setting, since
+     * prices in the database have no currency of their own (docs/CURRENCY.md).
+     */
+    'currencies' => [
+        'USD' => ['symbol' => '$', 'decimals' => 2],
+        'BDT' => ['symbol' => '৳', 'decimals' => 2],
+        'EUR' => ['symbol' => '€', 'decimals' => 2],
+        'GBP' => ['symbol' => '£', 'decimals' => 2],
+        'INR' => ['symbol' => '₹', 'decimals' => 2],
+        'CAD' => ['symbol' => 'CA$', 'decimals' => 2],
+        'AUD' => ['symbol' => 'A$', 'decimals' => 2],
     ],
 
     // Phase 10 (part B): gift card balance checks per visitor per minute.
@@ -131,7 +169,9 @@ return [
      * as defaults.
      */
     'store' => [
-        'currency' => 'USD',
+        // Phase 12: ISO 4217 code (USD, BDT, ...). Changing it changes what every stored price means:
+        // convert the prices with php artisan buynest:currency:convert (docs/CURRENCY.md).
+        'currency' => strtoupper(trim((string) (env('BUYNEST_CURRENCY') ?: 'USD'))),
 
         // Keys are the ids the storefront sends. Prices come from the settings
         // (standard_price, express_price, next_day_price). Standard is the
@@ -146,6 +186,8 @@ return [
             'card' => 'Credit or debit card',
             'paypal' => 'PayPal',
             'cod' => 'Cash on delivery',
+            // Phase 12: SSLCommerz's hosted page (bKash, Nagad, Rocket, Upay, cards, internet banking).
+            'sslcommerz' => 'bKash, Nagad, cards (SSLCommerz)',
         ],
 
         // Phase 6: only staff may choose these, for orders they create in the admin.

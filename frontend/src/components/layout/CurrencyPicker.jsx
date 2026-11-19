@@ -1,6 +1,6 @@
 import { useEffect, useId } from 'react'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
-import { chooseDisplayCurrency, setAvailableCurrencies, useDisplayCurrency } from '../../utils/displayCurrency'
+import { chooseDisplayCurrency, setAvailableCurrencies, setStoreCurrency, useDisplayCurrency } from '../../utils/displayCurrency'
 import './CurrencyPicker.css'
 
 /**
@@ -13,11 +13,14 @@ function CurrencyPicker() {
   const { settings } = useStoreSettings()
   const { available, active } = useDisplayCurrency()
   const selectId = useId()
-  const base = settings.currencies?.base ?? 'USD'
+  // Phase 12: the base is the store currency (USD or BDT).
+  const base = settings.currency?.code ?? settings.currencies?.base ?? 'USD'
 
   useEffect(() => {
-    setAvailableCurrencies(settings.currencies?.display ?? [], settings.currencies?.base ?? 'USD')
-  }, [settings.currencies])
+    // The service already set it when the settings loaded; this keeps it right if they come from elsewhere (cache, demo).
+    setStoreCurrency(settings.currency)
+    setAvailableCurrencies(settings.currencies?.display ?? [], base)
+  }, [settings.currency, settings.currencies, base])
 
   if (available.length === 0) return null
 

@@ -19,7 +19,7 @@ export const GIFT_CARD_FILTERS = Object.fromEntries(Object.entries(GIFT_CARD_STA
 export const cardName = (card) => (card?.last4 ? `Gift card ending ${card.last4}` : 'Gift card')
 
 /** +$10.00 / −$5.00 (a real minus sign, read as "minus"). */
-export const signedMoney = (amount) => (amount < 0 ? `−${formatMoney(-amount)}` : `+${formatMoney(amount)}`)
+export const signedMoney = (amount, currency) => (amount < 0 ? `−${formatMoney(-amount, currency)}` : `+${formatMoney(amount, currency)}`)
 
 const hasCents = (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -45,13 +45,13 @@ export function giftCardErrors(values, { sendEmail }) {
 }
 
 /** The adjustment's problems by field: a non-zero amount that keeps the balance at 0 or more, and a reason. */
-export function adjustmentErrors({ amount, note }, balance) {
+export function adjustmentErrors({ amount, note }, balance, currency) {
   const errors = {}
   const value = Number(amount)
   if (amount.trim() === '' || !Number.isFinite(value) || value === 0 || !hasCents(value) || Math.abs(value) > MAX_GIFT_CARD) {
     errors.amount = ['Enter an amount other than 0, with at most 2 decimals (negative takes money away).']
   } else if (Math.round((balance + value) * 100) < 0) {
-    errors.amount = [`The card has ${formatMoney(balance)}: you can take away at most that.`]
+    errors.amount = [`The card has ${formatMoney(balance, currency)}: you can take away at most that.`]
   }
   if (!note.trim()) errors.note = ['Say why the balance changes (kept in the history).']
   else if (note.trim().length < 3) errors.note = ['Give a reason of at least 3 characters.']

@@ -13,7 +13,7 @@ import { CategoryChecklist, GroupChecklist, ProductPicker } from '../components/
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { toLocalInput } from '../utils/couponSchema'
-import { formatCount, formatDate, formatMoney } from '../utils/format'
+import { formatCount, formatDate, formatMoney, storeCode } from '../utils/format'
 import { RULE_STATUSES, describeRuleAction, describeScope, ruleStatus, useNotice } from '../utils/marketing'
 
 /*
@@ -333,7 +333,7 @@ function CatalogRuleForm({ saved }) {
                   </select>
                 )}
               </Field>
-              <Field label={values.action === 'percent' ? 'Percent off' : 'Amount off (USD)'} error={err('amount')} hint={values.action === 'percent' ? '0.01 to 100.' : 'Never below $0.01.'}>
+              <Field label={values.action === 'percent' ? 'Percent off' : `Amount off (${storeCode()})`} error={err('amount')} hint={values.action === 'percent' ? '0.01 to 100.' : `Never below ${formatMoney(0.01)}.`}>
                 {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0.01" max={values.action === 'percent' ? 100 : undefined} step="0.01" value={values.amount} onChange={set('amount')} />}
               </Field>
               <Field label="Starts (optional)" error={err('startsAt')} hint="Your local time; empty to start now.">

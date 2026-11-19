@@ -100,7 +100,7 @@ class ReportsTest extends TestCase
                 ['period' => '2026-11-04', 'orders' => 0, 'gross' => '0.00', 'refunds' => '10.00', 'net' => '-10.00'],
                 ['period' => '2026-11-05', 'orders' => 0, 'gross' => '0.00', 'refunds' => '0.00', 'net' => '0.00'],
             ])
-            ->assertJsonPath('meta', ['from' => '2026-11-01', 'to' => '2026-11-05', 'group_by' => 'day']);
+            ->assertJsonPath('meta', ['from' => '2026-11-01', 'to' => '2026-11-05', 'group_by' => 'day', 'currency' => 'USD']);
     }
 
     public function test_sales_by_week_and_month(): void

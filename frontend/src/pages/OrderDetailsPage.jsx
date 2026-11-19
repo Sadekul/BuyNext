@@ -77,7 +77,7 @@ function ServerOrderDetailsPage() {
       // Phase 8: an unpaid card order can be paid on Stripe's page (phase 10: a PayPal order on PayPal's).
       // Phase 10: each invoice can be downloaded as a PDF.
       invoicePdf={{ orderNumber: request.data.number }}
-      payAction={canPayOrder(request.data, settings.cardPayments, settings.paypalPayments) ? <PayNowButton order={request.data} /> : null}
+      payAction={canPayOrder(request.data, settings.cardPayments, settings.paypalPayments, settings.sslcommerzPayments) ? <PayNowButton order={request.data} /> : null}
       // Phase 9: an unpaid order with nothing shipped can be cancelled here.
       actions={<CancelOrderButton order={request.data} onCancelled={handleCancelled} />}
     >

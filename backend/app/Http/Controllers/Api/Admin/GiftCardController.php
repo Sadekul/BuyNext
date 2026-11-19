@@ -12,6 +12,7 @@ use App\Models\OrderItem;
 use App\Services\Audit;
 use App\Services\GiftCards;
 use App\Services\Pricing;
+use App\Support\Currency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -99,7 +100,7 @@ class GiftCardController extends Controller
                 'message' => filled($data['message'] ?? null) ? trim($data['message']) : null,
                 'expires_at' => GiftCards::parseDate($data['expires_at'] ?? null),
             ], $admin, 'Created by staff.');
-            $this->audit->record('gift_card.created', "Gift card ••••{$card->last4} created (\${$card->initial_balance})"
+            $this->audit->record('gift_card.created', "Gift card ••••{$card->last4} created (".Currency::format($card->initial_balance, $card->currency).')'
                 .($card->recipient_email ? " for {$card->recipient_email}" : '').'.', 'gift_card', $card->id,
                 Audit::created(['last4' => $card->last4, 'amount' => $card->initial_balance, 'recipient_email' => $card->recipient_email,
                     'expires_at' => $card->expires_at?->toIso8601ZuluString(), 'emailed' => $notify]), $admin);

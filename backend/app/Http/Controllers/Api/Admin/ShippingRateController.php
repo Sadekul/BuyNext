@@ -9,6 +9,7 @@ use App\Services\Pricing;
 use App\Services\Settings;
 use App\Services\ShippingRates;
 use App\Support\Csv;
+use App\Support\Currency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +59,7 @@ class ShippingRateController extends Controller
         $rate = DB::transaction(function () use ($data) {
             $data['position'] ??= (int) ShippingRate::where('method', $data['method'])->max('position') + 1;
             $rate = ShippingRate::create($data);
-            $this->audit->record('shipping_rate.created', "Shipping rate added for {$rate->method} ({$rate->country}): \${$rate->price}.",
+            $this->audit->record('shipping_rate.created', "Shipping rate added for {$rate->method} ({$rate->country}): ".Currency::format($rate->price).'.',
                 'shipping_rate', $rate->id, Audit::created($rate->toApi()));
 
             return $rate;

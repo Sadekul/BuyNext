@@ -1093,6 +1093,9 @@ async function runChecks() {
     } else log(false, 'could not load buildContentSecurityPolicy from vite.config.js')
 
     const page = await newPage()
+    // First visit to this store's dev server after many other pages: under a full run its first
+    // "network idle" can take longer than the 15 s default (seen once in run-all, never alone).
+    page.setDefaultNavigationTimeout(45000)
     const seen = await fakeGoogle(page.context())
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
     const banner = page.locator('section.cookie-consent')

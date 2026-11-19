@@ -2873,3 +2873,28 @@ code.path {
     flex-wrap: wrap;
   }
 }
+
+/* ---------- Phase 12: store currency, payment provider status, SSLCommerz ---------- */
+.choices__option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.choices__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 0 1.6rem;
+}
+
+.store-currency {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.panel__note {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+}

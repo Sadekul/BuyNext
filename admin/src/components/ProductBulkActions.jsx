@@ -4,7 +4,7 @@ import { bulkProducts } from '../api/admin'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { withPaths } from '../utils/categories'
 import { actionErrorMessage } from '../utils/permissions'
-import { formatCount } from '../utils/format'
+import { formatCount, formatMoney, storeCode } from '../utils/format'
 import ConfirmDialog from './ConfirmDialog'
 
 // Each mass action (docs/backend/PHASE5_CONTRACT.md §4) and the permission it needs.
@@ -80,8 +80,8 @@ function ProductBulkActions({ selected, categories, onDone, onClear }) {
     const count = plural(selected.length)
     if (action === 'delete') return setConfirming({ value, title: `Delete ${count}?`, message: `${count} will be removed from the store. Past orders keep their copy.`, label: `Delete ${count}` })
     if (action === 'adjust_price') {
-      const change = mode === 'percent' ? `${value.amount > 0 ? '+' : ''}${value.amount}%` : `${value.amount > 0 ? '+' : '-'}$${Math.abs(value.amount).toFixed(2)}`
-      return setConfirming({ value, title: `Change the price of ${count}?`, message: `Each price changes by ${change}, and so do variant prices set separately. If any price would go below $0.01, nothing changes.`, label: 'Change prices' })
+      const change = mode === 'percent' ? `${value.amount > 0 ? '+' : ''}${value.amount}%` : `${value.amount > 0 ? '+' : '-'}${formatMoney(Math.abs(value.amount))}`
+      return setConfirming({ value, title: `Change the price of ${count}?`, message: `Each price changes by ${change}, and so do variant prices set separately. If any price would go below ${formatMoney(0.01)}, nothing changes.`, label: 'Change prices' })
     }
     run.mutate({ value })
   }
@@ -128,7 +128,7 @@ function ProductBulkActions({ selected, categories, onDone, onClear }) {
             <span>Change by</span>
             <select value={mode} onChange={(event) => setMode(event.target.value)}>
               <option value="percent">Percent</option>
-              <option value="fixed">Fixed amount (USD)</option>
+              <option value="fixed">Fixed amount ({storeCode()})</option>
             </select>
           </label>
           <label className="toolbar__select">

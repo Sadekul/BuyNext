@@ -1,4 +1,4 @@
-import { formatCount } from './format'
+import { formatCount, formatMoney } from './format'
 import { giftCardSplit } from './orders'
 
 /*
@@ -57,7 +57,7 @@ export function rewardSettingsValues(form) {
     return value
   }
   const earnRate = number('earnRate')
-  if (!Number.isFinite(earnRate) || earnRate < 0 || earnRate > 1000 || !hasPlaces(earnRate, 2)) errors.earnRate = ['Enter the points per $1.00 from 0 to 1,000, with at most 2 decimals.']
+  if (!Number.isFinite(earnRate) || earnRate < 0 || earnRate > 1000 || !hasPlaces(earnRate, 2)) errors.earnRate = [`Enter the points per ${formatMoney(1)} from 0 to 1,000, with at most 2 decimals.`]
   const pointValue = number('pointValue')
   if (!Number.isFinite(pointValue) || pointValue <= 0 || pointValue > 100 || !hasPlaces(pointValue, 4)) errors.pointValue = ['Enter the value of one point, above 0 and up to 100, with at most 4 decimals.']
   const values = {
