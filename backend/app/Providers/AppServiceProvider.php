@@ -24,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(HtmlSanitizer::class);
         // Phase 7 (part A): the compiled catalog price rules, read once per request.
         $this->app->singleton(CatalogRules::class);
+        // Phase 13: Bangla texts of emails and PDFs live in lang/mail/bn.json (store messages in lang/bn.json).
+        $this->callAfterResolving('translator', fn ($translator) => $translator->addJsonPath(lang_path('mail')));
     }
 
     public function boot(): void

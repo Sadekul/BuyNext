@@ -9,6 +9,8 @@ import { issuedGiftCards, lineGiftCard, orderGiftCardPayment } from './adminPhas
 import { creditMemoPoints, orderRewardPoints, productPhase11, refundablePoints } from './adminPhase11.js'
 // Phase 12: each order's currency, and SSLCommerz's details on the payment.
 import { paymentPhase12, withCurrency } from './adminPhase12.js'
+// Phase 13: Bangla texts and the grid's Bangla status on products; the order's language.
+import { BANGLA_FILTERS, orderLocale, productPhase13, toBanglaBody, toSpecificationRows } from './adminPhase13.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -95,6 +97,8 @@ export function adminProduct(raw) {
     ...productPhase10(raw),
     // Phase 11 §2 and §3: specifications, and linked products ({ id, name, sku, image, status } per type).
     ...productPhase11(raw),
+    // Phase 13: bn: { name, shortDescription, description, metaTitle, metaDescription }, banglaStatus (complete | missing).
+    ...productPhase13(raw),
   }
 }
 
@@ -114,7 +118,12 @@ function productPhase10(raw) {
 
 /** Admin form values (already validated) → the API's product fields. */
 function toProductBody(values) {
-  return Object.fromEntries(Object.entries(values).map(([field, value]) => [PRODUCT_FIELDS[field], value]))
+  const { bn, ...rest } = values
+  const body = Object.fromEntries(Object.entries(rest).map(([field, value]) => [PRODUCT_FIELDS[field], value]))
+  // Phase 13: the Bangla texts, and each specification row's Bangla label and value.
+  if (bn) Object.assign(body, toBanglaBody(bn, 'product'))
+  if (rest.specifications?.some((row) => row.labelBn !== undefined || row.valueBn !== undefined)) body.specifications = toSpecificationRows(rest.specifications)
+  return body
 }
 
 const customerName = (raw) => raw.customer?.name ?? [raw.shipping_address?.first_name, raw.shipping_address?.last_name].filter(Boolean).join(' ')
@@ -139,6 +148,8 @@ function adminOrderRow(raw) {
     source: raw.source ?? 'storefront',
     // Phase 12 §1: the order's own currency.
     ...withCurrency(raw),
+    // Phase 13: the language it was placed in.
+    ...orderLocale(raw),
   }
 }
 
@@ -197,6 +208,8 @@ export function adminOrderDetail(raw) {
     giftCardsIssued: issuedGiftCards(raw),
     // Phase 11 §4: reward points spent (and their value) and earned ({ spent, amount, earned } | null).
     rewardPoints: orderRewardPoints(raw),
+    // Phase 13: the language the order was placed in (en | bn; its emails and PDFs for guests).
+    ...orderLocale(raw),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -475,12 +488,14 @@ export const laravelAdminData = {
     }))
   },
 
-  async listProducts(token, { q, category, status, sortBy, order, limit, skip }, request) {
+  async listProducts(token, { q, category, status, bangla, sortBy, order, limit, skip }, request) {
     const { page, perPage } = pageOf({ limit, skip })
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
     if (q) params.set('search', q)
     if (category) params.set('category', category)
     if (status) params.set('status', status)
+    // Phase 13: products with or without their Bangla texts.
+    if (BANGLA_FILTERS[bangla]) params.set('bangla', BANGLA_FILTERS[bangla])
     if (PRODUCT_SORT[sortBy]) {
       params.set('sort', PRODUCT_SORT[sortBy])
       params.set('direction', order)

@@ -83,11 +83,11 @@ class StripePayments
     public function payProblem(Order $order): ?string
     {
         return match (true) {
-            ! $this->enabled() => 'Online card payments aren\'t available right now. We\'ll contact you about the payment.',
-            $order->payment_method !== 'card' => 'This order isn\'t paid by card.',
-            $order->payment_status !== 'unpaid' => 'This order has already been paid.',
-            $order->status === 'cancelled' => 'This order was cancelled, so it can\'t be paid.',
-            $order->status !== 'pending_payment' => 'This order isn\'t waiting for a payment.',
+            ! $this->enabled() => __('Online card payments aren\'t available right now. We\'ll contact you about the payment.'),
+            $order->payment_method !== 'card' => __('This order isn\'t paid by card.'),
+            $order->payment_status !== 'unpaid' => __('This order has already been paid.'),
+            $order->status === 'cancelled' => __('This order was cancelled, so it can\'t be paid.'),
+            $order->status !== 'pending_payment' => __('This order isn\'t waiting for a payment.'),
             default => null,
         };
     }
@@ -141,7 +141,7 @@ class StripePayments
                     'cancel_url' => "{$page}?payment=cancelled",
                 ], "order-{$order->id}-session-{$attempt}");
             } catch (StripeException $e) {
-                return ['provider' => 'stripe', 'url' => null, 'expires_at' => null, 'error' => $e->getMessage()];
+                return ['provider' => 'stripe', 'url' => null, 'expires_at' => null, 'error' => __($e->getMessage())];
             }
 
             $order->forceFill([

@@ -2,6 +2,8 @@ import { laravel, pick } from '../http.js'
 import { camelPath } from './laravel.js'
 // Phase 12 §5: the store currency and payment providers (settings), other currencies (sales report).
 import { salesCurrencies, settingsStore } from './adminPhase12.js'
+// Phase 13: the Bangla texts of CMS pages and home blocks.
+import { banglaOf, heroBangla, toBannerBangla, toHeroBangla, withBanglaBody } from './adminPhase13.js'
 
 /*
  * Phase 4 of the admin (docs/backend/PHASE4_CONTRACT.md) from BuyNest's
@@ -152,6 +154,8 @@ export function contentPage(raw) {
     isPublished: raw.is_published === true,
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
+    // Phase 13: bn: { title, body (sanitized HTML), metaTitle, metaDescription } ('' = the English text is shown).
+    ...banglaOf(raw, 'page'),
   }
 }
 const PAGE_FIELDS = { slug: 'slug', title: 'title', body: 'body', metaTitle: 'meta_title', metaDescription: 'meta_description', isPublished: 'is_published' }
@@ -171,6 +175,8 @@ export function homeContent(raw = {}) {
       imageUrl: text(hero.image_url),
       imageAlt: text(hero.image_alt),
       highlights: Array.isArray(hero.highlights) ? hero.highlights.map(text) : [],
+      // Phase 13: bn: { eyebrow, title, description, primaryCtaLabel, secondaryCtaLabel, imageAlt, highlights }.
+      ...heroBangla(hero),
     },
     banners: (Array.isArray(raw.banners) ? raw.banners : [])
       .map((banner) => ({
@@ -184,6 +190,8 @@ export function homeContent(raw = {}) {
         tone: banner.tone ?? 'navy',
         position: banner.position ?? 0,
         isActive: banner.is_active !== false,
+        // Phase 13: bn: { eyebrow, title, description, ctaLabel, imageAlt }.
+        ...banglaOf(banner, 'banner'),
       }))
       .sort((a, b) => a.position - b.position),
     featuredProductIds: Array.isArray(raw.featured_product_ids) ? raw.featured_product_ids.filter(Number.isInteger) : (raw.featured_products ?? []).map((product) => product.id),
@@ -210,6 +218,7 @@ export function toHomeBody(home) {
       image_url: home.hero.imageUrl,
       image_alt: home.hero.imageAlt,
       highlights: home.hero.highlights,
+      ...toHeroBangla(home.hero.bn),
     },
     banners: home.banners.map((banner, index) => ({
       ...(banner.id !== null && banner.id !== undefined && { id: banner.id }),
@@ -222,6 +231,7 @@ export function toHomeBody(home) {
       tone: banner.tone,
       position: index, // the list order is the position (0-based, like the seed)
       is_active: banner.isActive,
+      ...toBannerBangla(banner.bn),
     })),
     featured_product_ids: home.featuredProductIds,
   }
@@ -287,7 +297,8 @@ export const CSV_REPORTS = ['sales', 'products']
  * sent back. Only these keys are read or written.
  */
 const SETTINGS = {
-  general: { store_name: 'storeName', support_email: 'supportEmail', support_phone: 'supportPhone', address: 'address' },
+  // Phase 13: + the store's default language (en | bn) and whether Bangla writes numbers with Bangla digits.
+  general: { store_name: 'storeName', support_email: 'supportEmail', support_phone: 'supportPhone', address: 'address', default_locale: 'defaultLocale', bangla_digits: 'banglaDigits' },
   shipping: {
     standard_price: 'standardPrice',
     free_shipping_threshold: 'freeShippingThreshold',
@@ -412,10 +423,10 @@ export const laravelSystemData = {
     return answer(await call(`/pages/${id}`, token, request), [200], (data) => ({ ...contentPage(data.data), live: true }))
   },
   async createPage(token, values, request) {
-    return answer(await call('/pages', token, request, { method: 'POST', body: toBody(values, PAGE_FIELDS) }), [200, 201], (data) => ({ page: contentPage(data.data), live: true }))
+    return answer(await call('/pages', token, request, { method: 'POST', body: withBanglaBody(toBody(values, PAGE_FIELDS), values, 'page') }), [200, 201], (data) => ({ page: contentPage(data.data), live: true }))
   },
   async updatePage(token, id, values, request) {
-    return answer(await call(`/pages/${id}`, token, request, { method: 'PATCH', body: toBody(values, PAGE_FIELDS) }), [200], (data) => ({ page: contentPage(data.data), live: true }))
+    return answer(await call(`/pages/${id}`, token, request, { method: 'PATCH', body: withBanglaBody(toBody(values, PAGE_FIELDS), values, 'page') }), [200], (data) => ({ page: contentPage(data.data), live: true }))
   },
   async deletePage(token, id, request) {
     return answer(await call(`/pages/${id}`, token, request, { method: 'DELETE' }), [200, 204], () => ({ id: Number(id), deleted: true, live: true }))

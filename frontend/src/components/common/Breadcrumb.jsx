@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { LuChevronRight } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import './Breadcrumb.css'
 
 /**
@@ -7,8 +8,9 @@ import './Breadcrumb.css'
  * page (no link, aria-current="page").
  */
 function Breadcrumb({ items }) {
+  const { t } = useTranslation('common')
   return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
+    <nav className="breadcrumb" aria-label={t('breadcrumb.label')}>
       <ol className="breadcrumb__list">
         {items.map((item, index) => {
           const isCurrent = index === items.length - 1

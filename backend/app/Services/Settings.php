@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -25,7 +26,8 @@ class Settings
 
     /** The groups the admin shows (GET/PATCH /api/admin/v1/settings) and their keys. */
     public const GROUPS = [
-        'general' => ['store_name', 'support_email', 'support_phone', 'address'],
+        // Phase 13: default_locale (en|bn: the language a first visit gets) and bangla_digits (০–৯ in Bangla).
+        'general' => ['store_name', 'support_email', 'support_phone', 'address', 'default_locale', 'bangla_digits'],
         // Phase 10 (part B): default_weight_grams (products without a weight, for table rates).
         'shipping' => ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'enabled_methods', 'default_weight_grams'],
         'tax' => ['tax_enabled', 'tax_rates', 'prices_include_tax'],
@@ -68,6 +70,8 @@ class Settings
         'support_email' => 'support@buynest.example.com',
         'support_phone' => '+1 (555) 010-2030',
         'address' => null,
+        'default_locale' => 'en', // phase 13
+        'bangla_digits' => true, // phase 13
         'standard_price' => '4.99',
         'free_shipping_threshold' => '50.00',
         'express_price' => '12.99',
@@ -236,6 +240,8 @@ class Settings
             'general.support_email' => ['nullable', 'string', 'email', 'max:190'],
             'general.support_phone' => ['nullable', 'string', 'max:40'],
             'general.address' => ['nullable', 'string', 'max:300'],
+            'general.default_locale' => ['string', Rule::in(Locale::SUPPORTED)], // phase 13
+            'general.bangla_digits' => ['boolean'],
             'shipping.standard_price' => $money,
             'shipping.free_shipping_threshold' => $money,
             'shipping.express_price' => $money,
@@ -280,6 +286,7 @@ class Settings
     public function normalize(string $key, mixed $value): mixed
     {
         return match (true) {
+            $key === 'bangla_digits' => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 13
             $key === 'attach_pdf_to_emails' => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 10 (part A)
             // Phase 11.
             $key === 'rewards_enabled' => filter_var($value, FILTER_VALIDATE_BOOLEAN),

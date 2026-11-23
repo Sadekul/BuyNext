@@ -20,7 +20,6 @@ import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSett
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileQuery } from '../queries/userQueries'
 import { addressesQuery, customerKeys } from '../queries/customerQueries'
-import { productKeys } from '../queries/productQueries'
 import { cartPricingKey, cartPricingQuery, orderKeys } from '../queries/orderQueries'
 import { useOrders } from '../hooks/useOrders'
 import { createOrder, verifyCartWithServer } from '../services/orderService'
@@ -34,7 +33,7 @@ import { formatBasePrice } from '../utils/formatters'
 import { applyServerFieldErrors } from '../utils/serverErrors'
 import { cartLineKey } from '../reducers/cartReducer'
 import { MAX_SAVED_ADDRESSES, defaultAddress, isSameAddress, toOrderAddress } from '../utils/addresses'
-import { rememberGuestPayment } from '../utils/payment'
+import { localizedPaymentMethod, rememberGuestPayment, shippingMethodText } from '../utils/payment'
 import SavedAddressPicker from '../components/checkout/SavedAddressPicker'
 import GroupDiscountNote from '../components/cart/GroupDiscountNote'
 import GiftCardRedeem from '../components/checkout/GiftCardRedeem'
@@ -42,6 +41,7 @@ import RewardPointsRedeem from '../components/checkout/RewardPointsRedeem'
 import ChargedInBaseNote from '../components/cart/ChargedInBaseNote'
 import { trackBeginCheckout } from '../utils/analytics'
 import './CheckoutPage.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 // API field names → checkout form fields. The shop service (server/shop/laravel.js)
 // already turns the API's snake_case into these camelCase paths.
@@ -68,28 +68,14 @@ const SERVER_FIELD_MAP = {
 // Good enough to send to cart/validate; the order itself is validated properly.
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
 
-const GUEST_CHECKOUT_OFF = "Please sign in to place your order: guest checkout isn't available right now."
+// Phase 13: shopper-facing texts are in locales/<lang>/checkout.json (`page.*`).
 
 // Phase 11: the payment method sent when reward points alone pay the whole order (a gift card's path otherwise).
 const FULLY_COVERED_BY_POINTS = 'reward_points'
 
-const PRICES_CHANGED = 'Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.'
-
-// What the shopper is told about paying, per method (REAL_SHOP). `stripe`: card
-// payments through Stripe Checkout (phase 8); `online`: no provider for this method.
-const PAYMENT_NOTES = {
-  cod: 'Your order is confirmed straight away. Pay the courier when it arrives.',
-  stripe:
-    "Next you'll pay on Stripe's secure payment page (it also offers Apple Pay and Google Pay where available). BuyNest never sees your card number. Your order is saved first, so you can pay later from your order page if you leave.",
-  // Phase 10: PayPal orders are approved on PayPal's site (a redirect, no PayPal script on this page).
-  paypal:
-    "Next you'll approve the payment on PayPal's site, then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
-  // Phase 12: bKash, Nagad, Rocket, cards, and internet banking on SSLCommerz's hosted page (a redirect, no script here).
-  sslcommerz:
-    "You'll finish paying on SSLCommerz's secure page (bKash, Nagad, Rocket, cards, or internet banking), then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
-  online:
-    "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers.",
-}
+// What the shopper is told about paying, per method (REAL_SHOP): checkout:page.notes.<cod|stripe|paypal|sslcommerz|online>.
+// `stripe`: card payments through Stripe Checkout (phase 8); paypal (phase 10) and sslcommerz (phase 12) are
+// redirects to the provider's page (no provider script on this page); `online`: no provider for this method.
 
 /**
  * /checkout. Signed-in customers get their details pre-filled from the
@@ -98,6 +84,7 @@ const PAYMENT_NOTES = {
  * sign-in (AppRoutes) and no payment is taken.
  */
 function CheckoutPage() {
+  const { t } = useTranslation('checkout')
   const cart = useCart()
   const { user, status, authorizedRequest } = useAuth()
   // Same cache entry as the profile page: visiting /account first makes this instant.
@@ -116,8 +103,8 @@ function CheckoutPage() {
   if (cart.items.length === 0) {
     return (
       <div className="section container">
-        <EmptyState icon={LuShoppingBag} title="Your cart is empty" message="Add some products before checking out.">
-          <Button to={ROUTES.products}>Start shopping</Button>
+        <EmptyState icon={LuShoppingBag} title={t('page.emptyTitle')} message={t('page.emptyMessage')}>
+          <Button to={ROUTES.products}>{t('page.startShopping')}</Button>
         </EmptyState>
       </div>
     )
@@ -126,8 +113,8 @@ function CheckoutPage() {
   if (!cart.totals.canCheckout) {
     return (
       <div className="section container">
-        <EmptyState icon={LuTriangleAlert} title="Some items need your attention" message="Remove unavailable items from your cart to continue.">
-          <Button to={ROUTES.cart}>Review cart</Button>
+        <EmptyState icon={LuTriangleAlert} title={t('page.attentionTitle')} message={t('page.attentionMessage')}>
+          <Button to={ROUTES.cart}>{t('page.reviewCart')}</Button>
         </EmptyState>
       </div>
     )
@@ -137,7 +124,7 @@ function CheckoutPage() {
   if (status === 'checking' || (user && profileRequest.isPending) || (REAL_SHOP && user && addressRequest.isPending) || store.isPending) {
     return (
       <div className="section container">
-        <Loader label="Preparing checkout…" />
+        <Loader label={t('page.preparing')} />
       </div>
     )
   }
@@ -146,17 +133,13 @@ function CheckoutPage() {
   if (REAL_SHOP && !user && !settings.guestCheckout) {
     return (
       <div className="section container">
-        <title>{`Checkout | ${SITE.name}`}</title>
-        <EmptyState
-          icon={LuUserRound}
-          title="Sign in to check out"
-          message="Guest checkout isn't available right now. Sign in or create an account to place your order; your cart will be waiting."
-        >
+        <title>{`${t('page.tabTitle')} | ${SITE.name}`}</title>
+        <EmptyState icon={LuUserRound} title={t('page.signInTitle')} message={t('page.signInMessage')}>
           <Button to={ROUTES.login} state={{ from: location }}>
-            Sign in
+            {t('page.signIn')}
           </Button>
           <Button to={ROUTES.register} state={{ from: location }} variant="outline">
-            Create an account
+            {t('page.createAccount')}
           </Button>
         </EmptyState>
       </div>
@@ -170,8 +153,8 @@ function CheckoutPage() {
   if ((requiresShipping && settings.shippingMethods.length === 0) || settings.paymentMethods.length === 0 || settings.countries.length === 0) {
     return (
       <div className="section container">
-        <EmptyState icon={LuTriangleAlert} title="Checkout is unavailable right now" message={`Please try again later, or contact us at ${settings.supportEmail ?? SITE.supportEmail}.`}>
-          <Button to={ROUTES.cart}>Back to cart</Button>
+        <EmptyState icon={LuTriangleAlert} title={t('page.unavailableTitle')} message={t('page.unavailableMessage', { email: settings.supportEmail ?? SITE.supportEmail })}>
+          <Button to={ROUTES.cart}>{t('page.backToCart')}</Button>
         </EmptyState>
       </div>
     )
@@ -240,6 +223,7 @@ function withVariantLabels(lines, items) {
 }
 
 function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settings, savedAddresses = [], addressBookFull = false, group = null, requiresShipping = true }) {
+  const { t } = useTranslation('checkout')
   const cart = useCart()
   const { user, isAuthenticated, authorizedRequest } = useAuth()
   const { placeOrder } = useOrders()
@@ -353,9 +337,10 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const shippingOptions = (offered ?? settings.shippingMethods.map((method) => ({ ...method, price: calculateCartTotals(cart.items, localCoupon, method.id, settings).shipping }))).map((option) => {
     const known = settings.shippingMethods.find((method) => method.id === option.id)
     const price = option.price ?? 0
-    return { id: option.id, label: option.label ?? known?.label ?? option.id, description: option.eta ?? known?.eta, aside: price === 0 ? 'Free' : formatBasePrice(price) }
+    const text = shippingMethodText({ id: option.id, label: option.label ?? known?.label, eta: option.eta ?? known?.eta })
+    return { id: option.id, label: text.label || option.id, description: text.eta, aside: price === 0 ? t('page.free') : formatBasePrice(price) }
   })
-  const shippingLabel = shippingOptions.find((option) => option.id === shippingMethod)?.label ?? localTotals.shippingMethod.label
+  const shippingLabel = shippingOptions.find((option) => option.id === shippingMethod)?.label ?? shippingMethodText(localTotals.shippingMethod).label
   // The chosen method isn't offered for this cart (any more): switch to the first that is.
   const firstOffered = offered?.[0]?.id
   const chosenIsOffered = !requiresShipping || !offered || offered.some((option) => option.id === shippingMethod)
@@ -396,7 +381,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     const verification = await verifyMutation.mutateAsync({ items: cart.items, userId: user.id })
     if (verification.problems.length > 0) {
       setError('root.server', {
-        message: `${verification.problems.join(' ')} Please review your cart before placing the order.`,
+        message: t('page.reviewBeforePlacing', { problems: verification.problems.join(' ') }),
       })
       return
     }
@@ -406,7 +391,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     placeOrder(order)
     // Stock changed on the server: mark every cached product query stale so
     // pages refetch fresh data the next time they're shown (INVALIDATION).
-    queryClient.invalidateQueries({ queryKey: productKeys.all })
+    queryClient.invalidateQueries({ queryKey: ['products'] }) // every language
     navigate(ROUTES.orderConfirmation(order.id), { replace: true })
     cart.removeOrderedItems(order.items.map(cartLineKey))
   }
@@ -429,7 +414,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       rewardPoints: pointsSpent > 0 ? pointsSpent : undefined,
       requiresShipping,
     })
-    queryClient.invalidateQueries({ queryKey: productKeys.all }) // stock changed
+    queryClient.invalidateQueries({ queryKey: ['products'] }) // stock changed, in every language
     queryClient.invalidateQueries({ queryKey: orderKeys.all })
     if (saveAddress) queryClient.invalidateQueries({ queryKey: customerKeys.addresses(user.id) })
     // Phase 8, card through Stripe: the order exists now (stock reserved), so
@@ -457,13 +442,13 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
         if (error.data?.cart) queryClient.setQueryData(cartPricingKey(pricingInput), error.data.cart)
         else pricing.refetch()
         refreshProducts()
-        setError('root.server', { message: PRICES_CHANGED })
+        setError('root.server', { message: t('page.pricesChanged') })
         return
       }
       // Invalid fields (422) come back with per-field messages: show them on the fields.
       // Guest checkout was turned off after the page loaded.
       if (error.status === 403 && !isAuthenticated) {
-        setError('root.server', { message: error.data?.code === 'guest_checkout_disabled' ? GUEST_CHECKOUT_OFF : error.message })
+        setError('root.server', { message: error.data?.code === 'guest_checkout_disabled' ? t('page.guestOff') : error.message })
         return
       }
       if (applyServerFieldErrors(error, setError, requiresShipping ? SERVER_FIELD_MAP : { ...SERVER_FIELD_MAP, ...GIFT_CARD_ONLY_FIELD_MAP })) return
@@ -475,71 +460,59 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       const pointsMessage = error.fieldErrors?.rewardPoints?.[0]
       if (pointsMessage) {
         pricing.refetch()
-        setError('root.server', { message: `Reward points: ${pointsMessage}` })
+        setError('root.server', { message: t('page.pointsError', { message: pointsMessage }) })
         return
       }
       const giftCardMessage = error.fieldErrors?.giftCardCode?.[0]
       if (giftCardMessage) {
         pricing.refetch()
-        setError('root.server', { message: `Gift card: ${giftCardMessage} Remove it or try another card.` })
+        setError('root.server', { message: t('page.giftCardError', { message: giftCardMessage }) })
         return
       }
       const couponMessage = error.fieldErrors?.couponCode?.[0]
       if (couponMessage) {
         pricing.refetch()
-        setError('root.server', { message: `${cart.couponCode ? `${cart.couponCode}: ` : ''}${couponMessage} Remove the code or change your cart to continue.` })
+        setError('root.server', { message: `${cart.couponCode ? `${cart.couponCode}: ` : ''}${t('page.couponError', { message: couponMessage })}` })
         return
       }
       // Stock problems (422 on the items) explain themselves; so does a coupon
       // the server refused (couponCode), which has no field in this form.
       const stockProblems = error.data?.problems?.map((problem) => problem.message).join(' ')
       const otherField = Object.values(error.fieldErrors ?? {})[0]?.[0]
-      if (stockProblems) setError('root.server', { message: `${stockProblems} Please review your cart.` })
+      if (stockProblems) setError('root.server', { message: t('page.stockError', { problems: stockProblems }) })
       else setError('root.server', { message: otherField ?? error.message })
     }
   }
 
   const placeLabel = isBusy
-    ? 'Checking prices…'
+    ? t('page.checkingPrices')
     : payByStripe
-      ? 'Continue to secure payment'
+      ? t('page.continueSecure')
       : payByPaypal
-        ? 'Continue to PayPal'
+        ? t('page.continuePaypal')
         : payBySslcommerz
-          ? 'Continue to SSLCommerz'
-          : `Place order · ${formatBasePrice(prepaid > 0 ? amountDue : totals.total)}`
+          ? t('page.continueSslcommerz')
+          : t('page.placeOrder', { amount: formatBasePrice(prepaid > 0 ? amountDue : totals.total) })
   let paymentNote = null
   if (REAL_SHOP) {
-    paymentNote =
-      paymentMethod === 'cod'
-        ? PAYMENT_NOTES.cod
-        : payByStripe
-          ? PAYMENT_NOTES.stripe
-          : payByPaypal
-            ? PAYMENT_NOTES.paypal
-            : payBySslcommerz
-              ? PAYMENT_NOTES.sslcommerz
-              : PAYMENT_NOTES.online
-    if (giftCardPays > 0) paymentNote = `Your gift card pays ${formatBasePrice(giftCardPays)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
-    else if (pointsPay > 0) paymentNote = `Your reward points pay ${formatBasePrice(pointsPay)}; the remaining ${formatBasePrice(amountDue)} is paid as chosen above. ${paymentNote}`
+    const noteKey = paymentMethod === 'cod' ? 'cod' : payByStripe ? 'stripe' : payByPaypal ? 'paypal' : payBySslcommerz ? 'sslcommerz' : 'online'
+    paymentNote = t(`page.notes.${noteKey}`)
+    if (giftCardPays > 0) paymentNote = t('page.giftCardPays', { paid: formatBasePrice(giftCardPays), due: formatBasePrice(amountDue), note: paymentNote })
+    else if (pointsPay > 0) paymentNote = t('page.pointsPay', { paid: formatBasePrice(pointsPay), due: formatBasePrice(amountDue), note: paymentNote })
   }
 
   return (
     <div className="checkout section container">
-      <title>{`Checkout | ${SITE.name}`}</title>
+      <title>{`${t('page.tabTitle')} | ${SITE.name}`}</title>
       <header className="checkout__header">
-        <h1>Checkout</h1>
+        <h1>{t('page.title')}</h1>
         <p className="checkout__secure">
           <LuLock aria-hidden="true" />{' '}
-          {REAL_SHOP ? 'Secure checkout — our server confirms every price before your order is placed.' : 'Demo checkout — no payment is taken and nothing ships.'}
+          {t(REAL_SHOP ? 'page.secure' : 'page.demo')}
         </p>
         {REAL_SHOP && !isAuthenticated && settings.guestCheckout && (
           <p className="checkout__note">
-            Have an account?{' '}
-            <Link to={ROUTES.login} state={{ from: location }}>
-              Sign in
-            </Link>{' '}
-            to keep this order in your order history. Or continue as a guest.
+            <Trans t={t} i18nKey="page.haveAccount" components={{ signin: <Link to={ROUTES.login} state={{ from: location }} /> }} />
           </p>
         )}
       </header>
@@ -550,22 +523,22 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
       <div className="checkout__layout">
         <form id="checkout-form" className="checkout__form" onSubmit={handleSubmit(onSubmit)} noValidate>
           <section className="checkout__section" aria-labelledby="contact-title">
-            <h2 id="contact-title">Contact details</h2>
+            <h2 id="contact-title">{t('page.contact')}</h2>
             <div className="checkout__grid">
               <FormField
-                label="Email"
+                label={t('page.email')}
                 type="email"
                 autoComplete="email"
-                hint={REAL_SHOP ? "We'll send your order confirmation here." : undefined}
+                hint={REAL_SHOP ? t('page.emailHint') : undefined}
                 {...register('email')}
                 error={errors.email?.message}
               />
               {/* Phase 12: SSLCommerz needs a phone number for the payment page: the hint says so when it's chosen. */}
               <FormField
-                label="Phone"
+                label={t('page.phone')}
                 type="tel"
                 autoComplete="tel"
-                hint={paymentMethod === 'sslcommerz' && !fullyCovered ? 'Needed for paying through SSLCommerz, and for delivery updates.' : 'For delivery updates only.'}
+                hint={t(paymentMethod === 'sslcommerz' && !fullyCovered ? 'page.phoneHintSslcommerz' : 'page.phoneHint')}
                 {...register('phone')}
                 error={errors.phone?.message}
               />
@@ -574,20 +547,20 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
           {requiresShipping ? (
           <section className="checkout__section" aria-labelledby="shipping-title">
-            <h2 id="shipping-title">Shipping address</h2>
+            <h2 id="shipping-title">{t('page.shippingAddress')}</h2>
             {canUseAddressBook && savedAddresses.length > 0 && (
-              <SavedAddressPicker label="Saved shipping addresses" addresses={savedAddresses} current={shippingAddress} onChoose={(saved) => fillFromSaved('shipping', saved)} />
+              <SavedAddressPicker label={t('page.savedShipping')} addresses={savedAddresses} current={shippingAddress} onChoose={(saved) => fillFromSaved('shipping', saved)} />
             )}
             <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} />
-            {offerToSave && <CheckboxField label="Save this address to my address book" {...register('saveAddress')} />}
+            {offerToSave && <CheckboxField label={t('page.saveAddress')} {...register('saveAddress')} />}
           </section>
           ) : (
             // Phase 10: gift cards only: nothing ships, so only the billing address is asked for.
             <section className="checkout__section" aria-labelledby="billing-title">
-              <h2 id="billing-title">Billing address</h2>
-              <p className="checkout__note">Gift cards are sent by email, so there's no delivery address or shipping charge.</p>
+              <h2 id="billing-title">{t('page.billingAddress')}</h2>
+              <p className="checkout__note">{t('page.giftCardsByEmail')}</p>
               {canUseAddressBook && savedAddresses.length > 0 && (
-                <SavedAddressPicker label="Saved addresses" addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
+                <SavedAddressPicker label={t('page.savedAddresses')} addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
               )}
               <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
             </section>
@@ -595,10 +568,10 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
           {requiresShipping && (
           <section className="checkout__section" aria-labelledby="billing-title">
-            <h2 id="billing-title">Billing address</h2>
-            <CheckboxField label="Same as shipping address" {...register('billingSameAsShipping')} />
+            <h2 id="billing-title">{t('page.billingAddress')}</h2>
+            <CheckboxField label={t('page.sameAsShipping')} {...register('billingSameAsShipping')} />
             {!billingSameAsShipping && canUseAddressBook && savedAddresses.length > 0 && (
-              <SavedAddressPicker label="Saved billing addresses" addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
+              <SavedAddressPicker label={t('page.savedBilling')} addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
             )}
             {!billingSameAsShipping && (
               <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
@@ -610,7 +583,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           {requiresShipping && (
             <section className="checkout__section">
               <ChoiceCards
-                legend="Delivery"
+                legend={t('page.delivery')}
                 options={shippingOptions}
                 registration={register('shippingMethod')}
                 selectedId={shippingMethod}
@@ -618,8 +591,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
               />
               {noDelivery && (
                 <p className="checkout__error" role="alert">
-                  {serverCart?.shippingError ?? `We can't deliver this order to ${shippingCountry}.`} Choose another country, or contact us at{' '}
-                  {settings.supportEmail ?? SITE.supportEmail}.
+                  {t('page.chooseCountry', { reason: serverCart?.shippingError ?? t('page.cantDeliver', { country: t(`common:countries.${shippingCountry}`, { defaultValue: shippingCountry }) }), email: settings.supportEmail ?? SITE.supportEmail })}
                 </p>
               )}
             </section>
@@ -628,15 +600,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           <section className="checkout__section">
             {fullyCovered ? (
               <fieldset className="choice-cards">
-                <legend className="choice-cards__legend">Payment</legend>
+                <legend className="choice-cards__legend">{t('page.payment')}</legend>
                 <p className="checkout__note">
-                  {giftCardPays > 0 ? 'Your gift card pays for the whole order: no other payment is needed.' : 'Your reward points pay for the whole order: no other payment is needed.'}
+                  {t(giftCardPays > 0 ? 'page.giftCardCovers' : 'page.pointsCover')}
                 </p>
               </fieldset>
             ) : (
               <ChoiceCards
-                legend="Payment"
-                options={settings.paymentMethods}
+                legend={t('page.payment')}
+                options={settings.paymentMethods.map(localizedPaymentMethod)}
                 registration={register('paymentMethod')}
                 selectedId={paymentMethod}
                 error={errors.paymentMethod?.message}
@@ -648,8 +620,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
               </p>
             ) : (
               <p className="checkout__note">
-                BuyNest never asks for card numbers. A real payment would happen on the provider's secure page, and the
-                order would only be confirmed after our server verifies the payment.
+                {t('page.demoPayment')}
               </p>
             )}
           </section>
@@ -657,7 +628,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
         <aside className="checkout__summary cart-summary" aria-labelledby="checkout-summary-title">
           <h2 id="checkout-summary-title" className="cart-summary__title">
-            Order summary
+            {t('page.summary')}
           </h2>
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
           {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} format={formatBasePrice} />}
@@ -706,8 +677,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
           {changedCount > 0 && (
             <p className="checkout__notice" role="status">
-              {changedCount === 1 ? 'An item has' : `${changedCount} items have`} changed since you added{' '}
-              {changedCount === 1 ? 'it' : 'them'} (price or available quantity). The total above is up to date.
+              {t('page.changed', { count: changedCount })}
             </p>
           )}
 
@@ -715,16 +685,16 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             <div className="checkout__error" role="alert">
               <p>{problems.map((problem) => problem.message).join(' ')}</p>
               <Button to={ROUTES.cart} variant="outline" size="sm">
-                Review cart
+                {t('page.reviewCart')}
               </Button>
             </div>
           )}
 
           {REAL_SHOP && pricing.error && !serverCart && (
             <div className="checkout__error" role="alert">
-              <p>We couldn't check the prices: {pricing.error.message}</p>
+              <p>{t('page.pricesFailed', { reason: pricing.error.message })}</p>
               <Button variant="outline" size="sm" onClick={() => pricing.refetch()}>
-                Try again
+                {t('page.tryAgain')}
               </Button>
             </div>
           )}
@@ -733,7 +703,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             <div className="checkout__error" role="alert">
               <p>{errors.root.server.message}</p>
               <Button to={ROUTES.cart} variant="outline" size="sm">
-                Review cart
+                {t('page.reviewCart')}
               </Button>
             </div>
           )}
@@ -744,9 +714,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           {/* Phase 11: prices shown in another currency elsewhere; the order is charged in the store currency. */}
           <ChargedInBaseNote amount={prepaid > 0 ? amountDue : totals.total} />
           <p className="cart-summary__note">
-            {REAL_SHOP
-              ? 'Prices, stock, discounts, and shipping are checked again by our server when you place the order.'
-              : 'Prices are re-checked with the server before the order is recorded. Shipping, discounts, and taxes would be confirmed by the BuyNest backend.'}
+            {t(REAL_SHOP ? 'page.serverNote' : 'page.demoNote')}
           </p>
         </aside>
       </div>

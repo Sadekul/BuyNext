@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { confirmEmailChange, requestEmailChange } from '../../services/accountService'
 import { validateCode, validateEmail } from '../../utils/validation'
 import './ChangeEmailForm.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 const firstError = (error, field) => {
   const messages = error?.fieldErrors?.[field]
@@ -23,6 +24,7 @@ const firstError = (error, field) => {
  * `onChanged(profile)` receives the updated profile.
  */
 function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
+  const { t } = useTranslation('account')
   const { authorizedRequest } = useAuth()
   const [step, setStep] = useState(pendingEmail ? 'confirm' : 'closed') // closed | request | confirm
   const [values, setValues] = useState({ email: pendingEmail ?? '', password: '', code: '' })
@@ -50,7 +52,7 @@ function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
       setStep('closed')
       setValues({ email: '', password: '', code: '' })
       setSentTo(null)
-      setNotice(`Your email is now ${profile.email}. We've let your old address know.`)
+      setNotice(t('email.done', { email: profile.email }))
       onChanged?.(profile)
     },
     onError: (error) => setErrors({ code: firstError(error, 'code') ?? firstError(error, 'email') }),
@@ -82,8 +84,8 @@ function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
     event.preventDefault()
     const email = values.email.trim()
     const next = {
-      email: validateEmail(email) ?? (email.toLowerCase() === currentEmail?.toLowerCase() ? 'This is already your email address.' : null),
-      password: values.password ? null : 'Enter your current password.',
+      email: validateEmail(email) ?? (email.toLowerCase() === currentEmail?.toLowerCase() ? t('email.same') : null),
+      password: values.password ? null : t('email.passwordRequired'),
     }
     setErrors(next)
     if (next.email || next.password) {
@@ -110,22 +112,22 @@ function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
   return (
     <section className="change-email" aria-labelledby="change-email-title">
       <h2 id="change-email-title" className="profile__section-title" ref={headingRef} tabIndex={-1}>
-        Email address
+        {t('email.title')}
       </h2>
-      <p className="change-email__hint">The email you sign in with, and where we send order updates. It's shown with your details above.</p>
+      <p className="change-email__hint">{t('email.hint')}</p>
 
       {step === 'closed' && (
         <Button variant="outline" size="sm" onClick={() => go('request')} className="change-email__open">
-          Change email
+          {t('email.change')}
         </Button>
       )}
 
       {step === 'request' && (
-        <form className="change-email__form" onSubmit={handleRequest} noValidate aria-label="Change your email">
-          <p className="change-email__hint">We'll send a 6-digit code to the new address. Your email stays the same until you enter it.</p>
-          <FormField label="New email" name="email" type="email" autoComplete="email" value={values.email} onChange={handleChange} error={errors.email} />
+        <form className="change-email__form" onSubmit={handleRequest} noValidate aria-label={t('email.formLabel')}>
+          <p className="change-email__hint">{t('email.codeHint')}</p>
+          <FormField label={t('email.newEmail')} name="email" type="email" autoComplete="email" value={values.email} onChange={handleChange} error={errors.email} />
           <FormField
-            label="Current password"
+            label={t('email.password')}
             name="password"
             type="password"
             autoComplete="current-password"
@@ -141,29 +143,27 @@ function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
           )}
           <div className="change-email__actions">
             <Button type="submit" size="sm" disabled={request.isPending}>
-              {request.isPending ? 'Sending…' : 'Send code'}
+              {t(request.isPending ? 'email.sending' : 'email.send')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => go('closed')} disabled={request.isPending}>
-              Cancel
+              {t('email.cancel')}
             </Button>
           </div>
         </form>
       )}
 
       {step === 'confirm' && (
-        <form className="change-email__form" onSubmit={handleConfirm} noValidate aria-label="Confirm your new email">
+        <form className="change-email__form" onSubmit={handleConfirm} noValidate aria-label={t('email.confirmLabel')}>
           <p className="change-email__hint">
             {sentTo ? (
-              <>
-                Enter the 6-digit code we sent to <strong>{sentTo}</strong>. It expires in 10 minutes.
-              </>
+              <Trans t={t} i18nKey="email.enterSent" values={{ email: sentTo }} components={{ strong: <strong /> }} />
             ) : (
-              'Enter the 6-digit code we sent to your new address.'
+              t('email.enter')
             )}
           </p>
           <FormField
             ref={codeRef}
-            label="Code"
+            label={t('email.code')}
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
@@ -179,13 +179,13 @@ function ChangeEmailForm({ currentEmail, pendingEmail = null, onChanged }) {
           )}
           <div className="change-email__actions">
             <Button type="submit" size="sm" disabled={confirm.isPending}>
-              {confirm.isPending ? 'Confirming…' : 'Confirm new email'}
+              {t(confirm.isPending ? 'email.confirming' : 'email.confirm')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => go('request')} disabled={confirm.isPending}>
-              Send a new code
+              {t('email.newCode')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => go('closed')} disabled={confirm.isPending}>
-              Cancel
+              {t('email.cancel')}
             </Button>
           </div>
         </form>

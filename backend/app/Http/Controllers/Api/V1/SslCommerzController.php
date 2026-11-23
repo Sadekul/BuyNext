@@ -33,8 +33,8 @@ class SslCommerzController extends Controller
             'status' => ['nullable', 'string', 'max:40'],
             'value_a' => ['nullable', 'string', 'max:255'],
         ], [
-            'result.in' => 'The result must be success, fail, or cancel.',
-            'tran_id.regex' => 'This isn\'t an SSLCommerz transaction of this store.',
+            'result.in' => __('The result must be success, fail, or cancel.'),
+            'tran_id.regex' => __('This isn\'t an SSLCommerz transaction of this store.'),
         ]);
 
         [$number, $result] = $payments->handleReturn($data['result'], trim($data['tran_id']), filled($data['val_id'] ?? null) ? trim($data['val_id']) : null);

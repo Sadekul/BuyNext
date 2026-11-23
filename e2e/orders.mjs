@@ -149,8 +149,14 @@ await admin.getByRole('button', { name: 'Mark as delivered' }).click()
 await admin.getByRole('dialog').getByRole('button', { name: 'Mark as delivered' }).click()
 await admin.getByRole('button', { name: 'Invoice', exact: true }).click()
 await admin.getByRole('dialog').getByRole('button', { name: 'Create invoice' }).click()
-await admin.waitForTimeout(1000)
-const delivered = (await api(`/api/admin/v1/orders/${customerOrder}`, { token: adminToken })).body.data
+// Creating the invoice also renders its PDF and sends the email: under a full run that can take more
+// than a second, so wait for the order to say so (up to 15 s) instead of a fixed pause.
+let delivered = null
+for (let waited = 0; waited <= 15000; waited += 500) {
+  delivered = (await api(`/api/admin/v1/orders/${customerOrder}`, { token: adminToken })).body.data
+  if (delivered?.status === 'delivered' && delivered?.payment_status === 'paid') break
+  await admin.waitForTimeout(500)
+}
 log(delivered.status === 'delivered' && delivered.payment_status === 'paid', `delivered and paid (${delivered.status}, ${delivered.payment_status})`)
 log(delivered.history.some((entry) => entry.admin_name === 'Store Admin'), 'history records which admin did it')
 log(!(await admin.getByRole('button', { name: 'Cancel order' }).isVisible()), 'a delivered order offers no cancel')

@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\StockAlert;
 use App\Support\EmailBlocks;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Headers;
 
@@ -17,7 +18,11 @@ class BackInStockMail extends Mailable
 {
     use RendersEmailTemplate;
 
-    public function __construct(public StockAlert $alert, public string $unsubscribeUrl) {}
+    public function __construct(public StockAlert $alert, public string $unsubscribeUrl)
+    {
+        // Phase 13: the customer's language for an account's alert; a guest's alert (no language kept) uses the store default.
+        $this->locale(Locale::forCustomer($alert->customer) ?? Locale::storeDefault());
+    }
 
     protected function templateKey(): string
     {
@@ -35,17 +40,17 @@ class BackInStockMail extends Mailable
             'variant_label' => $label !== '' ? "({$label})" : '',
             'product_url' => $url,
             'unsubscribe_url' => $this->unsubscribeUrl,
-            'button' => EmailBlocks::button($url, 'Shop now'),
+            'button' => EmailBlocks::button($url, __('Shop now')),
         ];
     }
 
     protected function templateLayout(): array
     {
-        $why = 'You get this email because you asked us to tell you when this item was back.';
+        $why = __('You get this email because you asked us to tell you when this item was back.');
 
         return [
-            'footer_html' => e($why).' <a href="'.e($this->unsubscribeUrl).'" style="color:#78716c">Stop these alerts</a>',
-            'footer_text' => "{$why} Stop these alerts: {$this->unsubscribeUrl}",
+            'footer_html' => e($why).' <a href="'.e($this->unsubscribeUrl).'" style="color:#78716c">'.e(__('Stop these alerts')).'</a>',
+            'footer_text' => $why.' '.__('Stop these alerts').": {$this->unsubscribeUrl}",
         ];
     }
 

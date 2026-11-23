@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasTranslations;
 use App\Services\CatalogRules;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,6 +20,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['slug', 'name', 'image_url', 'position', 'parent_id', 'description', 'is_active', 'meta_title', 'meta_description'])]
 class Category extends Model
 {
+    use HasTranslations;
+
+    /** Phase 13: the fields with a Bangla version (product_translations etc.). */
+    public const TRANSLATABLE = ['name', 'description', 'meta_title', 'meta_description'];
+
+    protected static function translationModel(): string
+    {
+        return CategoryTranslation::class;
+    }
+
     /** Phase 7: catalog price rules include a category's descendants, so a tree change clears their cache. */
     protected static function booted(): void
     {

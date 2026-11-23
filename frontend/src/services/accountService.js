@@ -1,4 +1,5 @@
 import { ApiError, apiClient } from './apiClient'
+import { translate } from '../i18n'
 
 /*
  * Phase 9 self-service for signed-in customers (REAL_SHOP only), through the
@@ -53,12 +54,12 @@ export async function downloadMyData() {
   try {
     response = await fetch(new URL('/api/shop/me/export', window.location.origin), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(60_000) })
   } catch (error) {
-    if (error.name === 'TimeoutError') throw new ApiError('The server took too long to respond. Please try again.')
-    throw new ApiError('Network error. Check your internet connection and try again.')
+    if (error.name === 'TimeoutError') throw new ApiError(translate('errors:api.timeout'))
+    throw new ApiError(translate('errors:api.network'))
   }
   if (!response.ok) {
     const data = await response.json().catch(() => null)
-    const fallback = response.status === 429 ? 'You can download your data 3 times an hour. Please try again later.' : "We couldn't prepare your data. Please try again."
+    const fallback = translate(response.status === 429 ? 'errors:download.tooOften' : 'errors:download.failed')
     throw new ApiError(data?.message ?? fallback, { status: response.status, data })
   }
   const fileName = fileNameFrom(response.headers.get('content-disposition'), `buynest-my-data-${new Date().toISOString().slice(0, 10)}.json`)

@@ -37,7 +37,10 @@ class OrderResource extends JsonResource
             'payment_status' => $this->payment_status,
             'payment_method' => $this->payment_method,
             'currency' => $this->resource->currencyCode(), // phase 12: every amount of this order is in it
-            'shipping_method' => ['id' => $this->shipping_method, 'label' => $this->shipping_label, 'eta' => $this->shipping_eta],
+            'locale' => $this->locale ?? 'en', // phase 13: the language the order was placed in (its emails and PDFs, unless the customer chose one)
+            // Phase 13: the stored English label/ETA, translated for the request's language.
+            'shipping_method' => ['id' => $this->shipping_method, 'label' => filled($this->shipping_label) ? __($this->shipping_label) : $this->shipping_label,
+                'eta' => filled($this->shipping_eta) ? __($this->shipping_eta) : $this->shipping_eta],
             'email' => $this->email,
             'phone' => $this->phone,
             'shipping_address' => $this->shipping_address,

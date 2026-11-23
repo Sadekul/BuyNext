@@ -1,3 +1,5 @@
+import { translate } from '../i18n'
+import { formatNumber } from '../i18n/intl'
 /*
  * Phase 11 §4: reward points, as the storefront shows them. The server
  * decides every number that counts (earning on invoice, spending limits);
@@ -11,9 +13,10 @@ export function earnEstimate(amount, rewards) {
 }
 
 /** 1500 → "1,500 pts". */
-export const formatPoints = (points) => `${Number(points).toLocaleString('en-US')} ${Math.abs(points) === 1 ? 'pt' : 'pts'}`
+// Phase 13: "1,500 pts" / "১,৫০০ পয়েন্ট" (the number in the active language's digits).
+export const formatPoints = (points) => translate('cart:points', { count: Math.abs(Number(points)), points: formatNumber(Number(points)) })
 
-/** What a reward transaction was, in the shopper's words. */
+/** What a reward transaction was, in the shopper's words (English; rewardTypeLabel() gives the active language). */
 export const REWARD_TYPE_LABELS = {
   earn: 'Earned on an order',
   spend: 'Used on an order',
@@ -24,3 +27,6 @@ export const REWARD_TYPE_LABELS = {
   review: 'Review bonus',
   adjust: 'Adjusted by our team',
 }
+
+/** A reward transaction's type in the shopper's language; unknown types are shown as given. */
+export const rewardTypeLabel = (type) => (REWARD_TYPE_LABELS[type] ? translate(`cart:rewardTypes.${type}`) : type)

@@ -3,7 +3,10 @@
  * feedback — but it is NOT security: anyone can bypass browser code, so the
  * server must validate every field again. (Phase 10 switches the bigger
  * checkout form to React Hook Form + Zod.)
+ *
+ * Phase 13: the messages are in the shopper's language (validation namespace).
  */
+import { translate } from '../i18n'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,30}$/i
@@ -18,30 +21,30 @@ export function normalizePhone(phone) {
 }
 
 export function validatePhone(phone) {
-  if (!phone.trim()) return 'Enter your phone number.'
-  if (!PHONE_PATTERN.test(normalizePhone(phone))) return 'Include the country code, like +1 555 010 0100.'
+  if (!phone.trim()) return translate('validation:phone.required')
+  if (!PHONE_PATTERN.test(normalizePhone(phone))) return translate('validation:phone.countryCode')
   return null
 }
 
 export function validateCode(code) {
-  if (!code.trim()) return 'Enter the 6-digit code from the email.'
-  if (!CODE_PATTERN.test(code.trim())) return 'The code has 6 digits.'
+  if (!code.trim()) return translate('validation:code.required')
+  if (!CODE_PATTERN.test(code.trim())) return translate('validation:code.digits')
   return null
 }
 
 /** Password rules shared by sign-up and password reset (the server checks them again). */
 export function validateNewPassword(password, confirmPassword) {
   const errors = {}
-  if (password.length < 8) errors.password = 'Use at least 8 characters.'
-  else if (!/[a-z]/i.test(password) || !/\d/.test(password)) errors.password = 'Include at least one letter and one number.'
-  if (!confirmPassword) errors.confirmPassword = 'Confirm your password.'
-  else if (confirmPassword !== password) errors.confirmPassword = 'Passwords do not match.'
+  if (password.length < 8) errors.password = translate('validation:password.length')
+  else if (!/[a-z]/i.test(password) || !/\d/.test(password)) errors.password = translate('validation:password.mix')
+  if (!confirmPassword) errors.confirmPassword = translate('validation:password.confirm')
+  else if (confirmPassword !== password) errors.confirmPassword = translate('validation:password.mismatch')
   return errors
 }
 
 export function validateEmail(email) {
-  if (!email.trim()) return 'Enter your email address.'
-  if (!EMAIL_PATTERN.test(email.trim())) return 'Enter a valid email address, like name@example.com.'
+  if (!email.trim()) return translate('validation:email.required')
+  if (!EMAIL_PATTERN.test(email.trim())) return translate('validation:email.invalid')
   return null
 }
 
@@ -55,26 +58,26 @@ export function validateLogin({ username, email, password }) {
     const emailError = validateEmail(email)
     if (emailError) errors.email = emailError
   } else if (!username.trim()) {
-    errors.username = 'Enter your username.'
+    errors.username = translate('validation:login.username')
   }
-  if (!password) errors.password = 'Enter your password.'
+  if (!password) errors.password = translate('validation:login.password')
   return errors
 }
 
 /** Sign-up form: a phone number (BuyNest accounts) or a username (DummyJSON demo). */
 export function validateRegistration({ firstName, lastName, email, username, phone, password, confirmPassword, acceptTerms }) {
   const errors = {}
-  if (!firstName.trim()) errors.firstName = 'Enter your first name.'
-  if (!lastName.trim()) errors.lastName = 'Enter your last name.'
+  if (!firstName.trim()) errors.firstName = translate('validation:register.firstName')
+  if (!lastName.trim()) errors.lastName = translate('validation:register.lastName')
   const emailError = validateEmail(email)
   if (emailError) errors.email = emailError
   if (phone !== undefined) {
     const phoneError = validatePhone(phone)
     if (phoneError) errors.phone = phoneError
   } else if (!USERNAME_PATTERN.test(username.trim())) {
-    errors.username = 'Use 3–30 letters, numbers, dots, dashes, or underscores.'
+    errors.username = translate('validation:register.username')
   }
   Object.assign(errors, validateNewPassword(password, confirmPassword))
-  if (!acceptTerms) errors.acceptTerms = 'Please accept the terms to continue.'
+  if (!acceptTerms) errors.acceptTerms = translate('validation:register.terms')
   return errors
 }

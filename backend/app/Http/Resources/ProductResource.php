@@ -9,6 +9,7 @@ use App\Services\CatalogRules;
 use App\Services\Pricing;
 use App\Services\ProductLinks;
 use App\Support\ImageVariants;
+use App\Support\Locale;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -55,17 +56,23 @@ class ProductResource extends JsonResource
         $rules = app(CatalogRules::class);
         [$saleCents, $rule] = $rules->publicPrice($this->resource);
 
+        // Phase 13: texts in the request language, each field falling back to English; `locale` = the name's language.
+        $product = $this->resource;
+        $locale = Locale::current();
+
         return [
             'id' => $this->id,
-            'name' => $this->name,
+            'name' => $product->translated('name', $locale),
+            'locale' => $product->translatedLocale('name', $locale),
             'slug' => $this->slug,
             'sku' => $this->sku,
-            'description' => $this->when($this->detail, $this->description),
+            'description' => $this->when($this->detail, fn () => $product->translated('description', $locale)),
+            'short_description' => $this->when($this->detail, fn () => $product->translationFor($locale)?->short_description ?: null),
             // Phase 7 (part B, SEO): null = the storefront falls back to the name and description.
-            'meta_title' => $this->when($this->detail, $this->meta_title),
-            'meta_description' => $this->when($this->detail, $this->meta_description),
+            'meta_title' => $this->when($this->detail, fn () => $product->translated('meta_title', $locale)),
+            'meta_description' => $this->when($this->detail, fn () => $product->translated('meta_description', $locale)),
             'brand' => $this->brand ? ['name' => $this->brand->name] : null,
-            'category' => ['slug' => $this->category->slug, 'name' => $this->category->name],
+            'category' => ['slug' => $this->category->slug, 'name' => $this->category->translated('name', $locale)],
             'price' => $this->price,
             'discount_percent' => (float) $this->discount_percent,
             'sale_price' => Pricing::format($saleCents),
@@ -90,7 +97,7 @@ class ProductResource extends JsonResource
             'type' => $this->type ?? 'simple',
             'gift_card' => $this->resource->giftCardOptions(),
             // Phase 11: [{ label, value }] ([] when none).
-            'specifications' => $this->resource->specificationList(),
+            'specifications' => $this->resource->specificationList($locale),
             'related' => $this->when($this->recommendations, fn () => app(ProductLinks::class)->related($this->resource, $request)),
             'upsells' => $this->when($this->recommendations, fn () => app(ProductLinks::class)->upsells($this->resource, $request)),
             'reviews' => $this->when($this->detail && $this->relationLoaded('reviews'), fn () => $this->reviews
@@ -99,8 +106,8 @@ class ProductResource extends JsonResource
             'options' => $this->when($this->detail && $this->relationLoaded('options'), fn () => $this->has_variants ? $this->options
                 ->map(fn ($option) => [
                     'id' => $option->id,
-                    'name' => $option->name,
-                    'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->value])->values(),
+                    'name' => $option->translatedName($locale),
+                    'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->translatedValue($locale)])->values(),
                 ])->values() : []),
             'variants' => $this->when($this->detail && $this->relationLoaded('variants'), fn () => $this->has_variants ? $this->variants
                 ->filter(fn (ProductVariant $variant) => $variant->is_active)

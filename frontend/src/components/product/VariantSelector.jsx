@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { cn } from '../../utils/classNames'
 import { isValueAvailable } from '../../utils/variants'
 import './VariantSelector.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Option pickers for a configurable product (Size, Color, …): one native
@@ -16,6 +17,7 @@ import './VariantSelector.css'
  * that variant and ask to be emailed when it's back.
  */
 function VariantSelector({ product, selection, onChange, allowSoldOut = false }) {
+  const { t } = useTranslation('catalog')
   const id = useId()
 
   return (
@@ -45,7 +47,7 @@ function VariantSelector({ product, selection, onChange, allowSoldOut = false })
                     className={cn('variant-selector__label', !available && 'variant-selector__label--unavailable', soldOut && 'variant-selector__label--sold-out')}
                   >
                     {value.value}
-                    {!available && <span className="visually-hidden">{soldOut ? ' (sold out)' : ' (unavailable)'}</span>}
+                    {!available && <span className="visually-hidden">{t(soldOut ? 'variants.soldOut' : 'variants.unavailable')}</span>}
                   </label>
                 </span>
               )

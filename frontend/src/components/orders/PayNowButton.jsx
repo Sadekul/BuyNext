@@ -5,8 +5,9 @@ import Button from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import { payOrder } from '../../services/shopService'
 import { isPaymentUrl, paymentPage, rememberGuestPayment } from '../../utils/payment'
+import { useTranslation } from 'react-i18next'
 
-const NO_PAGE = "We couldn't open the secure payment page. Please try again in a moment."
+// Phase 13: shopper-facing texts in orders:payNow.*.
 
 /**
  * "Pay now" for an unpaid card order (phase 8): asks the server for a new
@@ -15,6 +16,7 @@ const NO_PAGE = "We couldn't open the secure payment page. Please try again in a
  * proof as order tracking). Errors are announced next to the button.
  */
 function PayNowButton({ order, email, size = 'md', variant = 'primary' }) {
+  const { t } = useTranslation('orders')
   const { isAuthenticated, authorizedRequest } = useAuth()
   const [leaving, setLeaving] = useState(false)
   const errorId = useId()
@@ -22,7 +24,7 @@ function PayNowButton({ order, email, size = 'md', variant = 'primary' }) {
   const pay = useMutation({
     mutationFn: async () => {
       const payment = await (isAuthenticated ? authorizedRequest(() => payOrder(order.number)) : payOrder(order.number, { email: guestEmail }))
-      if (!isPaymentUrl(payment?.url)) throw new Error(payment?.error || NO_PAGE)
+      if (!isPaymentUrl(payment?.url)) throw new Error(payment?.error || t('payNow.noPage'))
       return payment
     },
     onSuccess: (payment) => {
@@ -43,7 +45,7 @@ function PayNowButton({ order, email, size = 'md', variant = 'primary' }) {
   return (
     <div className="pay-now">
       <Button variant={variant} size={size} onClick={() => pay.mutate()} disabled={busy} aria-describedby={error ? errorId : undefined}>
-        <LuLock aria-hidden="true" /> {busy ? 'Opening secure payment…' : 'Pay now'}
+        <LuLock aria-hidden="true" /> {t(busy ? 'payNow.opening' : 'payNow.pay')}
       </Button>
       {error && (
         <p id={errorId} className="pay-now__error" role="alert">

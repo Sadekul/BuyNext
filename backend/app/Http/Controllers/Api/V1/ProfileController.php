@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PhoneNumber;
 use App\Http\Resources\CustomerResource;
 use App\Services\Newsletter;
+use App\Support\Locale;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /** The signed-in customer's own profile. The account always comes from the token, never from the request. */
 class ProfileController extends Controller
@@ -18,7 +20,9 @@ class ProfileController extends Controller
     }
 
     /**
-     * PATCH /api/v1/me { first_name?, last_name?, phone?, newsletter? }
+     * PATCH /api/v1/me { first_name?, last_name?, phone?, newsletter?, locale? }
+     * Phase 13: locale "en" | "bn" | null (null = the store default): the language of the customer's emails,
+     * and the store switches to it after sign-in.
      * The email isn't changed here: a new address must be verified first.
      * Phase 7: newsletter true/false subscribes or unsubscribes the account's
      * email at once (it's verified, so no confirmation email).
@@ -33,7 +37,8 @@ class ProfileController extends Controller
             'last_name' => ['sometimes', 'required', 'string', 'max:60'],
             'phone' => ['sometimes', 'required', 'string', PhoneNumber::RULE],
             'newsletter' => ['sometimes', 'boolean'],
-        ], ['phone.regex' => 'Enter a valid phone number, including the country code (for example +1 555 010 0100).']);
+            'locale' => ['sometimes', 'nullable', 'string', Rule::in(Locale::SUPPORTED)], // phase 13
+        ], ['phone.regex' => __('Enter a valid phone number, including the country code (for example +1 555 010 0100).')]);
 
         if (array_key_exists('newsletter', $data)) {
             $newsletter->setForCustomer($request->user(), (bool) $data['newsletter']);

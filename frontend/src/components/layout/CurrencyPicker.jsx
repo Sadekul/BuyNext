@@ -1,4 +1,5 @@
 import { useEffect, useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import { chooseDisplayCurrency, setAvailableCurrencies, setStoreCurrency, useDisplayCurrency } from '../../utils/displayCurrency'
 import './CurrencyPicker.css'
@@ -13,6 +14,7 @@ function CurrencyPicker() {
   const { settings } = useStoreSettings()
   const { available, active } = useDisplayCurrency()
   const selectId = useId()
+  const { t } = useTranslation('common')
   // Phase 12: the base is the store currency (USD or BDT).
   const base = settings.currency?.code ?? settings.currencies?.base ?? 'USD'
 
@@ -27,7 +29,7 @@ function CurrencyPicker() {
   return (
     <div className="currency-picker">
       <label htmlFor={selectId} className="visually-hidden">
-        Show prices in
+        {t('currency.showPricesIn')}
       </label>
       <select id={selectId} className="currency-picker__select" value={active?.code ?? base} onChange={(event) => chooseDisplayCurrency(event.target.value === base ? null : event.target.value)}>
         <option value={base}>{base}</option>

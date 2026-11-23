@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { LuCircleCheck, LuX } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import './Toast.css'
 
 const AUTO_DISMISS_MS = 4000
@@ -10,6 +11,7 @@ const AUTO_DISMISS_MS = 4000
  * announce new messages as they appear.
  */
 function Toast({ message, onDismiss }) {
+  const { t } = useTranslation('common')
   // Start a timer whenever a new message appears. The cleanup function
   // cancels the old timer if the message changes or the Toast unmounts.
   useEffect(() => {
@@ -24,7 +26,7 @@ function Toast({ message, onDismiss }) {
         <div className="toast">
           <LuCircleCheck className="toast__icon" aria-hidden="true" />
           <p className="toast__message">{message}</p>
-          <button type="button" className="toast__close" onClick={onDismiss} aria-label="Dismiss notification">
+          <button type="button" className="toast__close" onClick={onDismiss} aria-label={t('ui.dismissNotification')}>
             <LuX aria-hidden="true" />
           </button>
         </div>

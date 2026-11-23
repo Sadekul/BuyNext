@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { LuHeart, LuMenu, LuShoppingBag, LuUser } from 'react-icons/lu'
 import Logo from '../common/Logo'
@@ -6,10 +7,12 @@ import SearchBar from '../common/SearchBar'
 import MainNavigation from './MainNavigation'
 import MobileNavigation from './MobileNavigation'
 import CurrencyPicker from './CurrencyPicker'
+import LanguageSwitch from './LanguageSwitch'
 import { ROUTES } from '../../constants/routes'
 import { useCart } from '../../hooks/useCart'
 import { useWishlist } from '../../hooks/useWishlist'
 import { useAuth } from '../../hooks/useAuth'
+import { formatNumber } from '../../utils/formatters'
 import './Header.css'
 
 /**
@@ -24,6 +27,7 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
   const { totals, openCart } = useCart()
   const { count: wishlistCount } = useWishlist()
   const { user, isAuthenticated } = useAuth()
+  const { t } = useTranslation('common')
 
   return (
     <header className="site-header">
@@ -32,7 +36,7 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
           type="button"
           className="site-header__icon-button site-header__menu-button"
           onClick={() => setIsMenuOpen(true)}
-          aria-label="Open menu"
+          aria-label={t('header.openMenu')}
           aria-haspopup="dialog"
           aria-expanded={isMenuOpen}
         >
@@ -50,7 +54,10 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
           <CurrencyPicker />
         </div>
 
-        <nav className="site-header__actions" aria-label="Account and shopping">
+        {/* Phase 13: বাংলা / English. */}
+        <LanguageSwitch className="site-header__language" />
+
+        <nav className="site-header__actions" aria-label={t('header.actions')}>
           {/* The visible label is the start of the accessible name (WCAG 2.5.3). */}
           <Link to={isAuthenticated ? ROUTES.account : ROUTES.login} className="site-header__icon-button site-header__account">
             {isAuthenticated && user.image ? (
@@ -58,16 +65,16 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
             ) : (
               <LuUser aria-hidden="true" />
             )}
-            <span className="site-header__action-label">{isAuthenticated ? `Hi, ${user.firstName}` : 'Sign in'}</span>
-            {isAuthenticated && <span className="visually-hidden">, my account</span>}
+            <span className="site-header__action-label">{isAuthenticated ? t('header.greeting', { name: user.firstName }) : t('nav.signIn')}</span>
+            {isAuthenticated && <span className="visually-hidden">{t('header.myAccountSuffix')}</span>}
           </Link>
-          <HeaderCountLink to={ROUTES.wishlist} icon={LuHeart} label="Wishlist" count={wishlistCount} />
+          <HeaderCountLink to={ROUTES.wishlist} icon={LuHeart} label={t('nav.wishlist')} count={wishlistCount} />
           <button
             type="button"
             className="site-header__icon-button"
             onClick={openCart}
             aria-haspopup="dialog"
-            aria-label={`Cart, ${totals.totalQuantity} items`}
+            aria-label={t('header.cartItems', { count: totals.totalQuantity })}
           >
             <LuShoppingBag aria-hidden="true" />
             <CountBadge count={totals.totalQuantity} />
@@ -92,8 +99,9 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
 
 /** Icon link with a numeric badge. The accessible name includes the count. */
 function HeaderCountLink({ to, icon: Icon, label, count }) {
+  const { t } = useTranslation('common')
   return (
-    <Link to={to} className="site-header__icon-button" aria-label={`${label}, ${count} items`}>
+    <Link to={to} className="site-header__icon-button" aria-label={t('header.countItems', { label, count })}>
       <Icon aria-hidden="true" />
       <CountBadge count={count} />
     </Link>
@@ -105,7 +113,7 @@ function CountBadge({ count }) {
   if (count <= 0) return null
   return (
     <span className="site-header__badge" aria-hidden="true">
-      {count > 99 ? '99+' : count}
+      {count > 99 ? `${formatNumber(99)}+` : formatNumber(count)}
     </span>
   )
 }

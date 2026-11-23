@@ -15,17 +15,20 @@ import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { formatDate, formatBasePrice } from '../utils/formatters'
 import './OrderPages.css'
+import { useTranslation } from 'react-i18next'
 
 function NoOrders() {
+  const { t } = useTranslation('orders')
   return (
-    <EmptyState icon={LuPackage} titleAs="h2" title="No orders yet" message="Orders you place will appear here.">
-      <Button to={ROUTES.products}>Start shopping</Button>
+    <EmptyState icon={LuPackage} titleAs="h2" title={t('list.noOrders')} message={t('list.noOrdersMessage')}>
+      <Button to={ROUTES.products}>{t('list.startShopping')}</Button>
     </EmptyState>
   )
 }
 
 /** One row of the order history; works for real (`number`) and demo (`id`) orders. */
 function OrderRow({ order }) {
+  const { t } = useTranslation('orders')
   const id = order.number ?? order.id
   return (
     <li className="orders__item">
@@ -36,10 +39,10 @@ function OrderRow({ order }) {
       </div>
       <div className="orders__info">
         <Link to={ROUTES.orderDetails(id)} className="orders__id">
-          Order {id}
+          {t('list.order', { number: id })}
         </Link>
         <span className="orders__meta">
-          {formatDate(new Date(order.placedAt).toISOString())} · {order.totals.itemCount} {order.totals.itemCount === 1 ? 'item' : 'items'}
+          {formatDate(new Date(order.placedAt).toISOString())} · {t('list.items', { count: order.totals.itemCount })}
         </span>
       </div>
       <OrderStatusBadge status={order.status} />
@@ -50,16 +53,17 @@ function OrderRow({ order }) {
 
 /** Demo: the signed-in customer's orders saved on this device. */
 function DemoOrdersPage() {
+  const { t } = useTranslation('orders')
   const { orders } = useOrders()
   if (orders.length === 0) return <NoOrders />
 
   return (
     <section className="orders" aria-labelledby="orders-title">
-      <title>{`Orders | ${SITE.name}`}</title>
+      <title>{`${t('list.tabTitle')} | ${SITE.name}`}</title>
       <h2 id="orders-title" className="orders__title">
-        Order history
+        {t('list.title')}
       </h2>
-      <p className="orders__note">Demo orders are saved on this device only.</p>
+      <p className="orders__note">{t('list.demoNote')}</p>
       <ul className="orders__list">
         {orders.map((order) => (
           <OrderRow key={order.id} order={order} />
@@ -71,21 +75,22 @@ function DemoOrdersPage() {
 
 /** BuyNest's API: the customer's orders, newest first, a page at a time (?page=2). */
 function ServerOrdersPage() {
+  const { t } = useTranslation('orders')
   const { user, authorizedRequest } = useAuth()
   const [params, setParams] = useSearchParams()
   const page = Math.max(Number.parseInt(params.get('page') ?? '1', 10) || 1, 1)
   const request = useQuery(ordersQuery(user.id, authorizedRequest, page))
 
-  if (request.isPending) return <Loader label="Loading your orders…" />
-  if (request.error) return <ErrorMessage title="We couldn't load your orders" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
+  if (request.isPending) return <Loader label={t('list.loading')} />
+  if (request.error) return <ErrorMessage title={t('list.failed')} titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
   const { orders, lastPage } = request.data
   if (orders.length === 0 && page === 1) return <NoOrders />
 
   return (
     <section className="orders" aria-labelledby="orders-title" aria-busy={request.isFetching}>
-      <title>{`Orders | ${SITE.name}`}</title>
+      <title>{`${t('list.tabTitle')} | ${SITE.name}`}</title>
       <h2 id="orders-title" className="orders__title">
-        Order history
+        {t('list.title')}
       </h2>
       <ul className="orders__list">
         {orders.map((order) => (

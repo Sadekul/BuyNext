@@ -1,4 +1,5 @@
 import { laravel } from '../http.js'
+import { serverMessage } from '../i18n.js'
 
 /*
  * The newsletter with BuyNest's Laravel API (docs/backend/PHASE7_CONTRACT.md §3,
@@ -44,18 +45,18 @@ export const laravelNewsletter = {
     const email = str(body.email)?.trim().slice(0, 254)
     const source = SOURCES.includes(body.source) ? body.source : 'footer'
     const result = await laravel('/api/v1/newsletter', { method: 'POST', request, body: { email: email ?? '', source } })
-    return done(result, [200, 201, 202], (data) => ({ message: str(data.message) ?? "Thanks! Check your inbox to confirm." }))
+    return done(result, [200, 201, 202], (data) => ({ message: str(data.message) ?? serverMessage(request, 'newsletterThanks') }))
   },
 
   async confirm(body, request) {
     const value = token(body.token)
-    if (!value) return badToken('This confirmation link is invalid or has expired. Subscribe again to get a new one.')
+    if (!value) return badToken(serverMessage(request, 'newsletterConfirmInvalid'))
     return done(await laravel('/api/v1/newsletter/confirm', { method: 'POST', request, body: { token: value } }), [200], fromStatus)
   },
 
   async unsubscribe(body, request) {
     const value = token(body.token)
-    if (!value) return badToken('This unsubscribe link is invalid.')
+    if (!value) return badToken(serverMessage(request, 'newsletterUnsubscribeInvalid'))
     return done(await laravel('/api/v1/newsletter/unsubscribe', { method: 'POST', request, body: { token: value } }), [200], fromStatus)
   },
 }

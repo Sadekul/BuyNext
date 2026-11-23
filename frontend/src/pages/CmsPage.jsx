@@ -12,6 +12,7 @@ import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { toDescription } from '../utils/pageMeta'
 import './CmsPage.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Links in the admin's HTML are plain <a> tags. Same-site ones are followed
@@ -33,11 +34,12 @@ function useInAppLinks() {
 
 /** Support details from the store settings, under the contact page. */
 function SupportCard() {
+  const { t } = useTranslation('marketing')
   const { settings } = useStoreSettings()
   if (!settings.supportEmail && !settings.supportPhone) return null
   return (
     <aside className="cms-page__support" aria-labelledby="support-title">
-      <h2 id="support-title">Customer support</h2>
+      <h2 id="support-title">{t('cms.support')}</h2>
       <ul>
         {settings.supportEmail && (
           <li>
@@ -65,6 +67,7 @@ function SupportCard() {
  * only this one field from our own API is ever rendered as HTML.
  */
 function CmsPage() {
+  const { t, i18n } = useTranslation('marketing')
   const { slug } = useParams()
   const pageRequest = useQuery(cmsPageQuery(slug))
   const handleBodyClick = useInAppLinks()
@@ -72,7 +75,7 @@ function CmsPage() {
   if (pageRequest.isPending) {
     return (
       <div className="section container">
-        <Loader label="Loading page…" />
+        <Loader label={t('cms.loading')} />
       </div>
     )
   }
@@ -82,8 +85,8 @@ function CmsPage() {
   if (pageRequest.error) {
     return (
       <div className="section container">
-        <title>{`Page unavailable | ${SITE.name}`}</title>
-        <ErrorMessage titleAs="h1" title="We couldn't load this page" message={pageRequest.error.message} onRetry={pageRequest.refetch} />
+        <title>{`${t('cms.unavailable')} | ${SITE.name}`}</title>
+        <ErrorMessage titleAs="h1" title={t('cms.failed')} message={pageRequest.error.message} onRetry={pageRequest.refetch} />
       </div>
     )
   }
@@ -92,8 +95,9 @@ function CmsPage() {
   return (
     <div className="section container">
       <PageMeta title={page.metaTitle ?? page.title} description={toDescription(page.metaDescription ?? page.body)} canonicalPath={ROUTES.page(page.slug ?? slug)} />
-      <Breadcrumb items={[{ label: 'Home', to: ROUTES.home }, { label: page.title }]} />
-      <article className="cms-page" aria-labelledby="cms-page-title">
+      <Breadcrumb items={[{ label: t('cms.home'), to: ROUTES.home }, { label: page.title }]} />
+      {/* Phase 13: a page not yet translated keeps lang="en" so screen readers read it as English. */}
+      <article className="cms-page" aria-labelledby="cms-page-title" lang={page.locale && page.locale !== i18n.language ? page.locale : undefined}>
         <h1 id="cms-page-title" className="cms-page__title">
           {page.title}
         </h1>

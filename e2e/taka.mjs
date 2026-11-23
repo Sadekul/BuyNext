@@ -580,8 +580,15 @@ async function runChecks() {
   /** Clicks "Continue to SSLCommerz" and waits for the stand-in gateway page; returns { number, session }. */
   async function toGateway(page, click = () => continueButton(page).click()) {
     await page.waitForFunction(() => ![...document.querySelectorAll('button')].some((b) => /Checking prices/.test(b.textContent)), null, { timeout: 20000 }).catch(() => {})
+    // The button is briefly disabled while prices are re-checked: wait for it, and if a click landed in
+    // that moment (still on checkout, nothing shown, button enabled again), click once more. A placed
+    // order disables the button ("Placing…"), so this never places two.
+    await continueButton(page).and(page.locator(':enabled')).waitFor({ timeout: 20000 }).catch(() => {})
     await click()
-    await page.waitForURL((url) => url.href.startsWith(`${GATEWAY}/gwprocess/`), { timeout: 30000 }).catch(async (error) => {
+    const onGateway = (url) => url.href.startsWith(`${GATEWAY}/gwprocess/`)
+    const left = await page.waitForURL(onGateway, { timeout: 15000 }).then(() => true, () => false)
+    if (!left && new URL(page.url()).pathname === '/checkout' && (await continueButton(page).isEnabled().catch(() => false))) await click()
+    await page.waitForURL(onGateway, { timeout: 45000 }).catch(async (error) => {
       const shown = await page
         .locator('[role="alert"], .field__error, .form-error')
         .allInnerTexts()

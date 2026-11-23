@@ -10,8 +10,10 @@ import { useAuth } from '../hooks/useAuth'
 import { invoiceQuery } from '../queries/orderQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatDate, moneyFormatter } from '../utils/formatters'
+import { formatDate, formatNumber, moneyFormatter } from '../utils/formatters'
+import { translate } from '../i18n'
 import './InvoicePage.css'
+import { useTranslation } from 'react-i18next'
 
 function Address({ address }) {
   if (!address) return null
@@ -29,7 +31,7 @@ function Address({ address }) {
       <br />
       {address.city}, {address.state} {address.postalCode}
       <br />
-      {address.country}
+      {translate(`common:countries.${address.country}`, { defaultValue: address.country })}
     </address>
   )
 }
@@ -41,27 +43,28 @@ function Address({ address }) {
  * the site header, footer, and buttons. No PDF library needed.
  */
 function InvoicePage() {
+  const { t } = useTranslation('orders')
   const { orderId, invoiceNumber } = useParams()
   const { user, authorizedRequest } = useAuth()
   const request = useQuery(invoiceQuery(user.id, orderId, invoiceNumber, authorizedRequest))
   const backLink = (
     <Link to={ROUTES.orderDetails(orderId)} className="invoice-page__back">
-      <LuArrowLeft aria-hidden="true" /> Order {orderId}
+      <LuArrowLeft aria-hidden="true" /> {t('list.order', { number: orderId })}
     </Link>
   )
 
   if (request.isPending) {
     return (
       <div className="section container">
-        <Loader label="Loading the invoice…" />
+        <Loader label={t('invoice.loading')} />
       </div>
     )
   }
   if (request.error?.status === 404) {
     return (
       <div className="section container">
-        <EmptyState icon={LuFileX} title="Invoice not found" message="This invoice doesn't exist or belongs to another account.">
-          <Button to={ROUTES.orders}>Back to orders</Button>
+        <EmptyState icon={LuFileX} title={t('invoice.notFound')} message={t('invoice.notFoundMessage')}>
+          <Button to={ROUTES.orders}>{t('invoice.back')}</Button>
         </EmptyState>
       </div>
     )
@@ -69,7 +72,7 @@ function InvoicePage() {
   if (request.error) {
     return (
       <div className="section container">
-        <ErrorMessage title="We couldn't load this invoice" message={request.error.message} onRetry={() => request.refetch()} />
+        <ErrorMessage title={t('invoice.failed')} message={request.error.message} onRetry={() => request.refetch()} />
       </div>
     )
   }
@@ -80,14 +83,14 @@ function InvoicePage() {
   const formatBasePrice = moneyFormatter(invoice.currency)
   return (
     <div className="invoice-page section container">
-      <title>{`Invoice ${invoice.number} | ${SITE.name}`}</title>
+      <title>{`${t('view.invoiceNumber', { number: invoice.number })} | ${SITE.name}`}</title>
       <div className="invoice-page__actions">
         {backLink}
         <div className="invoice-page__buttons">
           {/* Phase 10: the store's own PDF, made by the server. */}
           <InvoicePdfButton orderNumber={orderId} invoiceNumber={invoice.number} />
           <Button onClick={() => window.print()} variant="outline">
-            <LuPrinter aria-hidden="true" /> Print
+            <LuPrinter aria-hidden="true" /> {t('invoice.print')}
           </Button>
         </div>
       </div>
@@ -103,14 +106,14 @@ function InvoicePage() {
             </p>
           </div>
           <div className="invoice__meta">
-            <h1 id="invoice-title">Invoice {invoice.number}</h1>
+            <h1 id="invoice-title">{t('view.invoiceNumber', { number: invoice.number })}</h1>
             <dl>
               <div>
-                <dt>Date</dt>
+                <dt>{t('invoice.date')}</dt>
                 <dd>{formatDate(invoice.createdAt)}</dd>
               </div>
               <div>
-                <dt>Order</dt>
+                <dt>{t('invoice.order')}</dt>
                 <dd>{invoice.orderNumber}</dd>
               </div>
             </dl>
@@ -119,24 +122,24 @@ function InvoicePage() {
 
         <section aria-labelledby="invoice-bill-to">
           <h2 id="invoice-bill-to" className="invoice__subheading">
-            Bill to
+            {t('invoice.billTo')}
           </h2>
           <Address address={invoice.billingAddress} />
         </section>
 
         <table className="invoice__table">
-          <caption className="visually-hidden">Items on invoice {invoice.number}</caption>
+          <caption className="visually-hidden">{t('invoice.caption', { number: invoice.number })}</caption>
           <thead>
             <tr>
-              <th scope="col">Item</th>
+              <th scope="col">{t('invoice.item')}</th>
               <th scope="col" className="invoice__num">
-                Qty
+                {t('invoice.qty')}
               </th>
               <th scope="col" className="invoice__num">
-                Unit price
+                {t('invoice.unitPrice')}
               </th>
               <th scope="col" className="invoice__num">
-                Amount
+                {t('invoice.amount')}
               </th>
             </tr>
           </thead>
@@ -148,7 +151,7 @@ function InvoicePage() {
                   {item.variantLabel && <span className="invoice__muted"> ({item.variantLabel})</span>}
                   {item.sku && <span className="invoice__muted"> · {item.sku}</span>}
                 </td>
-                <td className="invoice__num">{item.quantity}</td>
+                <td className="invoice__num">{formatNumber(item.quantity)}</td>
                 <td className="invoice__num">{formatBasePrice(item.salePrice)}</td>
                 <td className="invoice__num">{formatBasePrice(item.lineTotal)}</td>
               </tr>
@@ -157,46 +160,46 @@ function InvoicePage() {
           <tfoot>
             <tr>
               <th scope="row" colSpan={3}>
-                Subtotal
+                {t('invoice.subtotal')}
               </th>
               <td className="invoice__num">{formatBasePrice(totals.subtotal)}</td>
             </tr>
             {totals.discount > 0 && (
               <tr>
                 <th scope="row" colSpan={3}>
-                  Discount
+                  {t('invoice.discount')}
                 </th>
                 <td className="invoice__num">−{formatBasePrice(totals.discount)}</td>
               </tr>
             )}
             <tr>
               <th scope="row" colSpan={3}>
-                Shipping
+                {t('invoice.shipping')}
               </th>
-              <td className="invoice__num">{totals.shipping === 0 ? 'Free' : formatBasePrice(totals.shipping)}</td>
+              <td className="invoice__num">{totals.shipping === 0 ? t('invoice.free') : formatBasePrice(totals.shipping)}</td>
             </tr>
             <tr>
               <th scope="row" colSpan={3}>
-                Tax
+                {t('invoice.tax')}
               </th>
               <td className="invoice__num">{formatBasePrice(totals.tax)}</td>
             </tr>
             <tr className="invoice__total">
               <th scope="row" colSpan={3}>
-                Total
+                {t('invoice.total')}
               </th>
               <td className="invoice__num">{formatBasePrice(totals.total)}</td>
             </tr>
             <tr>
               <th scope="row" colSpan={3}>
-                Amount paid
+                {t('invoice.paid')}
               </th>
               <td className="invoice__num">{formatBasePrice(invoice.amount)}</td>
             </tr>
           </tfoot>
         </table>
 
-        <p className="invoice__muted">Thank you for shopping with {SITE.name}. Questions about this invoice? Write to {SITE.supportEmail}.</p>
+        <p className="invoice__muted">{t('invoice.thanks', { store: SITE.name, email: SITE.supportEmail })}</p>
       </article>
     </div>
   )

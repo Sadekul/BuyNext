@@ -10,6 +10,7 @@ use App\Models\OneTimeCode;
 use App\Services\OneTimeCodes;
 use App\Services\RewardPoints;
 use App\Services\TokenPairs;
+use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -35,19 +36,22 @@ class CustomerAuthController extends Controller
 
         if ($customer?->hasVerifiedEmail()) {
             throw ValidationException::withMessages([
-                'email' => 'An account with this email already exists. Sign in, or reset your password.',
+                'email' => __('An account with this email already exists. Sign in, or reset your password.'),
             ]);
         }
 
         // An unverified sign-up for this email is replaced: whoever can read
         // the inbox decides which details and password the account gets.
         $customer ??= new Customer;
-        $customer->fill(collect($data)->only(['first_name', 'last_name', 'email', 'phone', 'password'])->all())->save();
+        $customer->fill(collect($data)->only(['first_name', 'last_name', 'email', 'phone', 'password'])->all());
+        // Phase 13: the language the shopper signed up in (an explicit en/bn Accept-Language), for later emails.
+        $customer->locale = Locale::requested($request) ?? $customer->locale;
+        $customer->save();
 
         $resendIn = $this->codes->send($customer->email, OneTimeCode::VERIFY_EMAIL, $customer->first_name);
 
         return response()->json([
-            'message' => "We emailed a 6-digit code to {$customer->email}.",
+            'message' => __('We emailed a 6-digit code to :email.', ['email' => $customer->email]),
             'data' => $this->codeInfo($customer->email, $resendIn),
         ], 201);
     }
@@ -59,7 +63,7 @@ class CustomerAuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:190'],
             'code' => ['required', 'string', 'regex:/^\d{6}$/'],
             'remember' => ['sometimes', 'boolean'],
-        ], ['code.regex' => 'Enter the 6-digit code from the email.']);
+        ], ['code.regex' => __('Enter the 6-digit code from the email.')]);
 
         $customer = Customer::where('email', OneTimeCodes::normalize($data['email']))->first();
         $this->checkCode($data['email'], OneTimeCode::VERIFY_EMAIL, $data['code'], $customer !== null);
@@ -97,7 +101,7 @@ class CustomerAuthController extends Controller
             : config('buynest.codes.resend_cooldown_seconds');
 
         return response()->json([
-            'message' => 'If that email needs a code, we sent a new one.',
+            'message' => __('If that email needs a code, we sent a new one.'),
             'data' => $this->codeInfo($email, $resendIn),
         ]);
     }
@@ -115,7 +119,7 @@ class CustomerAuthController extends Controller
         // Hash::check runs even without an account, so the response time doesn't tell whether the email exists.
         $passwordOk = Hash::check($data['password'], $customer?->password ?? '$2y$12$'.str_repeat('a', 53));
         if (! $customer || ! $passwordOk) {
-            throw ValidationException::withMessages(['email' => 'The email or password is incorrect.']);
+            throw ValidationException::withMessages(['email' => __('The email or password is incorrect.')]);
         }
         if (! $customer->is_active) {
             return $this->disabled();
@@ -124,7 +128,7 @@ class CustomerAuthController extends Controller
             $resendIn = $this->codes->send($customer->email, OneTimeCode::VERIFY_EMAIL, $customer->first_name);
 
             return response()->json([
-                'message' => 'Please confirm your email first. We sent a code to '.$customer->email.'.',
+                'message' => __('Please confirm your email first. We sent a code to :email.', ['email' => $customer->email]),
                 'code' => 'email_unverified',
                 'data' => $this->codeInfo($customer->email, $resendIn),
             ], 403);
@@ -143,7 +147,7 @@ class CustomerAuthController extends Controller
 
         return $tokens
             ? response()->json(['data' => ['tokens' => $tokens]])
-            : response()->json(['message' => 'Your session has expired. Please sign in again.'], 401);
+            : response()->json(['message' => __('Your session has expired. Please sign in again.')], 401);
     }
 
     /** POST /api/v1/auth/logout (access token) → this device is signed out. */
@@ -151,7 +155,7 @@ class CustomerAuthController extends Controller
     {
         $this->tokens->revokePairOf($request->user()->currentAccessToken());
 
-        return response()->json(['message' => 'Signed out.']);
+        return response()->json(['message' => __('Signed out.')]);
     }
 
     /** POST /api/v1/auth/forgot-password { email } → always 200; a code is emailed if the account exists. */
@@ -166,7 +170,7 @@ class CustomerAuthController extends Controller
             : config('buynest.codes.resend_cooldown_seconds');
 
         return response()->json([
-            'message' => "If an account exists for {$email}, we emailed it a 6-digit code.",
+            'message' => __('If an account exists for :email, we emailed it a 6-digit code.', ['email' => $email]),
             'data' => $this->codeInfo($email, $resendIn),
         ]);
     }
@@ -178,7 +182,7 @@ class CustomerAuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:190'],
             'code' => ['required', 'string', 'regex:/^\d{6}$/'],
             'password' => ['required', 'string', 'max:128', 'confirmed', Password::min(8)->letters()->numbers()],
-        ], ['code.regex' => 'Enter the 6-digit code from the email.']);
+        ], ['code.regex' => __('Enter the 6-digit code from the email.')]);
 
         $customer = Customer::where('email', OneTimeCodes::normalize($data['email']))->first();
         $this->checkCode($data['email'], OneTimeCode::RESET_PASSWORD, $data['code'], $customer !== null);
@@ -193,17 +197,17 @@ class CustomerAuthController extends Controller
         }
         $this->tokens->revokeAll($customer); // every other device is signed out
 
-        return response()->json(['message' => 'Your password has been changed. Sign in with the new password.']);
+        return response()->json(['message' => __('Your password has been changed. Sign in with the new password.')]);
     }
 
     private function checkCode(string $email, string $purpose, string $code, bool $accountExists): void
     {
         $result = $accountExists ? $this->codes->verify($email, $purpose, $code) : 'invalid';
         if ($result === 'locked') {
-            throw ValidationException::withMessages(['code' => 'Too many wrong attempts. Ask for a new code.']);
+            throw ValidationException::withMessages(['code' => __('Too many wrong attempts. Ask for a new code.')]);
         }
         if ($result !== 'ok') {
-            throw ValidationException::withMessages(['code' => 'That code is incorrect or has expired.']);
+            throw ValidationException::withMessages(['code' => __('That code is incorrect or has expired.')]);
         }
     }
 
@@ -220,7 +224,7 @@ class CustomerAuthController extends Controller
     private function disabled(): JsonResponse
     {
         return response()->json([
-            'message' => 'This account has been disabled. Please contact BuyNest support.',
+            'message' => __('This account has been disabled. Please contact BuyNest support.'),
             'code' => 'account_disabled',
         ], 403);
     }

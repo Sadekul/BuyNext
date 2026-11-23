@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   compare: 'buynest.compare.v1', // the products picked for comparison (max 4)
   recentlyViewed: 'buynest.recentlyViewed.v1', // the last 12 products opened, newest first
   currency: 'buynest.currency.v1', // the display currency the shopper chose (prices are still charged in the store currency)
+  languageHint: 'buynest.languageHint.v1', // phase 13: the "বাংলায় দেখুন" hint was shown and closed (never again)
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */

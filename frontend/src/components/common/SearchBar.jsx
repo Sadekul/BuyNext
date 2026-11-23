@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { LuSearch } from 'react-icons/lu'
+import { Trans, useTranslation } from 'react-i18next'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useQuery } from '@tanstack/react-query'
 import { suggestionsQuery } from '../../queries/productQueries'
@@ -25,7 +26,9 @@ const DEBOUNCE_MS = 300
  *
  * `onSearch` is optional — the mobile menu uses it to close itself.
  */
-function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
+function SearchBar({ placeholder: placeholderProp, onSearch }) {
+  const { t } = useTranslation('common')
+  const placeholder = placeholderProp ?? t('search.placeholder')
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [active, setActive] = useState({ query: '', index: -1 })
@@ -100,7 +103,7 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
   return (
     <form className="search-bar" role="search" onSubmit={handleSubmit}>
       <label htmlFor={inputId} className="visually-hidden">
-        Search products
+        {t('search.label')}
       </label>
       <div className="search-bar__field">
         <input
@@ -123,15 +126,15 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
           placeholder={placeholder}
           autoComplete="off"
         />
-        <button type="submit" className="search-bar__button" aria-label="Search">
+        <button type="submit" className="search-bar__button" aria-label={t('search.submit')}>
           <LuSearch aria-hidden="true" />
         </button>
       </div>
 
-      <ul id={listboxId} role="listbox" aria-label="Search suggestions" className="search-bar__suggestions" hidden={!showList}>
+      <ul id={listboxId} role="listbox" aria-label={t('search.suggestions')} className="search-bar__suggestions" hidden={!showList}>
         {correctedQuery && suggestions.length > 0 && (
           <li className="search-bar__corrected" role="presentation">
-            Showing suggestions for <strong>{correctedQuery}</strong>
+            <Trans t={t} i18nKey="search.showingFor" values={{ query: correctedQuery }} components={{ strong: <strong /> }} />
           </li>
         )}
         {suggestions.map((product, index) => (
@@ -150,14 +153,14 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
             <img src={product.thumbnail} alt="" width="40" height="40" />
             <span className="search-bar__option-text">
               <HighlightedText text={product.title} query={correctedQuery ?? debouncedQuery} />
-              {product.category && <span className="search-bar__option-meta">{formatSlug(product.category)}</span>}
+              {product.category && <span className="search-bar__option-meta">{product.categoryName ?? formatSlug(product.category)}</span>}
             </span>
             <span className="search-bar__option-price">{formatPrice(getProductPricing(product).salePrice)}</span>
           </li>
         ))}
         {suggestions.length === 0 ? (
           <li className="search-bar__empty" role="presentation">
-            No products match "{debouncedQuery}"
+            {t('search.noMatch', { query: debouncedQuery })}
           </li>
         ) : (
           <li className="search-bar__all" role="presentation">
@@ -169,7 +172,7 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
                 submitSearch()
               }}
             >
-              See all {total} results for "{debouncedQuery}"
+              {t('search.seeAll', { count: total, query: debouncedQuery })}
             </button>
           </li>
         )}
@@ -177,8 +180,8 @@ function SearchBar({ placeholder = 'Search products and brands', onSearch }) {
       <p className="visually-hidden" role="status">
         {showList &&
           (suggestions.length > 0
-            ? `${suggestions.length} suggestions available${correctedQuery ? ` for ${correctedQuery}` : ''}`
-            : 'No suggestions')}
+            ? t(correctedQuery ? 'search.availableFor' : 'search.available', { count: suggestions.length, query: correctedQuery })
+            : t('search.none'))}
       </p>
     </form>
   )

@@ -75,3 +75,49 @@ export const featuredCategories = [
   { slug: 'mens-shoes', image: 'https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/thumbnail.webp' },
   { slug: 'sunglasses', image: 'https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/thumbnail.webp' },
 ]
+
+/*
+ * Phase 13: the demo's hero, banners and benefits in the shopper's language
+ * (marketing:demo.* / marketing:benefits.*). With BuyNest's API the hero and
+ * banners come from GET /home already in the request's language.
+ */
+/** freeShipping: the store's threshold as text ("$50"), or null: then the highlight doesn't name an amount. */
+export function localizedHeroContent(t, freeShipping = null) {
+  return {
+    ...heroContent,
+    eyebrow: t('demo.hero.eyebrow'),
+    title: t('demo.hero.title'),
+    description: t('demo.hero.description'),
+    primaryCta: { ...heroContent.primaryCta, label: t('demo.hero.primary') },
+    secondaryCta: { ...heroContent.secondaryCta, label: t('demo.hero.secondary') },
+    imageAlt: t('demo.hero.imageAlt'),
+    highlights: [
+      freeShipping ? t('demo.hero.highlight1', { amount: freeShipping }) : t('demo.hero.highlight1Any'),
+      t('demo.hero.highlight2'),
+      t('demo.hero.highlight3'),
+    ],
+  }
+}
+
+export const localizedPromoBanners = (t) =>
+  promoBanners.map((banner) => ({
+    ...banner,
+    eyebrow: t(`demo.banners.${banner.id}.eyebrow`),
+    title: t(`demo.banners.${banner.id}.title`),
+    description: t(`demo.banners.${banner.id}.description`),
+    cta: { ...banner.cta, label: t(`demo.banners.${banner.id}.cta`) },
+    imageAlt: t(`demo.banners.${banner.id}.imageAlt`),
+  }))
+
+/** freeShipping: as above; the shipping benefit names the store's own threshold (not a fixed "$50"). */
+export const localizedBenefits = (t, freeShipping = null) =>
+  customerBenefits.map((benefit) => ({
+    ...benefit,
+    title: t(`benefits.${benefit.id}.title`),
+    text:
+      benefit.id === 'shipping'
+        ? freeShipping
+          ? t('benefits.shipping.text', { amount: freeShipping })
+          : t('benefits.shipping.textAny')
+        : t(`benefits.${benefit.id}.text`),
+  }))

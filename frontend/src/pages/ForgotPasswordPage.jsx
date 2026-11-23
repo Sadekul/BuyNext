@@ -10,6 +10,7 @@ import { SITE } from '../constants/site'
 import { validateCode, validateEmail, validateNewPassword } from '../utils/validation'
 import { withoutField } from '../utils/serverErrors'
 import './AuthPages.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * /forgot-password
@@ -22,16 +23,17 @@ import './AuthPages.css'
  * DummyJSON demo: SIMULATED. No email is sent (DummyJSON has no reset API).
  */
 function ForgotPasswordPage() {
+  const { t } = useTranslation('auth')
   const [sent, setSent] = useState(null) // { email, resendIn } after step 1
 
   return (
     <div className="auth-page section container">
-      <title>{`Reset password | ${SITE.name}`}</title>
+      <title>{`${t('forgot.tabTitle')} | ${SITE.name}`}</title>
       <div className="auth-card">
         {sent ? <ResetStep email={sent.email} resendIn={sent.resendIn} /> : <RequestStep onSent={setSent} />}
         <p className="auth-card__footer">
           <Link to={ROUTES.login} className="auth-link">
-            Back to sign in
+            {t('forgot.back')}
           </Link>
         </p>
       </div>
@@ -40,6 +42,7 @@ function ForgotPasswordPage() {
 }
 
 function RequestStep({ onSent }) {
+  const { t } = useTranslation('auth')
   const [email, setEmail] = useState('')
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -72,8 +75,8 @@ function RequestStep({ onSent }) {
   return (
     <>
       <header>
-        <h1 className="auth-card__title">Reset your password</h1>
-        <p className="auth-card__subtitle">Enter your email and we'll send you a 6-digit code to choose a new password.</p>
+        <h1 className="auth-card__title">{t('forgot.title')}</h1>
+        <p className="auth-card__subtitle">{t('forgot.subtitle')}</p>
       </header>
 
       {serverError && (
@@ -85,16 +88,16 @@ function RequestStep({ onSent }) {
       {demoSentTo ? (
         <div role="status" className="auth-form">
           <p className="auth-alert auth-alert--success">
-            If an account exists for <strong>{demoSentTo}</strong>, you'll receive a code shortly.
+            <Trans t={t} i18nKey="forgot.demoSent" values={{ email: demoSentTo }} components={{ strong: <strong /> }} />
           </p>
           <p className="auth-alert auth-alert--info">
-            <strong>Demo only:</strong> no email was sent. DummyJSON has no password-reset API.
+            <Trans t={t} i18nKey="forgot.demoNote" components={{ strong: <strong /> }} />
           </p>
         </div>
       ) : (
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField
-            label="Email"
+            label={t('forgot.email')}
             name="email"
             type="email"
             autoComplete="email"
@@ -103,7 +106,7 @@ function RequestStep({ onSent }) {
             error={error ?? undefined}
           />
           <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? 'Sending…' : 'Send code'}
+            {t(isSubmitting ? 'forgot.sending' : 'forgot.send')}
           </Button>
         </form>
       )}
@@ -112,6 +115,7 @@ function RequestStep({ onSent }) {
 }
 
 function ResetStep({ email, resendIn }) {
+  const { t } = useTranslation('auth')
   const navigate = useNavigate()
   const [values, setValues] = useState({ code: '', password: '', confirmPassword: '' })
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -141,7 +145,7 @@ function ResetStep({ email, resendIn }) {
     setIsSubmitting(true)
     try {
       await resetPassword({ email, ...values })
-      navigate(ROUTES.login, { replace: true, state: { notice: 'Your password has been changed. Sign in with your new password.' } })
+      navigate(ROUTES.login, { replace: true, state: { notice: t('forgot.changed') } })
     } catch (failure) {
       if (failure.fieldErrors) setServerErrors(failure.fieldErrors)
       else setGeneralError(failure.message)
@@ -154,9 +158,9 @@ function ResetStep({ email, resendIn }) {
   return (
     <>
       <header>
-        <h1 className="auth-card__title">Choose a new password</h1>
+        <h1 className="auth-card__title">{t('forgot.newTitle')}</h1>
         <p className="auth-card__subtitle" role="status">
-          If an account exists for <strong>{email}</strong>, we emailed it a 6-digit code. It expires in 10 minutes.
+          <Trans t={t} i18nKey="forgot.emailed" values={{ email }} components={{ strong: <strong /> }} />
         </p>
       </header>
 
@@ -167,18 +171,18 @@ function ResetStep({ email, resendIn }) {
       )}
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        <FormField label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="auth-code" {...fieldProps('code')} />
+        <FormField label={t('forgot.code')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="auth-code" {...fieldProps('code')} />
         <FormField
-          label="New password"
+          label={t('forgot.newPassword')}
           type="password"
           revealable
           autoComplete="new-password"
-          hint="At least 8 characters, including a letter and a number."
+          hint={t('forgot.passwordHint')}
           {...fieldProps('password')}
         />
-        <FormField label="Confirm new password" type="password" revealable autoComplete="new-password" {...fieldProps('confirmPassword')} />
+        <FormField label={t('forgot.confirm')} type="password" revealable autoComplete="new-password" {...fieldProps('confirmPassword')} />
         <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : 'Save new password'}
+          {t(isSubmitting ? 'forgot.saving' : 'forgot.save')}
         </Button>
       </form>
 

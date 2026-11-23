@@ -1,5 +1,6 @@
 import { LuHeadphones, LuRotateCcw, LuShieldCheck, LuTruck } from 'react-icons/lu'
 import './BenefitsSection.css'
+import { useTranslation } from 'react-i18next'
 
 const BENEFIT_ICONS = {
   truck: LuTruck,
@@ -9,11 +10,12 @@ const BENEFIT_ICONS = {
 }
 
 function BenefitsSection({ benefits }) {
+  const { t } = useTranslation('marketing')
   return (
     <section className="benefits" aria-labelledby="benefits-title">
       <div className="container">
         <h2 id="benefits-title" className="visually-hidden">
-          Why shop with BuyNest
+          {t('benefits.title')}
         </h2>
         <ul className="benefits__list">
           {benefits.map((benefit) => {

@@ -56,6 +56,8 @@ export const customerProfile = (customer) => ({
   ...(typeof customer.newsletter === 'boolean' && { newsletter: customer.newsletter }),
   // Phase 9: a new email waiting for its code (the account keeps the old one until then).
   ...(typeof customer.pending_email === 'string' && customer.pending_email && { pendingEmail: customer.pending_email }),
+  // Phase 13: the account's language ('en' | 'bn', null = the store default); left out by an older API.
+  ...('locale' in customer && { locale: customer.locale === 'en' || customer.locale === 'bn' ? customer.locale : null }),
 })
 /*
  * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin
@@ -134,6 +136,8 @@ export const laravelAccounts = {
         phone: str(body.phone),
         // Phase 7: the newsletter switch in the account (no confirmation email: the address is verified).
         ...(typeof body.newsletter === 'boolean' && { newsletter: body.newsletter }),
+        // Phase 13: the store's language for this customer (the language switch saves it here).
+        ...((body.locale === 'en' || body.locale === 'bn') && { locale: body.locale }),
       }
       const result = await laravel('/api/v1/me', { method: 'PATCH', token, request, body: changes })
       return result.status === 200 ? { ok: true, profile: customerProfile(result.data.data) } : failed(result)

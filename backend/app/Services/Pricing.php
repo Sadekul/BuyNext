@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CategoryTree;
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Support\Collection;
 
 /**
@@ -157,8 +158,8 @@ class Pricing
         $shippingError = null;
         if ($shippingRequired && $itemCount > 0 && $methods === []) {
             $shippingError = $country !== null
-                ? "We can't ship this order to {$country} with the available methods."
-                : 'We can\'t ship this order with the available methods. Please check the shipping address.';
+                ? __('We can\'t ship this order to :country with the available methods.', ['country' => $country])
+                : __('We can\'t ship this order with the available methods. Please check the shipping address.');
         }
 
         // Phase 7: cart price rules (the best automatic rule + the typed code), each spread over its eligible lines.
@@ -250,20 +251,20 @@ class Pricing
         }
         $card = $this->giftCards->usable($code, $lock);
         if (! $card) {
-            return [null, 0, GiftCards::INVALID];
+            return [null, 0, __(GiftCards::INVALID)];
         }
         // Phase 12: a card pays only for orders in its own currency.
         $cardCurrency = strtoupper((string) ($card->currency ?: 'USD'));
         if ($cardCurrency !== Currency::store()) {
-            return [null, 0, "This gift card is in {$cardCurrency}, so it can't pay for an order in ".Currency::store().'.'];
+            return [null, 0, __('This gift card is in :card_currency, so it can\'t pay for an order in :currency.', ['card_currency' => $cardCurrency, 'currency' => Currency::store()])];
         }
         $balance = self::toCents($card->balance);
         if ($balance <= 0) {
-            return [null, 0, 'This gift card has no balance left.'];
+            return [null, 0, __('This gift card has no balance left.')];
         }
         $payable = max(0, $totalCents - $giftLinesCents);
         if ($payable === 0 && $giftLinesCents > 0) {
-            return [null, 0, 'Gift cards can\'t be used to buy other gift cards.'];
+            return [null, 0, __('Gift cards can\'t be used to buy other gift cards.')];
         }
 
         return [$card, min($balance, $payable), null];
@@ -374,8 +375,9 @@ class Pricing
             'variant_id' => $variantId,
             'product' => $product,
             'variant' => $sellsVariant ? $variant : null,
-            'name' => $product?->name,
-            'variant_label' => $sellsVariant ? $variant->label($product->optionValueMap()) : null,
+            // Phase 13: what the shopper sees, in the request language (orders snapshot the English text, see Checkout).
+            'name' => $product?->translated('name'),
+            'variant_label' => $sellsVariant ? $variant->label($product->optionValueMap(Locale::current())) : null,
             'sku' => $sellsVariant ? $variant->sku : $product?->sku,
             'thumbnail_url' => $product?->thumbnail_url,
             'price_cents' => $priceCents,
@@ -413,7 +415,7 @@ class Pricing
             'variant_id' => null,
             'product' => $product,
             'variant' => null,
-            'name' => $product->name,
+            'name' => $product->translated('name'), // phase 13
             'variant_label' => null,
             'sku' => $product->sku,
             'thumbnail_url' => $product->thumbnail_url,
@@ -445,22 +447,25 @@ class Pricing
     private function giftCardProblem(Product $product, ?int $variantId, ?array $details, CategoryTree $tree): ?array
     {
         if (! $product->isForSale($tree)) {
-            return ['code' => 'unavailable', 'message' => 'This product is no longer available.'];
+            return ['code' => 'unavailable', 'message' => __('This product is no longer available.')];
         }
         if ($variantId !== null) {
-            return ['code' => 'variant_unavailable', 'message' => "This option of {$product->name} is no longer available."];
+            return ['code' => 'variant_unavailable', 'message' => __('This option of :product is no longer available.', ['product' => $product->translated('name')])];
         }
         if (! is_array($details) || ! is_numeric($details['amount'] ?? null) || blank($details['recipient_name'] ?? null)
             || blank($details['recipient_email'] ?? null)) {
-            return ['code' => 'gift_card_details_required', 'message' => "Choose an amount and enter the recipient for {$product->name}."];
+            return ['code' => 'gift_card_details_required', 'message' => __('Choose an amount and enter the recipient for :product.', ['product' => $product->translated('name')])];
         }
         if (! $product->allowsGiftCardAmount(self::toCents((string) $details['amount']))) {
             $options = $product->giftCardOptions();
 
             return ['code' => 'gift_card_amount_invalid', 'message' => $options['custom']
-                ? "Choose an amount for {$product->name} between ".Currency::format($options['custom']['min']).' and '.Currency::format($options['custom']['max'])
-                    .($options['amounts'] ? ', or one of the listed amounts.' : '.')
-                : "Choose one of the amounts for {$product->name}."];
+                ? __($options['amounts'] ? 'Choose an amount for :product between :min and :max, or one of the listed amounts.' : 'Choose an amount for :product between :min and :max.', [
+                    'product' => $product->translated('name'),
+                    'min' => Currency::format($options['custom']['min'], null, Locale::current()),
+                    'max' => Currency::format($options['custom']['max'], null, Locale::current()),
+                ])
+                : __('Choose one of the amounts for :product.', ['product' => $product->translated('name')])];
         }
 
         return null;
@@ -469,24 +474,25 @@ class Pricing
     private function problemWith(?Product $product, ?int $variantId, ?ProductVariant $variant, int $quantity, CategoryTree $tree): ?array
     {
         if (! $product || ! $product->isForSale($tree)) {
-            return ['code' => 'unavailable', 'message' => 'This product is no longer available.'];
+            return ['code' => 'unavailable', 'message' => __('This product is no longer available.')];
         }
         if ($product->has_variants && $variantId === null) {
-            return ['code' => 'variant_required', 'message' => "Choose the options for {$product->name}."];
+            return ['code' => 'variant_required', 'message' => __('Choose the options for :product.', ['product' => $product->translated('name')])];
         }
         if ($variantId !== null && (! $product->has_variants || ! $variant || $variant->product_id !== $product->id
             || ! $variant->is_active || ! $this->isCurrentCombination($product, $variant))) {
-            return ['code' => 'variant_unavailable', 'message' => "This option of {$product->name} is no longer available."];
+            return ['code' => 'variant_unavailable', 'message' => __('This option of :product is no longer available.', ['product' => $product->translated('name')])];
         }
         $stock = $variant ? $variant->stock_quantity : $product->stock_quantity;
-        $label = $variant ? "{$product->name} ({$variant->label($product->optionValueMap())})" : $product->name;
+        $name = $product->translated('name'); // phase 13: messages in the request language
+        $label = $variant ? "{$name} ({$variant->label($product->optionValueMap(Locale::current()))})" : $name;
         if ($quantity > $stock) {
             return ['code' => 'insufficient_stock', 'message' => $stock === 0
-                ? "{$label} is out of stock."
-                : "Only {$stock} of {$label} left in stock."];
+                ? __(':item is out of stock.', ['item' => $label])
+                : __('Only :count of :item left in stock.', ['count' => Locale::digits($stock), 'item' => $label])];
         }
         if ($quantity < $product->min_order_quantity) {
-            return ['code' => 'below_minimum', 'message' => "The minimum order for {$product->name} is {$product->min_order_quantity}."];
+            return ['code' => 'below_minimum', 'message' => __('The minimum order for :product is :count.', ['product' => $product->translated('name'), 'count' => Locale::digits($product->min_order_quantity)])];
         }
 
         return null;

@@ -52,7 +52,7 @@ class SslCommerzGateway
             $reason = is_string($body['failedreason'] ?? null) && $body['failedreason'] !== '' ? $body['failedreason'] : 'it gave no payment page';
             Log::warning('SSLCommerz refused to open a payment session.', ['tran_id' => $fields['tran_id'] ?? null, 'status' => $body['status'] ?? null,
                 'reason' => $reason]);
-            throw new SslCommerzException('SSLCommerz could not start the payment ('.rtrim($reason, '.').'). Please try again in a moment.');
+            throw new SslCommerzException(__('SSLCommerz could not start the payment (:reason). Please try again in a moment.', ['reason' => rtrim($reason, '.')]));
         }
 
         return $body;

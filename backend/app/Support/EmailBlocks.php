@@ -62,9 +62,10 @@ final class EmailBlocks
     /** "Carrier: UPS / Tracking number: …" in a highlighted box. */
     public static function tracking(string $carrier, ?string $trackingNumber): string
     {
-        $html = 'Carrier: <strong>'.e($carrier).'</strong>';
+        // Phase 13: labels in the email's language.
+        $html = e(__('Carrier')).': <strong>'.e($carrier).'</strong>';
         if (filled($trackingNumber)) {
-            $html .= '<br>Tracking number: <strong>'.e($trackingNumber).'</strong>';
+            $html .= '<br>'.e(__('Tracking number')).': <strong>'.e($trackingNumber).'</strong>';
         }
 
         return self::box($html);
@@ -73,7 +74,7 @@ final class EmailBlocks
     /** "A note from {store}: …", or nothing without a note. */
     public static function note(?string $note, string $storeName = 'BuyNest'): string
     {
-        return filled($note) ? '<p style="margin:0 0 16px;font-size:14px">A note from '.e($storeName).': '.e($note).'</p>' : '';
+        return filled($note) ? '<p style="margin:0 0 16px;font-size:14px">'.e(__('A note from :store', ['store' => $storeName])).': '.e($note).'</p>' : '';
     }
 
     /** A plain paragraph, or nothing for an empty text. */

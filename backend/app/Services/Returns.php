@@ -6,6 +6,7 @@ use App\Mail\ReturnStatusMail;
 use App\Models\Admin;
 use App\Models\Order;
 use App\Models\OrderReturn;
+use App\Support\Locale;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -45,11 +46,11 @@ class Returns
         $deadline = $this->deadline($order);
 
         [$code, $message] = match (true) {
-            ! $this->settings->get('returns_enabled') => ['returns_disabled', 'Returns are not available at the moment.'],
+            ! $this->settings->get('returns_enabled') => ['returns_disabled', __('Returns are not available at the moment.')],
             // closed = fully refunded: it falls through to "nothing left".
-            ! in_array($order->status, ['shipped', 'delivered', 'closed'], true) || $order->shipments->isEmpty() => ['not_shipped', 'Items can be returned once the order has shipped.'],
-            ! $ignoreWindow && $deadline && $deadline->isPast() => ['window_closed', 'The return window for this order closed on '.$deadline->format('F j, Y').'.'],
-            array_sum($returnable) === 0 => ['nothing_left', 'Every item of this order has already been returned or refunded.'],
+            ! in_array($order->status, ['shipped', 'delivered', 'closed'], true) || $order->shipments->isEmpty() => ['not_shipped', __('Items can be returned once the order has shipped.')],
+            ! $ignoreWindow && $deadline && $deadline->isPast() => ['window_closed', __('The return window for this order closed on :date.', ['date' => Locale::isBangla() ? Locale::date($deadline) : $deadline->format('F j, Y')])],
+            array_sum($returnable) === 0 => ['nothing_left', __('Every item of this order has already been returned or refunded.')],
             default => [null, null],
         };
 
@@ -120,7 +121,7 @@ class Returns
                 throw ValidationException::withMessages(['order' => $eligibility['message']]);
             }
             if (! in_array($data['reason'], $eligibility['reasons'], true)) {
-                throw ValidationException::withMessages(['reason' => 'Choose one of the listed reasons.']);
+                throw ValidationException::withMessages(['reason' => __('Choose one of the listed reasons.')]);
             }
 
             $returnable = collect($eligibility['items'])->keyBy('order_item_id');
@@ -130,13 +131,13 @@ class Returns
                 $id = (int) $line['order_item_id'];
                 $item = $returnable->get($id);
                 if (! $item) {
-                    $errors["items.{$index}.order_item_id"] = 'This item isn\'t part of the order.';
+                    $errors["items.{$index}.order_item_id"] = __('This item isn\'t part of the order.');
                 } elseif (isset($lines[$id])) {
-                    $errors["items.{$index}.order_item_id"] = 'Each item can be listed only once.';
+                    $errors["items.{$index}.order_item_id"] = __('Each item can be listed only once.');
                 } elseif ((int) $line['quantity'] > $item['returnable']) {
                     $errors["items.{$index}.quantity"] = $item['returnable'] === 0
-                        ? "{$item['name']} can't be returned (already returned or refunded)."
-                        : "Only {$item['returnable']} of {$item['name']} can be returned.";
+                        ? __(':item can\'t be returned (already returned or refunded).', ['item' => $item['name']])
+                        : __('Only :count of :item can be returned.', ['count' => Locale::digits($item['returnable']), 'item' => $item['name']]);
                 } else {
                     $lines[$id] = (int) $line['quantity'];
                 }

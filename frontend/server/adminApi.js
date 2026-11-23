@@ -27,6 +27,8 @@ import { matchPhase10Route } from './adminPhase10Api.js'
 import { cleanSpecifications, linksProblem, matchPhase11Route, specificationsProblem } from './adminPhase11Api.js'
 // Phase 12: Check payment on an SSLCommerz order (adminPhase12Api.js).
 import { matchPhase12Route } from './adminPhase12Api.js'
+// Phase 13: Bangla texts on products (and their options and specifications), email templates per language (adminPhase13Api.js).
+import { banglaFilter, checkProductBangla, cleanSpecificationsBangla, matchPhase13Route, specificationsBanglaProblem } from './adminPhase13Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -188,7 +190,8 @@ const PRODUCT_RULES = {
   giftCardMinAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
   giftCardMaxAmount: (value) => (value === null || (typeof value === 'number' && value >= 1 && value <= 10_000 && hasCents(value)) ? null : 'Enter an amount from 1 to 10,000.'),
   // Phase 11 §2 and §3: specification rows, and related products, up-sells and cross-sells by id (omitted = unchanged).
-  specifications: specificationsProblem,
+  // Phase 13: + each row's optional Bangla label and value.
+  specifications: (value) => specificationsProblem(value) ?? specificationsBanglaProblem(value),
   links: linksProblem,
 }
 const REQUIRED_ON_CREATE = ['title', 'category', 'price', 'stock']
@@ -207,7 +210,9 @@ export function validateProduct(body, { partial }) {
   }
   // Phase 7 (system): a blank meta field is stored as null.
   for (const field of ['metaTitle', 'metaDescription']) if (values[field] === '') values[field] = null
-  if (values.specifications) values.specifications = cleanSpecifications(values.specifications)
+  if (values.specifications) values.specifications = cleanSpecificationsBangla(body.specifications, cleanSpecifications(values.specifications))
+  // Phase 13: the Bangla texts (bn), optional.
+  checkProductBangla(body, values, errors)
   if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) {
     errors.title = ['Change at least one field.']
   }
@@ -378,7 +383,8 @@ const ROUTES = {
     const order = url.searchParams.get('order') === 'desc' ? 'desc' : 'asc'
     if (realData()) {
       const status = oneOf(url.searchParams.get('status'), PRODUCT_STATUSES)
-      const filters = { q: q?.slice(0, 100), category: /^[a-z0-9-]{2,40}$/.test(category ?? '') ? category : undefined, status, sortBy, order, limit, skip }
+      // Phase 13: + bangla (complete | missing).
+      const filters = { q: q?.slice(0, 100), category: /^[a-z0-9-]{2,40}$/.test(category ?? '') ? category : undefined, status, bangla: banglaFilter(url), sortBy, order, limit, skip }
       return fromLaravel(await laravelAdminData.listProducts(ctx.token, filters, ctx.request))
     }
     const params = new URLSearchParams({ limit, skip, select: PRODUCT_LIST_FIELDS.join(',') })
@@ -632,6 +638,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 13: email-templates[/:key[/preview|test|reset]] with ?locale=en|bn (without one, the phase 7 routes).
+  const phase13 = matchPhase13Route(method, segments)
+  if (phase13 !== undefined) return phase13
   // Phase 12: orders/:number/payment/check.
   const phase12 = matchPhase12Route(method, segments)
   if (phase12 !== undefined) return phase12

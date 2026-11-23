@@ -59,7 +59,7 @@ class OrderController extends Controller
         $owner = $order && $customer && $order->customer_id === $customer->id;
         $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
         if (! $owner && ! $emailMatches) {
-            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+            return response()->json(['message' => __('We couldn\'t find an order with that number and email.')], 404);
         }
 
         if ($problem = $payments->payProblem($order)) {
@@ -87,7 +87,7 @@ class OrderController extends Controller
         $owner = $order && $customer && $order->customer_id === $customer->id;
         $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
         if (! $owner && ! $emailMatches) {
-            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+            return response()->json(['message' => __('We couldn\'t find an order with that number and email.')], 404);
         }
 
         [$result, $order] = $paypal->captureForShopper($order, trim($data['token']));
@@ -115,7 +115,7 @@ class OrderController extends Controller
         $owner = $order && $customer && $order->customer_id === $customer->id;
         $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
         if (! $owner && ! $emailMatches) {
-            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+            return response()->json(['message' => __('We couldn\'t find an order with that number and email.')], 404);
         }
         $reason = filled($data['reason'] ?? null) ? trim($data['reason']) : null;
 
@@ -123,12 +123,13 @@ class OrderController extends Controller
         $order = DB::transaction(function () use ($order, $documents, $settings, $reason) {
             $order = Order::whereKey($order->id)->lockForUpdate()->first();
             if ($order->status === 'cancelled') {
-                throw ValidationException::withMessages(['order' => 'This order is already cancelled.']);
+                throw ValidationException::withMessages(['order' => __('This order is already cancelled.')]);
             }
             if (! $order->customerCanCancel()) {
                 $support = $settings->get('support_email');
-                throw ValidationException::withMessages(['order' => 'This order has been paid or shipped, so it can\'t be cancelled online. Contact us to cancel it'
-                    .($support ? ": {$support}." : '.')]);
+                throw ValidationException::withMessages(['order' => $support
+                    ? __('This order has been paid or shipped, so it can\'t be cancelled online. Contact us to cancel it: :email.', ['email' => $support])
+                    : __('This order has been paid or shipped, so it can\'t be cancelled online. Contact us to cancel it.')]);
             }
             $documents->cancel($order, null, 'Cancelled by the customer.'.($reason ? " Reason: {$reason}" : ''), true);
 
@@ -161,7 +162,7 @@ class OrderController extends Controller
             ->with(['items', 'history', 'returns.items', ...Order::DOCUMENTS])
             ->first();
 
-        return $order ? new OrderResource($order) : response()->json(['message' => 'Order not found.'], 404);
+        return $order ? new OrderResource($order) : response()->json(['message' => __('Order not found.')], 404);
     }
 
     /**
@@ -175,7 +176,7 @@ class OrderController extends Controller
             ->with(['order.items', 'order.invoices', 'order.creditMemos'])
             ->first();
 
-        return $found ? (new InvoiceResource($found))->forCustomer() : response()->json(['message' => 'Invoice not found.'], 404);
+        return $found ? (new InvoiceResource($found))->forCustomer() : response()->json(['message' => __('Invoice not found.')], 404);
     }
 
     /** POST /api/v1/orders/lookup { number, email } - for guests. Same 404 whichever part is wrong. */
@@ -190,6 +191,6 @@ class OrderController extends Controller
 
         return $order && mb_strtolower($order->email) === mb_strtolower(trim($data['email']))
             ? new OrderResource($order)
-            : response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+            : response()->json(['message' => __('We couldn\'t find an order with that number and email.')], 404);
     }
 }

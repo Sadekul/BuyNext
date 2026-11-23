@@ -1,6 +1,7 @@
 import DiscountRows from '../cart/DiscountRows'
 import { moneyFormatter } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
+import { useTranslation } from 'react-i18next'
 
 /** Totals rows shared by checkout, confirmation, and order details. Reuses CartSummary's styles. */
 /** `appliedRules` (phase 7): the cart price rules the server applied, one row each. */
@@ -8,6 +9,7 @@ import { formatPoints } from '../../utils/rewards'
 /** Phase 11: `totals.rewardPoints` (what points pay, paid before a gift card) and `rewardPointsSpent` (how many points). */
 /** Phase 12: `currency`: the order's own currency code (its money is written in it); the store currency otherwise. */
 function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax = true, requiresShipping = true, rewardPointsSpent = null, currency = null }) {
+  const { t } = useTranslation('orders')
   const formatBasePrice = moneyFormatter(currency)
   const giftCard = totals.giftCard ?? 0
   const points = totals.rewardPoints ?? 0
@@ -15,52 +17,52 @@ function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax 
   return (
     <dl className="cart-summary__rows">
       <div>
-        <dt>Subtotal ({totals.itemCount} {totals.itemCount === 1 ? 'item' : 'items'})</dt>
+        <dt>{t('totals.subtotal', { count: totals.itemCount })}</dt>
         <dd>{formatBasePrice(totals.subtotal)}</dd>
       </div>
       <DiscountRows rules={appliedRules} discount={totals.discount} couponCode={couponCode} format={formatBasePrice} />
       {requiresShipping ? (
         <div>
-          <dt>Shipping{shippingLabel && ` (${shippingLabel})`}</dt>
-          <dd>{totals.shipping === 0 ? 'Free' : formatBasePrice(totals.shipping)}</dd>
+          <dt>{shippingLabel ? t('totals.shippingWith', { method: shippingLabel }) : t('totals.shipping')}</dt>
+          <dd>{totals.shipping === 0 ? t('totals.free') : formatBasePrice(totals.shipping)}</dd>
         </div>
       ) : (
         <div>
-          <dt>Shipping</dt>
-          <dd>None (sent by email)</dd>
+          <dt>{t('totals.shipping')}</dt>
+          <dd>{t('totals.noShipping')}</dd>
         </div>
       )}
       {/* Server-priced totals include the tax; the demo can't know it. Checkout hides the line when the store charges no tax. */}
       {showTax && (
         <div>
-          <dt>Taxes</dt>
-          <dd>{typeof totals.tax === 'number' ? formatBasePrice(totals.tax) : 'Calculated by our servers'}</dd>
+          <dt>{t('totals.taxes')}</dt>
+          <dd>{typeof totals.tax === 'number' ? formatBasePrice(totals.tax) : t('totals.taxesServer')}</dd>
         </div>
       )}
       <div className="cart-summary__total">
-        <dt>Total</dt>
+        <dt>{t('totals.total')}</dt>
         <dd>{formatBasePrice(totals.total)}</dd>
       </div>
       {points > 0 && (
         <div className="cart-summary__saving">
-          <dt>Reward points{rewardPointsSpent > 0 && ` (${formatPoints(rewardPointsSpent)})`}</dt>
+          <dt>{rewardPointsSpent > 0 ? t('totals.rewardPointsWith', { points: formatPoints(rewardPointsSpent) }) : t('totals.rewardPoints')}</dt>
           <dd>−{formatBasePrice(points)}</dd>
         </div>
       )}
       {points > 0 && giftCard === 0 && (
         <div className="cart-summary__total">
-          <dt>By other payment</dt>
+          <dt>{t('totals.otherPayment')}</dt>
           <dd>{formatBasePrice(amountDue)}</dd>
         </div>
       )}
       {giftCard > 0 && (
         <>
           <div className="cart-summary__saving">
-            <dt>Paid by gift card</dt>
+            <dt>{t('totals.giftCard')}</dt>
             <dd>−{formatBasePrice(giftCard)}</dd>
           </div>
           <div className="cart-summary__total">
-            <dt>By other payment</dt>
+            <dt>{t('totals.otherPayment')}</dt>
             <dd>{formatBasePrice(amountDue)}</dd>
           </div>
         </>
@@ -68,7 +70,7 @@ function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax 
       {/* Orders with refunds (credit memos) show what came back. */}
       {totals.refunded > 0 && (
         <div className="cart-summary__saving">
-          <dt>Refunded</dt>
+          <dt>{t('totals.refunded')}</dt>
           <dd>−{formatBasePrice(totals.refunded)}</dd>
         </div>
       )}

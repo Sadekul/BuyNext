@@ -5,6 +5,8 @@
  * Web standard Request/Response only, so it runs on Node, Vercel, and Netlify.
  */
 
+import { languageHeaders, serverMessage } from './i18n.js'
+
 export const UPSTREAM = 'https://dummyjson.com'
 
 export function json(body, status = 200, cookies = []) {
@@ -31,7 +33,7 @@ export async function readBody(request) {
   }
 }
 
-async function callJson(url, { method = 'GET', token, body, headers = {} }) {
+async function callJson(url, { method = 'GET', token, body, headers = {}, request }) {
   try {
     const response = await fetch(url, {
       method,
@@ -47,7 +49,7 @@ async function callJson(url, { method = 'GET', token, body, headers = {} }) {
     const data = await response.json().catch(() => ({}))
     return { status: response.status, data }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }
 
@@ -80,8 +82,9 @@ function bffHeaders(request) {
   return { 'X-BuyNest-Bff': key, ...(ip && { 'X-Client-IP': ip }) }
 }
 
-export function laravel(path, { request, ...options } = {}) {
-  return callJson(`${laravelBase()}${path}`, { ...options, headers: bffHeaders(request) })
+// Phase 13: every call carries the shopper's language (server/i18n.js); admin calls stay English.
+export function laravel(path, { request, language, ...options } = {}) {
+  return callJson(`${laravelBase()}${path}`, { ...options, request, headers: { ...languageHeaders(request, path, language), ...bffHeaders(request) } })
 }
 
 /**
@@ -92,14 +95,14 @@ export function laravel(path, { request, ...options } = {}) {
 export async function laravelFile(path, { token, request } = {}) {
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
-      headers: { Accept: 'text/csv, application/json', ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      headers: { Accept: 'text/csv, application/json', ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
       signal: AbortSignal.timeout(30_000),
     })
     const contentType = response.headers.get('content-type') ?? ''
     if (!response.ok || contentType.includes('application/json')) return { status: response.ok ? 502 : response.status, data: await response.json().catch(() => ({})) }
     return { status: response.status, contentType, disposition: response.headers.get('content-disposition'), text: await response.text() }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }
 
@@ -151,13 +154,13 @@ export async function laravelMultipart(path, { token, request, contentType, byte
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': contentType, ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      headers: { Accept: 'application/json', 'Content-Type': contentType, ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
       body: bytes,
       signal: AbortSignal.timeout(timeout),
     })
     return { status: response.status, data: await response.json().catch(() => ({})) }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }
 
@@ -171,13 +174,13 @@ export async function laravelRaw(path, { request, bytes, contentType, headers = 
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': contentType, ...headers, ...bffHeaders(request) },
+      headers: { Accept: 'application/json', 'Content-Type': contentType, ...headers, ...languageHeaders(request, path), ...bffHeaders(request) },
       body: bytes,
       signal: AbortSignal.timeout(timeout),
     })
     return { status: response.status, data: await response.json().catch(() => ({})) }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }
 
@@ -208,7 +211,7 @@ export function safeProfile(user) {
 export async function laravelDownload(path, { token, request, maxBytes = 20 * 1024 * 1024 } = {}) {
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
-      headers: { Accept: 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      headers: { Accept: 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
       signal: AbortSignal.timeout(60_000),
     })
     const disposition = response.headers.get('content-disposition') ?? ''
@@ -216,10 +219,10 @@ export async function laravelDownload(path, { token, request, maxBytes = 20 * 10
       return { status: response.ok ? 502 : response.status, data: await response.json().catch(() => ({})) }
     }
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.byteLength > maxBytes) return { status: 502, data: { message: 'The file is too large to download here.' } }
+    if (bytes.byteLength > maxBytes) return { status: 502, data: { message: serverMessage(request, 'fileTooLarge') } }
     return { status: response.status, contentType: response.headers.get('content-type') ?? 'application/octet-stream', disposition, bytes }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }
 
@@ -233,7 +236,7 @@ export async function laravelDownload(path, { token, request, maxBytes = 20 * 10
 export async function laravelPdf(path, { token, request, headers = {} } = {}) {
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
-      headers: { Accept: 'application/pdf, application/json', ...headers, ...(token && { Authorization: `Bearer ${token}` }), ...bffHeaders(request) },
+      headers: { Accept: 'application/pdf, application/json', ...headers, ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
       signal: AbortSignal.timeout(60_000),
     })
     const contentType = response.headers.get('content-type') ?? ''
@@ -248,6 +251,6 @@ export async function laravelPdf(path, { token, request, headers = {} } = {}) {
       disposition: response.headers.get('content-disposition') ?? '',
     }
   } catch {
-    return { status: 502, data: { message: 'The server could not be reached. Please try again.' } }
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }
 }

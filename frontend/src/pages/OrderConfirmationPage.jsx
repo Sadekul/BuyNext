@@ -20,9 +20,12 @@ import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import './OrderPages.css'
+import { Trans, useTranslation } from 'react-i18next'
+import { translate } from '../i18n'
 
 /** Demo: the order saved in this browser by the simulated checkout. */
 function DemoOrderConfirmation() {
+  const { t } = useTranslation('checkout')
   const { orderId } = useParams()
   const { getOrder } = useOrders()
   const { user } = useAuth()
@@ -31,8 +34,8 @@ function DemoOrderConfirmation() {
   if (!order) {
     return (
       <div className="section container">
-        <EmptyState icon={LuPackageX} title="Order not found" message="We couldn't find that order on this device.">
-          <Button to={ROUTES.orders}>View your orders</Button>
+        <EmptyState icon={LuPackageX} title={t('confirmation.notFound')} message={t('confirmation.notOnDevice')}>
+          <Button to={ROUTES.orders}>{t('confirmation.viewOrders')}</Button>
         </EmptyState>
       </div>
     )
@@ -40,14 +43,13 @@ function DemoOrderConfirmation() {
 
   return (
     <div className="order-page section container">
-      <title>{`Order ${order.id} | ${SITE.name}`}</title>
+      <title>{`${t('confirmation.tabTitle', { number: order.id })} | ${SITE.name}`}</title>
       <div className="order-page__hero" role="status">
         <LuCircleCheck className="order-page__check" aria-hidden="true" />
         <div>
-          <h1>Thank you, {user.firstName}!</h1>
+          <h1>{t('confirmation.thanksName', { name: user.firstName })}</h1>
           <p>
-            Your order <strong>{order.id}</strong> was recorded (demo). A real store would email a confirmation to{' '}
-            <strong>{order.contact.email}</strong>; no email was sent.
+            <Trans t={t} i18nKey="confirmation.demoRecorded" values={{ number: order.id, email: order.contact.email }} components={{ strong: <strong /> }} />
           </p>
         </div>
       </div>
@@ -56,9 +58,9 @@ function DemoOrderConfirmation() {
 
       <div className="order-page__actions">
         <Button to={ROUTES.orderDetails(order.id)} variant="outline">
-          View order details
+          {t('confirmation.viewDetails')}
         </Button>
-        <Button to={ROUTES.products}>Continue shopping</Button>
+        <Button to={ROUTES.products}>{t('confirmation.continue')}</Button>
       </div>
     </div>
   )
@@ -71,6 +73,8 @@ const POLL_CUSTOMER_MS = 2_000
 const POLL_GUEST_MS = 3_000
 
 const PROVIDER_NAMES = { stripe: 'Stripe', paypal: 'PayPal', sslcommerz: 'SSLCommerz' }
+// Phase 13: the messages below are in the shopper's language (checkout:confirmation.*).
+const tx = (key, values) => translate(`checkout:confirmation.${key}`, values)
 // Phase 12: SSLCommerz's return trip (server/paymentsApi.js) says success, failed, or cancelled.
 const PAYMENT_RETURNS = ['success', 'failed', 'cancelled']
 
@@ -88,50 +92,52 @@ const PAYMENT_RETURNS = ['success', 'failed', 'cancelled']
  */
 function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startError, provider = 'stripe', captureError = null }) {
   const paid = order.paymentStatus === 'paid'
-  const name = PROVIDER_NAMES[provider] ?? 'Our payment partner'
+  const name = PROVIDER_NAMES[provider] ?? tx('partner')
+  const number = order.number
+  const email = order.email
   if (leaving) {
-    if (provider === 'paypal') return { tone: 'waiting', title: 'Taking you to PayPal…', lines: [`Your order ${order.number} is saved. You'll approve the payment on PayPal's site, then come back here.`] }
+    if (provider === 'paypal') return { tone: 'waiting', title: tx('toPaypal.title'), lines: [tx('toPaypal.line', { number })] }
     if (provider === 'sslcommerz') {
-      return { tone: 'waiting', title: 'Taking you to SSLCommerz…', lines: [`Your order ${order.number} is saved. You'll pay with bKash, Nagad, or a card on SSLCommerz's secure page, then come back here.`] }
+      return { tone: 'waiting', title: tx('toSslcommerz.title'), lines: [tx('toSslcommerz.line', { number })] }
     }
-    return { tone: 'waiting', title: 'Taking you to secure payment…', lines: [`Your order ${order.number} is saved. You'll pay on Stripe's secure page; BuyNest never sees your card number.`] }
+    return { tone: 'waiting', title: tx('toStripe.title'), lines: [tx('toStripe.line', { number })] }
   }
   if (order.status === 'cancelled') {
     return {
       tone: 'cancelled',
-      title: 'Order cancelled',
-      lines: [`Your order ${order.number} was cancelled and its items were released.${order.paymentStatus === 'unpaid' ? ' Nothing was charged.' : ''} You're welcome to place a new order.`],
+      title: tx('cancelled.title'),
+      lines: [tx(order.paymentStatus === 'unpaid' ? 'cancelled.lineUnpaid' : 'cancelled.line', { number })],
     }
   }
   if (paymentReturn === 'success') {
-    if (paid) return { tone: 'done', title: 'Payment received — thank you', lines: [`Your order ${order.number} is paid and confirmed. We've emailed a receipt to ${order.email}.`] }
+    if (paid) return { tone: 'done', title: tx('paid.title'), lines: [tx('paid.line', { number, email })] }
     // Phase 12: SSLCommerz flagged the payment for a check (risk level 1): received, confirmed by staff.
     if (order.paymentStatus === 'review') {
-      return { tone: 'waiting', title: "We're checking your payment", lines: [`We've received the payment for order ${order.number} and are checking it. We'll email ${order.email} as soon as your order is confirmed; there's no need to pay again.`] }
+      return { tone: 'waiting', title: tx('checking.title'), lines: [tx('checking.line', { number, email })] }
     }
     // Phase 10: PayPal refused the capture (e.g. the funding source was declined): nothing was taken.
     if (captureError) {
       return {
         tone: 'waiting',
-        title: "PayPal didn't complete the payment",
-        lines: [`${captureError} Nothing was charged. Your order ${order.number} is saved, and you can try again.`],
+        title: tx('paypalFailed.title'),
+        lines: [tx('paypalFailed.line', { error: captureError, number })],
         pay: canPay,
         alert: true,
       }
     }
-    if (!gaveUp) return { tone: 'waiting', title: 'Confirming your payment…', lines: [`${name} is letting us know about your payment. This usually takes a few seconds.`] }
+    if (!gaveUp) return { tone: 'waiting', title: tx('confirming.title'), lines: [tx('confirming.line', { name })] }
     return {
       tone: 'waiting',
-      title: "We're confirming your payment",
-      lines: [`${name} hasn't confirmed your payment to us yet. There's no need to pay again: we'll email ${order.email} as soon as it's confirmed, and your order page will show it.`],
+      title: tx('slow.title'),
+      lines: [tx('slow.line', { name, email })],
     }
   }
   // Phase 12: SSLCommerz said the payment failed (declined, wrong PIN, timed out): nothing was taken.
   if (paymentReturn === 'failed' && !paid && order.status !== 'cancelled') {
     return {
       tone: 'waiting',
-      title: 'Payment failed',
-      lines: [`${name} couldn't complete the payment, so nothing was charged. Your order ${order.number} is saved: try again with Pay now.`, "If it isn't paid before the payment page expires, the order is cancelled and its items are released."],
+      title: tx('failed.title'),
+      lines: [tx('failed.line', { name, number }), tx('expires')],
       pay: canPay,
       alert: true,
     }
@@ -139,16 +145,16 @@ function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startEr
   if (paymentReturn === 'cancelled' && !paid && order.status !== 'cancelled') {
     return {
       tone: 'waiting',
-      title: 'Payment not completed',
-      lines: [`Nothing was charged. Your order ${order.number} is saved, and you can pay for it now.`, "If it isn't paid before the payment page expires, the order is cancelled and its items are released."],
+      title: tx('notCompleted.title'),
+      lines: [tx('notCompleted.line', { number }), tx('expires')],
       pay: canPay,
     }
   }
   if (startError && !paid && order.status !== 'cancelled') {
     return {
       tone: 'waiting',
-      title: "We couldn't open the payment page",
-      lines: [`Your order ${order.number} is saved and nothing was charged. ${startError}`, 'Please try again with Pay now.'],
+      title: tx('cantOpen.title'),
+      lines: [tx('cantOpen.line', { number, error: startError }), tx('cantOpen.retry')],
       pay: canPay,
       alert: true,
     }
@@ -170,6 +176,7 @@ function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startEr
  * are found again with the number and email kept in this tab (utils/payment.js).
  */
 function ServerOrderConfirmation() {
+  const { t } = useTranslation('checkout')
   const { orderId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -253,7 +260,7 @@ function ServerOrderConfirmation() {
   if (!order && (request.isLoading || waitingForSession)) {
     return (
       <div className="section container">
-        <Loader label="Loading your order…" />
+        <Loader label={t('confirmation.loading')} />
       </div>
     )
   }
@@ -263,14 +270,14 @@ function ServerOrderConfirmation() {
       <div className="section container">
         <EmptyState
           icon={LuPackageX}
-          title={paymentReturn ? 'Find your order' : 'Order not found'}
+          title={t(paymentReturn ? 'confirmation.findTitle' : 'confirmation.notFound')}
           message={
             paymentReturn
-              ? `Look up order ${orderId} with the email you used at checkout to see its payment status${paymentReturn !== 'success' ? ' and pay for it' : ''}.`
-              : 'Look it up with the order number and the email you used at checkout.'
+              ? t(paymentReturn !== 'success' ? 'confirmation.lookUpPay' : 'confirmation.lookUp', { number: orderId })
+              : t('confirmation.lookUpGeneric')
           }
         >
-          <Button to={ROUTES.trackOrder}>Track your order</Button>
+          <Button to={ROUTES.trackOrder}>{t('confirmation.track')}</Button>
         </EmptyState>
       </div>
     )
@@ -285,7 +292,7 @@ function ServerOrderConfirmation() {
   const sslcommerzOn = settings.sslcommerzPayments === 'sslcommerz' || sentTo === 'sslcommerz' || order.paymentProvider === 'sslcommerz'
   const canPay = canPayOrder(order, stripeOn ? 'stripe' : settings.cardPayments, paypalOn ? 'paypal' : settings.paypalPayments, sslcommerzOn ? 'sslcommerz' : settings.sslcommerzPayments)
   // The order was placed but the payment page couldn't be opened (no url in the answer).
-  const startError = !paymentReturn && sentTo && !isPaymentUrl(placed.payment.url) ? (placed.payment.error ?? "Our payment partner couldn't be reached.") : null
+  const startError = !paymentReturn && sentTo && !isPaymentUrl(placed.payment.url) ? (placed.payment.error ?? t('confirmation.partnerUnreachable')) : null
   const provider = returnProvider ?? sentTo ?? order.paymentProvider ?? (['paypal', 'sslcommerz'].includes(order.paymentMethod) ? order.paymentMethod : 'stripe')
   const captureError = paypalToken !== null && capture.isError && order.paymentStatus !== 'paid' ? capture.error.message : null
   const payment = paymentMessage({ order, paymentReturn, leaving: leaving || Boolean(payNowUrl), gaveUp, canPay, startError, provider, captureError })
@@ -296,7 +303,7 @@ function ServerOrderConfirmation() {
 
   return (
     <div className="order-page section container">
-      <title>{`Order ${order.number} | ${SITE.name}`}</title>
+      <title>{`${t('confirmation.tabTitle', { number: order.number })} | ${SITE.name}`}</title>
       {/* role=status: the result of the payment is announced as it changes (confirming → paid); a failure is an alert. */}
       <div className={waiting ? 'order-page__hero order-page__hero--waiting' : 'order-page__hero'} role={payment?.alert ? 'alert' : 'status'}>
         <HeroIcon className="order-page__check" aria-hidden="true" />
@@ -310,18 +317,22 @@ function ServerOrderConfirmation() {
             </>
           ) : (
             <>
-              <h1>{firstName ? `Thank you, ${firstName}!` : 'Thank you!'}</h1>
+              <h1>{firstName ? t('confirmation.thanksName', { name: firstName }) : t('confirmation.thanks')}</h1>
               <p>
-                Your order <strong>{order.number}</strong> {awaitingPayment ? 'is saved and awaiting payment.' : 'is confirmed.'} We've emailed a
-                confirmation to <strong>{order.email}</strong>.
+                <Trans
+                  t={t}
+                  i18nKey={awaitingPayment ? 'confirmation.awaiting' : 'confirmation.confirmed'}
+                  values={{ number: order.number, email: order.email }}
+                  components={{ strong: <strong /> }}
+                />
               </p>
               {awaitingPayment && <p>{paymentNote(order, { stripe: stripeOn, paypal: paypalOn, sslcommerz: sslcommerzOn })}</p>}
             </>
           )}
-          {!isAuthenticated && <p>Keep your order number: with your email, it lets you track this order.</p>}
+          {!isAuthenticated && <p>{t('confirmation.keepNumber')}</p>}
           {leaving && payNowUrl === null && placed?.payment?.url && (
             <p>
-              Nothing happening? <a href={placed.payment.url}>Continue to secure payment</a>
+              <Trans t={t} i18nKey="confirmation.nothingHappening" components={{ pay: <a href={placed.payment.url} /> }} />
             </p>
           )}
         </div>
@@ -336,14 +347,14 @@ function ServerOrderConfirmation() {
       <div className="order-page__actions">
         {isAuthenticated ? (
           <Button to={ROUTES.orderDetails(order.number)} variant="outline">
-            View order details
+            {t('confirmation.viewDetails')}
           </Button>
         ) : (
           <Button to={ROUTES.trackOrder} variant="outline">
-            Track your order
+            {t('confirmation.track')}
           </Button>
         )}
-        <Button to={ROUTES.products}>Continue shopping</Button>
+        <Button to={ROUTES.products}>{t('confirmation.continue')}</Button>
       </div>
     </div>
   )

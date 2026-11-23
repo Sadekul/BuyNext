@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { addressSummary, isSameAddress } from '../../utils/addresses'
+import { useTranslation } from 'react-i18next'
 
 /**
  * "Use a saved address" for signed-in customers at checkout (REAL_SHOP).
@@ -8,6 +9,7 @@ import { addressSummary, isSameAddress } from '../../utils/addresses'
  * address" once the shopper types something else.
  */
 function SavedAddressPicker({ label, addresses, current, onChoose }) {
+  const { t } = useTranslation('checkout')
   const id = useId()
   const selected = addresses.find((saved) => isSameAddress(saved, current))
 
@@ -22,7 +24,7 @@ function SavedAddressPicker({ label, addresses, current, onChoose }) {
         {label}
       </label>
       <select id={id} className="form-field__input form-field__select" value={selected ? String(selected.id) : ''} onChange={handleChange}>
-        <option value="">A new address (fill in below)</option>
+        <option value="">{t('savedAddress.new')}</option>
         {addresses.map((address) => (
           <option key={address.id} value={String(address.id)}>
             {addressSummary(address)}

@@ -15,7 +15,9 @@ import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { IMAGE_SIZES, responsiveImageProps } from '../../utils/images'
 import { isGiftCardProduct } from '../../utils/giftCards'
+import { availabilityLabel } from '../../utils/catalogText'
 import './ProductCard.css'
+import { useTranslation } from 'react-i18next'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
 
@@ -27,12 +29,13 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
  * (WishlistButton reads the wishlist context), shown unless showWishlist={false}.
  */
 function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true, showCompare = true }) {
+  const { t } = useTranslation('catalog')
   // Phase 11: memo() skips re-renders from the parent, so the card follows the display currency itself.
   useDisplayCurrency()
   const { id, title, brand, category, thumbnail, rating, stock, availabilityStatus } = product
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(product)
   const isOutOfStock = stock === 0
-  const { canBuy } = getPurchaseLimits(product)
+  const { canBuy, min: minQuantity } = getPurchaseLimits(product)
   const productUrl = ROUTES.productDetails(id)
   const isGiftCard = isGiftCardProduct(product)
   const choosesOnPage = product.hasVariants || isGiftCard
@@ -55,20 +58,20 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             type="button"
             className="product-card__quick-view"
             onClick={() => onQuickView(product)}
-            aria-label={`Quick view: ${title}`}
+            aria-label={t('card.quickViewLabel', { title })}
           >
             <LuEye aria-hidden="true" />
-            Quick view
+            {t('card.quickView')}
           </button>
         )}
       </div>
 
       <div className="product-card__badges">
         {hasDiscount && roundedDiscount >= STORE_SETTINGS.saleBadgeMinDiscount && (
-          <ProductBadge variant="sale">-{roundedDiscount}%</ProductBadge>
+          <ProductBadge variant="sale">{t('card.salePercent', { percent: roundedDiscount })}</ProductBadge>
         )}
-        {isOutOfStock && <ProductBadge variant="danger">Out of stock</ProductBadge>}
-        {availabilityStatus === 'Low Stock' && <ProductBadge variant="warning">Low stock</ProductBadge>}
+        {isOutOfStock && <ProductBadge variant="danger">{t('card.outOfStock')}</ProductBadge>}
+        {availabilityStatus === 'Low Stock' && <ProductBadge variant="warning">{t('card.lowStock')}</ProductBadge>}
       </div>
 
       {(showWishlist || showCompare) && (
@@ -82,7 +85,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
       <div className="product-card__body">
         <p className="product-card__meta">
           {brand && <span className="product-card__brand">{brand}</span>}
-          {layout === 'list' && category && <span className="product-card__category">{formatSlug(category)}</span>}
+          {layout === 'list' && category && <span className="product-card__category">{product.categoryName ?? formatSlug(category)}</span>}
         </p>
         <h3 className="product-card__title">
           <Link to={productUrl}>{title}</Link>
@@ -91,18 +94,18 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
 
         {layout === 'list' && availabilityStatus && (
           <p className={`product-card__availability product-card__availability--${AVAILABILITY_TONE[availabilityStatus] ?? 'success'}`}>
-            {availabilityStatus}
+            {availabilityLabel(availabilityStatus)}
           </p>
         )}
 
         <p className="product-card__price">
-          <span className="visually-hidden">{hasDiscount ? 'Sale price:' : 'Price:'}</span>
+          <span className="visually-hidden">{t(hasDiscount ? 'card.salePrice' : 'card.price')}</span>
           <span className="product-card__price-current">{formatPrice(salePrice)}</span>
           {hasDiscount && (
             <>
-              <span className="visually-hidden">Original price:</span>
+              <span className="visually-hidden">{t('card.originalPrice')}</span>
               <s className="product-card__price-original">{formatPrice(originalPrice)}</s>
-              {layout === 'list' && <span className="product-card__saving">Save {roundedDiscount}%</span>}
+              {layout === 'list' && <span className="product-card__saving">{t('card.save', { percent: roundedDiscount })}</span>}
             </>
           )}
         </p>
@@ -116,10 +119,14 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             size="sm"
             fullWidth={layout === 'grid'}
             className="product-card__action"
-            aria-label={`${isGiftCard ? 'Choose an amount' : 'Choose options'} for ${title}`}
+            aria-label={t(isGiftCard ? 'card.chooseAmountFor' : 'card.chooseOptionsFor', { title })}
           >
-            {isGiftCard ? 'Choose amount' : 'Choose options'}
+            {t(isGiftCard ? 'card.chooseAmount' : 'card.chooseOptions')}
           </Button>
+        )}
+        {/* A product with a minimum order adds that many at once: say so before the click. */}
+        {onAddToCart && !choosesOnPage && canBuy && minQuantity > 1 && (
+          <p className="product-card__note">{t('card.minimum', { count: minQuantity })}</p>
         )}
         {onAddToCart && !choosesOnPage && (
           <Button
@@ -131,7 +138,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             className="product-card__action"
           >
             <LuShoppingBag aria-hidden="true" />
-            {isOutOfStock ? 'Sold out' : canBuy ? 'Add to cart' : 'Unavailable'}
+            {t(isOutOfStock ? 'card.soldOut' : canBuy ? 'card.addToCart' : 'card.unavailable')}
           </Button>
         )}
       </div>

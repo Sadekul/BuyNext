@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
 import AnnouncementBar from '../components/layout/AnnouncementBar'
 import Header from '../components/layout/Header'
@@ -10,6 +11,7 @@ import CartDrawer from '../components/cart/CartDrawer'
 import CookieConsent from '../components/layout/CookieConsent'
 import CompareBar from '../components/layout/CompareBar'
 import WishlistSyncNotice from '../components/layout/WishlistSyncNotice'
+import LanguageHint from '../components/layout/LanguageHint'
 import Loader from '../components/ui/Loader'
 import { storeAnnouncements } from '../constants/site'
 import { useNavLinks } from '../hooks/useNavLinks'
@@ -31,13 +33,16 @@ function MainLayout() {
   usePageMetaDefaults()
   // Phase 12: the free-shipping threshold in the store's currency (৳ in a taka store).
   const { settings } = useStoreSettings()
+  const { t } = useTranslation('common')
 
   return (
     <>
       <ScrollToTop />
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {t('layout.skipToContent')}
       </a>
+      {/* Phase 13: a browser that prefers Bangla gets one "বাংলায় দেখুন" offer. */}
+      <LanguageHint />
       {/* Phase 10: asks before any statistics load (only when the store uses them); sends page views after. */}
       <CookieConsent />
       <OfflineBanner />
@@ -61,9 +66,10 @@ function MainLayout() {
 }
 
 function PageLoader() {
+  const { t } = useTranslation('common')
   return (
     <div className="section container">
-      <Loader label="Loading page…" />
+      <Loader label={t('layout.loadingPage')} />
     </div>
   )
 }

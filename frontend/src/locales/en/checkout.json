@@ -1,0 +1,250 @@
+{
+  "savedAddress": {
+    "new": "A new address (fill in below)"
+  },
+  "giftCard": {
+    "tooMany": "Too many tries. Please wait a minute and try again.",
+    "expired": "This gift card has expired.",
+    "cantUse": "This gift card can't be used.",
+    "empty": "This gift card has no balance left.",
+    "checkingCard": "Checking your gift card…",
+    "endingError": "Gift card ending {{last4}}: {{error}}",
+    "endingPays": "Gift card ending {{last4}} pays {{amount}}.",
+    "stays": "{{amount}} stays on the card.",
+    "appliedLabel": "Gift card <strong>•••• {{last4}}</strong>",
+    "pays": " — pays {{amount}}",
+    "checkingShort": " — checking…",
+    "left": " ({{amount}} left on the card after this order)",
+    "removeLabel": "Remove gift card ending {{last4}}",
+    "label": "Gift card",
+    "placeholder": "Gift card code",
+    "checking": "Checking…",
+    "apply": "Apply",
+    "hint": "The 16-character code from your gift card email. One gift card per order."
+  },
+  "points": {
+    "wholeNumber": "Enter a whole number of points.",
+    "upTo": "You can use up to {{points}} on this order.",
+    "atLeast": "Use at least {{points}} at a time.",
+    "worth": " (worth {{amount}})",
+    "checking": "Checking your reward points…",
+    "error": "Reward points: {{error}}",
+    "pays": "{{points}} pay {{amount}}.",
+    "appliedLabel": "Reward points <strong>{{points}}</strong>",
+    "pay": " — pay {{amount}}",
+    "checkingShort": " — checking…",
+    "stop": "Stop using reward points",
+    "youHave": "You have {{points}}{{worth}}.",
+    "onceYouHave": "You can use them once you have {{points}}.",
+    "cantUse": "They can't be used on this order.",
+    "label": "Use reward points",
+    "apply": "Apply",
+    "useAll": "Use all",
+    "hint": "You have {{points}}{{worth}}. Up to {{max}} can be used on this order.",
+    "hintMin": "You have {{points}}{{worth}}. Up to {{max}} can be used on this order, at least {{min}} at a time."
+  },
+  "methods": {
+    "payment": {
+      "card": {
+        "label": "Credit or debit card",
+        "description": "You'll enter your card on our payment partner's secure page. BuyNest never sees your card number."
+      },
+      "paypal": {
+        "label": "PayPal",
+        "description": "You'll confirm the payment in your PayPal account."
+      },
+      "cod": {
+        "label": "Cash on delivery",
+        "description": "Pay the courier when your order arrives."
+      },
+      "sslcommerz": {
+        "label": "bKash, Nagad or card (SSLCommerz)",
+        "description": "You'll finish paying on SSLCommerz's secure page."
+      },
+      "gift_card": {
+        "label": "Gift card"
+      },
+      "reward_points": {
+        "label": "Reward points"
+      }
+    },
+    "badges": {
+      "card": "Card"
+    },
+    "shipping": {
+      "standard": {
+        "label": "Standard",
+        "eta": "3–5 business days"
+      },
+      "express": {
+        "label": "Express",
+        "eta": "1–2 business days"
+      },
+      "nextDay": {
+        "label": "Next day",
+        "eta": "Next business day (order by 2 pm)"
+      }
+    }
+  },
+  "page": {
+    "guestOff": "Please sign in to place your order: guest checkout isn't available right now.",
+    "pricesChanged": "Prices changed since you added these items. The order summary now shows the new total: please check it, then place your order again.",
+    "notes": {
+      "cod": "Your order is confirmed straight away. Pay the courier when it arrives.",
+      "stripe": "Next you'll pay on Stripe's secure payment page (it also offers Apple Pay and Google Pay where available). BuyNest never sees your card number. Your order is saved first, so you can pay later from your order page if you leave.",
+      "paypal": "Next you'll approve the payment on PayPal's site, then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
+      "sslcommerz": "You'll finish paying on SSLCommerz's secure page (bKash, Nagad, Rocket, cards, or internet banking), then come back here. Your order is saved first, so you can pay later from your order page if you leave.",
+      "online": "No payment provider is connected yet, so nothing is charged now: your order is saved as awaiting payment and we'll email you about paying. BuyNest never asks for card numbers."
+    },
+    "emptyTitle": "Your cart is empty",
+    "emptyMessage": "Add some products before checking out.",
+    "startShopping": "Start shopping",
+    "attentionTitle": "Some items need your attention",
+    "attentionMessage": "Remove unavailable items from your cart to continue.",
+    "reviewCart": "Review cart",
+    "preparing": "Preparing checkout…",
+    "tabTitle": "Checkout",
+    "signInTitle": "Sign in to check out",
+    "signInMessage": "Guest checkout isn't available right now. Sign in or create an account to place your order; your cart will be waiting.",
+    "signIn": "Sign in",
+    "createAccount": "Create an account",
+    "unavailableTitle": "Checkout is unavailable right now",
+    "unavailableMessage": "Please try again later, or contact us at {{email}}.",
+    "backToCart": "Back to cart",
+    "free": "Free",
+    "reviewBeforePlacing": "{{problems}} Please review your cart before placing the order.",
+    "pointsError": "Reward points: {{message}}",
+    "giftCardError": "Gift card: {{message}} Remove it or try another card.",
+    "couponError": "{{message}} Remove the code or change your cart to continue.",
+    "stockError": "{{problems}} Please review your cart.",
+    "checkingPrices": "Checking prices…",
+    "continueSecure": "Continue to secure payment",
+    "continuePaypal": "Continue to PayPal",
+    "continueSslcommerz": "Continue to SSLCommerz",
+    "placeOrder": "Place order · {{amount}}",
+    "giftCardPays": "Your gift card pays {{paid}}; the remaining {{due}} is paid as chosen above. {{note}}",
+    "pointsPay": "Your reward points pay {{paid}}; the remaining {{due}} is paid as chosen above. {{note}}",
+    "title": "Checkout",
+    "secure": "Secure checkout — our server confirms every price before your order is placed.",
+    "demo": "Demo checkout — no payment is taken and nothing ships.",
+    "haveAccount": "Have an account? <signin>Sign in</signin> to keep this order in your order history. Or continue as a guest.",
+    "contact": "Contact details",
+    "email": "Email",
+    "emailHint": "We'll send your order confirmation here.",
+    "phone": "Phone",
+    "phoneHintSslcommerz": "Needed for paying through SSLCommerz, and for delivery updates.",
+    "phoneHint": "For delivery updates only.",
+    "shippingAddress": "Shipping address",
+    "savedShipping": "Saved shipping addresses",
+    "saveAddress": "Save this address to my address book",
+    "billingAddress": "Billing address",
+    "giftCardsByEmail": "Gift cards are sent by email, so there's no delivery address or shipping charge.",
+    "savedAddresses": "Saved addresses",
+    "sameAsShipping": "Same as shipping address",
+    "savedBilling": "Saved billing addresses",
+    "delivery": "Delivery",
+    "cantDeliver": "We can't deliver this order to {{country}}.",
+    "chooseCountry": "{{reason}} Choose another country, or contact us at {{email}}.",
+    "payment": "Payment",
+    "giftCardCovers": "Your gift card pays for the whole order: no other payment is needed.",
+    "pointsCover": "Your reward points pay for the whole order: no other payment is needed.",
+    "demoPayment": "BuyNest never asks for card numbers. A real payment would happen on the provider's secure page, and the order would only be confirmed after our server verifies the payment.",
+    "summary": "Order summary",
+    "changed_one": "An item has changed since you added it (price or available quantity). The total above is up to date.",
+    "changed_other": "{{count}} items have changed since you added them (price or available quantity). The total above is up to date.",
+    "pricesFailed": "We couldn't check the prices: {{reason}}",
+    "tryAgain": "Try again",
+    "serverNote": "Prices, stock, discounts, and shipping are checked again by our server when you place the order.",
+    "demoNote": "Prices are re-checked with the server before the order is recorded. Shipping, discounts, and taxes would be confirmed by the BuyNest backend."
+  },
+  "confirmation": {
+    "notFound": "Order not found",
+    "notOnDevice": "We couldn't find that order on this device.",
+    "viewOrders": "View your orders",
+    "tabTitle": "Order {{number}}",
+    "thanksName": "Thank you, {{name}}!",
+    "thanks": "Thank you!",
+    "demoRecorded": "Your order <strong>{{number}}</strong> was recorded (demo). A real store would email a confirmation to <strong>{{email}}</strong>; no email was sent.",
+    "viewDetails": "View order details",
+    "continue": "Continue shopping",
+    "partner": "Our payment partner",
+    "toPaypal": {
+      "title": "Taking you to PayPal…",
+      "line": "Your order {{number}} is saved. You'll approve the payment on PayPal's site, then come back here."
+    },
+    "toSslcommerz": {
+      "title": "Taking you to SSLCommerz…",
+      "line": "Your order {{number}} is saved. You'll pay with bKash, Nagad, or a card on SSLCommerz's secure page, then come back here."
+    },
+    "toStripe": {
+      "title": "Taking you to secure payment…",
+      "line": "Your order {{number}} is saved. You'll pay on Stripe's secure page; BuyNest never sees your card number."
+    },
+    "cancelled": {
+      "title": "Order cancelled",
+      "line": "Your order {{number}} was cancelled and its items were released. You're welcome to place a new order.",
+      "lineUnpaid": "Your order {{number}} was cancelled and its items were released. Nothing was charged. You're welcome to place a new order."
+    },
+    "paid": {
+      "title": "Payment received — thank you",
+      "line": "Your order {{number}} is paid and confirmed. We've emailed a receipt to {{email}}."
+    },
+    "checking": {
+      "title": "We're checking your payment",
+      "line": "We've received the payment for order {{number}} and are checking it. We'll email {{email}} as soon as your order is confirmed; there's no need to pay again."
+    },
+    "paypalFailed": {
+      "title": "PayPal didn't complete the payment",
+      "line": "{{error}} Nothing was charged. Your order {{number}} is saved, and you can try again."
+    },
+    "confirming": {
+      "title": "Confirming your payment…",
+      "line": "{{name}} is letting us know about your payment. This usually takes a few seconds."
+    },
+    "slow": {
+      "title": "We're confirming your payment",
+      "line": "{{name}} hasn't confirmed your payment to us yet. There's no need to pay again: we'll email {{email}} as soon as it's confirmed, and your order page will show it."
+    },
+    "failed": {
+      "title": "Payment failed",
+      "line": "{{name}} couldn't complete the payment, so nothing was charged. Your order {{number}} is saved: try again with Pay now."
+    },
+    "expires": "If it isn't paid before the payment page expires, the order is cancelled and its items are released.",
+    "notCompleted": {
+      "title": "Payment not completed",
+      "line": "Nothing was charged. Your order {{number}} is saved, and you can pay for it now."
+    },
+    "cantOpen": {
+      "title": "We couldn't open the payment page",
+      "line": "Your order {{number}} is saved and nothing was charged. {{error}}",
+      "retry": "Please try again with Pay now."
+    },
+    "loading": "Loading your order…",
+    "findTitle": "Find your order",
+    "lookUp": "Look up order {{number}} with the email you used at checkout to see its payment status.",
+    "lookUpPay": "Look up order {{number}} with the email you used at checkout to see its payment status and pay for it.",
+    "lookUpGeneric": "Look it up with the order number and the email you used at checkout.",
+    "track": "Track your order",
+    "partnerUnreachable": "Our payment partner couldn't be reached.",
+    "awaiting": "Your order <strong>{{number}}</strong> is saved and awaiting payment. We've emailed a confirmation to <strong>{{email}}</strong>.",
+    "confirmed": "Your order <strong>{{number}}</strong> is confirmed. We've emailed a confirmation to <strong>{{email}}</strong>.",
+    "keepNumber": "Keep your order number: with your email, it lets you track this order.",
+    "nothingHappening": "Nothing happening? <pay>Continue to secure payment</pay>"
+  },
+  "balance": {
+    "expired": "This gift card has expired.",
+    "disabled": "This gift card can't be used.",
+    "codeRequired": "Enter the gift card code from your email.",
+    "tooMany": "Too many tries. Please wait a minute and try again.",
+    "result": "Balance: {{amount}}.",
+    "useBy": "Use it by {{date}}.",
+    "never": "It never expires.",
+    "title": "Check gift card balance",
+    "intro": "Enter the code from your gift card email to see what's left on it. Use the card at checkout: it pays as much of your order as its balance covers.",
+    "code": "Gift card code",
+    "hint": "16 letters and numbers. Spaces and dashes are fine.",
+    "checking": "Checking…",
+    "check": "Check balance",
+    "startShopping": "Start shopping"
+  }
+}

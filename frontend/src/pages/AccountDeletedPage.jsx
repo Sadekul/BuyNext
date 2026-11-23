@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import './PrivacyPage.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * /goodbye (REAL_SHOP, phase 9): shown right after a customer deleted their
@@ -12,6 +13,7 @@ import './PrivacyPage.css'
  * any other way, it goes to the home page.
  */
 function AccountDeletedPage() {
+  const { t } = useTranslation('account')
   const location = useLocation()
   const headingRef = useRef(null)
   const deleted = location.state?.deleted === true
@@ -25,17 +27,14 @@ function AccountDeletedPage() {
 
   return (
     <div className="goodbye feedback section container">
-      <title>{`Account deleted | ${SITE.name}`}</title>
+      <title>{`${t('deleted.tabTitle')} | ${SITE.name}`}</title>
       <LuHeartHandshake className="feedback__icon" aria-hidden="true" />
       <h1 className="feedback__title" ref={headingRef} tabIndex={-1}>
-        Your account was deleted
+        {t('deleted.title')}
       </h1>
-      <p className="feedback__message">
-        Thank you for shopping with {SITE.name}. You've been signed out everywhere, and we've emailed a confirmation to your old address.
-        You're always welcome back, as a guest or with a new account.
-      </p>
+      <p className="feedback__message">{t('deleted.message', { store: SITE.name })}</p>
       <div className="feedback__actions">
-        <Button to={ROUTES.home}>Back to the shop</Button>
+        <Button to={ROUTES.home}>{t('deleted.back')}</Button>
       </div>
     </div>
   )

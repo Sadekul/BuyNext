@@ -3,6 +3,7 @@ import { LuTicket, LuX } from 'react-icons/lu'
 import Button from '../ui/Button'
 import { REAL_SHOP } from '../../constants/shop'
 import './CouponForm.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Discount code input. The draft text is local state; the applied code
@@ -12,6 +13,7 @@ import './CouponForm.css'
  * `checking`: the server is deciding about the code (REAL_SHOP).
  */
 function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disabled = false, checking = false }) {
+  const { t } = useTranslation('cart')
   const [draft, setDraft] = useState('')
   const inputId = useId()
   const messageId = useId()
@@ -23,9 +25,11 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disab
     setDraft('')
   }
 
+  // Phase 13: the demo's own codes are described in the shopper's language; the server's come translated.
+  const description = coupon && (!REAL_SHOP && appliedCode ? t(`coupons.${appliedCode}`, { defaultValue: coupon.description }) : coupon.description)
   let message = null
-  if (appliedCode && checking && !coupon && !couponError) message = `Checking ${appliedCode}…`
-  else if (appliedCode) message = couponError ? `${appliedCode}: ${couponError}` : coupon && `${appliedCode}: ${coupon.description}`
+  if (appliedCode && checking && !coupon && !couponError) message = t('coupon.checking', { code: appliedCode })
+  else if (appliedCode) message = couponError ? `${appliedCode}: ${couponError}` : coupon && `${appliedCode}: ${description}`
 
   return (
     <div className="coupon-form">
@@ -35,32 +39,32 @@ function CouponForm({ appliedCode, coupon, couponError, onApply, onRemove, disab
             <LuTicket aria-hidden="true" />
             <span>
               <strong>{appliedCode}</strong>
-              {couponError ? ` — ${couponError}` : coupon ? ` — ${coupon.description}` : checking && ' — checking…'}
+              {couponError ? ` — ${couponError}` : coupon ? ` — ${description}` : checking && t('coupon.checkingShort')}
             </span>
           </p>
-          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={`Remove code ${appliedCode}`}>
+          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={t('coupon.removeLabel', { code: appliedCode })}>
             <LuX aria-hidden="true" />
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
           <fieldset disabled={disabled} className="coupon-form__fieldset">
-          <label htmlFor={inputId}>Discount code</label>
+          <label htmlFor={inputId}>{t('coupon.label')}</label>
           <div className="coupon-form__row">
             <input
               id={inputId}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="e.g. NEST10"
+              placeholder={t('coupon.placeholder')}
               autoComplete="off"
               aria-describedby={messageId}
             />
             <Button type="submit" variant="outline" size="sm">
-              Apply
+              {t('coupon.apply')}
             </Button>
           </div>
           <p id={messageId} className="coupon-form__hint">
-            {REAL_SHOP ? 'Codes are checked by our server.' : 'Demo codes: NEST10, SAVE20'}
+            {t(REAL_SHOP ? 'coupon.serverHint' : 'coupon.demoHint')}
           </p>
           </fieldset>
         </form>

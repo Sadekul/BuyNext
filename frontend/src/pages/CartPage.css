@@ -26,6 +26,9 @@
 
 .cart-page__layout {
   display: grid;
+  /* One column on phones that never grows past the screen (an implicit `auto` track
+     takes the summary's min-content width: wider than 390px with the Bangla texts). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-8);
   align-items: start;
 }

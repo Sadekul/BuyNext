@@ -1,4 +1,5 @@
 import { json, readBody } from './http.js'
+import { serverMessage } from './i18n.js'
 import { accounts } from './accounts/index.js'
 import { CUSTOMER, clearedCookies, notSignedIn, sessionCookies } from './session.js'
 
@@ -14,7 +15,8 @@ import { CUSTOMER, clearedCookies, notSignedIn, sessionCookies } from './session
  *   POST /api/auth/login            { email | username, password, remember } → profile
  *   GET  /api/auth/me                                                        → profile
  *   POST /api/auth/refresh                                                   → { ok: true }
- *   PUT  /api/auth/profile          { firstName, lastName, phone, newsletter? } → profile (newsletter: Laravel accounts, phase 7)
+ *   PUT  /api/auth/profile          { firstName, lastName, phone, newsletter?, locale? } → profile
+ *                                   (newsletter: Laravel accounts, phase 7; locale 'en' | 'bn': Laravel accounts, phase 13 → PATCH /me)
  *   POST /api/auth/logout                                                    → { ok: true }
  * Laravel accounts only (DummyJSON answers 404):
  *   POST /api/auth/register         { firstName, lastName, email, phone, password, confirmPassword, acceptTerms }
@@ -36,7 +38,7 @@ export const AUTH_ROUTES = {
   },
 
   async 'GET me'(request, cookies) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     const result = await accounts().customer.me(cookies[CUSTOMER.access], request)
     // 403 = the account was blocked: its session is over.
     if (!result.ok) return json(result.body, result.status, result.status === 403 ? clearedCookies(CUSTOMER) : [])
@@ -44,7 +46,7 @@ export const AUTH_ROUTES = {
   },
 
   async 'POST refresh'(request, cookies) {
-    if (!cookies[CUSTOMER.refresh]) return json({ message: 'Your session has expired.' }, 401, clearedCookies(CUSTOMER))
+    if (!cookies[CUSTOMER.refresh]) return json({ message: serverMessage(request, 'sessionExpired') }, 401, clearedCookies(CUSTOMER))
     const remember = cookies[CUSTOMER.remember] === '1'
     const result = await accounts().customer.refresh(cookies[CUSTOMER.refresh], remember, request)
     if (!result.ok) {
@@ -57,7 +59,7 @@ export const AUTH_ROUTES = {
 
   // The account comes from the session, so a customer can only edit their own profile.
   async 'PUT profile'(request, cookies) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     const result = await accounts().customer.updateProfile(cookies[CUSTOMER.access], await readBody(request), request)
     return reply(result, ({ profile }) => json(profile))
   },

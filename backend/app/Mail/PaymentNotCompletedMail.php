@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\Order;
 use App\Support\EmailBlocks;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -15,7 +16,10 @@ class PaymentNotCompletedMail extends Mailable
 {
     use RendersEmailTemplate;
 
-    public function __construct(public Order $order) {}
+    public function __construct(public Order $order)
+    {
+        $this->locale(Locale::forOrder($order)); // phase 13
+    }
 
     /** Phase 12: the order's currency. */
     protected function templateCurrency(): ?string
@@ -33,11 +37,11 @@ class PaymentNotCompletedMail extends Mailable
         $shop = (string) config('buynest.storefront_url');
 
         return [
-            'customer_first_name' => $this->order->shipping_address['first_name'] ?? 'there',
+            'customer_first_name' => $this->order->shipping_address['first_name'] ?? __('there'),
             'order_number' => $this->order->number,
             'order_total' => $this->order->grand_total,
             'shop_url' => $shop,
-            'button' => EmailBlocks::button($shop, 'Shop again'),
+            'button' => EmailBlocks::button($shop, __('Shop again')),
         ];
     }
 }

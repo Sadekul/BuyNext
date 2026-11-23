@@ -17,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
  * A storefront customer. Signs in only on the storefront; admin routes refuse
  * customer tokens (EnsureTokenKind).
  */
-#[Fillable(['first_name', 'last_name', 'email', 'phone', 'password', 'group_id'])]
+#[Fillable(['first_name', 'last_name', 'email', 'phone', 'password', 'group_id', 'locale'])] // phase 13: locale (en|bn|null)
 #[Hidden(['password', 'wishlist_share_hash'])]
 class Customer extends Authenticatable
 {

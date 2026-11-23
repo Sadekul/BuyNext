@@ -22,6 +22,12 @@ const CSV_COLUMNS = [
   ['description', ''],
   ['tags', 'Separated by |'],
   ['image_urls', 'https:// addresses separated by |; only new ones are added'],
+  // Phase 13: the Bangla texts (empty cell = not translated: the store shows the English text).
+  ['name_bn', 'Bangla name. Empty: the English name is shown.'],
+  ['short_description_bn', 'Bangla short description'],
+  ['description_bn', 'Bangla description. Empty: the English one is shown.'],
+  ['meta_title_bn', 'Bangla meta title'],
+  ['meta_description_bn', 'Bangla meta description'],
 ]
 const MAX_CSV_BYTES = 2 * 1024 * 1024
 
@@ -152,6 +158,10 @@ function ImportPanel() {
       </h2>
       <p className="field__hint">
         UTF-8 CSV with a header row, up to 2 MB and 5,000 rows; columns in any order. Checking the file saves nothing. If any row has an error, nothing is imported.
+      </p>
+      <p className="field__hint">
+        Bangla texts go in the <code>name_bn</code>, <code>short_description_bn</code>, <code>description_bn</code>, <code>meta_title_bn</code> and <code>meta_description_bn</code>{' '}
+        columns (the export has them too). Save the file as UTF-8 so Bangla letters stay readable.
       </p>
       <details className="csv-columns">
         <summary>Columns</summary>

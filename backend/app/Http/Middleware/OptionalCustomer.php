@@ -27,7 +27,7 @@ class OptionalCustomer
         // Like auth:sanctum: from now on $request->user() reads the token.
         Auth::shouldUse('sanctum');
         if (! $request->user()) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => __('Unauthenticated.')], 401);
         }
 
         return $this->tokenKind->handle($request, $next, 'customer');

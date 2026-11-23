@@ -1,10 +1,14 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getCmsPage, getHomeContent, getStoreSettings } from '../services/contentService'
+import { currentLanguage } from '../i18n'
 
 /* The admin's content and store settings (REAL_SHOP). The server caches them for 60 s too. */
+// Phase 13: home content and pages come back in the shopper's language, so it is part of their keys.
 export const contentKeys = {
-  home: ['content', 'home'],
-  page: (slug) => ['content', 'page', slug],
+  get home() {
+    return ['content', 'home', currentLanguage()]
+  },
+  page: (slug) => ['content', 'page', slug, currentLanguage()],
   store: ['content', 'store'],
 }
 

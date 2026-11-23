@@ -1,11 +1,17 @@
 import { Link } from 'react-router'
+import { useTranslation } from 'react-i18next'
+import LanguageSwitch from './LanguageSwitch'
 import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { LuMail, LuPhone } from 'react-icons/lu'
 import Logo from '../common/Logo'
 import { FOOTER_LINK_GROUPS, SITE, SOCIAL_LINKS } from '../../constants/site'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import { analyticsAvailable, openCookieSettings } from '../../utils/analytics'
+import { formatNumber } from '../../utils/formatters'
 import './Footer.css'
+
+// "2026" (no thousands separator), in Bangla digits in Bangla.
+const formatYear = (year) => formatNumber(year, { useGrouping: false })
 
 // Maps the data-friendly icon keys in SOCIAL_LINKS to icon components.
 const SOCIAL_ICONS = {
@@ -16,6 +22,7 @@ const SOCIAL_ICONS = {
 }
 
 function Footer() {
+  const { t } = useTranslation('common')
   const currentYear = new Date().getFullYear()
   // REAL_SHOP: the support details the admin set (store settings); the demo's otherwise.
   const { settings } = useStoreSettings()
@@ -28,9 +35,7 @@ function Footer() {
       <div className="site-footer__main container">
         <div className="site-footer__brand">
           <Logo tone="light" showTagline />
-          <p className="site-footer__about">
-            Quality products, honest prices, and a shopping experience built around you.
-          </p>
+          <p className="site-footer__about">{t('footer.about')}</p>
           <ul className="site-footer__contact">
             <li>
               <LuMail aria-hidden="true" />
@@ -44,12 +49,12 @@ function Footer() {
         </div>
 
         {FOOTER_LINK_GROUPS.map((group) => (
-          <nav key={group.title} className="site-footer__group" aria-label={group.title}>
-            <h2 className="site-footer__heading">{group.title}</h2>
+          <nav key={group.title} className="site-footer__group" aria-label={group.titleKey ? t(group.titleKey) : group.title}>
+            <h2 className="site-footer__heading">{group.titleKey ? t(group.titleKey) : group.title}</h2>
             <ul className="site-footer__links">
               {group.links.map((link) => (
                 <li key={link.to}>
-                  <Link to={link.to}>{link.label}</Link>
+                  <Link to={link.to}>{link.labelKey ? t(link.labelKey) : link.label}</Link>
                 </li>
               ))}
             </ul>
@@ -59,21 +64,21 @@ function Footer() {
 
       <div className="site-footer__bottom">
         <div className="site-footer__bottom-inner container">
-          <p>
-            © {currentYear} {storeName}. All rights reserved.
-          </p>
+          <p>{t('footer.rights', { year: formatYear(currentYear), store: storeName })}</p>
+          {/* Phase 13: বাংলা / English, also here. */}
+          <LanguageSwitch className="language-switch--footer" />
           {/* Phase 10: change the statistics choice at any time (only when the store uses statistics). */}
           {analyticsAvailable(settings) && (
             <button type="button" className="site-footer__cookie-settings" onClick={openCookieSettings}>
-              Cookie settings
+              {t('footer.cookieSettings')}
             </button>
           )}
-          <ul className="site-footer__social" aria-label="Social media">
+          <ul className="site-footer__social" aria-label={t('footer.social')}>
             {SOCIAL_LINKS.map((social) => {
               const Icon = SOCIAL_ICONS[social.icon]
               return (
                 <li key={social.label}>
-                  <a href={social.href} target="_blank" rel="noopener noreferrer" aria-label={`${SITE.name} on ${social.label}`}>
+                  <a href={social.href} target="_blank" rel="noopener noreferrer" aria-label={t('footer.socialLink', { site: SITE.name, network: social.label })}>
                     <Icon aria-hidden="true" />
                   </a>
                 </li>

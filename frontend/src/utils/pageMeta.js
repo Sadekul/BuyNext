@@ -12,9 +12,20 @@
  * React 19's <title> (it replaces the one in index.html).
  */
 
+import { translate } from '../i18n'
+
 export const DEFAULT_DESCRIPTION =
   'BuyNest — Your Modern Shopping Destination. Shop electronics, fashion, beauty, and home essentials.'
 const SITE_NAME = 'BuyNest'
+
+/*
+ * Phase 13: the site's default description and title in the active language
+ * (common:site.*). The default title replaces index.html's English one on
+ * pages without their own <PageMeta title>, and follows a language switch.
+ */
+const defaultDescription = () => translate('common:site.description', { defaultValue: DEFAULT_DESCRIPTION })
+const siteTitle = (lng) => `${SITE_NAME} — ${translate('common:site.tagline', lng ? { lng } : undefined)}`
+const isDefaultTitle = (title) => title === siteTitle('en') || title === siteTitle('bn')
 const DEFAULT_IMAGE = '/favicon.svg'
 
 const layers = new Map() // id → { title, description, image, type, canonicalPath, noindex }
@@ -74,7 +85,7 @@ export function currentPageMeta() {
   const latest = [...layers.values()].at(-1) ?? {}
   return {
     title: latest.title ?? null,
-    description: latest.description || DEFAULT_DESCRIPTION,
+    description: latest.description || defaultDescription(),
     image: latest.image || DEFAULT_IMAGE,
     type: latest.type || 'website',
     canonicalPath: latest.canonicalPath ?? window.location.pathname,
@@ -86,6 +97,7 @@ export function currentPageMeta() {
 export function applyPageMeta() {
   if (typeof document === 'undefined') return
   const meta = currentPageMeta()
+  if (!meta.title && isDefaultTitle(document.title) && document.title !== siteTitle()) document.title = siteTitle()
   // The page's own <title> (React renders it) when no layer names one.
   const title = meta.title ?? (document.title || SITE_NAME)
   const url = absolute(meta.canonicalPath)

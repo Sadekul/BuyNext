@@ -34,6 +34,14 @@ describe('ProductCard', () => {
     expect(onAddToCart).toHaveBeenCalledWith(iphone13)
   })
 
+  it('says before the click when a product has a minimum order (it adds that many at once)', () => {
+    const { unmount } = renderWithProviders(<ProductCard product={{ ...iphone13, stock: 50, minimumOrderQuantity: 4 }} onAddToCart={vi.fn()} />)
+    expect(screen.getByText('Minimum order: 4 (adds 4 at once)')).toBeInTheDocument()
+    unmount()
+    renderWithProviders(<ProductCard product={{ ...iphone13, stock: 50, minimumOrderQuantity: 1 }} onAddToCart={vi.fn()} />)
+    expect(screen.queryByText(/Minimum order/)).not.toBeInTheDocument()
+  })
+
   it('disables buying when sold out', () => {
     renderWithProviders(<ProductCard product={galaxyS8} onAddToCart={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Sold out' })).toBeDisabled()

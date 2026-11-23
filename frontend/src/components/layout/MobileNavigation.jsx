@@ -1,4 +1,7 @@
 import { NavLink } from 'react-router'
+import { useTranslation } from 'react-i18next'
+import LanguageSwitch from './LanguageSwitch'
+import { linkLabel } from './navLabel'
 import { LuHeart, LuShoppingBag, LuUser } from 'react-icons/lu'
 import Modal from '../ui/Modal'
 import SearchBar from '../common/SearchBar'
@@ -15,20 +18,21 @@ import './MobileNavigation.css'
  */
 function MobileNavigation({ isOpen, onClose, links }) {
   const { isAuthenticated } = useAuth()
+  const { t } = useTranslation('common')
   const accountLinks = [
     isAuthenticated
-      ? { label: 'My account', to: ROUTES.account, icon: LuUser }
-      : { label: 'Sign in', to: ROUTES.login, icon: LuUser },
-    { label: 'Wishlist', to: ROUTES.wishlist, icon: LuHeart },
-    { label: 'Cart', to: ROUTES.cart, icon: LuShoppingBag },
+      ? { label: t('nav.myAccount'), to: ROUTES.account, icon: LuUser }
+      : { label: t('nav.signIn'), to: ROUTES.login, icon: LuUser },
+    { label: t('nav.wishlist'), to: ROUTES.wishlist, icon: LuHeart },
+    { label: t('nav.cart'), to: ROUTES.cart, icon: LuShoppingBag },
   ]
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Menu" variant="drawer">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('nav.menu')} variant="drawer">
       <div className="mobile-nav">
         <SearchBar onSearch={onClose} />
 
-        <nav aria-label="Mobile main">
+        <nav aria-label={t('nav.mobileMain')}>
           <ul className="mobile-nav__list">
             {links.map((link) => (
               <li key={link.to}>
@@ -40,10 +44,10 @@ function MobileNavigation({ isOpen, onClose, links }) {
                     cn('mobile-nav__link', isActive && 'mobile-nav__link--active', link.highlight && 'mobile-nav__link--highlight')
                   }
                 >
-                  {link.label}
+                  {linkLabel(t, link)}
                 </NavLink>
                 {link.children?.length > 0 && (
-                  <ul className="mobile-nav__sublist" aria-label={`${link.label} subcategories`}>
+                  <ul className="mobile-nav__sublist" aria-label={t('nav.subcategories', { label: linkLabel(t, link) })}>
                     {link.children.map((child) => (
                       <li key={child.to}>
                         <NavLink
@@ -73,6 +77,9 @@ function MobileNavigation({ isOpen, onClose, links }) {
             </li>
           ))}
         </ul>
+
+        {/* Phase 13: বাংলা / English. */}
+        <LanguageSwitch className="mobile-nav__language" />
       </div>
     </Modal>
   )

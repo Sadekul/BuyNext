@@ -1,0 +1,71 @@
+/* Phase 13: the language switch (header and footer). */
+.language-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 999px;
+  background: var(--color-surface, #fff);
+}
+
+.language-switch__option {
+  min-height: 32px;
+  padding: 0 var(--space-3, 0.75rem);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  cursor: pointer;
+}
+
+.language-switch__option:hover {
+  text-decoration: underline;
+}
+
+.language-switch__option--active {
+  background: var(--color-primary, #047857);
+  color: #fff;
+}
+
+.language-switch__option:focus-visible {
+  outline: 2px solid var(--color-primary, #047857);
+  outline-offset: 2px;
+}
+
+.language-switch--footer {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+}
+
+.language-switch--footer .language-switch__option--active {
+  background: #fff;
+  color: var(--color-primary, #047857);
+}
+
+.language-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  background: var(--color-primary-soft, #ecfdf5);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.language-hint p {
+  margin: 0;
+}
+
+.language-hint button {
+  min-height: 32px;
+  padding: 0 var(--space-3, 0.75rem);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

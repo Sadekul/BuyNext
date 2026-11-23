@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasTranslations;
 use App\Services\Pricing;
 use App\Services\Settings;
 use App\Support\CategoryTree;
@@ -34,6 +35,16 @@ use Illuminate\Support\Str;
 ])]
 class Product extends Model
 {
+    use HasTranslations;
+
+    /** Phase 13: the fields with a Bangla version (product_translations etc.). */
+    public const TRANSLATABLE = ['name', 'short_description', 'description', 'meta_title', 'meta_description'];
+
+    protected static function translationModel(): string
+    {
+        return ProductTranslation::class;
+    }
+
     /** @use HasFactory<ProductFactory> */
     use HasFactory, SoftDeletes;
 
@@ -100,11 +111,53 @@ class Product extends Model
         return $this->hasMany(ProductLink::class)->orderBy('type')->orderBy('position')->orderBy('id');
     }
 
-    /** Phase 11: [{ label, value }] (never null). */
-    public function specificationList(): array
+    /**
+     * Phase 11: [{ label, value }] (never null).
+     * Phase 13: $locale "bn" uses each row's label_bn / value_bn when filled (per field, else the English text).
+     */
+    public function specificationList(?string $locale = null): array
     {
-        return array_values(array_map(fn ($row) => ['label' => (string) ($row['label'] ?? ''), 'value' => (string) ($row['value'] ?? '')],
+        $pick = function (array $row, string $field) use ($locale) {
+            $translated = $locale && $locale !== 'en' ? ($row["{$field}_{$locale}"] ?? null) : null;
+
+            return is_string($translated) && trim($translated) !== '' ? $translated : (string) ($row[$field] ?? '');
+        };
+
+        return array_values(array_map(fn ($row) => ['label' => $pick($row, 'label'), 'value' => $pick($row, 'value')],
             is_array($this->specifications) ? $this->specifications : []));
+    }
+
+    /**
+     * Phase 13: { complete, missing } in Bangla. Complete = the name is translated, and the
+     * description too when the product has an English one (SEO fields and short description are optional).
+     */
+    public function banglaStatus(): array
+    {
+        $missing = $this->missingTranslations('bn');
+        $required = filled(strip_tags((string) $this->description)) ? ['name', 'description'] : ['name'];
+
+        return ['complete' => array_intersect($required, $missing) === [], 'missing' => array_values($missing)];
+    }
+
+    /** Phase 13: products whose Bangla text is complete ($complete) or missing (see banglaStatus()). */
+    public function scopeBanglaComplete($query, bool $complete = true)
+    {
+        $filled = fn (string $column) => "{$column} IS NOT NULL AND TRIM({$column}) <> ''";
+        $sql = 'EXISTS (SELECT 1 FROM product_translations pt WHERE pt.product_id = products.id AND pt.locale = \'bn\''
+            .' AND '.$filled('pt.name')
+            .' AND (products.description IS NULL OR TRIM(products.description) = \'\' OR ('.$filled('pt.description').')))';
+
+        return $complete ? $query->whereRaw($sql) : $query->whereRaw("NOT {$sql}");
+    }
+
+    /** Phase 13: the admin's rows: [{ label, value, label_bn, value_bn }] (null = falls back to English). */
+    public function specificationRowsForAdmin(): array
+    {
+        return array_values(array_map(fn ($row) => [
+            'label' => (string) ($row['label'] ?? ''), 'value' => (string) ($row['value'] ?? ''),
+            'label_bn' => filled($row['label_bn'] ?? null) ? (string) $row['label_bn'] : null,
+            'value_bn' => filled($row['value_bn'] ?? null) ? (string) $row['value_bn'] : null,
+        ], is_array($this->specifications) ? $this->specifications : []));
     }
 
     /** The image limit per product (uploads and URLs together). */
@@ -167,13 +220,15 @@ class Product extends Model
      * value id => [option name, value, option position], for variant labels.
      * Loads options.values if needed.
      */
-    public function optionValueMap(): array
+    public function optionValueMap(?string $locale = null): array // phase 13: $locale = names in that language (fallback English)
     {
         $this->loadMissing('options.values');
         $map = [];
         foreach ($this->options as $option) {
             foreach ($option->values as $value) {
-                $map[$value->id] = [$option->name, $value->value, $option->position];
+                $map[$value->id] = $locale === null
+                    ? [$option->name, $value->value, $option->position]
+                    : [$option->translatedName($locale), $value->translatedValue($locale), $option->position];
             }
         }
 

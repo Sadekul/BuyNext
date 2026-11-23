@@ -11,6 +11,7 @@ use App\Models\ProductLink;
 use App\Services\Audit;
 use App\Services\Pricing;
 use App\Services\ProductLinks;
+use App\Support\TranslationInput;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([...self::filterRules(), 'per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        return AdminProductResource::collection(self::filtered($data)->with(['category', 'brand'])
+        return AdminProductResource::collection(self::filtered($data)->with(['category', 'brand', 'translations'])
             ->paginate($data['per_page'] ?? 20)
             ->withQueryString());
     }
@@ -50,6 +51,7 @@ class ProductController extends Controller
             'status' => ['nullable', Rule::in(Product::STATUSES)],
             'sort' => ['nullable', 'in:name,price,stock,rating,newest'],
             'direction' => ['nullable', 'in:asc,desc'],
+            'bangla' => ['nullable', 'in:complete,missing'], // phase 13
         ];
     }
 
@@ -68,6 +70,7 @@ class ProductController extends Controller
             })
             ->when($data['category'] ?? null, fn ($query, $slug) => $query->whereHas('category', fn ($c) => $c->where('slug', $slug)))
             ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($data['bangla'] ?? null, fn ($query, $bangla) => $query->banglaComplete($bangla === 'complete')) // phase 13
             ->orderBy($column, $direction)
             ->orderBy('id', $direction);
     }
@@ -112,6 +115,7 @@ class ProductController extends Controller
             }
             $this->audit->record('product.created', "Product {$product->sku} \"{$product->name}\" created.", 'product', $product->id,
                 Audit::created(Audit::fieldsOf($product, self::AUDITED)));
+            $this->saveBangla($product, $data);
 
             return $product;
         });
@@ -162,6 +166,7 @@ class ProductController extends Controller
             if ($changes = Audit::diff($before, $after)) {
                 $this->audit->record('product.updated', "Product {$product->sku} \"{$product->name}\" updated.", 'product', $product->id, $changes);
             }
+            $this->saveBangla($product, $data);
         });
 
         return (new AdminProductResource($product->fresh(self::DETAIL)))->withDetail();
@@ -220,6 +225,10 @@ class ProductController extends Controller
             'specifications.*' => ['array'],
             'specifications.*.label' => ['required', 'string', 'max:60', 'distinct:ignore_case'],
             'specifications.*.value' => ['required', 'string', 'max:255'],
+            'specifications.*.label_bn' => ['nullable', 'string', 'max:60'], // phase 13
+            'specifications.*.value_bn' => ['nullable', 'string', 'max:255'],
+            // Phase 13: translations.bn.{name, short_description, description, meta_title, meta_description}.
+            ...TranslationInput::rules(['name' => 120, 'short_description' => 500, 'description' => 5000, 'meta_title' => 190, 'meta_description' => 500]),
             'links' => ['nullable', 'array'],
             ...collect(ProductLink::TYPES)->flatMap(fn ($type) => [
                 "links.{$type}" => ['nullable', 'array', 'max:'.ProductLink::MAX_PER_TYPE],
@@ -307,9 +316,23 @@ class ProductController extends Controller
     }
 
     /** Phase 11: [{ label, value }] trimmed, or null for none. */
+    /** Phase 13: saves translations.bn and logs which Bangla fields changed. */
+    private function saveBangla(Product $product, array $data): void
+    {
+        $fields = TranslationInput::save($product, $data);
+        if ($fields) {
+            $this->audit->record('product.translated', "Product {$product->sku} \"{$product->name}\" Bangla text updated (".implode(', ', $fields).').',
+                'product', $product->id);
+        }
+    }
+
     public static function cleanSpecifications(?array $rows): ?array
     {
-        $rows = array_values(array_map(fn ($row) => ['label' => trim((string) $row['label']), 'value' => trim((string) $row['value'])], $rows ?? []));
+        // Phase 13: label_bn / value_bn are kept only when filled (empty = the store shows the English text).
+        $rows = array_values(array_map(fn ($row) => array_filter([
+            'label' => trim((string) $row['label']), 'value' => trim((string) $row['value']),
+            'label_bn' => trim((string) ($row['label_bn'] ?? '')), 'value_bn' => trim((string) ($row['value_bn'] ?? '')),
+        ], fn ($value, $key) => ! str_ends_with($key, '_bn') || $value !== '', ARRAY_FILTER_USE_BOTH), $rows ?? []));
 
         return $rows === [] ? null : $rows;
     }
@@ -345,6 +368,10 @@ class ProductController extends Controller
                 $copy->thumbnail_url = null;
             }
             $copy->save();
+            // Phase 13: the Bangla texts come along (a copy's name gets no Bangla "(copy)", staff rename it anyway).
+            foreach ($source->translations as $translation) {
+                $copy->translations()->create($translation->only(['locale', ...Product::TRANSLATABLE]));
+            }
             foreach ($source->images->whereNull('path')->values() as $position => $image) {
                 $copy->images()->create(['url' => $image->url, 'alt' => $image->alt, 'position' => $position]);
             }

@@ -11,7 +11,9 @@ import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { isGiftCardProduct } from '../../utils/giftCards'
+import { availabilityLabel } from '../../utils/catalogText'
 import './QuickViewModal.css'
+import { useTranslation } from 'react-i18next'
 
 const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out of Stock': 'danger' }
 
@@ -22,8 +24,9 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
  * the same query, so opening "View full details" afterwards is instant.
  */
 function QuickViewModal({ product, onClose, onAddToCart }) {
+  const { t } = useTranslation('catalog')
   return (
-    <Modal isOpen={product !== null} onClose={onClose} title={product?.title ?? 'Quick view'}>
+    <Modal isOpen={product !== null} onClose={onClose} title={product?.title ?? t('quickView.title')}>
       {/* Mount the content only while open, so each product gets a fresh request. */}
       {product && <QuickViewContent product={product} onAddToCart={onAddToCart} />}
     </Modal>
@@ -31,9 +34,10 @@ function QuickViewModal({ product, onClose, onAddToCart }) {
 }
 
 function QuickViewContent({ product, onAddToCart }) {
+  const { t } = useTranslation('catalog')
   const request = useQuery(productQuery(product.id))
 
-  if (request.isPending) return <Loader label="Loading product details…" />
+  if (request.isPending) return <Loader label={t('quickView.loading')} />
   if (request.error) {
     return <ErrorMessage titleAs="h3" message={request.error.message} onRetry={() => request.refetch()} />
   }
@@ -55,7 +59,7 @@ function QuickViewContent({ product, onAddToCart }) {
       <div className="quick-view__info">
         <p className="quick-view__meta">
           {details.brand && <span>{details.brand}</span>}
-          {details.category && <span>{formatSlug(details.category)}</span>}
+          {details.category && <span>{details.categoryName ?? formatSlug(details.category)}</span>}
         </p>
         {details.rating !== null && <RatingStars rating={details.rating} />}
 
@@ -64,14 +68,14 @@ function QuickViewContent({ product, onAddToCart }) {
           {hasDiscount && (
             <>
               <s>{formatPrice(originalPrice)}</s>
-              <span className="quick-view__saving">Save {roundedDiscount}%</span>
+              <span className="quick-view__saving">{t('card.save', { percent: roundedDiscount })}</span>
             </>
           )}
         </p>
 
         {details.availabilityStatus && (
           <p className={`quick-view__stock quick-view__stock--${AVAILABILITY_TONE[details.availabilityStatus] ?? 'success'}`}>
-            {details.availabilityStatus}
+            {availabilityLabel(details.availabilityStatus)}
           </p>
         )}
         {details.description && <p className="quick-view__description">{details.description}</p>}
@@ -79,15 +83,15 @@ function QuickViewContent({ product, onAddToCart }) {
         <div className="quick-view__actions">
           {details.hasVariants || isGiftCardProduct(details) ? (
             // Options (size, color), or a gift card's amount and recipient, are chosen on the product page.
-            <Button to={ROUTES.productDetails(details.id)}>{isGiftCardProduct(details) ? 'Choose amount' : 'Choose options'}</Button>
+            <Button to={ROUTES.productDetails(details.id)}>{t(isGiftCardProduct(details) ? 'card.chooseAmount' : 'card.chooseOptions')}</Button>
           ) : (
             <>
               <Button onClick={() => onAddToCart(details)} disabled={!canBuy}>
                 <LuShoppingBag aria-hidden="true" />
-                {canBuy ? 'Add to cart' : 'Unavailable'}
+                {t(canBuy ? 'card.addToCart' : 'card.unavailable')}
               </Button>
               <Button to={ROUTES.productDetails(details.id)} variant="outline">
-                View full details
+                {t('quickView.fullDetails')}
               </Button>
             </>
           )}

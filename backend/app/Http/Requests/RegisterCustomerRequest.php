@@ -33,8 +33,8 @@ class RegisterCustomerRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.regex' => 'Enter a valid phone number, including the country code (for example +1 555 010 0100).',
-            'accept_terms.accepted' => 'Please accept the terms to create an account.',
+            'phone.regex' => __('Enter a valid phone number, including the country code (for example +1 555 010 0100).'),
+            'accept_terms.accepted' => __('Please accept the terms to create an account.'),
         ];
     }
 }

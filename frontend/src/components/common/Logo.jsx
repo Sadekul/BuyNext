@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { SITE } from '../../constants/site'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
@@ -6,6 +7,7 @@ import './Logo.css'
 
 /** Brand mark + wordmark linking to the homepage. `tone="light"` for dark backgrounds. */
 function Logo({ tone = 'dark', showTagline = false }) {
+  const { t } = useTranslation('common')
   return (
     // No aria-label: the visible wordmark (and tagline) is the link's accessible name,
     // so voice-control users can activate it by saying what they see.
@@ -19,7 +21,7 @@ function Logo({ tone = 'dark', showTagline = false }) {
         <span className="logo__name">
           Buy<span className="logo__accent">Nest</span>
         </span>
-        {showTagline && <span className="logo__tagline">{SITE.tagline}</span>}
+        {showTagline && <span className="logo__tagline">{t('site.tagline', { defaultValue: SITE.tagline })}</span>}
       </span>
     </Link>
   )

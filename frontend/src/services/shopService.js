@@ -2,6 +2,7 @@ import { ApiError, apiClient } from './apiClient'
 import { normalizePhone } from '../utils/validation'
 import { giftCardPayload } from '../utils/giftCards'
 import { normalizeProduct } from './adapters/laravelAdapter'
+import { translate } from '../i18n'
 
 /*
  * Carts and orders with BuyNest's Laravel API, through the shop service on
@@ -149,12 +150,12 @@ export async function getInvoicePdf(number, invoice, { email } = {}) {
       signal: AbortSignal.timeout(60_000),
     })
   } catch (error) {
-    throw new ApiError(error?.name === 'TimeoutError' ? 'The server took too long to respond. Please try again.' : 'Network error. Check your internet connection and try again.')
+    throw new ApiError(translate(error?.name === 'TimeoutError' ? 'errors:api.timeout' : 'errors:api.network'))
   }
   const type = response.headers.get('content-type') ?? ''
   if (!response.ok || !type.includes('application/pdf')) {
     const data = await response.json().catch(() => null)
-    const fallback = response.status === 404 ? "We couldn't find that invoice." : "We couldn't download the PDF. Please try again."
+    const fallback = translate(response.status === 404 ? 'errors:pdf.notFound' : 'errors:pdf.failed')
     throw new ApiError(data?.message ?? fallback, { status: response.ok ? 502 : response.status, data })
   }
   const match = /filename="?([\w.-]+\.pdf)"?/i.exec(response.headers.get('content-disposition') ?? '')

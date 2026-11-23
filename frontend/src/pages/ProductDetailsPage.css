@@ -246,3 +246,4 @@
   font-weight: 600;
   color: var(--color-sale);
 }
+.product-details__lead { font-weight: 500; }

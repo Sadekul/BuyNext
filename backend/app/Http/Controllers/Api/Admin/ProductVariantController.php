@@ -43,6 +43,11 @@ class ProductVariantController extends Controller
             'options.*.name' => ['required', 'string', 'min:1', 'max:40', 'distinct:ignore_case'],
             'options.*.values' => ['required', 'array', 'min:1', 'max:'.ProductOption::MAX_VALUES],
             'options.*.values.*' => ['required', 'string', 'min:1', 'max:40', 'distinct:ignore_case'],
+            // Phase 13: Bangla names. name_bn: the option's; values_bn: one per value, same order (null/"" = English is shown).
+            // Left out: the saved Bangla text of options/values that keep their name stays.
+            'options.*.name_bn' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'options.*.values_bn' => ['sometimes', 'nullable', 'array'],
+            'options.*.values_bn.*' => ['nullable', 'string', 'max:40'],
         ], [
             'options.max' => 'A product can have at most '.ProductOption::MAX_PER_PRODUCT.' options.',
             'options.*.name.required' => 'Enter the option name (for example "Size").',
@@ -63,22 +68,29 @@ class ProductVariantController extends Controller
             foreach (array_values($data['options']) as $position => $input) {
                 $name = trim($input['name']);
                 $option = $existing->get(mb_strtolower($name));
+                $translations = array_key_exists('name_bn', $input)
+                    ? self::withBangla($option?->translations, 'name', $input['name_bn'])
+                    : $option?->translations;
                 if ($option) {
-                    $option->update(['name' => $name, 'position' => $position]);
+                    $option->update(['name' => $name, 'position' => $position, 'translations' => $translations]);
                 } else {
-                    $option = $product->options()->create(['name' => $name, 'position' => $position]);
+                    $option = $product->options()->create(['name' => $name, 'position' => $position, 'translations' => $translations]);
                 }
                 $keptOptions[] = $option->id;
 
                 $values = $option->values()->get()->keyBy(fn ($value) => mb_strtolower($value->value));
                 $keptValues = [];
+                $valuesBn = is_array($input['values_bn'] ?? null) ? array_values($input['values_bn']) : null;
                 foreach (array_values($input['values']) as $valuePosition => $text) {
                     $text = trim($text);
                     $value = $values->get(mb_strtolower($text));
+                    $valueTranslations = $valuesBn !== null
+                        ? self::withBangla($value?->translations, 'value', $valuesBn[$valuePosition] ?? null)
+                        : $value?->translations;
                     if ($value) {
-                        $value->update(['value' => $text, 'position' => $valuePosition]);
+                        $value->update(['value' => $text, 'position' => $valuePosition, 'translations' => $valueTranslations]);
                     } else {
-                        $value = $option->values()->create(['value' => $text, 'position' => $valuePosition]);
+                        $value = $option->values()->create(['value' => $text, 'position' => $valuePosition, 'translations' => $valueTranslations]);
                     }
                     $keptValues[] = $value->id;
                 }
@@ -212,6 +224,23 @@ class ProductVariantController extends Controller
     }
 
     /** Variants whose values are no longer all current are switched off. */
+    /** Phase 13: $translations with bn.$field set to $text (empty → removed; null when nothing is left). */
+    private static function withBangla(?array $translations, string $field, mixed $text): ?array
+    {
+        $translations ??= [];
+        $text = is_string($text) ? trim($text) : '';
+        if ($text === '') {
+            unset($translations['bn'][$field]);
+            if (empty($translations['bn'])) {
+                unset($translations['bn']);
+            }
+        } else {
+            $translations['bn'][$field] = $text;
+        }
+
+        return $translations === [] ? null : $translations;
+    }
+
     private function deactivateStale(Product $product): void
     {
         foreach ($product->variants()->where('is_active', true)->get() as $variant) {

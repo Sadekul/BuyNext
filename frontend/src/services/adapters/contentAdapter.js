@@ -83,6 +83,8 @@ export function normalizePage(raw) {
     metaTitle: data.meta_title || null,
     metaDescription: data.meta_description || null,
     updatedAt: data.updated_at ?? null,
+    // Phase 13: the language the page actually came in ("en" when it isn't translated yet).
+    ...((data.locale === 'en' || data.locale === 'bn') && { locale: data.locale }),
   }
 }
 
@@ -138,6 +140,10 @@ export function normalizeStoreSettings(raw) {
     currencies: normalizeCurrencies(data.currencies, currency.code),
     // Phase 11: reward points, when the store has them on (null = off: nothing about points is shown).
     rewards: normalizeRewardSettings(data.rewards),
+    // Phase 13: the store's languages, the language for first visits, and Bangla digits (০–৯) in Bangla.
+    locales: Array.isArray(data.locales) && data.locales.length > 0 ? data.locales.filter((code) => code === 'en' || code === 'bn') : ['en', 'bn'],
+    defaultLocale: data.default_locale === 'bn' ? 'bn' : 'en',
+    banglaDigits: data.bangla_digits !== false,
   }
 }
 

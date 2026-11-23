@@ -245,3 +245,10 @@
     font-size: var(--text-sm);
   }
 }
+
+/* A product with a minimum order: said before "Add to cart" (it adds that many at once). */
+.product-card__note {
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted);
+}

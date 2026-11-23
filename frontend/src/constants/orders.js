@@ -1,5 +1,6 @@
 import { formatDate } from '../utils/formatters'
 import { sslcommerzMethodName } from '../utils/payment'
+import { translate } from '../i18n'
 import { LuBan, LuCircleCheck, LuCircleX, LuClock, LuLock, LuPackage, LuPackageCheck, LuPackageOpen, LuUndo2, LuTruck } from 'react-icons/lu'
 
 /*
@@ -40,10 +41,15 @@ export const RETURN_STATUSES = {
   closed: { label: 'Closed', icon: LuLock, help: 'This return is complete.' },
 }
 
-export const returnStatus = (status) => RETURN_STATUSES[status] ?? { label: status, icon: LuUndo2, help: '' }
+// Phase 13: the labels and help texts shown are the shopper's language (orders:status.*, payment.*, returnStatus.*);
+// the English ones above stay as the reference.
+export const returnStatus = (status) =>
+  RETURN_STATUSES[status]
+    ? { ...RETURN_STATUSES[status], label: translate(`orders:returnStatus.${status}.label`), help: translate(`orders:returnStatus.${status}.help`) }
+    : { label: status, icon: LuUndo2, help: '' }
 
-export const orderStatus = (status) => ORDER_STATUSES[status] ?? { label: status, icon: LuPackage }
-export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: status, icon: LuClock }
+export const orderStatus = (status) => (ORDER_STATUSES[status] ? { ...ORDER_STATUSES[status], label: translate(`orders:status.${status}`) } : { label: status, icon: LuPackage })
+export const paymentStatus = (status) => (PAYMENT_STATUSES[status] ? { ...PAYMENT_STATUSES[status], label: translate(`orders:payment.${status}`) } : { label: status, icon: LuClock })
 
 /**
  * What happens about payment, honestly. With Stripe (phase 8) card orders are
@@ -51,36 +57,39 @@ export const paymentStatus = (status) => PAYMENT_STATUSES[status] ?? { label: st
  * orders wait until the store records the payment (nothing was charged).
  * `stripe`: the store takes card payments through Stripe (store settings).
  */
+/** Phase 13: a payment note in the shopper's language (orders:notes.*). */
+const n = (key, values) => translate(`orders:notes.${key}`, values)
+
 export function paymentNote(order, { stripe = false, paypal = false, sslcommerz = false } = {}) {
   const byStripe = order.paymentMethod === 'card' && (order.paymentProvider === 'stripe' || stripe)
   // Phase 10: PayPal orders approved on PayPal's site, and orders paid in full by a gift card.
   const byPaypal = order.paymentMethod === 'paypal' && (order.paymentProvider === 'paypal' || paypal)
   // Phase 12: bKash, Nagad, and cards on SSLCommerz's page.
   const bySslcommerz = order.paymentMethod === 'sslcommerz' && (order.paymentProvider === 'sslcommerz' || sslcommerz)
-  if (order.paymentMethod === 'gift_card' && order.paymentStatus === 'paid') return 'Paid in full with a gift card. Thank you.'
+  if (order.paymentMethod === 'gift_card' && order.paymentStatus === 'paid') return n('giftCard')
   // Phase 11: reward points paid the whole order.
-  if (order.paymentMethod === 'reward_points' && order.paymentStatus === 'paid') return 'Paid in full with reward points. Thank you.'
-  if (order.paymentStatus === 'refunded') return 'Your payment was refunded in full, by the same method you paid with.'
-  if (order.paymentStatus === 'partially_refunded') return 'Part of your payment was refunded, by the same method you paid with. See the refunds below.'
+  if (order.paymentMethod === 'reward_points' && order.paymentStatus === 'paid') return n('rewardPoints')
+  if (order.paymentStatus === 'refunded') return n('refunded')
+  if (order.paymentStatus === 'partially_refunded') return n('partlyRefunded')
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'card' && order.paymentProvider === 'stripe') {
-    return order.paidAt ? `Paid by card on ${formatDate(order.paidAt)}. Thank you.` : 'Paid by card. Thank you.'
+    return order.paidAt ? n('cardOn', { date: formatDate(order.paidAt) }) : n('card')
   }
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'paypal' && order.paymentProvider === 'paypal') {
-    return order.paidAt ? `Paid with PayPal on ${formatDate(order.paidAt)}. Thank you.` : 'Paid with PayPal. Thank you.'
+    return order.paidAt ? n('paypalOn', { date: formatDate(order.paidAt) }) : n('paypal')
   }
   if (order.paymentStatus === 'paid' && order.paymentMethod === 'sslcommerz' && order.paymentProvider === 'sslcommerz') {
     // "Paid with bKash (SSLCommerz) on Nov 19, 2026."
     const method = sslcommerzMethodName(order.payment)
-    const how = method ? `Paid with ${method} (SSLCommerz)` : 'Paid through SSLCommerz'
-    return order.paidAt ? `${how} on ${formatDate(order.paidAt)}. Thank you.` : `${how}. Thank you.`
+    if (method) return order.paidAt ? n('sslMethodOn', { method, date: formatDate(order.paidAt) }) : n('sslMethod', { method })
+    return order.paidAt ? n('sslOn', { date: formatDate(order.paidAt) }) : n('ssl')
   }
   // Phase 12: held for a check (SSLCommerz flagged the payment as risky): nothing to do for the shopper.
-  if (order.paymentStatus === 'review') return "We've received your payment and are checking it. We'll email you as soon as your order is confirmed."
-  if (order.paymentStatus === 'paid') return 'Payment received. Thank you.'
-  if (order.status === 'cancelled') return 'This order was cancelled, so nothing will be charged.'
-  if (order.paymentMethod === 'cod') return 'Pay the courier when your order arrives.'
-  if (byPaypal) return "Awaiting payment: nothing has been charged yet. Approve the payment on PayPal's site with Pay now. If it isn't completed in time, the order is cancelled and the items are released."
-  if (bySslcommerz) return "Awaiting payment: nothing has been charged yet. Pay with bKash, Nagad, Rocket, or a card on SSLCommerz's secure page with Pay now. If it isn't completed in time, the order is cancelled and the items are released."
-  if (byStripe) return "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released."
-  return "Nothing has been charged. Online payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
+  if (order.paymentStatus === 'review') return n('review')
+  if (order.paymentStatus === 'paid') return n('paid')
+  if (order.status === 'cancelled') return n('cancelled')
+  if (order.paymentMethod === 'cod') return n('cod')
+  if (byPaypal) return n('awaitPaypal')
+  if (bySslcommerz) return n('awaitSslcommerz')
+  if (byStripe) return n('awaitStripe')
+  return n('manual')
 }

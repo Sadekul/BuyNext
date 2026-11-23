@@ -1,4 +1,5 @@
 import { safeProfile, upstream } from '../http.js'
+import { serverMessage } from '../i18n.js'
 import { REMEMBER_MINUTES, SHORT_MINUTES } from '../session.js'
 
 /*
@@ -10,13 +11,14 @@ import { REMEMBER_MINUTES, SHORT_MINUTES } from '../session.js'
 
 const failed = ({ status, data }) => ({ ok: false, status, body: { message: data?.message ?? 'The request failed.' } })
 const tokensOf = (data) => ({ accessToken: data.accessToken, refreshToken: data.refreshToken })
-const notAvailable = async () => ({ ok: false, status: 404, body: { message: 'This needs the BuyNest backend; the demo accounts cannot do it.' } })
+// Phase 13: the request is the last argument of every account call (its language: server/i18n.js).
+const notAvailable = async (...args) => ({ ok: false, status: 404, body: { message: serverMessage(args.at(-1), 'demoOnly') } })
 const minutes = (remember) => (remember ? REMEMBER_MINUTES : SHORT_MINUTES)
 const adminProfile = (profile) => ({ ...profile, name: [profile.firstName, profile.lastName].filter(Boolean).join(' ') })
 
-async function signIn({ username, password }, remember) {
+async function signIn({ username, password }, remember, request) {
   if (typeof username !== 'string' || typeof password !== 'string') {
-    return { ok: false, status: 400, body: { message: 'Enter your username and password.' } }
+    return { ok: false, status: 400, body: { message: serverMessage(request, 'usernamePassword') } }
   }
   const login = await upstream('/auth/login', { method: 'POST', body: { username, password, expiresInMins: minutes(remember) } })
   if (login.status !== 200) return failed(login)

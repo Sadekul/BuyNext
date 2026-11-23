@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { LuEye, LuEyeOff } from 'react-icons/lu'
 import { cn } from '../../utils/classNames'
 import './FormField.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Labelled input with hint and error text, wired up for screen readers:
@@ -12,6 +13,7 @@ import './FormField.css'
  * `revealable` adds a show/hide toggle for password fields.
  */
 function FormField({ label, error, hint, type = 'text', revealable = false, className, ...inputProps }) {
+  const { t } = useTranslation('common')
   const id = useId()
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
@@ -37,7 +39,7 @@ function FormField({ label, error, hint, type = 'text', revealable = false, clas
             type="button"
             className="form-field__reveal"
             onClick={() => setIsRevealed((value) => !value)}
-            aria-label={isRevealed ? 'Hide password' : 'Show password'}
+            aria-label={t(isRevealed ? 'form.hidePassword' : 'form.showPassword')}
             aria-pressed={isRevealed}
           >
             {isRevealed ? <LuEyeOff aria-hidden="true" /> : <LuEye aria-hidden="true" />}

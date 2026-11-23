@@ -23,7 +23,7 @@ final class CategoryTree
 
     public function __construct(?Collection $categories = null)
     {
-        $categories ??= Category::orderBy('position')->orderBy('name')->orderBy('id')->get();
+        $categories ??= Category::with('translations')->orderBy('position')->orderBy('name')->orderBy('id')->get();
         $this->byId = $categories->keyBy('id');
         foreach ($categories as $category) {
             $this->children[$category->parent_id ?? ''][] = $category->id;

@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\OrderReturn;
 use App\Support\EmailBlocks;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 
 /** "Your return RMA-… was approved / received / …": sent when a return is created and on every status change (template return_status). */
@@ -21,7 +22,10 @@ class ReturnStatusMail extends Mailable
         'closed' => ['Your return is complete', 'Your return has been completed.'],
     ];
 
-    public function __construct(public OrderReturn $return) {}
+    public function __construct(public OrderReturn $return)
+    {
+        $this->locale(Locale::forOrder($return->order)); // phase 13
+    }
 
     /** Phase 12: the order's currency. */
     protected function templateCurrency(): ?string
@@ -39,16 +43,16 @@ class ReturnStatusMail extends Mailable
         $order = $this->return->order;
 
         return [
-            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'customer_first_name' => $order->shipping_address['first_name'] ?? __('there'),
             'return_number' => $this->return->number,
             'order_number' => $order->number,
-            'reason' => $this->return->reason,
+            'reason' => __((string) $this->return->reason),
             'status' => $this->return->status,
-            'status_heading' => self::TEXT[$this->return->status][0],
-            'status_message' => self::TEXT[$this->return->status][1],
+            'status_heading' => __(self::TEXT[$this->return->status][0]),
+            'status_message' => __(self::TEXT[$this->return->status][1]),
             'items_table' => EmailBlocks::list($this->return->items
-                ->map(fn ($item) => ($item->orderItem?->displayName() ?? 'Item')." × {$item->quantity}")->all()),
-            'resolution' => $this->return->resolution === 'replace' ? EmailBlocks::paragraph('We\'ll send you a replacement.') : '',
+                ->map(fn ($item) => ($item->orderItem?->displayName() ?? __('Item')).' × '.$this->number($item->quantity))->all()),
+            'resolution' => $this->return->resolution === 'replace' ? EmailBlocks::paragraph(__('We\'ll send you a replacement.')) : '',
             // Staff notes reach the customer only in an email (this one is being sent).
             'note' => EmailBlocks::note($this->return->admin_note, self::storeName()),
         ];

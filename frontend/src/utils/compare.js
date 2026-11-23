@@ -1,4 +1,6 @@
-import { formatSlug } from './formatters'
+import { formatNumber, formatSlug } from './formatters'
+import { translate } from '../i18n'
+import { availabilityLabel } from './catalogText'
 
 /*
  * Phase 11 §2: the rows of the compare table, built from normalized
@@ -11,11 +13,11 @@ import { formatSlug } from './formatters'
 export const MISSING = '—'
 
 const stockText = (product) => {
-  if (product.type === 'gift_card') return 'Available'
-  if (product.stock === 0 || product.availabilityStatus === 'Out of Stock') return 'Out of stock'
-  if (product.availabilityStatus === 'Low Stock') return product.stock ? `Low stock (${product.stock} left)` : 'Low stock'
-  if (product.stock === null || product.stock === undefined) return product.availabilityStatus ?? MISSING
-  return 'In stock'
+  if (product.type === 'gift_card') return translate('catalog:compare.stock.available')
+  if (product.stock === 0 || product.availabilityStatus === 'Out of Stock') return translate('catalog:compare.stock.out')
+  if (product.availabilityStatus === 'Low Stock') return product.stock ? translate('catalog:compare.stock.lowLeft', { count: product.stock }) : translate('catalog:compare.stock.low')
+  if (product.stock === null || product.stock === undefined) return product.availabilityStatus ? availabilityLabel(product.availabilityStatus) : MISSING
+  return translate('catalog:compare.stock.in')
 }
 
 const optionsText = (product) =>
@@ -27,7 +29,9 @@ const optionsText = (product) =>
 /** Weight in grams (the API's unit): "250 g", or "1.2 kg" from 1,000 g. */
 const weightText = (weight) => {
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) return MISSING
-  return weight >= 1000 ? `${Number((weight / 1000).toFixed(2))} kg` : `${Math.round(weight)} g`
+  return weight >= 1000
+    ? translate('catalog:compare.kg', { value: formatNumber(Number((weight / 1000).toFixed(2))) })
+    : translate('catalog:compare.g', { value: formatNumber(Math.round(weight)) })
 }
 
 export function specificationLabels(products) {
@@ -47,11 +51,11 @@ export function specificationLabels(products) {
 /** The text rows (everything but the image, price, rating, and actions, which are rendered specially). */
 export function compareRows(products) {
   const fixed = [
-    { key: 'stock', label: 'Stock', values: products.map(stockText) },
-    { key: 'brand', label: 'Brand', values: products.map((product) => product.brand ?? MISSING) },
-    { key: 'category', label: 'Category', values: products.map((product) => product.categoryName ?? (product.category ? formatSlug(product.category) : MISSING)) },
-    { key: 'weight', label: 'Weight', values: products.map((product) => weightText(product.weight)) },
-    { key: 'options', label: 'Options', values: products.map(optionsText) },
+    { key: 'stock', label: translate('catalog:compare.rows.stock'), values: products.map(stockText) },
+    { key: 'brand', label: translate('catalog:compare.rows.brand'), values: products.map((product) => product.brand ?? MISSING) },
+    { key: 'category', label: translate('catalog:compare.rows.category'), values: products.map((product) => product.categoryName ?? (product.category ? formatSlug(product.category) : MISSING)) },
+    { key: 'weight', label: translate('catalog:compare.rows.weight'), values: products.map((product) => weightText(product.weight)) },
+    { key: 'options', label: translate('catalog:compare.rows.options'), values: products.map(optionsText) },
   ]
   const specs = specificationLabels(products).map((label) => ({
     key: `spec:${label.toLowerCase()}`,

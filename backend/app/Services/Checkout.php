@@ -9,6 +9,7 @@ use App\Models\CouponRedemption;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -63,7 +64,7 @@ class Checkout
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
-                    'message' => 'Some items in your cart can\'t be ordered.',
+                    'message' => __('Some items in your cart can\'t be ordered.'),
                     'errors' => ['items' => array_column($quote->problems, 'message')],
                     'problems' => $quote->problems,
                 ], 422));
@@ -76,7 +77,7 @@ class Checkout
                 throw ValidationException::withMessages(['shipping_method' => $quote->shippingError]);
             }
             if (! $quote->requestedShippingAvailable) {
-                throw ValidationException::withMessages(['shipping_method' => 'This shipping method isn\'t available for your order. Please choose another one.']);
+                throw ValidationException::withMessages(['shipping_method' => __('This shipping method isn\'t available for your order. Please choose another one.')]);
             }
             // Phase 10 (part B): a gift card that covers everything is the payment; one that doesn't needs another method.
             if ($quote->giftCardError) {
@@ -91,15 +92,15 @@ class Checkout
                 $data['payment_method'] = $paidByCard ? 'gift_card' : 'reward_points';
             } elseif ($data['payment_method'] === 'gift_card') {
                 throw ValidationException::withMessages(['payment_method' => $quote->giftCard
-                    ? 'Your gift card doesn\'t cover the whole total. Choose how to pay the rest.'
-                    : 'Enter your gift card code, or choose another payment method.']);
+                    ? __('Your gift card doesn\'t cover the whole total. Choose how to pay the rest.')
+                    : __('Enter your gift card code, or choose another payment method.')]);
             } elseif ($data['payment_method'] === 'reward_points') {
-                throw ValidationException::withMessages(['payment_method' => 'Your reward points don\'t cover the whole total. Choose how to pay the rest.']);
+                throw ValidationException::withMessages(['payment_method' => __('Your reward points don\'t cover the whole total. Choose how to pay the rest.')]);
             }
             // The shopper saw a total; never charge a different one without asking.
             if (isset($data['expected_total']) && Pricing::toCents($data['expected_total']) !== $quote->totalCents) {
                 throw new HttpResponseException(response()->json([
-                    'message' => 'Prices changed since you added these items. Please review your order.',
+                    'message' => __('Prices changed since you added these items. Please review your order.'),
                     'data' => $quote->toArray(),
                 ], 409));
             }
@@ -154,6 +155,8 @@ class Checkout
             'tax_total' => Pricing::format($quote->taxCents),
             'grand_total' => Pricing::format($quote->totalCents),
             'currency' => Currency::store(), // phase 12: what the prices above are in
+            // Phase 13: the shopper's language (the request's); staff orders take the customer's saved language, else the store default.
+            'locale' => $admin ? (Locale::forCustomer($customer) ?? Locale::storeDefault()) : Locale::current(),
             // Phase 10 (part B): the gift card's part of the payment (taken below).
             'gift_card_id' => $quote->giftCard?->id,
             'gift_card_amount' => Pricing::format($quote->giftCardCents),
@@ -186,7 +189,8 @@ class Checkout
                 'variant_id' => $variant?->id,
                 'sku' => $line['sku'],
                 'name' => $product->name,
-                'variant_label' => $line['variant_label'],
+                // Phase 13: the order keeps the English option names (the quote's label is in the shopper's language).
+                'variant_label' => $line['variant'] ? $line['variant']->label($product->optionValueMap()) : null,
                 'thumbnail_url' => $product->thumbnail_url,
                 'unit_price' => Pricing::format($line['price_cents']),
                 'discount_percent' => $product->discount_percent,

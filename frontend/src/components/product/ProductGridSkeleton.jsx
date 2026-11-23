@@ -1,14 +1,16 @@
 import './ProductGrid.css'
 import './ProductGridSkeleton.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Grey placeholder cards shown while products load. Matches the real grid's
  * layout so the page doesn't jump when data arrives.
  */
-function ProductGridSkeleton({ count = 8, label = 'Loading products…' }) {
+function ProductGridSkeleton({ count = 8, label }) {
+  const { t } = useTranslation('catalog')
   return (
     <div role="status">
-      <span className="visually-hidden">{label}</span>
+      <span className="visually-hidden">{label ?? t('grid.loading')}</span>
       <ul className="product-grid" aria-hidden="true">
         {/* Index keys are fine: placeholders have no identity and never reorder. */}
         {Array.from({ length: count }, (_, index) => (

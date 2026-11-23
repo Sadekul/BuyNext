@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Requests\PhoneNumber;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
+use App\Support\Locale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -47,9 +48,9 @@ class AddressBook
             'is_default_shipping' => ['sometimes', 'boolean'],
             'is_default_billing' => ['sometimes', 'boolean'],
         ], [
-            'phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',
-            'postal_code.regex' => 'The postal code is invalid.',
-            'country.in' => 'We don\'t deliver to that country yet.',
+            'phone.regex' => __('Enter the phone number with its country code, for example +1 555 010 0100.'),
+            'postal_code.regex' => __('The postal code is invalid.'),
+            'country.in' => __('We don\'t deliver to that country yet.'),
         ], [
             'line1' => 'address', 'line2' => 'address line 2', 'postal_code' => 'postal code',
         ]);
@@ -63,7 +64,7 @@ class AddressBook
             // Lock the customer row: two requests at once can't both add the 20th address.
             Customer::whereKey($customer->id)->lockForUpdate()->first();
             if ($customer->addresses()->count() >= CustomerAddress::MAX_PER_CUSTOMER) {
-                throw ValidationException::withMessages(['address' => 'An address book can have at most '.CustomerAddress::MAX_PER_CUSTOMER.' addresses. Delete one first.']);
+                throw ValidationException::withMessages(['address' => __('An address book can have at most :max addresses. Delete one first.', ['max' => Locale::digits(CustomerAddress::MAX_PER_CUSTOMER)])]);
             }
             $first = ! $customer->addresses()->exists();
             $address = $customer->addresses()->create([

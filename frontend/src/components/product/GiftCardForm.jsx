@@ -7,6 +7,7 @@ import { useDisplayCurrency } from '../../utils/displayCurrency'
 import { GIFT_CARD_MESSAGE_MAX, GIFT_CARD_NAME_MAX, customAmountError, withGiftCard } from '../../utils/giftCards'
 import { validateEmail } from '../../utils/validation'
 import './GiftCardForm.css'
+import { useTranslation } from 'react-i18next'
 
 const OTHER = 'other'
 
@@ -20,6 +21,7 @@ const OTHER = 'other'
  * (aria-describedby); focus moves to the first field to fix.
  */
 function GiftCardForm({ product, onAdd }) {
+  const { t } = useTranslation('catalog')
   const id = useId()
   // Phase 12: gift cards are sold in the store currency (USD or BDT).
   const { store } = useDisplayCurrency()
@@ -37,9 +39,9 @@ function GiftCardForm({ product, onAdd }) {
 
   const isOther = values.choice === OTHER
   const errors = {
-    choice: values.choice ? null : 'Choose an amount.',
+    choice: values.choice ? null : t('giftCard.chooseAmount'),
     customAmount: isOther && custom ? customAmountError(values.customAmount, custom) : null,
-    recipientName: values.recipientName.trim() ? null : "Enter the recipient's name.",
+    recipientName: values.recipientName.trim() ? null : t('giftCard.recipientNameRequired'),
     recipientEmail: validateEmail(values.recipientEmail),
   }
   const shown = submitted ? errors : {}
@@ -59,24 +61,24 @@ function GiftCardForm({ product, onAdd }) {
       return
     }
     onAdd(withGiftCard(product, { amount, recipientName: values.recipientName, recipientEmail: values.recipientEmail, message: values.message }))
-    setAdded(`A ${formatBasePrice(amount)} gift card for ${values.recipientName.trim()} was added to your cart.`)
+    setAdded(t('giftCard.added', { amount: formatBasePrice(amount), name: values.recipientName.trim() }))
     setSubmitted(false)
     setValues((current) => ({ ...current, recipientName: '', recipientEmail: '', message: '' }))
   }
 
   if (amounts.length === 0 && !custom) {
-    return <p className="product-details__stock product-details__stock--out">This gift card isn't available right now.</p>
+    return <p className="product-details__stock product-details__stock--out">{t('giftCard.unavailable')}</p>
   }
 
   const messageHintId = `${id}-message-hint`
   return (
     <form ref={formRef} className="gift-card-form" onSubmit={handleSubmit} noValidate aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`} className="gift-card-form__title">
-        <LuGift aria-hidden="true" /> Send this gift card
+        <LuGift aria-hidden="true" /> {t('giftCard.title')}
       </h2>
 
       <fieldset className="gift-card-form__amounts" aria-describedby={shown.choice ? `${id}-choice-error` : undefined}>
-        <legend className="gift-card-form__legend">Amount</legend>
+        <legend className="gift-card-form__legend">{t('giftCard.amount')}</legend>
         <div className="gift-card-form__options">
           {amounts.map((value, index) => (
             <label key={value} className="gift-card-form__option">
@@ -94,7 +96,7 @@ function GiftCardForm({ product, onAdd }) {
           {custom && (
             <label className="gift-card-form__option">
               <input type="radio" name={`${id}-amount`} value={OTHER} checked={isOther} onChange={change('choice')} data-field={amounts.length === 0 ? 'choice' : undefined} />
-              <span>Other amount</span>
+              <span>{t('giftCard.other')}</span>
             </label>
           )}
         </div>
@@ -107,7 +109,7 @@ function GiftCardForm({ product, onAdd }) {
 
       {isOther && custom && (
         <FormField
-          label={`Your amount (${store.code})`}
+          label={t('giftCard.yourAmount', { code: store.code })}
           type="number"
           inputMode="decimal"
           min={custom.min}
@@ -115,7 +117,7 @@ function GiftCardForm({ product, onAdd }) {
           step="0.01"
           value={values.customAmount}
           onChange={change('customAmount')}
-          hint={`From ${formatBasePrice(custom.min)} to ${formatBasePrice(custom.max)}.`}
+          hint={t('giftCard.range', { min: formatBasePrice(custom.min), max: formatBasePrice(custom.max) })}
           error={shown.customAmount}
           data-field="customAmount"
         />
@@ -123,7 +125,7 @@ function GiftCardForm({ product, onAdd }) {
 
       <div className="gift-card-form__grid">
         <FormField
-          label="Recipient's name"
+          label={t('giftCard.recipientName')}
           autoComplete="off"
           maxLength={GIFT_CARD_NAME_MAX}
           value={values.recipientName}
@@ -132,13 +134,13 @@ function GiftCardForm({ product, onAdd }) {
           data-field="recipientName"
         />
         <FormField
-          label="Recipient's email"
+          label={t('giftCard.recipientEmail')}
           type="email"
           autoComplete="off"
           maxLength={254}
           value={values.recipientEmail}
           onChange={change('recipientEmail')}
-          hint="We email the gift card here once your order is paid."
+          hint={t('giftCard.recipientEmailHint')}
           error={shown.recipientEmail}
           data-field="recipientEmail"
         />
@@ -146,7 +148,7 @@ function GiftCardForm({ product, onAdd }) {
 
       <div className="form-field">
         <label htmlFor={`${id}-message`} className="form-field__label">
-          Message (optional)
+          {t('giftCard.message')}
         </label>
         <textarea
           id={`${id}-message`}
@@ -158,14 +160,14 @@ function GiftCardForm({ product, onAdd }) {
           aria-describedby={messageHintId}
         />
         <p id={messageHintId} className="form-field__hint">
-          Included in the email to the recipient. Up to {GIFT_CARD_MESSAGE_MAX} characters ({values.message.length} so far).
+          {t('giftCard.messageHint', { max: GIFT_CARD_MESSAGE_MAX, length: values.message.length })}
         </p>
       </div>
 
       <Button type="submit" size="lg" className="gift-card-form__submit">
-        <LuGift aria-hidden="true" /> Add to cart{Number.isFinite(amount) && amount > 0 && !errors.customAmount ? ` · ${formatBasePrice(amount)}` : ''}
+        <LuGift aria-hidden="true" /> {t('giftCard.add')}{Number.isFinite(amount) && amount > 0 && !errors.customAmount ? ` · ${formatBasePrice(amount)}` : ''}
       </Button>
-      <p className="gift-card-form__note">Gift cards are delivered by email: no shipping, no tax. They can't be bought with another gift card or a discount code.</p>
+      <p className="gift-card-form__note">{t('giftCard.note')}</p>
       <p className="visually-hidden" role="status">
         {added}
       </p>

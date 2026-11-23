@@ -7,6 +7,8 @@ import App from './App.jsx'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import RootErrorFallback from './components/common/RootErrorFallback'
 import { installErrorReporting } from './utils/errorReporting'
+// Phase 13: translations (English bundled; Bangla loaded when the cookie asks for it).
+import { initLanguage } from './i18n'
 
 // Phase 9: report crashes to BuyNest's server (POST /api/client-errors), which
 // passes them to the API's error tracking. Only with BuyNest's own API behind
@@ -26,12 +28,17 @@ if (import.meta.env.VITE_API_PROVIDER === 'laravel' || import.meta.env.VITE_ACCO
 // The outer ErrorBoundary is the last line of defence: MainLayout has one per
 // page, but a crash in the header, cart drawer, or a provider would otherwise
 // leave a blank screen.
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <ErrorBoundary fallback={() => <RootErrorFallback />}>
-      <BrowserRouter useTransitions={false}>
-        <App />
-      </BrowserRouter>
-    </ErrorBoundary>
-  </StrictMode>,
-)
+//
+// Phase 13: a shopper who chose Bangla gets the Bangla catalogs BEFORE the
+// first render (no English flash); initLanguage() never rejects.
+initLanguage().then(() => {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <ErrorBoundary fallback={() => <RootErrorFallback />}>
+        <BrowserRouter useTransitions={false}>
+          <App />
+        </BrowserRouter>
+      </ErrorBoundary>
+    </StrictMode>,
+  )
+})

@@ -24,6 +24,7 @@ use App\Services\OneTimeCodes;
 use App\Services\Pricing;
 use App\Services\TokenPairs;
 use App\Services\Wishlists;
+use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -31,7 +32,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -57,17 +57,17 @@ class MyAccountController extends Controller
 
         $this->checkPassword($customer, $data['password']);
         if ($email === mb_strtolower($customer->email)) {
-            throw ValidationException::withMessages(['email' => 'This is already your email address.']);
+            throw ValidationException::withMessages(['email' => __('This is already your email address.')]);
         }
         if ($this->emailTaken($email, $customer)) {
-            throw ValidationException::withMessages(['email' => self::TAKEN]);
+            throw ValidationException::withMessages(['email' => __(self::TAKEN)]);
         }
 
         $customer->forceFill(['pending_email' => $email])->save();
         $resendIn = $this->codes->send($email, OneTimeCode::EMAIL_CHANGE, $customer->first_name);
 
         return response()->json([
-            'message' => "We emailed a 6-digit code to {$email}. Your email stays the same until you enter it.",
+            'message' => __('We emailed a 6-digit code to :email. Your email stays the same until you enter it.', ['email' => $email]),
             'data' => [
                 'email' => $email,
                 'expires_in' => config('buynest.codes.ttl_minutes') * 60,
@@ -82,19 +82,19 @@ class MyAccountController extends Controller
      */
     public function confirmEmailChange(Request $request, Newsletter $newsletter): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/']], ['code.regex' => 'Enter the 6-digit code from the email.']);
+        $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/']], ['code.regex' => __('Enter the 6-digit code from the email.')]);
         $customer = $request->user();
         $new = $customer->pending_email;
         if (! $new) {
-            throw ValidationException::withMessages(['email' => 'Ask for a code first.']);
+            throw ValidationException::withMessages(['email' => __('Ask for a code first.')]);
         }
 
         $result = $this->codes->verify($new, OneTimeCode::EMAIL_CHANGE, $data['code']);
         if ($result === 'locked') {
-            throw ValidationException::withMessages(['code' => 'Too many wrong attempts. Ask for a new code.']);
+            throw ValidationException::withMessages(['code' => __('Too many wrong attempts. Ask for a new code.')]);
         }
         if ($result !== 'ok') {
-            throw ValidationException::withMessages(['code' => 'That code is incorrect or has expired.']);
+            throw ValidationException::withMessages(['code' => __('That code is incorrect or has expired.')]);
         }
 
         $old = $customer->email;
@@ -103,7 +103,7 @@ class MyAccountController extends Controller
             // gives way (this customer just proved they own the inbox); a real account doesn't.
             $other = Customer::where('email', $new)->whereKeyNot($customer->id)->lockForUpdate()->first();
             if ($other && $this->isRealAccount($other)) {
-                throw ValidationException::withMessages(['email' => self::TAKEN]);
+                throw ValidationException::withMessages(['email' => __(self::TAKEN)]);
             }
             $other?->delete();
 
@@ -121,7 +121,7 @@ class MyAccountController extends Controller
         Mail::to($old)->send(new EmailChangedMail($customer->first_name, $old, $new));
 
         return response()->json([
-            'message' => "Your email is now {$new}.",
+            'message' => __('Your email is now :email.', ['email' => $new]),
             'data' => new CustomerResource($customer->fresh()),
         ]);
     }
@@ -208,12 +208,14 @@ class MyAccountController extends Controller
         $customer = $request->user();
         $this->checkPassword($customer, $data['password']);
         if ($data['confirm'] !== 'DELETE') {
-            throw ValidationException::withMessages(['confirm' => 'Type DELETE to confirm.']);
+            throw ValidationException::withMessages(['confirm' => __('Type DELETE to confirm.')]);
         }
         $open = $accounts->openOrderCount($customer);
         if ($open > 0) {
-            throw ValidationException::withMessages(['account' => "You have {$open} open ".Str::plural('order', $open)
-                .' (pending payment, processing, or shipped). You can delete your account once '.($open === 1 ? 'it\'s' : 'they\'re').' delivered or cancelled.']);
+            throw ValidationException::withMessages(['account' => $open === 1
+                ? __('You have 1 open order (pending payment, processing, or shipped). You can delete your account once it\'s delivered or cancelled.')
+                : __('You have :count open orders (pending payment, processing, or shipped). You can delete your account once they\'re delivered or cancelled.',
+                    ['count' => Locale::digits($open)])]);
         }
 
         $email = $customer->email;
@@ -226,13 +228,13 @@ class MyAccountController extends Controller
         });
         Mail::to($email)->send(new AccountDeletedMail($firstName));
 
-        return response()->json(['message' => 'Your account was deleted.']);
+        return response()->json(['message' => __('Your account was deleted.')]);
     }
 
     private function checkPassword(Customer $customer, string $password): void
     {
         if (! Hash::check($password, $customer->password)) {
-            throw ValidationException::withMessages(['password' => 'Your password is incorrect.']);
+            throw ValidationException::withMessages(['password' => __('Your password is incorrect.')]);
         }
     }
 

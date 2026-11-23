@@ -17,6 +17,8 @@ import { PdfLink } from './SalesDocumentsPages'
 import { useAdminAuth } from '../auth/useAdminAuth'
 // Phase 11 §4: reward points spent and earned.
 import { formatPoints } from '../utils/rewards'
+// Phase 13: the order's language.
+import { languageName } from '../utils/bangla'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -630,6 +632,15 @@ function LiveOrderDetailPage() {
               <>
                 <dt>Phone</dt>
                 <dd>{data.phone}</dd>
+              </>
+            )}
+            {/* Phase 13: the language the order was placed in. */}
+            {data.locale !== undefined && (
+              <>
+                <dt>Language</dt>
+                <dd>
+                  {languageName(data.locale, 'Store default')} <span className="muted">· placed in this language</span>
+                </dd>
               </>
             )}
           </dl>

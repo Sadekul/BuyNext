@@ -5,6 +5,7 @@ import Button from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import { getInvoicePdf } from '../../services/shopService'
 import { saveFile } from '../../services/accountService'
+import { useTranslation } from 'react-i18next'
 
 /**
  * "Download PDF" for an invoice (phase 10). The server makes the PDF; this
@@ -14,6 +15,7 @@ import { saveFile } from '../../services/accountService'
  * proof as order tracking. Errors are announced next to the button.
  */
 function InvoicePdfButton({ orderNumber, invoiceNumber, email, size = 'md', variant = 'outline' }) {
+  const { t } = useTranslation('orders')
   const { isAuthenticated, authorizedRequest } = useAuth()
   const errorId = useId()
   const download = useMutation({
@@ -33,10 +35,10 @@ function InvoicePdfButton({ orderNumber, invoiceNumber, email, size = 'md', vari
         size={size}
         onClick={() => download.mutate()}
         disabled={download.isPending}
-        aria-label={download.isPending ? `Preparing PDF of invoice ${invoiceNumber}…` : `Download PDF of invoice ${invoiceNumber}`}
+        aria-label={t(download.isPending ? 'pdf.preparingLabel' : 'pdf.downloadLabel', { number: invoiceNumber })}
         aria-describedby={error ? errorId : undefined}
       >
-        <LuDownload aria-hidden="true" /> {download.isPending ? 'Preparing PDF…' : 'Download PDF'}
+        <LuDownload aria-hidden="true" /> {t(download.isPending ? 'pdf.preparing' : 'pdf.download')}
       </Button>
       {error && (
         <p id={errorId} className="pay-now__error" role="alert">

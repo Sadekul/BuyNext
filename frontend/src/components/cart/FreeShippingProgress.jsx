@@ -1,6 +1,7 @@
 import { SHIPPING_RULES } from '../../constants/store'
 import { formatPrice } from '../../utils/formatters'
 import './FreeShippingProgress.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * "Add $X more for free shipping" with a progress bar. `threshold` is the
@@ -8,6 +9,7 @@ import './FreeShippingProgress.css'
  * shipping, so nothing is shown.
  */
 function FreeShippingProgress({ amountRemaining, threshold = SHIPPING_RULES.freeShippingThreshold }) {
+  const { t } = useTranslation('cart')
   if (!threshold || amountRemaining === null || amountRemaining === undefined) return null
   const percent = Math.min(100, ((threshold - amountRemaining) / threshold) * 100)
 
@@ -15,14 +17,12 @@ function FreeShippingProgress({ amountRemaining, threshold = SHIPPING_RULES.free
     <div className="shipping-progress">
       <p>
         {amountRemaining > 0 ? (
-          <>
-            Add <strong>{formatPrice(amountRemaining)}</strong> more for free shipping
-          </>
+          <Trans t={t} i18nKey="freeShipping.add" values={{ amount: formatPrice(amountRemaining) }} components={{ strong: <strong /> }} />
         ) : (
-          <strong>You've unlocked free shipping</strong>
+          <strong>{t('freeShipping.unlocked')}</strong>
         )}
       </p>
-      <progress max={100} value={percent} aria-label="Progress toward free shipping" />
+      <progress max={100} value={percent} aria-label={t('freeShipping.progress')} />
     </div>
   )
 }

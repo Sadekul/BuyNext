@@ -1,9 +1,10 @@
 import { Link } from 'react-router'
 import { ROUTES } from '../../constants/routes'
-import { moneyFormatter } from '../../utils/formatters'
+import { formatNumber, moneyFormatter } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
 import { recipientLabel } from '../../utils/giftCards'
 import './OrderItems.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Compact list of order or checkout lines. `items` use cart/order item shape.
@@ -12,6 +13,7 @@ import './OrderItems.css'
  * ("Size: M / Color: Red"). `currency` (phase 12): the order's currency code.
  */
 function OrderItems({ items, currency = null }) {
+  const { t } = useTranslation('orders')
   // Phase 12: an order's lines in the order's own currency; checkout's in the store currency.
   const formatBasePrice = moneyFormatter(currency)
   return (
@@ -25,7 +27,7 @@ function OrderItems({ items, currency = null }) {
             <span className="order-items__thumb">
               <img src={item.thumbnail} alt="" width="56" height="56" loading="lazy" />
               <span className="order-items__qty" aria-hidden="true">
-                {item.quantity}
+                {formatNumber(item.quantity)}
               </span>
             </span>
             <span className="order-items__title">
@@ -37,7 +39,7 @@ function OrderItems({ items, currency = null }) {
               {/* Phase 7: the catalog price rule that set the price ("VIP price", "Black Friday"). */}
               {item.priceLabel && <span className="order-items__price-label">{item.priceLabel}</span>}
               <span className="order-items__meta">
-                {item.quantity} × {formatBasePrice(salePrice)}
+                {t('items.meta', { quantity: item.quantity, price: formatBasePrice(salePrice) })}
               </span>
             </span>
             <span className="order-items__total">{formatBasePrice(lineTotal)}</span>

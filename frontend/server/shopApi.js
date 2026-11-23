@@ -1,4 +1,5 @@
 import { json, readBody } from './http.js'
+import { serverMessage } from './i18n.js'
 import { laravelShop } from './shop/laravel.js'
 import { laravelCustomer } from './shop/customer.js'
 import { laravelNewsletter } from './shop/newsletter.js'
@@ -124,22 +125,22 @@ const ROUTES = {
   },
 
   async 'GET orders'({ request, cookies, url }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelShop.listOrders(cookies[CUSTOMER.access], pageOf(url), request))
   },
 
   async 'GET orders/:number'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelShop.getOrder(cookies[CUSTOMER.access], param, request))
   },
 
   async 'GET orders/:number/invoices/:invoice'({ request, cookies, param, invoice }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelShop.getInvoice(cookies[CUSTOMER.access], param, invoice, request))
   },
 
   async 'POST products/:id/reviews'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelShop.submitReview(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
   },
 
@@ -155,37 +156,37 @@ const ROUTES = {
   // ---- phase 6: address book and returns (the account comes from the session) ----
 
   async 'GET me/addresses'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.listAddresses(cookies[CUSTOMER.access], request))
   },
 
   async 'POST me/addresses'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.createAddress(cookies[CUSTOMER.access], await readBody(request), request), 201)
   },
 
   async 'PATCH me/addresses/:id'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.updateAddress(cookies[CUSTOMER.access], param, await readBody(request), request))
   },
 
   async 'DELETE me/addresses/:id'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.deleteAddress(cookies[CUSTOMER.access], param, request), 200)
   },
 
   async 'POST orders/:number/returns'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.requestReturn(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
   },
 
   async 'GET returns'({ request, cookies, url }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.listReturns(cookies[CUSTOMER.access], pageOf(url), request))
   },
 
   async 'GET returns/:number'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCustomer.getReturn(cookies[CUSTOMER.access], param, request))
   },
 
@@ -204,30 +205,30 @@ const ROUTES = {
   },
 
   async 'GET me/cart'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCart.get(cookies[CUSTOMER.access], request))
   },
 
   async 'POST me/cart/merge'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelCart.merge(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   // ---- phase 9: self-service (email change, my data, delete my account, stock alerts, cancel) ----
 
   async 'POST me/email'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelAccount.requestEmailChange(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   async 'POST me/email/confirm'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelAccount.confirmEmailChange(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   // The file as the API made it: never parsed or rebuilt here.
   async 'GET me/export'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     const result = await laravelAccount.exportData(cookies[CUSTOMER.access], request)
     if (!result.ok) return json(result.body, result.status)
     const { bytes, fileName } = result.data
@@ -244,18 +245,18 @@ const ROUTES = {
 
   // The account is gone, so is the session: the cookies are deleted with the answer.
   async 'POST me/delete'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     const result = await laravelAccount.deleteAccount(cookies[CUSTOMER.access], await readBody(request), request)
     return result.ok ? json(result.data, 200, clearedCookies(CUSTOMER)) : json(result.body, result.status)
   },
 
   async 'GET me/stock-alerts'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelAccount.listStockAlerts(cookies[CUSTOMER.access], request))
   },
 
   async 'DELETE me/stock-alerts/:id'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelAccount.deleteStockAlert(cookies[CUSTOMER.access], param, request), 200)
   },
 
@@ -275,7 +276,7 @@ const ROUTES = {
   // ---- phase 10: invoice PDFs, PayPal, gift cards ----
 
   async 'GET orders/:number/invoices/:invoice.pdf'({ request, cookies, param, invoice }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return pdfReply(await laravelShop.invoicePdf(cookies[CUSTOMER.access], param, invoice, {}, request))
   },
 
@@ -295,37 +296,37 @@ const ROUTES = {
   // ---- phase 11: the account's wishlist (and sharing it), shared wishlists, reward points ----
 
   async 'GET me/wishlist'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.list(cookies[CUSTOMER.access], request))
   },
 
   async 'POST me/wishlist'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.add(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   async 'PATCH me/wishlist/:id'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.update(cookies[CUSTOMER.access], param, await readBody(request), request))
   },
 
   async 'DELETE me/wishlist/:id'({ request, cookies, param }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.remove(cookies[CUSTOMER.access], param, request), 200)
   },
 
   async 'POST me/wishlist/merge'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.merge(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   async 'POST me/wishlist/share'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.share(cookies[CUSTOMER.access], await readBody(request), request))
   },
 
   async 'DELETE me/wishlist/share'({ request, cookies }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelWishlist.stopSharing(cookies[CUSTOMER.access], request), 200)
   },
 
@@ -335,7 +336,7 @@ const ROUTES = {
   },
 
   async 'GET me/rewards'({ request, cookies, url }) {
-    if (!cookies[CUSTOMER.access]) return notSignedIn()
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelRewards.get(cookies[CUSTOMER.access], pageOf(url), request))
   },
 }
@@ -402,6 +403,6 @@ function matchRoute(method, segments) {
 
 export async function handleShopRequest(request, segments, cookies) {
   const match = matchRoute(request.method, segments)
-  if (!match?.route) return json({ message: 'Not found.' }, 404)
+  if (!match?.route) return json({ message: serverMessage(request, 'notFound') }, 404)
   return match.route({ request, cookies, url: new URL(request.url), param: match.param, invoice: match.invoice })
 }

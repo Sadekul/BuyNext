@@ -17,6 +17,7 @@ use App\Services\Pricing;
 use App\Services\RewardPoints;
 use App\Services\TokenPairs;
 use App\Support\Csv;
+use App\Support\Locale;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -124,12 +125,12 @@ class CustomerController extends Controller
         $data = $this->validated($request, $customer);
 
         DB::transaction(function () use ($customer, $data) {
-            $fields = ['first_name', 'last_name', 'email', 'phone', 'group_id', 'is_active'];
+            $fields = ['first_name', 'last_name', 'email', 'phone', 'group_id', 'is_active', 'locale']; // phase 13: locale
             $before = Audit::fieldsOf($customer, $fields);
             $emailChanged = isset($data['email']) && $data['email'] !== $customer->email;
             $wasActive = $customer->is_active;
 
-            $customer->fill(array_intersect_key($data, array_flip(['first_name', 'last_name', 'email', 'phone', 'group_id'])));
+            $customer->fill(array_intersect_key($data, array_flip(['first_name', 'last_name', 'email', 'phone', 'group_id', 'locale'])));
             if (array_key_exists('is_active', $data)) {
                 $customer->is_active = (bool) $data['is_active'];
             }
@@ -313,6 +314,7 @@ class CustomerController extends Controller
             'phone' => [...$required, 'string', PhoneNumber::RULE],
             'group_id' => ['sometimes', 'nullable', 'integer', Rule::exists('customer_groups', 'id')],
             'is_active' => $customer ? ['sometimes', 'boolean'] : ['prohibited'],
+            'locale' => ['sometimes', 'nullable', 'string', Rule::in(Locale::SUPPORTED)], // phase 13: null = the store default
         ], [
             'email.unique' => 'Another customer already uses this email.',
             'phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',

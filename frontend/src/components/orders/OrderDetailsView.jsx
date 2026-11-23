@@ -12,6 +12,9 @@ import { formatDate, moneyFormatter } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import './OrderDetailsView.css'
+import { useTranslation } from 'react-i18next'
+import { translate } from '../../i18n'
+import { paymentMethodLabel, shippingMethodText } from '../../utils/payment'
 
 function AddressBlock({ address }) {
   return (
@@ -28,30 +31,31 @@ function AddressBlock({ address }) {
       <br />
       {address.city}, {address.state} {address.postalCode}
       <br />
-      {address.country}
+      {translate(`common:countries.${address.country}`, { defaultValue: address.country })}
     </address>
   )
 }
 
 /** Shipments with carrier, tracking number, and a link to the carrier's tracking page (new tab). */
 function Shipments({ shipments }) {
+  const { t } = useTranslation('orders')
   if (!shipments?.length) return null
   return (
     <>
-      <h3 className="order-view__subheading">{shipments.length === 1 ? 'Shipment' : 'Shipments'}</h3>
+      <h3 className="order-view__subheading">{t('view.shipment', { count: shipments.length })}</h3>
       <ul className="order-view__documents">
         {shipments.map((shipment) => (
           <li key={shipment.number}>
             <p>
               <strong>{shipment.carrierLabel}</strong>
-              {shipment.trackingNumber ? ` · tracking number ${shipment.trackingNumber}` : ' · no tracking number'}
+              {shipment.trackingNumber ? t('view.tracking', { number: shipment.trackingNumber }) : t('view.noTracking')}
             </p>
-            <p className="order-view__muted">Shipped {formatDate(shipment.createdAt)}</p>
+            <p className="order-view__muted">{t('view.shippedOn', { date: formatDate(shipment.createdAt) })}</p>
             {shipment.trackingUrl && (
               // noopener: the carrier's page can't reach back into this tab.
               <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="order-view__link">
-                Track with {shipment.carrierLabel} <LuExternalLink aria-hidden="true" />
-                <span className="visually-hidden"> (opens in a new tab)</span>
+                {t('view.trackWith', { carrier: shipment.carrierLabel })} <LuExternalLink aria-hidden="true" />
+                <span className="visually-hidden">{t('view.newTab')}</span>
               </a>
             )}
           </li>
@@ -67,24 +71,25 @@ function Shipments({ shipments }) {
  * proof for the PDF download ({ email } for a guest, {} for the customer).
  */
 function Invoices({ invoices, invoiceLink, invoicePdf, formatBasePrice }) {
+  const { t } = useTranslation('orders')
   if (!invoices?.length) return null
   return (
     <>
-      <h3 className="order-view__subheading">{invoices.length === 1 ? 'Invoice' : 'Invoices'}</h3>
+      <h3 className="order-view__subheading">{t('view.invoice', { count: invoices.length })}</h3>
       <ul className="order-view__documents">
         {invoices.map((invoice) => (
           <li key={invoice.number}>
             <p className="order-view__row">
               {invoiceLink ? (
                 <Link to={invoiceLink(invoice.number)} className="order-view__link">
-                  <LuFileText aria-hidden="true" /> Invoice {invoice.number}
+                  <LuFileText aria-hidden="true" /> {t('view.invoiceNumber', { number: invoice.number })}
                 </Link>
               ) : (
-                <span>Invoice {invoice.number}</span>
+                <span>{t('view.invoiceNumber', { number: invoice.number })}</span>
               )}
               <strong>{formatBasePrice(invoice.amount)}</strong>
             </p>
-            <p className="order-view__muted">Issued {formatDate(invoice.createdAt)}</p>
+            <p className="order-view__muted">{t('view.issued', { date: formatDate(invoice.createdAt) })}</p>
             {invoicePdf && <InvoicePdfButton orderNumber={invoicePdf.orderNumber} invoiceNumber={invoice.number} email={invoicePdf.email} size="sm" variant="ghost" />}
           </li>
         ))}
@@ -94,16 +99,17 @@ function Invoices({ invoices, invoiceLink, invoicePdf, formatBasePrice }) {
 }
 
 function Refunds({ creditMemos, formatBasePrice }) {
+  const { t } = useTranslation('orders')
   if (!creditMemos?.length) return null
   return (
     <>
-      <h3 className="order-view__subheading">{creditMemos.length === 1 ? 'Refund' : 'Refunds'}</h3>
+      <h3 className="order-view__subheading">{t('view.refund', { count: creditMemos.length })}</h3>
       <ul className="order-view__documents">
         {creditMemos.map((memo) => (
           <li key={memo.number}>
             <p className="order-view__row">
               <span>
-                <LuUndo2 aria-hidden="true" /> Refund {memo.number}
+                <LuUndo2 aria-hidden="true" /> {t('view.refundNumber', { number: memo.number })}
               </span>
               <strong>{formatBasePrice(memo.total)}</strong>
             </p>
@@ -111,7 +117,7 @@ function Refunds({ creditMemos, formatBasePrice }) {
           </li>
         ))}
       </ul>
-      <p className="order-view__muted">Refunds are returned by the method you paid with; your bank may take a few days to show them.</p>
+      <p className="order-view__muted">{t('view.refundsNote')}</p>
     </>
   )
 }
@@ -127,8 +133,11 @@ function Refunds({ creditMemos, formatBasePrice }) {
  */
 // Phase 10: an order paid in full by a gift card (no other method); phase 11: by reward points.
 const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card', reward_points: 'Reward points' }
+// Phase 13: a payment method's name in the shopper's language (utils/payment.js).
+const paymentName = (method) => (ALL_PAYMENT_METHODS.some((known) => known.id === method) || OTHER_PAYMENT_LABELS[method] ? paymentMethodLabel(method) : method)
 
 function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = null }) {
+  const { t } = useTranslation('orders')
   const payment = ALL_PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
   // Phase 12: the order's money in the currency it was charged in (older orders: USD), not today's store currency.
   const formatBasePrice = moneyFormatter(order.currency)
@@ -141,8 +150,8 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
     <div className="order-view">
       <section className="order-view__card" aria-labelledby="order-status-title">
         <div className="order-view__row">
-          <h2 id="order-status-title">Status</h2>
-          <p className="order-view__muted">Placed {formatDate(new Date(order.placedAt).toISOString())}</p>
+          <h2 id="order-status-title">{t('view.status')}</h2>
+          <p className="order-view__muted">{t('view.placed', { date: formatDate(new Date(order.placedAt).toISOString()) })}</p>
         </div>
         {isReal && <OrderStatusBadge status={order.status} />}
         {/* A cancelled order has no steps left: the status above says it all. */}
@@ -150,20 +159,19 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
         {isReal && <OrderHistory history={order.history} />}
         {order.isSimulated && (
           <p className="order-view__demo">
-            Demo order: no payment was taken and nothing will ship. Real orders move through these steps as the backend
-            updates them.
+            {t('view.demo')}
           </p>
         )}
       </section>
 
       <div className="order-view__columns">
         <section className="order-view__card" aria-labelledby="order-delivery-title">
-          <h2 id="order-delivery-title">Delivery</h2>
+          <h2 id="order-delivery-title">{t('view.delivery')}</h2>
           {/* Phase 10: gift cards only: nothing ships (no address, no method). */}
-          {order.shippingAddress && order.requiresShipping !== false ? <AddressBlock address={order.shippingAddress} /> : <p>Sent by email: nothing to ship.</p>}
+          {order.shippingAddress && order.requiresShipping !== false ? <AddressBlock address={order.shippingAddress} /> : <p>{t('view.byEmail')}</p>}
           {order.shippingMethod && (
             <p>
-              <strong>{order.shippingMethod.label}</strong> — {order.shippingMethod.eta}
+              <strong>{shippingMethodText(order.shippingMethod).label}</strong> — {shippingMethodText(order.shippingMethod).eta}
             </p>
           )}
           <p className="order-view__muted">
@@ -172,35 +180,36 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
           <Shipments shipments={order.shipments} />
         </section>
         <section className="order-view__card" aria-labelledby="order-payment-title">
-          <h2 id="order-payment-title">Payment</h2>
+          <h2 id="order-payment-title">{t('view.payment')}</h2>
           {isReal ? (
             <>
               <p className="order-view__row">
-                <strong>{payment?.label ?? order.paymentMethod}</strong>
+                <strong>{payment ? paymentName(order.paymentMethod) : order.paymentMethod}</strong>
                 <OrderStatusBadge status={order.paymentStatus} payment />
               </p>
               <p className="order-view__muted">{paymentNote(order, { stripe: settings.cardPayments === 'stripe', paypal: settings.paypalPayments === 'paypal', sslcommerz: settings.sslcommerzPayments === 'sslcommerz' })}</p>
               {/* Phase 10: the gift card that paid part (or all) of it: its last 4 characters only. */}
               {order.giftCard?.applied > 0 && (
                 <p className="order-view__muted">
-                  Gift card {order.giftCard.last4 ? `•••• ${order.giftCard.last4} ` : ''}paid {formatBasePrice(order.giftCard.applied)}.
+                  {t('view.giftCardPaid', { card: order.giftCard.last4 ? `•••• ${order.giftCard.last4} ` : '', amount: formatBasePrice(order.giftCard.applied) })}
                 </p>
               )}
               {/* Phase 11: reward points used on the order, and earned once it was paid. */}
               {order.rewardPointsSpent > 0 && (
                 <p className="order-view__muted">
-                  {formatPoints(order.rewardPointsSpent)} paid {formatBasePrice(order.rewardPointsAmount ?? order.totals.rewardPoints ?? 0)}.
+                  {t('view.pointsPaid', { points: formatPoints(order.rewardPointsSpent), amount: formatBasePrice(order.rewardPointsAmount ?? order.totals.rewardPoints ?? 0) })}
                 </p>
               )}
-              {order.rewardPointsEarned > 0 && <p className="order-view__muted">You earned {formatPoints(order.rewardPointsEarned)} with this order.</p>}
+              {order.rewardPointsEarned > 0 && <p className="order-view__muted">{t('view.pointsEarned', { points: formatPoints(order.rewardPointsEarned) })}</p>}
               {payAction && <div className="order-view__pay">{payAction}</div>}
             </>
           ) : (
             <p>
-              <strong>{payment?.label ?? order.paymentMethod}</strong> (not charged)
+              <strong>{payment ? paymentName(order.paymentMethod) : order.paymentMethod}</strong>
+              {t('view.notCharged')}
             </p>
           )}
-          <h3 className="order-view__subheading">Billing address</h3>
+          <h3 className="order-view__subheading">{t('view.billing')}</h3>
           <AddressBlock address={order.billingAddress} />
           <Invoices invoices={order.invoices} invoiceLink={invoiceLink} invoicePdf={invoicePdf} formatBasePrice={formatBasePrice} />
           <Refunds creditMemos={order.creditMemos} formatBasePrice={formatBasePrice} />
@@ -209,22 +218,21 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
 
       <section className="order-view__card cart-summary" aria-labelledby="order-items-title">
         <h2 id="order-items-title" className="cart-summary__title">
-          Items
+          {t('view.items')}
         </h2>
         <OrderItems items={order.items} currency={order.currency} />
         <OrderTotals
           totals={order.totals}
           couponCode={order.couponCode ?? order.totals.couponCode}
           appliedRules={order.appliedRules}
-          shippingLabel={order.shippingMethod?.label}
+          shippingLabel={order.shippingMethod ? shippingMethodText(order.shippingMethod).label : undefined}
           requiresShipping={order.requiresShipping !== false}
           rewardPointsSpent={order.rewardPointsSpent ?? null}
           currency={order.currency}
         />
         {order.verification && (
           <p className="cart-summary__note">
-            Prices verified with the server (DummyJSON cart #{order.verification.cartId}). Its own discounted total was{' '}
-            {formatBasePrice(order.verification.serverDiscountedTotal)}, rounded to whole dollars, before coupons and shipping.
+            {t('view.verified', { cart: order.verification.cartId, total: formatBasePrice(order.verification.serverDiscountedTotal) })}
           </p>
         )}
       </section>

@@ -1,0 +1,117 @@
+{
+  "stockUnsubscribe": {
+    "title": "Stop back-in-stock emails",
+    "incomplete": "This link is incomplete. Open the link from the email again.",
+    "stopping": "Stopping your alerts…",
+    "explain": "We'll stop every back-in-stock email we were waiting to send to this address.",
+    "stop": "Stop these emails",
+    "continue": "Continue shopping"
+  },
+  "newsletterPage": {
+    "confirmTitle": "Confirm your subscription",
+    "confirmMissing": "This confirmation link is incomplete. Open the link from the email again, or subscribe again to get a new one.",
+    "unsubscribeTitle": "Unsubscribe from the newsletter",
+    "unsubscribeMissing": "This unsubscribe link is incomplete. Open the link from the newsletter email again.",
+    "subscribed": "You're subscribed.",
+    "unsubscribed": "You're unsubscribed.",
+    "confirming": "Confirming your subscription…",
+    "unsubscribing": "Unsubscribing…",
+    "explain": "You'll stop getting BuyNest newsletters at this address. Order emails still arrive as usual.",
+    "unsubscribe": "Unsubscribe",
+    "continue": "Continue shopping"
+  },
+  "newsletter": {
+    "thanks": "Thanks! If this address isn't subscribed yet, we've sent you a link to confirm.",
+    "invalid": "Please enter a valid email address.",
+    "title": "Get 10% off your first order",
+    "text": "Join the BuyNest newsletter for new arrivals, exclusive deals, and style tips.",
+    "email": "Email address",
+    "subscribing": "Subscribing…",
+    "subscribe": "Subscribe",
+    "checkInbox": "Check your inbox",
+    "demoTitle": "You're on the list (demo)",
+    "valid": "The link is valid for 7 days.",
+    "demoText": "Thanks! In this learning build nothing is actually sent — <strong>{{email}}</strong> was not stored anywhere. Real sign-ups will be handled by the BuyNest backend.",
+    "continue": "Continue shopping"
+  },
+  "home": {
+    "heroFailed": "We couldn't load this page's highlights",
+    "loading": "Loading…",
+    "products": "Products",
+    "productsFailed": "We couldn't load products",
+    "handpicked": "Handpicked",
+    "featured": "Featured products",
+    "promotions": "Promotions",
+    "justLanded": "Just landed",
+    "newArrivals": "New arrivals",
+    "limited": "Limited time",
+    "offers": "Special offers",
+    "offersDescription": "Our biggest in-stock discounts right now.",
+    "favorites": "Customer favorites",
+    "bestSellers": "Best sellers"
+  },
+  "categories": {
+    "eyebrow": "Browse",
+    "title": "Shop by category",
+    "all": "All products",
+    "unavailable": "Categories unavailable",
+    "loading": "Loading categories…"
+  },
+  "benefits": {
+    "title": "Why shop with BuyNest",
+    "shipping": {
+      "title": "Free shipping",
+      "text": "On every order over {{amount}}.",
+      "textAny": "On qualifying orders."
+    },
+    "returns": {
+      "title": "Easy returns",
+      "text": "30 days to change your mind."
+    },
+    "secure": {
+      "title": "Secure payments",
+      "text": "Handled by trusted payment providers."
+    },
+    "support": {
+      "title": "Friendly support",
+      "text": "Real people, seven days a week."
+    }
+  },
+  "demo": {
+    "hero": {
+      "eyebrow": "New season essentials",
+      "title": "Everything you love, delivered to your nest.",
+      "description": "Discover premium electronics, fashion, beauty, and home essentials — curated for quality and priced for everyday life.",
+      "primary": "Shop now",
+      "secondary": "Explore deals",
+      "imageAlt": "Apple AirPods Max over-ear headphones in silver",
+      "highlight1": "Free shipping over {{amount}}",
+      "highlight2": "30-day returns",
+      "highlight3": "Secure checkout",
+      "highlight1Any": "Free shipping on qualifying orders"
+    },
+    "banners": {
+      "work-anywhere": {
+        "eyebrow": "Laptops",
+        "title": "Work from anywhere",
+        "description": "Thin, light, powerful laptops for work and play.",
+        "cta": "Shop laptops",
+        "imageAlt": "Huawei MateBook X Pro laptop"
+      },
+      "signature-scents": {
+        "eyebrow": "Fragrances",
+        "title": "Find your signature scent",
+        "description": "Iconic fragrances from Chanel, Dior, Gucci and more.",
+        "cta": "Shop fragrances",
+        "imageAlt": "Chanel Coco Noir eau de parfum bottle"
+      }
+    }
+  },
+  "cms": {
+    "loading": "Loading page…",
+    "unavailable": "Page unavailable",
+    "failed": "We couldn't load this page",
+    "home": "Home",
+    "support": "Customer support"
+  }
+}

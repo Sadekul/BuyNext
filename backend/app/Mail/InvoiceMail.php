@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Services\DocumentPdfs;
 use App\Services\Settings;
 use App\Support\EmailBlocks;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Throwable;
@@ -20,7 +21,10 @@ class InvoiceMail extends Mailable
 {
     use RendersEmailTemplate;
 
-    public function __construct(public Invoice $invoice) {}
+    public function __construct(public Invoice $invoice)
+    {
+        $this->locale(Locale::forOrder($invoice->order)); // phase 13
+    }
 
     /** Phase 12: the order's currency. */
     protected function templateCurrency(): ?string
@@ -38,14 +42,14 @@ class InvoiceMail extends Mailable
         $order = $this->invoice->order;
 
         return [
-            'customer_first_name' => $order->shipping_address['first_name'] ?? 'there',
+            'customer_first_name' => $order->shipping_address['first_name'] ?? __('there'),
             'order_number' => $order->number,
             'invoice_number' => $this->invoice->number,
             'invoice_amount' => $this->invoice->amount,
             'note' => EmailBlocks::note($this->invoice->note, self::storeName()),
             // Phase 11: "You earned 120 reward points with this order." (empty when none). Read fresh: points are earned after the invoice is made.
             'reward_points_earned' => ($earned = (int) Order::whereKey($order->id)->value('reward_points_earned')) > 0
-                ? EmailBlocks::paragraph('You earned '.number_format($earned).' reward '.($earned === 1 ? 'point' : 'points').' with this order.')
+                ? EmailBlocks::paragraph(trans_choice('You earned :count reward point with this order.|You earned :count reward points with this order.', $earned, ['count' => $this->number($earned)]))
                 : '',
         ];
     }

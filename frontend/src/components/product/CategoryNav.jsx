@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
 import './CategoryNav.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Category links built from the categories API. Scrolls sideways on small
@@ -10,6 +11,7 @@ import './CategoryNav.css'
  * `activeSlug` highlights a parent while one of its subcategories is open.
  */
 function CategoryNav({ categories, activeSlug = null }) {
+  const { t } = useTranslation('catalog')
   const navRef = useRef(null)
   const { pathname } = useLocation()
 
@@ -26,11 +28,11 @@ function CategoryNav({ categories, activeSlug = null }) {
   const categoryClass = (slug) => ({ isActive }) => linkClass({ isActive: isActive || slug === activeSlug })
 
   return (
-    <nav ref={navRef} className="category-nav" aria-label="Product categories">
+    <nav ref={navRef} className="category-nav" aria-label={t('categories.label')}>
       <ul className="category-nav__list">
         <li>
           <NavLink to={ROUTES.products} end className={linkClass}>
-            All products
+            {t('categories.all')}
           </NavLink>
         </li>
         {categories.map((category) => (

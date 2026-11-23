@@ -2898,3 +2898,46 @@ code.path {
   margin: 0;
   padding: var(--space-3) var(--space-5) 0;
 }
+
+/* ---------- Phase 13: Bangla texts ---------- */
+.bangla-section {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  min-width: 0;
+}
+
+.bangla-section > legend {
+  font-weight: 700;
+}
+
+.bangla-section .form__fieldset > legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+/* Bangla script needs a little more line height for its vowel signs. */
+[lang='bn'] {
+  line-height: 1.7;
+}
+
+.bangla-fallback {
+  display: inline;
+  overflow-wrap: anywhere;
+}
+
+.bangla-option {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.bangla-option:last-of-type {
+  border-bottom: 0;
+}
+
+.cms-preview-label {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 1rem;
+}

@@ -26,11 +26,11 @@ class NewsletterController extends Controller
         $data = $request->validate([
             'email' => ['required', 'string', 'email', 'max:190'],
             'source' => ['nullable', 'in:footer,checkout'],
-        ], ['email.required' => 'Enter your email address.', 'email.email' => 'Enter a valid email address.']);
+        ], ['email.required' => __('Enter your email address.'), 'email.email' => __('Enter a valid email address.')]);
 
         $this->newsletter->subscribe($data['email'], $data['source'] ?? 'footer');
 
-        return response()->json(['message' => self::ACCEPTED], 202);
+        return response()->json(['message' => __(self::ACCEPTED)], 202);
     }
 
     /** POST /api/v1/newsletter/confirm { token } */
@@ -39,11 +39,11 @@ class NewsletterController extends Controller
         $data = $request->validate(['token' => ['required', 'string', 'max:200']]);
         $subscriber = $this->newsletter->confirm($data['token']);
         if (! $subscriber) {
-            throw ValidationException::withMessages(['token' => 'This confirmation link is invalid or has expired. Subscribe again to get a new one.']);
+            throw ValidationException::withMessages(['token' => __('This confirmation link is invalid or has expired. Subscribe again to get a new one.')]);
         }
 
         return response()->json([
-            'message' => 'You\'re subscribed to the '.app(Settings::class)->get('store_name').' newsletter.',
+            'message' => __('You\'re subscribed to the :store newsletter.', ['store' => app(Settings::class)->get('store_name')]),
             'data' => ['email' => $subscriber->email, 'status' => $subscriber->status],
         ]);
     }
@@ -54,12 +54,12 @@ class NewsletterController extends Controller
         $data = $request->validate(['token' => ['required', 'string', 'max:200']]);
         $subscriber = NewsletterSubscriber::fromUnsubscribeToken($data['token']);
         if (! $subscriber) {
-            throw ValidationException::withMessages(['token' => 'This unsubscribe link is invalid.']);
+            throw ValidationException::withMessages(['token' => __('This unsubscribe link is invalid.')]);
         }
         $this->newsletter->unsubscribe($subscriber);
 
         return response()->json([
-            'message' => 'You\'re unsubscribed. You won\'t get any more newsletters.',
+            'message' => __('You\'re unsubscribed. You won\'t get any more newsletters.'),
             'data' => ['email' => $subscriber->email, 'status' => 'unsubscribed'],
         ]);
     }

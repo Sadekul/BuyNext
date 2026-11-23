@@ -1,14 +1,14 @@
-@php($money = fn ($amount) => \App\Services\DocumentPdfs::money($amount, $currency ?? null))
+@php($money = fn ($amount) => \App\Services\DocumentPdfs::money($amount, $currency ?? null, $locale ?? null))
 @extends('documents.layout')
 
-@section('title', 'Invoice '.$invoice['number'])
-@section('heading', 'Invoice')
+@section('title', __('Invoice').' '.$invoice['number'])
+@section('heading', __('Invoice'))
 
 @section('meta')
-    <tr><td class="label">Invoice</td><td>{{ $invoice['number'] }}</td></tr>
-    <tr><td class="label">Date</td><td>{{ $invoice['date'] }}</td></tr>
-    <tr><td class="label">Order</td><td>{{ $order['number'] }}</td></tr>
-    <tr><td class="label">Order date</td><td>{{ $order['date'] }}</td></tr>
+    <tr><td class="label">{{ __('Invoice') }}</td><td>{{ $invoice['number'] }}</td></tr>
+    <tr><td class="label">{{ __('Date') }}</td><td>{{ $invoice['date'] }}</td></tr>
+    <tr><td class="label">{{ __('Order') }}</td><td>{{ $order['number'] }}</td></tr>
+    <tr><td class="label">{{ __('Order date') }}</td><td>{{ $order['date'] }}</td></tr>
 @endsection
 
 @section('content')
@@ -17,10 +17,10 @@
 
     @if ($credit_memos)
         <div class="section">
-            <h2>Refunds</h2>
+            <h2>{{ __('Refunds') }}</h2>
             <table class="items">
                 <thead>
-                    <tr><th>Credit memo</th><th>Date</th><th>Refund reference</th><th class="num">Amount</th></tr>
+                    <tr><th>{{ __('Credit memo') }}</th><th>{{ __('Date') }}</th><th>{{ __('Refund reference') }}</th><th class="num">{{ __('Amount') }}</th></tr>
                 </thead>
                 <tbody>
                     @foreach ($credit_memos as $memo)

@@ -1,4 +1,5 @@
 import { json, readCookies } from './http.js'
+import { serverMessage } from './i18n.js'
 import { AUTH_ROUTES } from './authBff.js'
 import { handleAdminRequest } from './adminApi.js'
 import { handleCatalogRequest } from './catalogApi.js'
@@ -32,13 +33,13 @@ export async function handleApiRequest(request) {
   // Only BuyNest's own pages may call these services. Browsers label requests
   // that start on another website "cross-site" (Fetch Metadata), on top of
   // the SameSite=Strict cookies.
-  if (request.headers.get('sec-fetch-site') === 'cross-site') return json({ message: 'Forbidden.' }, 403)
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return json({ message: serverMessage(request, 'forbidden') }, 403)
 
   const cookies = readCookies(request)
 
   if (segments[0] === 'api' && segments[1] === 'auth' && segments.length === 3) {
     const route = AUTH_ROUTES[`${request.method} ${segments[2]}`]
-    return route ? route(request, cookies) : json({ message: 'Not found.' }, 404)
+    return route ? route(request, cookies) : json({ message: serverMessage(request, 'notFound') }, 404)
   }
   if (segments[0] === 'api' && segments[1] === 'admin') {
     return handleAdminRequest(request, segments.slice(2), cookies)
@@ -46,5 +47,5 @@ export async function handleApiRequest(request) {
   if (segments[0] === 'api' && segments[1] === 'catalog') return handleCatalogRequest(request, segments.slice(2))
   if (segments[0] === 'api' && segments[1] === 'shop') return handleShopRequest(request, segments.slice(2), cookies)
   if (segments[0] === 'api' && segments[1] === 'client-errors' && segments.length === 2) return handleClientErrorRequest(request)
-  return json({ message: 'Not found.' }, 404)
+  return json({ message: serverMessage(request, 'notFound') }, 404)
 }

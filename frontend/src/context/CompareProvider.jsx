@@ -3,6 +3,7 @@ import { CompareContext } from './compareContext'
 import { COMPARE_ACTIONS, EMPTY_COMPARE, MAX_COMPARE, compareReducer, sanitizeCompare } from '../reducers/compareReducer'
 import { usePersistentReducer } from '../hooks/usePersistentReducer'
 import { STORAGE_KEYS } from '../constants/storageKeys'
+import { translate } from '../i18n'
 
 const STORAGE_OPTIONS = {
   storageKey: STORAGE_KEYS.compare,
@@ -32,11 +33,11 @@ function CompareProvider({ children }) {
     (product) => {
       if (ids.has(product.id)) return 'present'
       if (ids.size >= MAX_COMPARE) {
-        setNotice(COMPARE_FULL_MESSAGE)
+        setNotice(translate('catalog:compare.full', { max: MAX_COMPARE }))
         return 'full'
       }
       dispatch({ type: COMPARE_ACTIONS.ADDED, product })
-      setNotice(`${product.title} added to compare (${ids.size + 1} of ${MAX_COMPARE}).`)
+      setNotice(translate('catalog:compare.added', { title: product.title, count: ids.size + 1, max: MAX_COMPARE }))
       return 'added'
     },
     [ids, dispatch],

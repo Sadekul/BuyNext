@@ -12,10 +12,11 @@ import { useStoreSettings } from '../hooks/useStoreSettings'
 import { rewardsQuery } from '../queries/customerQueries'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
-import { formatBasePrice, formatDate } from '../utils/formatters'
-import { REWARD_TYPE_LABELS, formatPoints } from '../utils/rewards'
+import { formatBasePrice, formatDate, formatNumber } from '../utils/formatters'
+import { REWARD_TYPE_LABELS, formatPoints, rewardTypeLabel } from '../utils/rewards'
 import './OrderPages.css'
 import './RewardsPage.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * /account/rewards (phase 11 §4, REAL_SHOP): the reward points balance, what
@@ -24,59 +25,60 @@ import './RewardsPage.css'
  * store's checkout, so their value is shown in the store's own currency.
  */
 function RewardsPage() {
+  const { t } = useTranslation('account')
   const { user, authorizedRequest } = useAuth()
   const { settings } = useStoreSettings()
   const [page, setPage] = useState(1)
   const request = useQuery(rewardsQuery(user.id, authorizedRequest, page))
 
-  if (request.isPending) return <Loader label="Loading your reward points…" />
+  if (request.isPending) return <Loader label={t('rewards.loading')} />
   if (request.error) {
-    return <ErrorMessage title="We couldn't load your reward points" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
+    return <ErrorMessage title={t('rewards.failed')} titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   const { balance, value, transactions, lastPage } = request.data
   const rewards = settings.rewards
   return (
     <section className="orders rewards" aria-labelledby="rewards-title">
-      <title>{`Reward points | ${SITE.name}`}</title>
+      <title>{`${t('rewards.title')} | ${SITE.name}`}</title>
       <h2 id="rewards-title" className="orders__title">
-        Reward points
+        {t('rewards.title')}
       </h2>
 
       <div className="rewards__balance">
         <LuCoins aria-hidden="true" className="rewards__icon" />
         <p>
           <span className="rewards__points">{formatPoints(balance)}</span>
-          <span className="rewards__value">Worth {formatBasePrice(value)} at checkout</span>
+          <span className="rewards__value">{t('rewards.worth', { amount: formatBasePrice(value) })}</span>
         </p>
       </div>
       {rewards && (
         <p className="orders__note">
-          {rewards.earnRate > 0 && `You earn ${formatPoints(rewards.earnRate)} for every ${formatBasePrice(1)} you spend, once your order is paid. `}
-          {rewards.minRedeem > 0 ? `Use them at checkout once you have at least ${formatPoints(rewards.minRedeem)}.` : 'Use them at checkout.'}
+          {rewards.earnRate > 0 && t('rewards.earn', { points: formatPoints(rewards.earnRate), amount: formatBasePrice(1) })}
+          {rewards.minRedeem > 0 ? t('rewards.useMin', { points: formatPoints(rewards.minRedeem) }) : t('rewards.use')}
         </p>
       )}
 
-      <h3 className="rewards__subtitle">History</h3>
+      <h3 className="rewards__subtitle">{t('rewards.history')}</h3>
       {transactions.length === 0 ? (
-        <EmptyState icon={LuCoins} titleAs="h4" title="No points yet" message="Points you earn on paid orders and bonuses show up here.">
-          <Button to={ROUTES.products}>Start shopping</Button>
+        <EmptyState icon={LuCoins} titleAs="h4" title={t('rewards.empty')} message={t('rewards.emptyMessage')}>
+          <Button to={ROUTES.products}>{t('rewards.startShopping')}</Button>
         </EmptyState>
       ) : (
         <div className="rewards__table-wrap" role="region" aria-labelledby="rewards-history-caption" tabIndex={0}>
           <table className="rewards__table">
             <caption id="rewards-history-caption" className="visually-hidden">
-              Reward points history, newest first
+              {t('rewards.caption')}
             </caption>
             <thead>
               <tr>
-                <th scope="col">Date</th>
-                <th scope="col">What happened</th>
+                <th scope="col">{t('rewards.date')}</th>
+                <th scope="col">{t('rewards.what')}</th>
                 <th scope="col" className="rewards__num">
-                  Points
+                  {t('rewards.points')}
                 </th>
                 <th scope="col" className="rewards__num">
-                  Balance
+                  {t('rewards.balance')}
                 </th>
               </tr>
             </thead>
@@ -85,7 +87,7 @@ function RewardsPage() {
                 <tr key={entry.id}>
                   <td>{entry.createdAt ? formatDate(entry.createdAt) : '—'}</td>
                   <td>
-                    {REWARD_TYPE_LABELS[entry.type] ?? 'Points changed'}
+                    {REWARD_TYPE_LABELS[entry.type] ? rewardTypeLabel(entry.type) : t('rewards.changed')}
                     {entry.orderNumber && (
                       <>
                         {' '}
@@ -96,9 +98,9 @@ function RewardsPage() {
                   </td>
                   <td className={entry.points < 0 ? 'rewards__num rewards__num--minus' : 'rewards__num rewards__num--plus'}>
                     {entry.points > 0 ? '+' : entry.points < 0 ? '−' : ''}
-                    {Math.abs(entry.points).toLocaleString('en-US')}
+                    {formatNumber(Math.abs(entry.points))}
                   </td>
-                  <td className="rewards__num">{entry.balanceAfter.toLocaleString('en-US')}</td>
+                  <td className="rewards__num">{formatNumber(entry.balanceAfter)}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,0 +1,51 @@
+{
+  "address": {
+    "firstName": "Enter a first name.",
+    "lastName": "Enter a last name.",
+    "line1": "Enter a street address.",
+    "city": "Enter a city.",
+    "state": "Enter a state or region.",
+    "postalCode": "Enter a valid postal code.",
+    "country": "Choose a country."
+  },
+  "checkout": {
+    "email": "Enter a valid email address.",
+    "phone": "Enter a valid phone number.",
+    "sslcommerzPhone": "Enter a phone number: SSLCommerz needs one for bKash, Nagad, and card payments.",
+    "shippingMethod": "Choose a delivery option.",
+    "paymentMethod": "Choose a payment method."
+  },
+  "savedAddress": {
+    "phoneRequired": "Enter a phone number.",
+    "phone": "Enter a valid phone number.",
+    "company": "Keep the company name to {{max}} characters or fewer."
+  },
+  "phone": {
+    "required": "Enter your phone number.",
+    "countryCode": "Include the country code, like +1 555 010 0100."
+  },
+  "code": {
+    "required": "Enter the 6-digit code from the email.",
+    "digits": "The code has 6 digits."
+  },
+  "password": {
+    "length": "Use at least 8 characters.",
+    "mix": "Include at least one letter and one number.",
+    "confirm": "Confirm your password.",
+    "mismatch": "Passwords do not match."
+  },
+  "email": {
+    "required": "Enter your email address.",
+    "invalid": "Enter a valid email address, like name@example.com."
+  },
+  "login": {
+    "username": "Enter your username.",
+    "password": "Enter your password."
+  },
+  "register": {
+    "firstName": "Enter your first name.",
+    "lastName": "Enter your last name.",
+    "username": "Use 3–30 letters, numbers, dots, dashes, or underscores.",
+    "terms": "Please accept the terms to continue."
+  }
+}

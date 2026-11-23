@@ -104,8 +104,9 @@ final readonly class CartQuote
             'applied_rules' => $this->appliedRulesSummary(),
             'shipping_options' => array_map(fn (array $option) => [
                 'id' => $option['id'],
-                'label' => $option['label'],
-                'eta' => $option['eta'],
+                // Phase 13: translated on the way out (stored and computed in English).
+                'label' => filled($option['label']) ? __($option['label']) : $option['label'],
+                'eta' => filled($option['eta']) ? __($option['eta']) : $option['eta'],
                 'price' => $money($option['price_cents']),
                 'source' => $option['source'] ?? 'flat', // phase 10 (part B): "table" (a table rate) or "flat"
             ], $this->shippingOptions),

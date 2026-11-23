@@ -11,6 +11,7 @@ import { SITE } from '../constants/site'
 import { validateRegistration } from '../utils/validation'
 import { withoutField } from '../utils/serverErrors'
 import './AuthPages.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /*
  * /register — step 1 of sign-up.
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
 }
 
 function RegisterPage() {
+  const { t } = useTranslation('auth')
   const navigate = useNavigate()
   const location = useLocation()
   const [values, setValues] = useState(EMPTY_FORM)
@@ -76,13 +78,12 @@ function RegisterPage() {
       <div className="auth-page section container">
         <div className="auth-card" role="status">
           <LuCircleCheck size={40} color="var(--color-success)" aria-hidden="true" />
-          <h1 className="auth-card__title">Account request received</h1>
+          <h1 className="auth-card__title">{t('register.demoTitle')}</h1>
           <p className="auth-alert auth-alert--info">
-            <strong>Demo only:</strong> DummyJSON replied with a new user (#{createdDemoUser.id}) but does not save it, so you
-            can't sign in as <strong>{createdDemoUser.username}</strong>. Use the demo account on the sign-in page instead.
+            <Trans t={t} i18nKey="register.demoNote" values={{ id: createdDemoUser.id, username: createdDemoUser.username }} components={{ strong: <strong /> }} />
           </p>
           <Button to={ROUTES.login} size="lg" fullWidth>
-            Go to sign in
+            {t('register.goSignIn')}
           </Button>
         </div>
       </div>
@@ -100,11 +101,11 @@ function RegisterPage() {
 
   return (
     <div className="auth-page section container">
-      <title>{`Create account | ${SITE.name}`}</title>
+      <title>{`${t('register.tabTitle')} | ${SITE.name}`}</title>
       <div className="auth-card auth-card--wide">
         <header>
-          <h1 className="auth-card__title">Create your account</h1>
-          <p className="auth-card__subtitle">Track orders, save addresses, and check out faster.</p>
+          <h1 className="auth-card__title">{t('register.title')}</h1>
+          <p className="auth-card__subtitle">{t('register.subtitle')}</p>
         </header>
 
         {generalError && (
@@ -115,60 +116,60 @@ function RegisterPage() {
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-form__row">
-            <FormField label="First name" autoComplete="given-name" {...fieldProps('firstName')} />
-            <FormField label="Last name" autoComplete="family-name" {...fieldProps('lastName')} />
+            <FormField label={t('register.firstName')} autoComplete="given-name" {...fieldProps('firstName')} />
+            <FormField label={t('register.lastName')} autoComplete="family-name" {...fieldProps('lastName')} />
           </div>
           <FormField
-            label="Email"
+            label={t('register.email')}
             type="email"
             autoComplete="email"
-            hint={REAL_ACCOUNTS ? "We'll email you a code to confirm it." : undefined}
+            hint={REAL_ACCOUNTS ? t('register.emailHint') : undefined}
             {...fieldProps('email')}
           />
           {REAL_ACCOUNTS ? (
             <FormField
-              label="Phone number"
+              label={t('register.phone')}
               type="tel"
               autoComplete="tel"
               inputMode="tel"
-              hint="With the country code, like +880 1712 345678. For delivery updates."
+              hint={t('register.phoneHint')}
               {...fieldProps('phone')}
             />
           ) : (
             <FormField
-              label="Username"
+              label={t('register.username')}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
-              hint="3–30 characters: letters, numbers, dots, dashes, or underscores."
+              hint={t('register.usernameHint')}
               {...fieldProps('username')}
             />
           )}
           <FormField
-            label="Password"
+            label={t('register.password')}
             type="password"
             revealable
             autoComplete="new-password"
-            hint="At least 8 characters, including a letter and a number."
+            hint={t('register.passwordHint')}
             {...fieldProps('password')}
           />
-          <FormField label="Confirm password" type="password" revealable autoComplete="new-password" {...fieldProps('confirmPassword')} />
+          <FormField label={t('register.confirm')} type="password" revealable autoComplete="new-password" {...fieldProps('confirmPassword')} />
           <CheckboxField
-            label="I agree to the terms of service and privacy policy."
+            label={t('register.terms')}
             name="acceptTerms"
             checked={values.acceptTerms}
             onChange={handleChange}
             error={visibleError('acceptTerms')}
           />
           <Button type="submit" size="lg" fullWidth disabled={registration.isPending}>
-            {registration.isPending ? 'Creating account…' : 'Create account'}
+            {t(registration.isPending ? 'register.creating' : 'register.submit')}
           </Button>
         </form>
 
         <p className="auth-card__footer">
-          Already have an account?{' '}
+          {t('register.already')}{' '}
           <Link to={ROUTES.login} className="auth-link">
-            Sign in
+            {t('register.signIn')}
           </Link>
         </p>
       </div>

@@ -6,6 +6,7 @@ import Modal from '../ui/Modal'
 import { REAL_SHOP } from '../../constants/shop'
 import { subscribeToNewsletter } from '../../services/newsletterService'
 import './Newsletter.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 // Deliberately simple check; real validation (React Hook Form + Zod) comes later.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -18,6 +19,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * DEMO: nothing is sent anywhere; the modal says so.
  */
 function Newsletter() {
+  const { t } = useTranslation('marketing')
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
@@ -27,7 +29,7 @@ function Newsletter() {
   const subscribe = useMutation({
     mutationFn: (address) => subscribeToNewsletter(address, { source: 'footer' }),
     onSuccess: (answer) => {
-      setConfirmation(answer?.message || "Thanks! If this address isn't subscribed yet, we've sent you a link to confirm.")
+      setConfirmation(answer?.message || t('newsletter.thanks'))
       setIsConfirmationOpen(true)
     },
     onError: (failure) => setError(failure.fieldErrors?.email?.[0] ?? failure.message),
@@ -37,7 +39,7 @@ function Newsletter() {
     event.preventDefault()
 
     if (!EMAIL_PATTERN.test(email.trim())) {
-      setError('Please enter a valid email address.')
+      setError(t('newsletter.invalid'))
       return
     }
 
@@ -58,16 +60,16 @@ function Newsletter() {
           <LuMail className="newsletter__icon" aria-hidden="true" />
           <div>
             <h2 id="newsletter-title" className="newsletter__title">
-              Get 10% off your first order
+              {t('newsletter.title')}
             </h2>
-            <p className="newsletter__text">Join the BuyNest newsletter for new arrivals, exclusive deals, and style tips.</p>
+            <p className="newsletter__text">{t('newsletter.text')}</p>
           </div>
         </div>
 
         <form className="newsletter__form" onSubmit={handleSubmit} noValidate>
           <div className="newsletter__field">
             <label htmlFor={inputId} className="visually-hidden">
-              Email address
+              {t('newsletter.email')}
             </label>
             <input
               id={inputId}
@@ -81,7 +83,7 @@ function Newsletter() {
               autoComplete="email"
             />
             <Button type="submit" variant="secondary" disabled={subscribe.isPending}>
-              {subscribe.isPending ? 'Subscribing…' : 'Subscribe'}
+              {t(subscribe.isPending ? 'newsletter.subscribing' : 'newsletter.subscribe')}
             </Button>
           </div>
           {error && (
@@ -92,19 +94,18 @@ function Newsletter() {
         </form>
       </div>
 
-      <Modal isOpen={isConfirmationOpen} onClose={handleConfirmationClose} title={REAL_SHOP ? 'Check your inbox' : "You're on the list (demo)"}>
+      <Modal isOpen={isConfirmationOpen} onClose={handleConfirmationClose} title={t(REAL_SHOP ? 'newsletter.checkInbox' : 'newsletter.demoTitle')}>
         {REAL_SHOP ? (
           <p>
-            {confirmation} The link is valid for 7 days.
+            {confirmation} {t('newsletter.valid')}
           </p>
         ) : (
           <p>
-            Thanks! In this learning build nothing is actually sent — <strong>{email}</strong> was not stored anywhere.
-            Real sign-ups will be handled by the BuyNest backend.
+            <Trans t={t} i18nKey="newsletter.demoText" values={{ email }} components={{ strong: <strong /> }} />
           </p>
         )}
         <Button onClick={handleConfirmationClose} className="newsletter__modal-button">
-          Continue shopping
+          {t('newsletter.continue')}
         </Button>
       </Modal>
     </section>

@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Services\CatalogSearch;
 use App\Services\SearchTerms;
 use App\Support\CategoryTree;
+use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -55,7 +56,7 @@ class CatalogController extends Controller
             : null;
         $phrase = $correctedQuery ?? $search;
 
-        $query = Product::forSale($tree)->with(['category', 'brand'])
+        $query = Product::forSale($tree)->with(['category', 'brand', ...self::translationRelations()])
             ->when($phrase !== null, fn ($query) => $this->search->filter($query, $phrase))
             // A category includes its subcategories' products.
             ->when($data['category'] ?? null, function ($query, $slug) use ($tree) {
@@ -103,12 +104,12 @@ class CatalogController extends Controller
      */
     public function show(int $id): ProductResource|JsonResponse
     {
-        $product = Product::forSale()->with(['category', 'brand', 'images', 'options.values', 'variants',
+        $product = Product::forSale()->with(['category', 'brand', 'images', 'options.values', 'variants', ...self::translationRelations(),
             'reviews' => fn ($q) => $q->where('status', 'approved')])->find($id);
 
         return $product
             ? (new ProductResource($product))->withDetail()->withRecommendations() // phase 11: related and upsells
-            : response()->json(['message' => 'Product not found.'], 404);
+            : response()->json(['message' => __('Product not found.')], 404);
     }
 
     /**
@@ -121,9 +122,9 @@ class CatalogController extends Controller
         $parts = array_filter(array_map('trim', explode(',', $raw)), fn ($part) => $part !== '');
         $ids = array_values(array_unique(array_map('intval', $parts)));
         if (count($parts) === 0 || array_filter($parts, fn ($part) => ! ctype_digit($part)) !== [] || count($ids) < 2 || count($ids) > 4) {
-            throw ValidationException::withMessages(['ids' => 'Choose 2 to 4 products to compare.']);
+            throw ValidationException::withMessages(['ids' => __('Choose 2 to 4 products to compare.')]);
         }
-        $products = Product::forSale()->with(['category', 'brand', 'options.values'])->whereIn('id', $ids)->get()->keyBy('id');
+        $products = Product::forSale()->with(['category', 'brand', 'options.values', ...self::translationRelations()])->whereIn('id', $ids)->get()->keyBy('id');
 
         $data = [];
         foreach ($ids as $id) {
@@ -131,15 +132,15 @@ class CatalogController extends Controller
             if (! $product) {
                 continue;
             }
-            $description = trim((string) preg_replace('/\s+/', ' ', strip_tags((string) $product->description)));
+            $description = trim((string) preg_replace('/\s+/', ' ', strip_tags((string) $product->translated('description'))));
             $data[] = [
                 ...(new ProductResource($product))->resolve($request),
                 'description_short' => $description === '' ? null : Str::limit($description, 197, '...'),
                 'options' => $product->has_variants ? $product->options->map(fn ($option) => [
-                    'name' => $option->name,
-                    'values' => $option->values->pluck('value')->values()->all(),
+                    'name' => $option->translatedName(),
+                    'values' => $option->values->map(fn ($value) => $value->translatedValue())->values()->all(),
                 ])->values()->all() : [],
-                'specifications' => $product->specificationList(),
+                'specifications' => $product->specificationList(Locale::current()),
             ];
         }
 
@@ -160,15 +161,23 @@ class CatalogController extends Controller
         $categories = $tree->nested(fn (Category $category) => [
             'id' => $category->id,
             'slug' => $category->slug,
-            'name' => $category->name,
+            // Phase 13: in the request language, each field falling back to English; `locale` = the name's language.
+            'name' => $category->translated('name'),
+            'locale' => $category->translatedLocale('name'),
             'image_url' => $category->image_url,
-            'description' => $category->description,
-            'meta_title' => $category->meta_title,
-            'meta_description' => $category->meta_description,
+            'description' => $category->translated('description'),
+            'meta_title' => $category->translated('meta_title'),
+            'meta_description' => $category->translated('meta_description'),
             'parent_id' => $category->parent_id,
         ], fn (Category $category) => $category->is_active && $hasProducts($category));
 
         return response()->json(['data' => $categories]);
+    }
+
+    /** Phase 13: the translations a Bangla answer needs (nothing extra in English). */
+    public static function translationRelations(): array
+    {
+        return Locale::isBangla() ? ['translations', 'category.translations'] : [];
     }
 
     /** Without a sort: the catalog's own order (by id). Ties always fall back to the id, so pages never overlap. */

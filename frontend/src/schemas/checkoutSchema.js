@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { COUNTRIES, PAYMENT_METHODS, SHIPPING_METHODS } from '../constants/store'
+import { translate } from '../i18n'
 
 // The production Content-Security-Policy forbids eval. Zod otherwise probes
 // `new Function` to speed up parsing, which the browser reports as a violation.
@@ -11,29 +12,36 @@ z.config({ jitless: true })
  * again as the user corrects a field. The same rules must be enforced again on the server.
  */
 
+/*
+ * Phase 13: every message is looked up when the form is checked (a function,
+ * not a fixed string), so it is in the shopper's current language
+ * (locales/<lang>/validation.json).
+ */
+const message = (key, values) => ({ error: () => translate(`validation:${key}`, values) })
+
 // The same friendly message whether the field is empty OR missing entirely.
-const requiredText = (message) => z.string({ error: message }).trim().min(1, message)
+const requiredText = (key) => z.string(message(key)).trim().min(1, message(key))
 
 /** One address; `countries` are the ones the store ships to (the demo list, or the server's settings). */
 export const createAddressSchema = (countries) => z.object({
-  firstName: requiredText('Enter a first name.'),
-  lastName: requiredText('Enter a last name.'),
-  line1: requiredText('Enter a street address.'),
+  firstName: requiredText('address.firstName'),
+  lastName: requiredText('address.lastName'),
+  line1: requiredText('address.line1'),
   line2: z.string().trim().optional(),
-  city: requiredText('Enter a city.'),
-  state: requiredText('Enter a state or region.'),
+  city: requiredText('address.city'),
+  state: requiredText('address.state'),
   postalCode: z
-    .string({ error: 'Enter a valid postal code.' })
+    .string(message('address.postalCode'))
     .trim()
-    .regex(/^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$/, 'Enter a valid postal code.'),
-  country: z.enum(countries, { error: 'Choose a country.' }),
+    .regex(/^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$/, message('address.postalCode')),
+  country: z.enum(countries, message('address.country')),
 })
 
 export const addressSchema = createAddressSchema(COUNTRIES)
 
 const PHONE = /^\+?[0-9 ()-]{7,20}$/
 
-/** Phase 12: what a shopper paying through SSLCommerz is told without a phone number. */
+/** Phase 12: what a shopper paying through SSLCommerz is told without a phone number (English; validation:checkout.sslcommerzPhone). */
 export const SSLCOMMERZ_PHONE_MESSAGE = 'Enter a phone number: SSLCommerz needs one for bKash, Nagad, and card payments.'
 
 /**
@@ -43,8 +51,8 @@ export const SSLCOMMERZ_PHONE_MESSAGE = 'Enter a phone number: SSLCommerz needs 
 function checkPhone(data, ctx) {
   const phone = typeof data.phone === 'string' ? data.phone : ''
   if (PHONE.test(phone)) return
-  const message = phone === '' && data.paymentMethod === 'sslcommerz' ? SSLCOMMERZ_PHONE_MESSAGE : 'Enter a valid phone number.'
-  ctx.addIssue({ code: 'custom', message, path: ['phone'] })
+  const key = phone === '' && data.paymentMethod === 'sslcommerz' ? 'checkout.sslcommerzPhone' : 'checkout.phone'
+  ctx.addIssue({ code: 'custom', message: translate(`validation:${key}`), path: ['phone'] })
 }
 
 /**
@@ -63,28 +71,28 @@ export function createCheckoutSchema({
   if (!requiresShipping) {
     return z
       .object({
-        email: z.email('Enter a valid email address.'),
+        email: z.email(message('checkout.email')),
         // Checked with the payment method below (phase 12: SSLCommerz says why it needs one).
-        phone: z.string({ error: 'Enter a valid phone number.' }).trim(),
+        phone: z.string(message('checkout.phone')).trim(),
         shipping: z.any(),
         billingSameAsShipping: z.any(),
         billing: storeAddressSchema,
         shippingMethod: z.any(),
-        paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
+        paymentMethod: z.enum(paymentMethodIds, message('checkout.paymentMethod')),
         saveAddress: z.boolean().optional(),
       })
       .superRefine(checkPhone)
   }
   return z
     .object({
-      email: z.email('Enter a valid email address.'),
+      email: z.email(message('checkout.email')),
       // Checked with the payment method below (phase 12: SSLCommerz says why it needs one).
-      phone: z.string({ error: 'Enter a valid phone number.' }).trim(),
+      phone: z.string(message('checkout.phone')).trim(),
       shipping: storeAddressSchema,
       billingSameAsShipping: z.boolean(),
       billing: z.any(), // validated below, only when it's a separate address
-      shippingMethod: z.enum(shippingMethodIds, { error: 'Choose a delivery option.' }),
-      paymentMethod: z.enum(paymentMethodIds, { error: 'Choose a payment method.' }),
+      shippingMethod: z.enum(shippingMethodIds, message('checkout.shippingMethod')),
+      paymentMethod: z.enum(paymentMethodIds, message('checkout.paymentMethod')),
       // Signed-in customers (REAL_SHOP): keep the shipping address in the address book.
       saveAddress: z.boolean().optional(),
     })
@@ -120,10 +128,10 @@ export const EMPTY_ADDRESS = {
 export function createSavedAddressSchema(countries = COUNTRIES) {
   return createAddressSchema(countries).extend({
     phone: z
-      .string({ error: 'Enter a phone number.' })
+      .string(message('savedAddress.phoneRequired'))
       .trim()
-      .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a valid phone number.'),
-    company: z.string().trim().max(100, 'Keep the company name to 100 characters or fewer.'),
+      .regex(/^\+?[0-9 ()-]{7,20}$/, message('savedAddress.phone')),
+    company: z.string().trim().max(100, message('savedAddress.company', { max: 100 })),
     isDefaultShipping: z.boolean(),
     isDefaultBilling: z.boolean(),
   })

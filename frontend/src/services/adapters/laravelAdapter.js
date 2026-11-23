@@ -64,6 +64,10 @@ export function normalizeProduct(raw) {
     ...(raw.weight !== undefined && { weight: toNumberOrNull(raw.weight) }),
     ...(raw.review_count !== undefined && { reviewCount: Number(raw.review_count) || 0 }),
     ...(raw.description_short !== undefined && { shortDescription: typeof raw.description_short === 'string' && raw.description_short.trim() ? raw.description_short.trim() : null }),
+    // Phase 13: the Bangla short description (product detail in Bangla; null otherwise), and the
+    // language the name actually came in ("bn", or "en" when it isn't translated yet).
+    ...(typeof raw.short_description === 'string' && raw.short_description.trim() && { translatedShortDescription: raw.short_description.trim() }),
+    ...((raw.locale === 'en' || raw.locale === 'bn') && { contentLocale: raw.locale }),
     ...(Array.isArray(raw.related) && { related: raw.related.slice(0, 8).map(normalizeProduct) }),
     ...(Array.isArray(raw.upsells) && { upsells: raw.upsells.slice(0, 4).map(normalizeProduct) }),
   }

@@ -10,6 +10,7 @@ import { productKeys } from '../../queries/productQueries'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
 import './ReviewForm.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 const RATINGS = [1, 2, 3, 4, 5]
 const TITLE_MAX = 120
@@ -18,18 +19,17 @@ const COMMENT_MAX = 2000
 
 export const REVIEW_PENDING = 'Thanks — your review will appear after approval.'
 export const REVIEW_PUBLISHED = 'Thanks — your review is now published.'
-const ALREADY_REVIEWED = "You've already reviewed this product. Thank you!"
-
-function validate({ rating, title, comment }) {
+// Phase 13: the English texts above are kept for tests; what's shown comes from the catalog namespace.
+function validate({ rating, title, comment }, t) {
   const length = comment.trim().length
   return {
-    rating: rating ? null : 'Choose a rating from 1 to 5 stars.',
-    title: title.trim().length > TITLE_MAX ? `Keep the title to ${TITLE_MAX} characters or fewer.` : null,
+    rating: rating ? null : t('reviewForm.ratingRequired', { min: 1, max: 5 }),
+    title: title.trim().length > TITLE_MAX ? t('reviewForm.titleTooLong', { max: TITLE_MAX }) : null,
     comment:
       length < COMMENT_MIN
-        ? `Write at least ${COMMENT_MIN} characters.`
+        ? t('reviewForm.commentShort', { min: COMMENT_MIN })
         : length > COMMENT_MAX
-          ? `Keep your review to ${COMMENT_MAX} characters or fewer.`
+          ? t('reviewForm.commentLong', { max: COMMENT_MAX })
           : null,
   }
 }
@@ -47,6 +47,7 @@ const isAlreadyReviewed = (error) =>
  * get a link to sign in and come back.
  */
 function ReviewForm({ productId, productTitle }) {
+  const { t } = useTranslation('catalog')
   const { isAuthenticated, authorizedRequest } = useAuth()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -58,7 +59,7 @@ function ReviewForm({ productId, productTitle }) {
   const mutation = useMutation({
     mutationFn: (input) => authorizedRequest(() => submitReview(productId, input)),
     onSuccess: (review) => {
-      setResult(review?.status === 'approved' ? REVIEW_PUBLISHED : REVIEW_PENDING)
+      setResult(review?.status === 'approved' ? 'published' : 'pending')
       // A published review changes the product's reviews and rating.
       if (review?.status === 'approved') queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) })
     },
@@ -67,10 +68,7 @@ function ReviewForm({ productId, productTitle }) {
   if (!isAuthenticated) {
     return (
       <p className="review-form__signin">
-        <Link to={ROUTES.login} state={{ from: location }}>
-          Sign in
-        </Link>{' '}
-        to write a review.
+        <Trans t={t} i18nKey="reviewForm.signIn" components={{ signin: <Link to={ROUTES.login} state={{ from: location }} /> }} />
       </p>
     )
   }
@@ -78,19 +76,19 @@ function ReviewForm({ productId, productTitle }) {
   if (result) {
     return (
       <p className="review-form__success" role="status">
-        {result}
+        {t(result === 'published' ? 'reviewForm.published' : 'reviewForm.pending')}
       </p>
     )
   }
 
-  const errors = validate(values)
+  const errors = validate(values, t)
   const shown = (field) => {
     const serverMessage = mutation.error?.fieldErrors?.[field]?.[0]
     return (hasSubmitted && errors[field]) || (!isAlreadyReviewed(mutation.error) && serverMessage) || undefined
   }
 
   let formError = null
-  if (isAlreadyReviewed(mutation.error)) formError = ALREADY_REVIEWED
+  if (isAlreadyReviewed(mutation.error)) formError = t('reviewForm.already')
   // Errors without a field of this form (network, rate limit, an unknown field) are shown above the button.
   else if (mutation.error && !['rating', 'title', 'comment'].some((field) => mutation.error.fieldErrors?.[field])) formError = mutation.error.message
 
@@ -109,11 +107,11 @@ function ReviewForm({ productId, productTitle }) {
   return (
     <form className="review-form" onSubmit={handleSubmit} noValidate aria-labelledby={`${id}-title`}>
       <h3 id={`${id}-title`} className="review-form__title">
-        Write a review
+        {t('reviewForm.title')}
       </h3>
 
       <fieldset className={cn('review-form__rating', ratingError && 'review-form__rating--invalid')} aria-describedby={ratingError ? `${id}-rating-error` : undefined}>
-        <legend className="form-field__label">Your rating</legend>
+        <legend className="form-field__label">{t('reviewForm.yourRating')}</legend>
         <div className="review-form__stars">
           {RATINGS.map((rating) => (
             <span key={rating} className="review-form__star">
@@ -128,7 +126,7 @@ function ReviewForm({ productId, productTitle }) {
               />
               <label htmlFor={`${id}-rating-${rating}`} className={cn('review-form__star-label', rating <= values.rating && 'review-form__star-label--on')}>
                 <LuStar aria-hidden="true" />
-                <span className="visually-hidden">{rating === 1 ? '1 star' : `${rating} stars`}</span>
+                <span className="visually-hidden">{t('reviewForm.stars', { count: rating })}</span>
               </label>
             </span>
           ))}
@@ -140,11 +138,11 @@ function ReviewForm({ productId, productTitle }) {
         )}
       </fieldset>
 
-      <FormField label="Title (optional)" name="title" value={values.title} onChange={change('title')} maxLength={TITLE_MAX} error={shown('title')} />
+      <FormField label={t('reviewForm.titleLabel')} name="title" value={values.title} onChange={change('title')} maxLength={TITLE_MAX} error={shown('title')} />
 
       <div className={cn('form-field', commentError && 'form-field--invalid')}>
         <label htmlFor={`${id}-comment`} className="form-field__label">
-          Your review
+          {t('reviewForm.yourReview')}
         </label>
         <textarea
           id={`${id}-comment`}
@@ -158,7 +156,7 @@ function ReviewForm({ productId, productTitle }) {
           aria-describedby={[`${id}-comment-hint`, commentError && `${id}-comment-error`].filter(Boolean).join(' ')}
         />
         <p id={`${id}-comment-hint`} className="form-field__hint">
-          {`What did you like or dislike about ${productTitle}? ${COMMENT_MIN} to ${COMMENT_MAX} characters (${commentLength} so far).`}
+          {t('reviewForm.hint', { product: productTitle, min: COMMENT_MIN, max: COMMENT_MAX, length: commentLength })}
         </p>
         {commentError && (
           <p id={`${id}-comment-error`} className="form-field__error">
@@ -175,7 +173,7 @@ function ReviewForm({ productId, productTitle }) {
 
       <div>
         <Button type="submit" disabled={mutation.isPending || isAlreadyReviewed(mutation.error)}>
-          {mutation.isPending ? 'Sending…' : 'Submit review'}
+          {t(mutation.isPending ? 'reviewForm.sending' : 'reviewForm.submit')}
         </Button>
       </div>
     </form>

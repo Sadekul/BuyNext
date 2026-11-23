@@ -202,7 +202,7 @@ try {
   log(groupMade.status === 201, `a test customer group without its own discount (API): ${groupName}`)
 
   await admin.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
-  await admin.getByLabel('Name').fill(productName)
+  await admin.getByLabel('Name', { exact: true }).fill(productName)
   await admin.getByLabel('Brand').fill('NestWorks')
   await admin.getByLabel('Category').selectOption(category.slug)
   await admin.getByLabel('Price (USD)').fill('20')
@@ -610,7 +610,7 @@ try {
     await axe(admin, 'email templates')
     await admin.getByRole('link', { name: 'Email verification code' }).first().click()
     await admin.waitForURL(/\/admin\/email-templates\/email_verification$/)
-    await admin.getByLabel('Subject').fill(templateSubject)
+    await admin.getByLabel('Subject', { exact: true }).fill(templateSubject)
     const previewSubject = admin.locator('.email-preview__subject strong')
     await admin.waitForFunction((text) => document.querySelector('.email-preview__subject strong')?.textContent === text, `E2E ${run}: confirm your email for BuyNest`, { timeout: 15000 }).catch(() => {})
     log((await previewSubject.innerText().catch(() => '')) === `E2E ${run}: confirm your email for BuyNest`, `live preview with sample data: "${await previewSubject.innerText().catch(() => '')}"`)

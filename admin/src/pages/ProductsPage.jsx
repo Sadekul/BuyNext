@@ -20,6 +20,8 @@ import GridPreferences from '../components/GridPreferences'
 import RedirectOffer from '../components/RedirectOffer'
 import { useGridPreferences } from '../utils/useGridPreferences'
 import { storePaths } from '../utils/redirects'
+// Phase 13: the optional "Bangla" column and filter (complete / missing).
+import { BANGLA_STATUSES } from '../utils/bangla'
 
 const COLUMNS = [
   { id: 'product', label: 'Product', required: true },
@@ -27,6 +29,8 @@ const COLUMNS = [
   { id: 'price', label: 'Price' },
   { id: 'stock', label: 'Stock' },
   { id: 'status', label: 'Status' },
+  // Phase 13: hidden until chosen under Columns.
+  { id: 'bangla', label: 'Bangla', optional: true },
 ]
 
 /**
@@ -41,6 +45,7 @@ function ProductsPage() {
   const q = params.get('q') ?? ''
   const category = params.get('category') ?? ''
   const status = LIVE_DATA ? (params.get('status') ?? '') : ''
+  const bangla = LIVE_DATA && ['complete', 'missing'].includes(params.get('bangla')) ? params.get('bangla') : ''
   const sortBy = params.get('sortBy') ?? ''
   const order = params.get('order') ?? 'asc'
   const skip = Number(params.get('skip')) || 0
@@ -53,7 +58,7 @@ function ProductsPage() {
   const [summary, setSummary] = useState(null) // the last mass action's result
   const summaryRef = useRef(null)
 
-  const query = { q, category, status, sortBy, order, skip, limit }
+  const query = { q, category, status, bangla, sortBy, order, skip, limit }
   // The ticked products, for this page and these filters only (a new page starts empty).
   const pageKey = JSON.stringify(query)
   const [selection, setSelection] = useState({ pageKey, ids: [] })
@@ -211,6 +216,16 @@ function ProductsPage() {
             </select>
           </label>
         )}
+        {LIVE_DATA && (
+          <label className="toolbar__select">
+            <span>Bangla</span>
+            <select value={bangla} onChange={(event) => update({ bangla: event.target.value, skip: 0 })}>
+              <option value="">Any</option>
+              <option value="complete">Complete</option>
+              <option value="missing">Missing</option>
+            </select>
+          </label>
+        )}
         <label className="toolbar__select">
           <span>Sort</span>
           <select
@@ -234,7 +249,7 @@ function ProductsPage() {
         prefs={grid}
         noun="products"
         onPageSize={() => update({ skip: 0 })}
-        current={{ q, category, status, sortBy, order: sortBy ? order : '' }}
+        current={{ q, category, status, bangla, sortBy, order: sortBy ? order : '' }}
         onApply={(saved) => {
           setDraft(saved.q ?? '')
           setParams(new URLSearchParams(Object.entries(saved).filter(([, value]) => value !== '' && value !== null)))
@@ -274,6 +289,7 @@ function ProductsPage() {
                 )}
                 {grid.isVisible('stock') && <th scope="col">Stock</th>}
                 {LIVE_DATA && grid.isVisible('status') && <th scope="col">Status</th>}
+                {LIVE_DATA && grid.isVisible('bangla') && <th scope="col">Bangla</th>}
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
                 </th>
@@ -308,6 +324,7 @@ function ProductsPage() {
                       <StatusBadge {...productStatus(product.status)} />
                     </td>
                   )}
+                  {LIVE_DATA && grid.isVisible('bangla') && <td>{product.banglaStatus ? <StatusBadge {...BANGLA_STATUSES[product.banglaStatus]} /> : '—'}</td>}
                   <td className="table__actions">
                     {can('products.edit') && (
                       <Link to={`/products/${product.id}`} className="icon-button" aria-label={`Edit ${product.title}`}>

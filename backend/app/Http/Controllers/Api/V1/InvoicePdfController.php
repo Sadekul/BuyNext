@@ -35,11 +35,11 @@ class InvoicePdfController extends Controller
         $owner = $order && $customer && $order->customer_id === $customer->id;
         $emailMatches = $order && filled($data['email'] ?? null) && mb_strtolower($order->email) === mb_strtolower(trim($data['email']));
         if (! $owner && ! $emailMatches) {
-            return response()->json(['message' => 'We couldn\'t find an order with that number and email.'], 404);
+            return response()->json(['message' => __('We couldn\'t find an order with that number and email.')], 404);
         }
 
         $found = Invoice::where('order_id', $order->id)->where('number', strtoupper(trim($invoice)))->first();
 
-        return $found ? $pdfs->download($found->setRelation('order', $order)) : response()->json(['message' => 'Invoice not found.'], 404);
+        return $found ? $pdfs->download($found->setRelation('order', $order)) : response()->json(['message' => __('Invoice not found.')], 404);
     }
 }

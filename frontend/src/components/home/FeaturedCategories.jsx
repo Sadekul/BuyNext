@@ -4,21 +4,23 @@ import ErrorMessage from '../ui/ErrorMessage'
 import Loader from '../ui/Loader'
 import { ROUTES } from '../../constants/routes'
 import './FeaturedCategories.css'
+import { useTranslation } from 'react-i18next'
 
 /** Category tiles. `categories` arrive already merged (API name + configured image). */
 function FeaturedCategories({ categories, isLoading, error, onRetry }) {
+  const { t } = useTranslation('marketing')
   return (
     <section className="section" aria-labelledby="featured-categories-title">
       <div className="container">
         <SectionHeading
           id="featured-categories-title"
-          eyebrow="Browse"
-          title="Shop by category"
+          eyebrow={t('categories.eyebrow')}
+          title={t('categories.title')}
           viewAllTo={ROUTES.products}
-          viewAllLabel="All products"
+          viewAllLabel={t('categories.all')}
         />
-        {error && <ErrorMessage titleAs="h3" title="Categories unavailable" message={error.message} onRetry={onRetry} />}
-        {isLoading && <Loader label="Loading categories…" />}
+        {error && <ErrorMessage titleAs="h3" title={t('categories.unavailable')} message={error.message} onRetry={onRetry} />}
+        {isLoading && <Loader label={t('categories.loading')} />}
         {!isLoading && !error && (
           <ul className="featured-categories">
             {categories.map((category) => (

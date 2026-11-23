@@ -1,12 +1,14 @@
 import OrderStatusBadge from './OrderStatusBadge'
 import { formatDateTime } from '../../utils/formatters'
 import './OrderHistory.css'
+import { useTranslation } from 'react-i18next'
 
 /** What happened to an order, oldest first: each status change with its date and note. */
 function OrderHistory({ history }) {
+  const { t } = useTranslation('orders')
   if (!history?.length) return null
   return (
-    <ol className="order-history" aria-label="Order history">
+    <ol className="order-history" aria-label={t('history.label')}>
       {history.map((entry, index) => (
         <li key={`${entry.createdAt}-${index}`} className="order-history__entry">
           <OrderStatusBadge status={entry.status} />

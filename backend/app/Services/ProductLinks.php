@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Models\ProductLink;
@@ -31,7 +32,7 @@ class ProductLinks
         if ($linked->isNotEmpty()) {
             return $this->cards($linked, $request);
         }
-        $fallback = Product::forSale()->with(['category', 'brand'])
+        $fallback = Product::forSale()->with(['category', 'brand', ...CatalogController::translationRelations()])
             ->where('category_id', $product->category_id)->whereKeyNot($product->id)
             ->orderByDesc('rating_average')->orderBy('id')->limit(self::MAX_RELATED)->get();
 
@@ -61,7 +62,7 @@ class ProductLinks
             return [];
         }
         $stats = $links->groupBy('linked_product_id')->map(fn (Collection $rows) => [$rows->count(), $rows->min('position')]);
-        $products = Product::forSale()->with(['category', 'brand'])->whereIn('id', $stats->keys())->get()
+        $products = Product::forSale()->with(['category', 'brand', ...CatalogController::translationRelations()])->whereIn('id', $stats->keys())->get()
             ->sortBy(fn (Product $p) => [-$stats[$p->id][0], $stats[$p->id][1], $p->id])->take(self::MAX_CROSS_SELLS)->values();
 
         return $this->cards($products, $request);
@@ -121,7 +122,7 @@ class ProductLinks
     {
         $tree = CategoryTree::load();
 
-        return Product::forSale($tree)->with(['category', 'brand'])
+        return Product::forSale($tree)->with(['category', 'brand', ...CatalogController::translationRelations()])
             ->join('product_links', 'product_links.linked_product_id', '=', 'products.id')
             ->where('product_links.product_id', $product->id)->where('product_links.type', $type)
             ->select('products.*')

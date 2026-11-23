@@ -5,6 +5,7 @@ import { ROUTES } from '../../constants/routes'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import { COOKIE_SETTINGS_EVENT, analyticsAvailable, readConsent, saveConsent, startAnalytics, stopAnalytics, trackPageView } from '../../utils/analytics'
 import './CookieConsent.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * The cookie consent banner (phase 10, §6), and the page views it allows.
@@ -23,6 +24,7 @@ import './CookieConsent.css'
  * to its heading.
  */
 function CookieConsent() {
+  const { t } = useTranslation('common')
   const { settings } = useStoreSettings()
   const available = analyticsAvailable(settings)
   const measurementId = settings.ga4MeasurementId
@@ -91,37 +93,35 @@ function CookieConsent() {
     <section className="cookie-consent" aria-labelledby={titleId}>
       <div className="cookie-consent__inner container">
         <h2 id={titleId} className="cookie-consent__title" ref={headingRef} tabIndex={-1}>
-          Cookies and visitor statistics
+          {t('cookies.title')}
         </h2>
         <p className="cookie-consent__text">
-          With your permission, we use Google Analytics to count visits and see which pages and products are popular. It sets cookies and tells Google how this
-          site is used, never your name, email, or address. It stays off unless you accept. The cookies that keep you signed in and remember your cart are
-          always on. <Link to={ROUTES.page('privacy')}>Privacy policy</Link>
+          <Trans t={t} i18nKey="cookies.text" components={{ privacy: <Link to={ROUTES.page('privacy')} /> }} />
         </p>
 
         {showSettings && (
           <fieldset className="cookie-consent__settings">
-            <legend className="visually-hidden">Optional cookies</legend>
+            <legend className="visually-hidden">{t('cookies.optional')}</legend>
             <div className="cookie-consent__option">
               <input ref={checkboxRef} id={statisticsId} type="checkbox" checked={statistics} onChange={(event) => setStatistics(event.target.checked)} aria-describedby={`${statisticsId}-hint`} />
-              <label htmlFor={statisticsId}>Statistics</label>
+              <label htmlFor={statisticsId}>{t('cookies.statistics')}</label>
             </div>
             <p id={`${statisticsId}-hint`} className="cookie-consent__hint">
-              Google Analytics 4: which pages are viewed, and which products are looked at, added to the cart, or bought. Off until you switch it on.
+              {t('cookies.statisticsHint')}
             </p>
           </fieldset>
         )}
 
         <div className="cookie-consent__actions">
           <Button variant="outline" onClick={() => choose(true)}>
-            Accept all
+            {t('cookies.accept')}
           </Button>
           <Button variant="outline" onClick={() => choose(false)}>
-            Reject
+            {t('cookies.reject')}
           </Button>
           {showSettings ? (
             <Button variant="outline" onClick={() => choose(statistics)}>
-              Save choices
+              {t('cookies.save')}
             </Button>
           ) : (
             <Button
@@ -131,7 +131,7 @@ function CookieConsent() {
                 setShowSettings(true)
               }}
             >
-              Settings
+              {t('cookies.settings')}
             </Button>
           )}
         </div>

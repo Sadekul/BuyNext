@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+// Phase 13: the app's translations (English, synchronously), as main.jsx loads them.
+import i18n from '../i18n'
+import { resetIntlForTests } from '../i18n/intl'
 
 // findBy…/waitFor give up after 1 s by default. Multi-step page flows (checkout, then a payment
 // redirect) can take longer while ~50 test files run in parallel, so wait up to 5 s.
@@ -10,9 +13,13 @@ configure({ asyncUtilTimeout: 5000 })
 const hasDom = typeof window !== 'undefined'
 
 // Unmount rendered components and reset storage between tests.
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals()
+  // Phase 13: every test starts in English (a Bangla test switches on its own).
+  if (i18n.language !== 'en') await i18n.changeLanguage('en')
+  resetIntlForTests()
   if (!hasDom) return
+  document.cookie = 'buynest_lang=; Max-Age=0; Path=/'
   cleanup()
   window.localStorage.clear()
   window.sessionStorage.clear()

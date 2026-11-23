@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PageResource;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\Audit;
 use App\Support\CategoryTree;
+use App\Support\TranslationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +61,7 @@ class CategoryController extends Controller
             ]);
             $this->audit->record('category.created', "Category \"{$category->name}\" ({$category->slug}) created.", 'category', $category->id,
                 Audit::created(Audit::fieldsOf($category, self::AUDITED)));
+            $this->saveBangla($category, $data);
 
             return $category;
         });
@@ -83,11 +86,12 @@ class CategoryController extends Controller
                 // Moved: last among the new siblings (unless a position is given too).
                 $category->position = $data['position'] ?? $this->nextPosition($data['parent_id']);
             }
-            $category->fill(collect($data)->except(['parent_id'])->all())->save();
+            $category->fill(collect($data)->except(['parent_id', 'translations'])->all())->save();
 
             if ($changes = Audit::diff($before, Audit::fieldsOf($category, self::AUDITED))) {
                 $this->audit->record('category.updated', "Category \"{$category->name}\" ({$category->slug}) updated.", 'category', $category->id, $changes);
             }
+            $this->saveBangla($category, $data);
         });
 
         return response()->json(['data' => $this->find($category->id)]);
@@ -198,7 +202,19 @@ class CategoryController extends Controller
             'meta_title' => $category->meta_title,
             'meta_description' => $category->meta_description,
             'product_count' => $productCount,
+            // Phase 13: the Bangla text (null = the store shows English) and whether it's complete (name, and description when there is one).
+            'translations' => ['bn' => $category->translationFields('bn')],
+            'bangla' => PageResource::banglaStatus($category->missingTranslations('bn'), filled($category->description) ? ['name', 'description'] : ['name']),
         ];
+    }
+
+    /** Phase 13: saves translations.bn and logs which Bangla fields changed. */
+    private function saveBangla(Category $category, array $data): void
+    {
+        $fields = TranslationInput::save($category, $data);
+        if ($fields) {
+            $this->audit->record('category.translated', "Category \"{$category->name}\" Bangla text updated (".implode(', ', $fields).').', 'category', $category->id);
+        }
     }
 
     private function validated(Request $request, ?Category $category): array
@@ -216,6 +232,8 @@ class CategoryController extends Controller
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'meta_title' => ['sometimes', 'nullable', 'string', 'max:190'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:500'],
+            // Phase 13: translations.bn.{name, description, meta_title, meta_description}.
+            ...TranslationInput::rules(['name' => 120, 'description' => 5000, 'meta_title' => 190, 'meta_description' => 500]),
         ], [
             'name.required' => 'Enter a category name.',
             'slug.regex' => 'The URL key can only contain lower-case letters, numbers, and dashes (for example "phone-cases").',

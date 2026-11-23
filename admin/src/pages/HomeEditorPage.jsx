@@ -7,6 +7,9 @@ import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import { ErrorState, Loading } from '../components/States'
 import { formatMoney } from '../utils/format'
+// Phase 13 §4: the hero's and banners' Bangla texts.
+import BanglaField from '../components/BanglaField'
+import { BANNER_BANGLA_FIELDS, HERO_BANGLA_FIELDS, banglaValues, toBangla } from '../utils/bangla'
 
 const TONES = [
   { value: 'navy', label: 'Navy' },
@@ -21,7 +24,25 @@ const LINK = /^(\/(?!\/)|https?:\/\/)\S*$/i
 let nextKey = 0
 // A stable React key per banner, so reordering keeps each banner's inputs (and focus) with it.
 const withKey = (banner) => ({ ...banner, key: `banner-${nextKey++}` })
-const emptyBanner = () => withKey({ id: null, eyebrow: '', title: '', description: '', cta: { label: '', url: '' }, imageUrl: '', imageAlt: '', tone: 'navy', isActive: true })
+const emptyBanner = (bangla = false) =>
+  withKey({ id: null, eyebrow: '', title: '', description: '', cta: { label: '', url: '' }, imageUrl: '', imageAlt: '', tone: 'navy', isActive: true, ...(bangla && { bn: banglaValues(null, BANNER_BANGLA_FIELDS) }) })
+const heroBangla = (bn) => ({ ...banglaValues(bn, HERO_BANGLA_FIELDS), highlights: [0, 1, 2].map((index) => bn?.highlights?.[index] ?? '') })
+
+/** Phase 13: a "Bangla (বাংলা)" group of fields inside a hero or banner. */
+function BanglaGroup({ children }) {
+  return (
+    <fieldset className="form__fieldset bangla-section">
+      <legend>
+        Bangla{' '}
+        <span lang="bn" className="muted">
+          (বাংলা)
+        </span>
+      </legend>
+      <p className="field__hint">Shown when shoppers use the store in Bangla. Empty fields show the English text.</p>
+      {children}
+    </fieldset>
+  )
+}
 
 /** Content → Home page: hero, promo banners (ordered), and featured products. Needs content.view; saving content.edit. */
 function HomeEditorPage() {
@@ -39,8 +60,13 @@ function HomeEditor({ saved }) {
     ...saved.hero,
     secondaryCta: saved.hero.secondaryCta ?? { label: '', url: '' },
     highlights: [0, 1, 2].map((index) => saved.hero.highlights[index] ?? ''),
+    // Phase 13: only when the API has the Bangla texts.
+    ...(saved.hero.bn !== undefined && { bn: heroBangla(saved.hero.bn) }),
   }))
-  const [banners, setBanners] = useState(() => saved.banners.map(withKey))
+  const bangla = saved.hero.bn !== undefined
+  const [banners, setBanners] = useState(() => saved.banners.map((banner) => withKey(bangla ? { ...banner, bn: banglaValues(banner.bn, BANNER_BANGLA_FIELDS) } : banner)))
+  const setHeroBn = (field) => (text) => setHero((current) => ({ ...current, bn: { ...current.bn, [field]: text } }))
+  const setBannerBn = (banner, field) => (text) => setBanner(banner.key, { bn: { ...banner.bn, [field]: text } })
   const [featured, setFeatured] = useState(() => saved.featuredProductIds.map((id) => saved.featuredProducts.find((product) => product.id === id) ?? { id, title: `Product #${id}` }))
   const [errors, setErrors] = useState({})
   const [notice, setNotice] = useState(null)
@@ -68,7 +94,7 @@ function HomeEditor({ saved }) {
     })
   }
   function addBanner() {
-    const banner = emptyBanner()
+    const banner = emptyBanner(bangla)
     setBanners((current) => [...current, banner])
     setAnnouncement(`Banner ${banners.length + 1} added.`)
     requestAnimationFrame(() => document.querySelector(`[data-banner-title="${banner.key}"]`)?.focus())
@@ -122,8 +148,24 @@ function HomeEditor({ saved }) {
     }
     const secondary = hero.secondaryCta.label.trim() || hero.secondaryCta.url.trim() ? hero.secondaryCta : null
     save.mutate({
-      hero: { ...hero, secondaryCta: secondary, highlights: hero.highlights.map((text) => text.trim()).filter(Boolean) },
-      banners: banners.map((banner) => ({ id: banner.id, eyebrow: banner.eyebrow, title: banner.title, description: banner.description, cta: banner.cta, imageUrl: banner.imageUrl, imageAlt: banner.imageAlt, tone: banner.tone, isActive: banner.isActive })),
+      hero: {
+        ...hero,
+        secondaryCta: secondary,
+        highlights: hero.highlights.map((text) => text.trim()).filter(Boolean),
+        ...(hero.bn && { bn: { ...toBangla(hero.bn, HERO_BANGLA_FIELDS), highlights: hero.bn.highlights.map((text) => text.trim()).filter(Boolean) } }),
+      },
+      banners: banners.map((banner) => ({
+        id: banner.id,
+        eyebrow: banner.eyebrow,
+        title: banner.title,
+        description: banner.description,
+        cta: banner.cta,
+        imageUrl: banner.imageUrl,
+        imageAlt: banner.imageAlt,
+        tone: banner.tone,
+        isActive: banner.isActive,
+        ...(banner.bn && { bn: toBangla(banner.bn, BANNER_BANGLA_FIELDS) }),
+      })),
       featuredProductIds: featured.map((product) => product.id),
     })
   }
@@ -199,6 +241,31 @@ function HomeEditor({ saved }) {
                 ))}
               </div>
             </fieldset>
+            {hero.bn && (
+              <BanglaGroup>
+                <div className="form__grid">
+                  <BanglaField label="Hero eyebrow in Bangla" value={hero.bn.eyebrow} english={hero.eyebrow} onChange={setHeroBn('eyebrow')} maxLength={60} error={err('hero.bn.eyebrow')} />
+                  <BanglaField label="Headline in Bangla" value={hero.bn.title} english={hero.title} onChange={setHeroBn('title')} maxLength={120} error={err('hero.bn.title')} />
+                </div>
+                <BanglaField label="Hero description in Bangla" value={hero.bn.description} english={hero.description} onChange={setHeroBn('description')} maxLength={300} multiline rows={2} error={err('hero.bn.description')} />
+                <div className="form__grid">
+                  <BanglaField label="Main button text in Bangla" value={hero.bn.primaryCtaLabel} english={hero.primaryCta.label} onChange={setHeroBn('primaryCtaLabel')} maxLength={40} error={err('hero.bn.primaryCtaLabel')} />
+                  <BanglaField label="Second button text in Bangla" value={hero.bn.secondaryCtaLabel} english={hero.secondaryCta.label} onChange={setHeroBn('secondaryCtaLabel')} maxLength={40} error={err('hero.bn.secondaryCtaLabel')} />
+                  <BanglaField label="Hero image description in Bangla" value={hero.bn.imageAlt} english={hero.imageAlt} onChange={setHeroBn('imageAlt')} maxLength={200} error={err('hero.bn.imageAlt')} />
+                  {hero.bn.highlights.map((text, index) => (
+                    <BanglaField
+                      key={index}
+                      label={`Highlight ${index + 1} in Bangla`}
+                      value={text}
+                      english={hero.highlights[index]}
+                      maxLength={80}
+                      error={err('hero.bn.highlights')}
+                      onChange={(next) => setHero((current) => ({ ...current, bn: { ...current.bn, highlights: current.bn.highlights.map((item, position) => (position === index ? next : item)) } }))}
+                    />
+                  ))}
+                </div>
+              </BanglaGroup>
+            )}
           </section>
 
           <section className="panel" aria-labelledby="banners-title">
@@ -276,6 +343,17 @@ function HomeEditor({ saved }) {
                         <input type="checkbox" checked={banner.isActive} onChange={(event) => setBanner(banner.key, { isActive: event.target.checked })} />
                         Active (shown in the store)
                       </label>
+                      {banner.bn && (
+                        <BanglaGroup>
+                          <div className="form__grid">
+                            <BanglaField label={`${name}: title in Bangla`} value={banner.bn.title} english={banner.title} onChange={setBannerBn(banner, 'title')} maxLength={120} error={err(`${path}.bn.title`)} />
+                            <BanglaField label={`${name}: eyebrow in Bangla`} value={banner.bn.eyebrow} english={banner.eyebrow} onChange={setBannerBn(banner, 'eyebrow')} maxLength={60} error={err(`${path}.bn.eyebrow`)} />
+                            <BanglaField label={`${name}: description in Bangla`} value={banner.bn.description} english={banner.description} onChange={setBannerBn(banner, 'description')} maxLength={300} error={err(`${path}.bn.description`)} />
+                            <BanglaField label={`${name}: button text in Bangla`} value={banner.bn.ctaLabel} english={banner.cta.label} onChange={setBannerBn(banner, 'ctaLabel')} maxLength={40} error={err(`${path}.bn.ctaLabel`)} />
+                            <BanglaField label={`${name}: image description in Bangla`} value={banner.bn.imageAlt} english={banner.imageAlt} onChange={setBannerBn(banner, 'imageAlt')} maxLength={200} error={err(`${path}.bn.imageAlt`)} />
+                          </div>
+                        </BanglaGroup>
+                      )}
                     </fieldset>
                   </li>
                 )

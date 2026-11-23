@@ -68,7 +68,7 @@ class CartRules
                 $tree ??= CategoryTree::load();
                 $eligible = $record->eligibleLines($lines, $tree);
             }
-            $error = $record ? $record->problemFor($subtotalCents, $customerId, $email, $group?->id, $eligible !== []) : 'This code is not valid.';
+            $error = $record ? $record->problemFor($subtotalCents, $customerId, $email, $group?->id, $eligible !== []) : __('This code is not valid.');
             if (! $error) {
                 $applied[] = $this->use($record, $record->lineDiscounts($lines, $eligible, $remaining));
                 $coupon = ['code' => $record->code, 'description' => $record->description];

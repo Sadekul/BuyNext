@@ -18,7 +18,8 @@ class ProductTransferTest extends TestCase
     use PlacesOrders, RefreshDatabase;
 
     private const HEADER = 'sku,name,category_slug,brand,price,discount_percent,stock_quantity,status,description,tags,image_urls,'
-        .'specifications,related_skus,upsell_skus,crosssell_skus'; // phase 11: the last four
+        .'specifications,related_skus,upsell_skus,crosssell_skus' // phase 11
+        .',name_bn,short_description_bn,description_bn,meta_title_bn,meta_description_bn'; // phase 13
 
     private array $admin;
 
@@ -66,7 +67,7 @@ class ProductTransferTest extends TestCase
         $this->assertSame(explode(',', self::HEADER), $rows[0]);
         $this->assertCount(2, $rows); // the draft is filtered out
         $this->assertSame(['MUG-1', '\'=HYPERLINK("http://x","click")', 'beauty', "'@Evil Brand", '9.50', '5.00', '7', 'active',
-            "'-2+3\nSecond line", 'a|b', 'https://cdn.example.com/1.webp|https://cdn.example.com/2.webp', '', '', '', ''], $rows[1]);
+            "'-2+3\nSecond line", 'a|b', 'https://cdn.example.com/1.webp|https://cdn.example.com/2.webp', '', '', '', '', '', '', '', '', ''], $rows[1]); // phase 13: 5 empty Bangla cells
     }
 
     public function test_a_dry_run_reports_without_saving(): void

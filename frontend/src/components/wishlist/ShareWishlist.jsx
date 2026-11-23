@@ -6,6 +6,7 @@ import { useWishlist } from '../../hooks/useWishlist'
 import { shareWishlist, stopSharingWishlist } from '../../services/wishlistService'
 import { ROUTES } from '../../constants/routes'
 import './ShareWishlist.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Phase 11 §1 (REAL_SHOP, signed in): "Share my wishlist". Makes a link
@@ -16,6 +17,7 @@ import './ShareWishlist.css'
  * working). "Stop sharing" turns it off.
  */
 function ShareWishlist() {
+  const { t } = useTranslation('catalog')
   const { authorizedRequest } = useAuth()
   const wishlist = useWishlist()
   const [link, setLink] = useState(null)
@@ -33,7 +35,7 @@ function ShareWishlist() {
     try {
       onDone(await authorizedRequest(action))
     } catch (failure) {
-      setError(failure?.message ?? 'Something went wrong. Please try again.')
+      setError(failure?.message ?? t('share.failed'))
     } finally {
       setBusy(false)
     }
@@ -47,11 +49,11 @@ function ShareWishlist() {
         // Already shared (from another device): the API can't show that link again.
         if (!result.token) {
           setLink(null)
-          setStatus('Your wishlist is already shared. Get a new link to copy it here.')
+          setStatus(t('share.alreadyShared'))
           return
         }
         setLink(`${window.location.origin}${ROUTES.sharedWishlist(result.token)}`)
-        setStatus(regenerate ? 'A new share link was made. The old link no longer works.' : 'Your share link is ready.')
+        setStatus(t(regenerate ? 'share.newLink' : 'share.ready'))
       },
     )
 
@@ -61,58 +63,56 @@ function ShareWishlist() {
       () => {
         setLink(null)
         wishlist.setShared(false)
-        setStatus('Sharing is off. The link no longer works.')
+        setStatus(t('share.stopped'))
       },
     )
 
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(link)
-      setStatus('Link copied.')
+      setStatus(t('share.copied'))
     } catch {
       // No clipboard access (an older browser, or permission refused): select the link so it can be copied by hand.
       inputRef.current?.select()
-      setStatus('Select the link and copy it.')
+      setStatus(t('share.selectToCopy'))
     }
   }
 
   return (
     <section className="share-wishlist" aria-labelledby={titleId}>
       <h2 id={titleId} className="share-wishlist__title">
-        <LuShare2 aria-hidden="true" /> Share my wishlist
+        <LuShare2 aria-hidden="true" /> {t('share.title')}
       </h2>
       {link ? (
         <>
           <label htmlFor={inputId} className="share-wishlist__label">
-            Share link
+            {t('share.linkLabel')}
           </label>
           <div className="share-wishlist__row">
             <input ref={inputRef} id={inputId} className="share-wishlist__input" value={link} readOnly onFocus={(event) => event.target.select()} />
             <Button size="sm" onClick={copyLink} disabled={busy}>
-              <LuCopy aria-hidden="true" /> Copy link
+              <LuCopy aria-hidden="true" /> {t('share.copy')}
             </Button>
           </div>
-          <p className="share-wishlist__hint">Anyone with this link can see your wishlist and your first name. Save it now: for your privacy it isn&apos;t shown again.</p>
+          <p className="share-wishlist__hint">{t('share.linkHint')}</p>
         </>
       ) : (
         <p className="share-wishlist__hint">
-          {wishlist.shared
-            ? 'Your wishlist is shared. For your privacy the link is only shown when it is made: get a new link to copy it again (the old one stops working).'
-            : 'Make a link to send to friends and family. They see your saved products and your first name, nothing else.'}
+          {t(wishlist.shared ? 'share.sharedHint' : 'share.intro')}
         </p>
       )}
       <div className="share-wishlist__actions">
         {!wishlist.shared ? (
           <Button size="sm" onClick={() => makeLink(false)} disabled={busy}>
-            <LuLink aria-hidden="true" /> Create share link
+            <LuLink aria-hidden="true" /> {t('share.create')}
           </Button>
         ) : (
           <>
             <Button size="sm" variant="outline" onClick={() => makeLink(true)} disabled={busy}>
-              Get a new link
+              {t('share.regenerate')}
             </Button>
             <Button size="sm" variant="ghost" onClick={stopSharing} disabled={busy}>
-              Stop sharing
+              {t('share.stop')}
             </Button>
           </>
         )}

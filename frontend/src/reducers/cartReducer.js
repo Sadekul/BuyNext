@@ -3,6 +3,7 @@ import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { effectiveDiscountPercent, getProductPricing } from '../utils/pricing'
 import { storedInteger, storedProductSnapshot, storedText } from '../utils/storedValues'
 import { giftCardLineId, storedGiftCard } from '../utils/giftCards'
+import { translate } from '../i18n'
 
 /*
  * Cart reducer: a pure function (state, action) → new state.
@@ -66,8 +67,9 @@ const actionKey = (action) => action.lineKey ?? String(action.productId)
 
 /** Explains why the stored quantity differs from what was requested, or null. */
 function quantityNotice(requested, actual, limits) {
-  if (actual < requested) return `Only ${limits.max} available, so the quantity was set to ${actual}.`
-  if (actual > requested) return `Minimum order is ${limits.min}, so the quantity was set to ${actual}.`
+  // Phase 13: written in the shopper's language when the change happens.
+  if (actual < requested) return translate('cart:notices.onlyAvailable', { max: limits.max, quantity: actual })
+  if (actual > requested) return translate('cart:notices.minimum', { min: limits.min, quantity: actual })
   return null
 }
 
@@ -155,21 +157,21 @@ export function cartReducer(state, action) {
         ...state,
         items: state.items.map((item) => {
           const fresh = freshById.get(item.productId)
-          if (!fresh) return { ...item, isUnavailable: true, notice: 'This product is no longer available.' }
+          if (!fresh) return { ...item, isUnavailable: true, notice: translate('cart:notices.productGone') }
           // A gift card line keeps its chosen amount (the list only has the product's own price).
           if (item.giftCard) return { ...item, title: fresh.title ?? item.title, thumbnail: fresh.thumbnail ?? item.thumbnail, isUnavailable: false }
           // A variant line: the list only has the product's own price and total
           // stock, so the variant's price and stock stay as they were (the
           // server checks them again in cart/validate). The rest is refreshed.
           if (item.variantId) {
-            if (fresh.hasVariants === false) return { ...item, isUnavailable: true, notice: 'This option is no longer available.' }
+            if (fresh.hasVariants === false) return { ...item, isUnavailable: true, notice: translate('cart:notices.optionGone') }
             const { price, stock, availabilityStatus } = item
             return { ...item, ...toSnapshot(fresh), price, stock, availabilityStatus }
           }
 
           const limits = getPurchaseLimits(fresh)
           if (!limits.canBuy) {
-            return { ...item, ...toSnapshot(fresh), isUnavailable: true, notice: 'This product is out of stock.' }
+            return { ...item, ...toSnapshot(fresh), isUnavailable: true, notice: translate('cart:notices.outOfStock') }
           }
 
           // Start with no notice: old messages (e.g. "out of stock" before a
@@ -179,7 +181,7 @@ export function cartReducer(state, action) {
           const newSalePrice = getProductPricing(fresh).salePrice
           let notice = quantityNotice(item.quantity, quantity, limits)
           if (!notice && oldSalePrice !== newSalePrice) {
-            notice = `Price changed from ${formatBasePrice(oldSalePrice)} to ${formatBasePrice(newSalePrice)}.`
+            notice = translate('cart:notices.priceChanged', { from: formatBasePrice(oldSalePrice), to: formatBasePrice(newSalePrice) })
           }
           return { ...item, ...toSnapshot(fresh), quantity, isUnavailable: false, notice }
         }),

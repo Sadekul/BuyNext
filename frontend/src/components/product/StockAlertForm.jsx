@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { createStockAlert } from '../../services/accountService'
 import { validateEmail } from '../../utils/validation'
 import './StockAlertForm.css'
+import { useTranslation } from 'react-i18next'
 
 // One answer for everyone: it never tells whether an address was already on the list.
 export const STOCK_ALERT_DONE = "We'll email you when it's back in stock."
@@ -19,6 +20,7 @@ export const STOCK_ALERT_DONE = "We'll email you when it's back in stock."
  * before, the shopper sees the same message.
  */
 function StockAlertForm({ productId, variantId = null, variantLabel = null }) {
+  const { t } = useTranslation('catalog')
   const { isAuthenticated, authorizedRequest } = useAuth()
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState(null)
@@ -50,13 +52,13 @@ function StockAlertForm({ productId, variantId = null, variantLabel = null }) {
   return (
     <section className="stock-alert" aria-labelledby={headingId}>
       <h2 id={headingId} className="stock-alert__title">
-        <LuBell aria-hidden="true" /> {variantLabel ? `${variantLabel} is sold out` : 'Sold out for now'}
+        <LuBell aria-hidden="true" /> {variantLabel ? t('stockAlert.variantSoldOut', { variant: variantLabel }) : t('stockAlert.soldOut')}
       </h2>
       {/* The live region exists before the answer arrives, so it is announced. */}
       <p className="stock-alert__done" role="status">
         {subscribe.isSuccess && (
           <>
-            <LuMailCheck aria-hidden="true" /> {STOCK_ALERT_DONE}
+            <LuMailCheck aria-hidden="true" /> {t('stockAlert.done')}
           </>
         )}
       </p>
@@ -64,7 +66,7 @@ function StockAlertForm({ productId, variantId = null, variantLabel = null }) {
         <form className="stock-alert__form" onSubmit={handleSubmit} noValidate aria-labelledby={headingId}>
           {!isAuthenticated && (
             <FormField
-              label="Your email"
+              label={t('stockAlert.email')}
               name="email"
               type="email"
               autoComplete="email"
@@ -74,7 +76,7 @@ function StockAlertForm({ productId, variantId = null, variantLabel = null }) {
                 if (emailError) setEmailError(null)
               }}
               error={emailError}
-              hint="We'll only use it for this alert."
+              hint={t('stockAlert.emailHint')}
             />
           )}
           {generalError && (
@@ -83,7 +85,7 @@ function StockAlertForm({ productId, variantId = null, variantLabel = null }) {
             </p>
           )}
           <Button type="submit" variant="outline" disabled={subscribe.isPending}>
-            {subscribe.isPending ? 'Saving…' : "Email me when it's back"}
+            {t(subscribe.isPending ? 'stockAlert.saving' : 'stockAlert.submit')}
           </Button>
         </form>
       )}

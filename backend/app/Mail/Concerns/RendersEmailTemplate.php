@@ -5,6 +5,7 @@ namespace App\Mail\Concerns;
 use App\Services\EmailTemplates;
 use App\Services\Settings;
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
@@ -12,6 +13,11 @@ use Illuminate\Mail\Mailables\Envelope;
  * Phase 7: a mailable whose subject and body come from an email template
  * (App\Services\EmailTemplates). The mailable only says which template and
  * which values; staff can change the wording in the admin.
+ *
+ * Phase 13: each mailable sets its language in the constructor
+ * ($this->locale(...)); Laravel renders it inside that locale, so the
+ * template version, __() texts, money and numbers follow it. Without one, the
+ * email is in the language of the request that sends it.
  */
 trait RendersEmailTemplate
 {
@@ -59,9 +65,15 @@ trait RendersEmailTemplate
         return null;
     }
 
-    /** An amount in the email's currency ("$59.97", "৳1,250.00"). */
+    /** An amount in the email's currency ("$59.97", "৳1,250.00"; phase 13: "৳১,২৫০.০০" in Bangla with Bangla digits on). */
     protected function money(string|int|float|null $amount): string
     {
-        return Currency::format($amount, $this->templateCurrency());
+        return Currency::format($amount, $this->templateCurrency(), Locale::current());
+    }
+
+    /** Phase 13: a count in the email's language ("1,250" / "১,২৫০"). */
+    protected function number(int|float $number): string
+    {
+        return Locale::number($number);
     }
 }

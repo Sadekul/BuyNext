@@ -33,6 +33,10 @@ export const DEFAULT_STORE_SETTINGS = {
   // Phase 12: the demo charges in USD and has no SSLCommerz (never offered; see constants/store.js).
   currency: DEFAULT_STORE_CURRENCY,
   sslcommerzPayments: 'manual',
+  // Phase 13: both languages, English first, Bangla digits in Bangla.
+  locales: ['en', 'bn'],
+  defaultLocale: 'en',
+  banglaDigits: true,
 }
 
 /**

@@ -1,4 +1,4 @@
-import { STORE_SETTINGS } from '../constants/store'
+import { getIntlLanguage, intlLocale, localizeDigits } from '../i18n/intl'
 import { getDisplayCurrency, getStoreCurrency, sanitizeStoreCurrency } from './displayCurrency'
 
 /*
@@ -14,6 +14,12 @@ import { getDisplayCurrency, getStoreCurrency, sanitizeStoreCurrency } from './d
  * belongs to an order (or an invoice, a refund, a gift card) is written in
  * ITS currency: formatBasePrice(amount, order.currency), so an old USD
  * order still reads "$" after the store switched to taka.
+ *
+ * Phase 13: money keeps the phase 12 layout in both languages (symbol first,
+ * groups of three, like the API's emails and PDFs); in Bangla the digits are
+ * Bangla ("৳১,২৫০.০০") unless the store turned them off ("৳1,250.00"). Dates
+ * and plain numbers use Intl in the active locale (i18n/intl.js): en-US,
+ * bn-BD, or bn-BD-u-nu-latn.
  */
 
 /** The currency to write money in: the given one (an order's code), else the store currency. */
@@ -42,14 +48,16 @@ export const chargedCurrencyCode = (currency) => chargedCurrency(currency).code
 
 const displayFormatters = new Map()
 function displayFormatter(currency) {
+  // Phase 13: money is always laid out the en-US way (symbol first, groups of three), in every
+  // language, exactly like the API's emails and PDFs; Bangla only swaps the digits (formatInCurrency).
   const key = `${currency.code}:${currency.decimals}`
   if (!displayFormatters.has(key)) {
     const digits = { minimumFractionDigits: currency.decimals, maximumFractionDigits: currency.decimals }
     let formatter
     try {
-      formatter = new Intl.NumberFormat(STORE_SETTINGS.locale, { style: 'currency', currency: currency.code, ...digits })
+      formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.code, ...digits })
     } catch {
-      formatter = new Intl.NumberFormat(STORE_SETTINGS.locale, digits) // a code Intl doesn't know: number only
+      formatter = new Intl.NumberFormat('en-US', digits) // a code Intl doesn't know: number only
     }
     displayFormatters.set(key, formatter)
   }
@@ -70,7 +78,8 @@ export function formatInCurrency(amount, currency) {
     .filter((part) => part.type !== 'literal' || !hasCurrency || part.value.trim() !== '')
     .map((part) => (part.type === 'currency' ? currency.symbol : part.value))
     .join('')
-  return hasCurrency ? text : `${currency.symbol}${text}`
+  // Bangla (phase 13): the same layout with Bangla digits ("৳১,২৫০.০০"; "৳1,250.00" when the store turned them off).
+  return localizeDigits(hasCurrency ? text : `${currency.symbol}${text}`)
 }
 
 /** Formats a price for display: the shopper's chosen currency, or the base currency, e.g. 1099.99 → "$1,099.99". */
@@ -79,12 +88,26 @@ export function formatPrice(amount) {
   return currency ? formatInCurrency(amount, currency) : formatBasePrice(amount)
 }
 
-const dateFormatter = new Intl.DateTimeFormat(STORE_SETTINGS.locale, { dateStyle: 'medium' })
-
-/** ISO date string → "Apr 30, 2025". */
-export function formatDate(isoDate) {
-  return dateFormatter.format(new Date(isoDate))
+const dateFormatters = new Map()
+/** One Intl.DateTimeFormat per locale and style (Bangla spells the month out: "৩০ এপ্রিল, ২০২৬"). */
+function dateFormatter(style) {
+  const locale = intlLocale()
+  const key = `${locale}:${style}`
+  if (!dateFormatters.has(key)) {
+    const bangla = getIntlLanguage() === 'bn'
+    const options = style === 'date' ? { dateStyle: bangla ? 'long' : 'medium' } : { dateStyle: bangla ? 'long' : 'medium', timeStyle: 'short' }
+    dateFormatters.set(key, new Intl.DateTimeFormat(locale, options))
+  }
+  return dateFormatters.get(key)
 }
+
+/** ISO date string → "Apr 30, 2025" (Bangla: "৩০ এপ্রিল, ২০২৫"). */
+export function formatDate(isoDate) {
+  return dateFormatter('date').format(new Date(isoDate))
+}
+
+/** 12345 → "12,345" in the active language (Bangla digits in Bangla). */
+export { formatNumber } from '../i18n/intl'
 
 /** "mens-watches" → "Mens Watches" (the same format the categories API uses). */
 export function formatSlug(slug) {
@@ -94,9 +117,7 @@ export function formatSlug(slug) {
     .join(' ')
 }
 
-const dateTimeFormatter = new Intl.DateTimeFormat(STORE_SETTINGS.locale, { dateStyle: 'medium', timeStyle: 'short' })
-
 /** ISO date-time → "Nov 10, 2026, 9:41 AM" (in the shopper's time zone). */
 export function formatDateTime(isoDate) {
-  return dateTimeFormatter.format(new Date(isoDate))
+  return dateFormatter('dateTime').format(new Date(isoDate))
 }

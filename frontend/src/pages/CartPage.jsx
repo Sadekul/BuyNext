@@ -18,8 +18,10 @@ import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSett
 import { withServerPricing } from '../utils/cartTotals'
 import { cartLineKey } from '../reducers/cartReducer'
 import './CartPage.css'
+import { useTranslation } from 'react-i18next'
 
 function CartPage() {
+  const { t } = useTranslation('cart')
   const cart = useCart()
   const { user } = useAuth()
   // Re-check prices and stock once each time the cart page opens.
@@ -46,9 +48,9 @@ function CartPage() {
   if (cart.items.length === 0) {
     return (
       <div className="section container">
-        <title>{`Cart | ${SITE.name}`}</title>
-        <EmptyState icon={LuShoppingBag} title="Your cart is empty" message="Browse the catalog and add something you love.">
-          <Button to={ROUTES.products}>Start shopping</Button>
+        <title>{`${t('page.tabTitle')} | ${SITE.name}`}</title>
+        <EmptyState icon={LuShoppingBag} title={t('page.emptyTitle')} message={t('page.emptyMessage')}>
+          <Button to={ROUTES.products}>{t('page.startShopping')}</Button>
         </EmptyState>
       </div>
     )
@@ -56,19 +58,18 @@ function CartPage() {
 
   return (
     <div className="cart-page section container">
-      <title>{`Cart (${cart.totals.itemCount}) | ${SITE.name}`}</title>
+      <title>{`${t('page.tabTitleCount', { count: cart.totals.itemCount })} | ${SITE.name}`}</title>
       <header className="cart-page__header">
-        <h1>Shopping cart</h1>
+        <h1>{t('page.title')}</h1>
         <p className="cart-page__status" role="status">
           {/* This live region is always rendered, so screen readers announce its changes. */}
-          {refresh.isFetching && 'Checking the latest prices and stock…'}
-          {!refresh.isFetching && !refresh.error && changedCount > 0 &&
-            `${changedCount} ${changedCount === 1 ? 'item has' : 'items have'} changed since you added ${changedCount === 1 ? 'it' : 'them'}. See the notes below.`}
+          {refresh.isFetching && t('page.checking')}
+          {!refresh.isFetching && !refresh.error && changedCount > 0 && t('page.changed', { count: changedCount })}
           {refresh.error && (
             <>
-              We couldn't check the latest prices ({refresh.error.message}){' '}
+              {t('page.checkFailed', { reason: refresh.error.message })}{' '}
               <button type="button" className="cart-page__link-button" onClick={() => refresh.refetch()}>
-                Try again
+                {t('page.tryAgain')}
               </button>
             </>
           )}
@@ -78,7 +79,7 @@ function CartPage() {
       <div className="cart-page__layout">
         <section aria-labelledby="cart-items-title">
           <h2 id="cart-items-title" className="visually-hidden">
-            Items in your cart
+            {t('page.items')}
           </h2>
           <ul className="cart-page__list">
             {cart.items.map((item) => (
@@ -89,10 +90,10 @@ function CartPage() {
           </ul>
           <div className="cart-page__list-actions">
             <Button to={ROUTES.products} variant="ghost">
-              Continue shopping
+              {t('page.continue')}
             </Button>
             <Button variant="ghost" onClick={cart.clearCart}>
-              Clear cart
+              {t('page.clear')}
             </Button>
           </div>
         </section>
@@ -113,22 +114,21 @@ function CartPage() {
           )}
           {REAL_SHOP && pricing.error && !pricing.data && (
             <p className="cart-page__blocker" role="alert">
-              We couldn't check the prices ({pricing.error.message}). The total is confirmed at checkout.
+              {t('page.pricesFailed', { reason: pricing.error.message })}
             </p>
           )}
           {unavailableCount > 0 && (
             <p className="cart-page__blocker" role="alert">
-              Remove {unavailableCount === 1 ? 'the unavailable item' : `${unavailableCount} unavailable items`} to
-              continue.
+              {t('page.removeUnavailable', { count: unavailableCount })}
             </p>
           )}
           {!canCheckout ? (
             <Button size="lg" fullWidth disabled>
-              Proceed to checkout
+              {t('page.proceed')}
             </Button>
           ) : (
             <Button to={ROUTES.checkout} size="lg" fullWidth>
-              Proceed to checkout
+              {t('page.proceed')}
             </Button>
           )}
         </CartSummary>
@@ -136,7 +136,7 @@ function CartPage() {
 
       {crossSells.length > 0 && (
         <section className="cart-page__cross-sells" aria-labelledby="cross-sells-title">
-          <h2 id="cross-sells-title">Customers also bought</h2>
+          <h2 id="cross-sells-title">{t('page.crossSells')}</h2>
           <ProductGrid products={crossSells} onAddToCart={handleAddToCart} />
         </section>
       )}

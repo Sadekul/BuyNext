@@ -6,6 +6,7 @@ use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\GiftCard;
 use App\Services\GiftCards;
 use App\Support\EmailBlocks;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -17,7 +18,12 @@ class GiftCardReceivedMail extends Mailable
 {
     use RendersEmailTemplate;
 
-    public function __construct(public GiftCard $card, public string $code, public ?string $senderName = null) {}
+    public function __construct(public GiftCard $card, public string $code, public ?string $senderName = null)
+    {
+        // Phase 13: the recipient's language isn't known: the language of the order that bought it, else the store default.
+        $order = $card->purchaserOrderItem?->order;
+        $this->locale($order ? Locale::forOrder($order) : Locale::storeDefault());
+    }
 
     /** Phase 12: the order's currency. */
     protected function templateCurrency(): ?string
@@ -35,14 +41,14 @@ class GiftCardReceivedMail extends Mailable
         $shop = (string) config('buynest.storefront_url');
 
         return [
-            'recipient_name' => $this->card->recipient_name ?: 'there',
+            'recipient_name' => $this->card->recipient_name ?: __('there'),
             'sender_name' => $this->senderName ?: self::storeName(),
             'amount' => $this->card->initial_balance,
             'code' => GiftCards::format($this->code),
             'message' => $this->card->message ? EmailBlocks::paragraph('“'.$this->card->message.'”') : '',
-            'expires' => $this->card->expires_at ? 'It can be used until '.$this->card->expires_at->format('F j, Y').'.' : 'It doesn’t expire.',
+            'expires' => $this->card->expires_at ? __('It can be used until :date.', ['date' => Locale::isBangla() ? Locale::date($this->card->expires_at) : $this->card->expires_at->format('F j, Y')]) : __('It doesn’t expire.'),
             'shop_url' => $shop,
-            'button' => EmailBlocks::button($shop, 'Start shopping'),
+            'button' => EmailBlocks::button($shop, __('Start shopping')),
         ];
     }
 }

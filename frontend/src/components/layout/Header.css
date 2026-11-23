@@ -136,3 +136,28 @@
   background: var(--color-bg-muted);
   border-radius: 50%;
 }
+
+/* Phase 13: the language switch sits before the account actions. */
+.site-header__language {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.site-header__currency:not(:empty) ~ .site-header__language {
+  margin-left: 0;
+}
+
+.site-header__language + .site-header__actions {
+  margin-left: 0;
+}
+
+/* Small phones: the switch is in the menu drawer and the footer instead. */
+@media (max-width: 479px) {
+  .site-header__language {
+    display: none;
+  }
+
+  .site-header__language + .site-header__actions {
+    margin-left: auto;
+  }
+}

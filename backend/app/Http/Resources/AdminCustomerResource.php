@@ -25,6 +25,7 @@ class AdminCustomerResource extends JsonResource
             'last_name' => $this->last_name,
             'email' => $this->email,
             'phone' => $this->phone,
+            'locale' => $this->locale, // phase 13: "en" | "bn" | null (= the store default): the language of their emails
             'email_verified_at' => $this->email_verified_at?->toIso8601ZuluString(),
             'email_verified' => $this->email_verified_at !== null,
             'is_active' => $this->is_active,

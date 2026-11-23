@@ -6,6 +6,7 @@ import Modal from '../ui/Modal'
 import { useAuth } from '../../hooks/useAuth'
 import { cancelOrder } from '../../services/shopService'
 import './CancelOrderButton.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 const MAX_REASON = 500
 
@@ -19,6 +20,7 @@ const MAX_REASON = 500
  * `onCancelled(order)` receives the cancelled order.
  */
 function CancelOrderButton({ order, email, onCancelled }) {
+  const { t } = useTranslation('orders')
   const { isAuthenticated, authorizedRequest } = useAuth()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -34,7 +36,7 @@ function CancelOrderButton({ order, email, onCancelled }) {
     },
     onSuccess: (cancelled) => {
       setOpen(false)
-      setDone(`Order ${order.number} was cancelled. We've emailed you a confirmation.`)
+      setDone(t('cancel.done', { number: order.number }))
       onCancelled?.(cancelled)
     },
   })
@@ -52,7 +54,7 @@ function CancelOrderButton({ order, email, onCancelled }) {
     <div className="cancel-order">
       {order.canCancel && (
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          <LuBan aria-hidden="true" /> Cancel order
+          <LuBan aria-hidden="true" /> {t('cancel.button')}
         </Button>
       )}
       <p className="cancel-order__status" role="status">
@@ -61,22 +63,22 @@ function CancelOrderButton({ order, email, onCancelled }) {
       <Modal
         isOpen={open && order.canCancel}
         onClose={close}
-        title={`Cancel order ${order.number}?`}
+        title={t('cancel.title', { number: order.number })}
         footer={
           <div className="cancel-order__actions">
             <Button variant="ghost" onClick={close} disabled={cancel.isPending}>
-              Keep my order
+              {t('cancel.keep')}
             </Button>
             <Button className="cancel-order__confirm" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-              {cancel.isPending ? 'Cancelling…' : 'Yes, cancel it'}
+              {t(cancel.isPending ? 'cancel.cancelling' : 'cancel.confirm')}
             </Button>
           </div>
         }
       >
         <div className="cancel-order__body">
-          <p>The items go back on sale, any discount code can be used again, and nothing is charged. We'll email you a confirmation.</p>
+          <p>{t('cancel.explain')}</p>
           <label htmlFor={reasonId} className="cancel-order__label">
-            Why are you cancelling? <span className="cancel-order__optional">(optional)</span>
+            <Trans t={t} i18nKey="cancel.why" components={{ optional: <span className="cancel-order__optional" /> }} />
           </label>
           <textarea
             id={reasonId}
@@ -88,7 +90,7 @@ function CancelOrderButton({ order, email, onCancelled }) {
             aria-describedby={hintId}
           />
           <p id={hintId} className="cancel-order__hint">
-            Up to {MAX_REASON} characters. It's kept with the order.
+            {t('cancel.hint', { max: MAX_REASON })}
           </p>
           {cancel.error && (
             <p className="cancel-order__error" role="alert">

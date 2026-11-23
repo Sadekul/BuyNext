@@ -1,4 +1,5 @@
 import { LuTriangleAlert } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import Button from '../ui/Button'
 import { ACCOUNT_STORES } from '../../constants/storageKeys'
 
@@ -24,18 +25,16 @@ function resetSavedDataAndReload() {
  * context, since those may be what failed (Button without `to` is a plain <button>).
  */
 function RootErrorFallback() {
+  const { t } = useTranslation('errors')
   return (
     <div className="feedback feedback--error section container" role="alert">
       <LuTriangleAlert className="feedback__icon" aria-hidden="true" />
-      <h1 className="feedback__title">BuyNest couldn&apos;t load</h1>
-      <p className="feedback__message">
-        Something went wrong while starting the store. Reloading usually fixes it. If it keeps happening, resetting
-        your saved cart and wishlist on this device should help.
-      </p>
+      <h1 className="feedback__title">{t('root.title')}</h1>
+      <p className="feedback__message">{t('root.message')}</p>
       <div className="feedback__actions">
-        <Button onClick={() => window.location.reload()}>Reload page</Button>
+        <Button onClick={() => window.location.reload()}>{t('root.reload')}</Button>
         <Button variant="outline" onClick={resetSavedDataAndReload}>
-          Reset saved cart and reload
+          {t('root.reset')}
         </Button>
       </div>
     </div>

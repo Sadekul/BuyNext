@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Api\V1\CatalogController;
 use App\Models\Product;
+use App\Support\Locale;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -46,11 +48,54 @@ class HomeContent
     {
         $content = $this->get();
 
+        // Phase 13: in Bangla, the filled fields of each `bn` object replace the English ones; `bn` never goes to the store.
+        $bangla = Locale::isBangla();
+
         return [
-            'hero' => $content['hero'],
-            'banners' => array_values(array_filter($content['banners'], fn ($banner) => $banner['is_active'])),
-            'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand'])),
+            'hero' => $content['hero'] ? self::localizeHero($content['hero'], $bangla) : null,
+            'banners' => array_values(array_map(fn ($banner) => self::localizeBanner($banner, $bangla),
+                array_filter($content['banners'], fn ($banner) => $banner['is_active']))),
+            'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand', ...CatalogController::translationRelations()])),
         ];
+    }
+
+    /** Phase 13: the hero in English or Bangla (per field), without its `bn` object. */
+    private static function localizeHero(array $hero, bool $bangla): array
+    {
+        $bn = $bangla && is_array($hero['bn'] ?? null) ? $hero['bn'] : [];
+        unset($hero['bn']);
+        foreach (['eyebrow', 'title', 'description', 'image_alt'] as $field) {
+            if (filled($bn[$field] ?? null)) {
+                $hero[$field] = $bn[$field];
+            }
+        }
+        foreach (['primary_cta', 'secondary_cta'] as $cta) {
+            if (is_array($hero[$cta] ?? null) && filled($bn["{$cta}_label"] ?? null)) {
+                $hero[$cta]['label'] = $bn["{$cta}_label"];
+            }
+        }
+        if (! empty($bn['highlights'])) {
+            $hero['highlights'] = $bn['highlights'];
+        }
+
+        return $hero;
+    }
+
+    /** Phase 13: a banner in English or Bangla (per field), without its `bn` object. */
+    private static function localizeBanner(array $banner, bool $bangla): array
+    {
+        $bn = $bangla && is_array($banner['bn'] ?? null) ? $banner['bn'] : [];
+        unset($banner['bn']);
+        foreach (['eyebrow', 'title', 'description', 'image_alt'] as $field) {
+            if (filled($bn[$field] ?? null)) {
+                $banner[$field] = $bn[$field];
+            }
+        }
+        if (is_array($banner['cta'] ?? null) && filled($bn['cta_label'] ?? null)) {
+            $banner['cta']['label'] = $bn['cta_label'];
+        }
+
+        return $banner;
     }
 
     /** Products by id, in the order of $ids (missing ones skipped). */
@@ -104,6 +149,22 @@ class HomeContent
             'banners.*.tone' => ['required', Rule::in(self::TONES)],
             'banners.*.position' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'banners.*.is_active' => ['nullable', 'boolean'],
+            // Phase 13: the Bangla texts (all optional; empty = English is shown).
+            'hero.bn' => ['nullable', 'array:eyebrow,title,description,primary_cta_label,secondary_cta_label,image_alt,highlights'],
+            'hero.bn.eyebrow' => $text(60),
+            'hero.bn.title' => $text(120),
+            'hero.bn.description' => $text(300),
+            'hero.bn.primary_cta_label' => $text(40),
+            'hero.bn.secondary_cta_label' => $text(40),
+            'hero.bn.image_alt' => $text(160),
+            'hero.bn.highlights' => ['nullable', 'array', 'max:3'],
+            'hero.bn.highlights.*' => ['nullable', 'string', 'max:60'],
+            'banners.*.bn' => ['nullable', 'array:eyebrow,title,description,cta_label,image_alt'],
+            'banners.*.bn.eyebrow' => $text(60),
+            'banners.*.bn.title' => $text(120),
+            'banners.*.bn.description' => $text(300),
+            'banners.*.bn.cta_label' => $text(40),
+            'banners.*.bn.image_alt' => $text(160),
 
             'featured_product_ids' => ['present', 'array', 'max:8'],
             'featured_product_ids.*' => ['integer', 'distinct', Rule::exists('products', 'id')->whereNull('deleted_at')],
@@ -144,6 +205,7 @@ class HomeContent
                 'tone' => $banner['tone'],
                 'position' => (int) ($banner['position'] ?? $index),
                 'is_active' => (bool) ($banner['is_active'] ?? true),
+                'bn' => self::banglaFields($banner['bn'] ?? null, ['eyebrow', 'title', 'description', 'cta_label', 'image_alt']), // phase 13
             ];
         }
         // Renumber 0, 1, 2... in the sorted order, so positions never have gaps or ties.
@@ -160,10 +222,28 @@ class HomeContent
                 'image_url' => $text($hero['image_url'] ?? null),
                 'image_alt' => $text($hero['image_alt'] ?? null),
                 'highlights' => array_values(array_map('trim', $hero['highlights'] ?? [])),
+                'bn' => self::banglaFields($hero['bn'] ?? null, ['eyebrow', 'title', 'description', 'primary_cta_label', 'secondary_cta_label', 'image_alt'], true), // phase 13
             ],
             'banners' => $banners,
             'featured_product_ids' => array_values(array_map('intval', $data['featured_product_ids'])),
         ];
+    }
+
+    /** Phase 13: a stored `bn` object (trimmed, empty fields null), or null when nothing is filled. */
+    private static function banglaFields(mixed $input, array $fields, bool $highlights = false): ?array
+    {
+        if (! is_array($input)) {
+            return null;
+        }
+        $out = [];
+        foreach ($fields as $field) {
+            $out[$field] = is_string($input[$field] ?? null) && trim($input[$field]) !== '' ? trim($input[$field]) : null;
+        }
+        if ($highlights) {
+            $out['highlights'] = array_values(array_filter(array_map(fn ($h) => is_string($h) ? trim($h) : '', $input['highlights'] ?? []), fn ($h) => $h !== ''));
+        }
+
+        return array_filter($out, fn ($value) => $value !== null && $value !== []) === [] ? null : $out;
     }
 
     /** By position; equal positions keep the order they were sent in. */

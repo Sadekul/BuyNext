@@ -17,7 +17,7 @@ export const EMPTY_LINKS = { related: [], upsell: [], crosssell: [] }
 
 let rowKey = 0
 /** A row with a key of its own, so React keeps focus on it while rows move. */
-export const specRow = (row = { label: '', value: '' }) => ({ label: row.label ?? '', value: row.value ?? '', key: `spec-${rowKey++}` })
+export const specRow = (row = { label: '', value: '' }) => ({ label: row.label ?? '', value: row.value ?? '', labelBn: row.labelBn ?? '', valueBn: row.valueBn ?? '', key: `spec-${rowKey++}` })
 
 /** The product's links → the form's lists (every type present). */
 export const linkLists = (links) => Object.fromEntries(LINK_TYPES.map(({ id }) => [id, Array.isArray(links?.[id]) ? links[id] : []]))
@@ -43,7 +43,11 @@ export function specificationErrors(rows) {
 }
 
 /** The rows → what is saved (trimmed, empty rows left out). */
-export const toSpecifications = (rows) => rows.map((row) => ({ label: row.label.trim(), value: row.value.trim() })).filter((row) => row.label || row.value)
+export const toSpecifications = (rows, { bangla = false } = {}) =>
+  rows
+    .filter((row) => row.label.trim() || row.value.trim())
+    // Phase 13: with Bangla texts (the API has them), each row's Bangla label and value too ('' = shows the English one).
+    .map((row) => ({ label: row.label.trim(), value: row.value.trim(), ...(bangla && { labelBn: (row.labelBn ?? '').trim(), valueBn: (row.valueBn ?? '').trim() }) }))
 
 /** The lists → { related: [ids], upsell: [ids], crosssell: [ids] }. */
 export const toLinkIds = (lists) => Object.fromEntries(LINK_TYPES.map(({ id }) => [id, (lists[id] ?? []).map((product) => product.id)]))

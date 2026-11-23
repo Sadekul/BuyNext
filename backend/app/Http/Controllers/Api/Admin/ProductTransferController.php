@@ -37,7 +37,14 @@ use Illuminate\Validation\ValidationException;
 class ProductTransferController extends Controller
 {
     public const COLUMNS = ['sku', 'name', 'category_slug', 'brand', 'price', 'discount_percent', 'stock_quantity', 'status', 'description', 'tags', 'image_urls',
-        'specifications', 'related_skus', 'upsell_skus', 'crosssell_skus']; // phase 11: the last four
+        'specifications', 'related_skus', 'upsell_skus', 'crosssell_skus', // phase 11
+        'name_bn', 'short_description_bn', 'description_bn', 'meta_title_bn', 'meta_description_bn']; // phase 13: the Bangla texts
+
+    /** Phase 13: Bangla column → [translation field, max length]. An empty cell leaves that field as it is (like every column). */
+    private const BANGLA_COLUMNS = [
+        'name_bn' => ['name', 120], 'short_description_bn' => ['short_description', 500], 'description_bn' => ['description', 5000],
+        'meta_title_bn' => ['meta_title', 190], 'meta_description_bn' => ['meta_description', 500],
+    ];
 
     /** Phase 11: CSV column → product link type. */
     private const LINK_COLUMNS = ['related_skus' => 'related', 'upsell_skus' => 'upsell', 'crosssell_skus' => 'crosssell'];
@@ -54,7 +61,7 @@ class ProductTransferController extends Controller
         $data = $request->validate(ProductController::filterRules());
 
         $rows = [];
-        ProductController::filtered($data)->with(['category', 'brand', 'images', 'links.linked'])->get()->each(function (Product $product) use (&$rows) {
+        ProductController::filtered($data)->with(['category', 'brand', 'images', 'links.linked', 'translations'])->get()->each(function (Product $product) use (&$rows) {
             $skus = fn (string $type) => $product->links->where('type', $type)->filter(fn ($link) => $link->linked)->sortBy('position')
                 ->map(fn ($link) => $link->linked->sku)->implode('|');
             $rows[] = [
@@ -74,6 +81,8 @@ class ProductTransferController extends Controller
                 $skus('related'),
                 $skus('upsell'),
                 $skus('crosssell'),
+                // Phase 13.
+                ...array_values(array_map(fn (array $spec) => $product->translationFields('bn')[$spec[0]], self::BANGLA_COLUMNS)),
             ];
         });
 
@@ -218,7 +227,7 @@ class ProductTransferController extends Controller
     {
         $categories = Category::pluck('id', 'slug');
         $skus = array_filter(array_map(fn ($cells) => trim((string) ($cells[$columns['sku']] ?? '')), $rows));
-        $existing = Product::withTrashed()->with(['brand', 'images', 'links.linked'])->whereIn('sku', $skus)->get()->keyBy('sku');
+        $existing = Product::withTrashed()->with(['brand', 'images', 'links.linked', 'translations'])->whereIn('sku', $skus)->get()->keyBy('sku');
         // Phase 11: SKUs a link may name: existing products and the file's own rows.
         $linkSkus = [];
         foreach ($rows as $cells) {
@@ -386,12 +395,23 @@ class ProductTransferController extends Controller
                 $links[$type] = $list;
             }
 
+            // Phase 13: name_bn, short_description_bn, description_bn, meta_title_bn, meta_description_bn.
+            $bangla = [];
+            foreach (self::BANGLA_COLUMNS as $column => [$field, $max]) {
+                $value = $cell($column);
+                if ($value === null) {
+                    continue;
+                }
+                mb_strlen($value) > $max ? $error($column, "At most {$max} characters.") : $bangla[$field] = $value;
+            }
+
             if (count($errors) > $errorCount) {
                 continue;
             }
 
             if ($creating) {
-                $plans[] = ['action' => 'created', 'sku' => $sku, 'name' => $name, 'fields' => $fields, 'brand' => $brand, 'images' => $newImages, 'links' => $links];
+                $plans[] = ['action' => 'created', 'sku' => $sku, 'name' => $name, 'fields' => $fields, 'brand' => $brand, 'images' => $newImages, 'links' => $links,
+                    'bangla' => $bangla];
 
                 continue;
             }
@@ -419,8 +439,11 @@ class ProductTransferController extends Controller
                 }
             }
             $brandChanged = $brand !== null && $brand !== $product->brand?->name;
+            $currentBangla = $product->translationFields('bn');
+            $bangla = array_filter($bangla, fn ($value, $field) => $currentBangla[$field] !== $value, ARRAY_FILTER_USE_BOTH); // phase 13
             $plans[] = [
-                'action' => $changed || $brandChanged || $newImages || $linksChanged ? 'updated' : 'unchanged',
+                'action' => $changed || $brandChanged || $newImages || $linksChanged || $bangla ? 'updated' : 'unchanged',
+                'bangla' => $bangla,
                 'product' => $product,
                 'sku' => $sku,
                 'fields' => $changed,
@@ -505,6 +528,10 @@ class ProductTransferController extends Controller
         } else {
             $product = $plan['product'];
             $product->forceFill($fields)->save();
+        }
+
+        if (! empty($plan['bangla'])) {
+            $product->saveTranslation('bn', $plan['bangla']); // phase 13
         }
 
         $hadImages = $product->images()->exists();

@@ -28,7 +28,7 @@ class StockAlertController extends Controller
         $tree = CategoryTree::load();
         $product = Product::forSale($tree)->with('variants')->find($id);
         if (! $product) {
-            return response()->json(['message' => 'Product not found.'], 404);
+            return response()->json(['message' => __('Product not found.')], 404);
         }
         $customer = $request->user() instanceof Customer ? $request->user() : null;
 
@@ -36,25 +36,25 @@ class StockAlertController extends Controller
             'email' => [$customer ? 'nullable' : 'required', 'string', 'email:rfc', 'max:190'],
             'variant_id' => ['nullable', 'integer'],
         ], [
-            'email.required' => 'Enter your email address.',
-            'email.email' => 'Enter a valid email address.',
-            'variant_id.integer' => 'Choose one of this product\'s options.',
+            'email.required' => __('Enter your email address.'),
+            'email.email' => __('Enter a valid email address.'),
+            'variant_id.integer' => __('Choose one of this product\'s options.'),
         ]);
 
         $variant = null;
         if (isset($data['variant_id'])) {
             $variant = $product->has_variants ? $product->variants->firstWhere('id', (int) $data['variant_id']) : null;
             if (! $variant || ! $variant->is_active) {
-                throw ValidationException::withMessages(['variant_id' => 'This option of the product isn\'t available.']);
+                throw ValidationException::withMessages(['variant_id' => __('This option of the product isn\'t available.')]);
             }
         }
         if ($this->alerts->isAvailable($product, $variant, $tree)) {
-            throw ValidationException::withMessages(['stock' => 'This item is in stock, so you can order it now.']);
+            throw ValidationException::withMessages(['stock' => __('This item is in stock, so you can order it now.')]);
         }
 
         $this->alerts->subscribe($product, $variant, $customer ? $customer->email : $data['email'], $customer);
 
-        return response()->json(['data' => ['message' => StockAlerts::MESSAGE]], 202);
+        return response()->json(['data' => ['message' => __(StockAlerts::MESSAGE)]], 202);
     }
 
     /** GET /api/v1/me/stock-alerts → the account's waiting alerts. */
@@ -68,7 +68,7 @@ class StockAlertController extends Controller
     {
         $alert = $this->alerts->waitingFor($request->user())->firstWhere('id', $id);
         if (! $alert) {
-            return response()->json(['message' => 'Stock alert not found.'], 404);
+            return response()->json(['message' => __('Stock alert not found.')], 404);
         }
         $alert->delete();
 
@@ -81,7 +81,7 @@ class StockAlertController extends Controller
         $data = $request->validate(['token' => ['required', 'string', 'max:100']]);
         $removed = $this->alerts->unsubscribe($data['token']);
         if ($removed === null) {
-            throw ValidationException::withMessages(['token' => 'This link isn\'t valid. Copy the whole link from the email, or contact us.']);
+            throw ValidationException::withMessages(['token' => __('This link isn\'t valid. Copy the whole link from the email, or contact us.')]);
         }
 
         return response()->json(['data' => ['removed' => $removed]]);

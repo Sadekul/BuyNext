@@ -1,6 +1,8 @@
 import { laravel, laravelMultipart } from '../http.js'
 import { camelPath } from './laravel.js'
 import { failed } from './adminSystem.js'
+// Phase 13: the Bangla texts of categories, option names and values.
+import { banglaOf, optionNameBangla, optionValueBangla, toOptionBody, withBanglaBody } from './adminPhase13.js'
 
 /*
  * Phase 5 of the admin (docs/backend/PHASE5_CONTRACT.md) from BuyNest's
@@ -54,6 +56,8 @@ export function adminCategory(raw, depth = 0) {
     productCount: raw.product_count ?? raw.products_count ?? 0,
     childCount: list(raw.children).length,
     depth,
+    // Phase 13: bn: { name, description, metaTitle, metaDescription } ('' = the English text is shown).
+    ...banglaOf(raw, 'category'),
   }
 }
 
@@ -125,13 +129,22 @@ export function adminImage(raw) {
 }
 const images = (raw) => list(raw).map(adminImage).sort((a, b) => a.position - b.position)
 
+// Phase 13: only answers that have the Bangla names carry them (older answers: nothing).
+const hasBangla = (raw) => raw.name_bn !== undefined || raw.value_bn !== undefined || raw.translations !== undefined
+
 export function adminOption(raw) {
   return {
     id: raw.id ?? null,
     name: text(raw.name),
+    // Phase 13: the Bangla name of the option and of each value ('' = the English one is shown).
+    ...(hasBangla(raw) && { nameBn: optionNameBangla(raw) }),
     position: raw.position ?? 0,
     values: list(raw.values)
-      .map((value) => (typeof value === 'string' ? { id: null, value, position: 0 } : { id: value.id ?? null, value: text(value.value), position: value.position ?? 0 }))
+      .map((value) =>
+        typeof value === 'string'
+          ? { id: null, value, position: 0 }
+          : { id: value.id ?? null, value: text(value.value), ...(hasBangla(value) && { valueBn: optionValueBangla(value) }), position: value.position ?? 0 },
+      )
       .sort((a, b) => a.position - b.position),
   }
 }
@@ -236,10 +249,10 @@ export const laravelCatalogData = {
     return answer(await call('/categories', token, request), [200], (data) => flattenCategories(data?.data))
   },
   async createCategory(token, values, request) {
-    return answer(await call('/categories', token, request, { method: 'POST', body: toBody(values, CATEGORY_FIELDS) }), [200, 201], (data) => ({ category: adminCategory(data?.data ?? {}), live: true }))
+    return answer(await call('/categories', token, request, { method: 'POST', body: withBanglaBody(toBody(values, CATEGORY_FIELDS), values, 'category') }), [200, 201], (data) => ({ category: adminCategory(data?.data ?? {}), live: true }))
   },
   async updateCategory(token, id, values, request) {
-    return answer(await call(`/categories/${id}`, token, request, { method: 'PATCH', body: toBody(values, CATEGORY_FIELDS) }), [200], (data) => ({ category: adminCategory(data?.data ?? {}), live: true }))
+    return answer(await call(`/categories/${id}`, token, request, { method: 'PATCH', body: withBanglaBody(toBody(values, CATEGORY_FIELDS), values, 'category') }), [200], (data) => ({ category: adminCategory(data?.data ?? {}), live: true }))
   },
   async deleteCategory(token, id, request) {
     return answer(await call(`/categories/${id}`, token, request, { method: 'DELETE' }), [200, 204], done(id))
@@ -265,7 +278,7 @@ export const laravelCatalogData = {
   },
 
   async saveOptions(token, id, { options }, request) {
-    const result = await call(`/products/${id}/options`, token, request, { method: 'PUT', body: { options } })
+    const result = await call(`/products/${id}/options`, token, request, { method: 'PUT', body: { options: options.map(toOptionBody) } })
     return answer(result, [200], (data) => ({ ...productParts(data?.data ?? {}), live: true }))
   },
   async generateVariants(token, id, request) {

@@ -39,6 +39,7 @@ import { followRedirect } from '../utils/safeRedirect'
 import { readCatalogParams, withFilters, withParam } from '../utils/catalogParams'
 import { categoryAncestors, childCategories, topLevelCategories } from '../utils/categories'
 import './ProductListingPage.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * Product catalog for three routes:
@@ -55,7 +56,9 @@ import './ProductListingPage.css'
  * All of it lives in the URL (see utils/catalogParams.js), so Back, refresh,
  * and shared links restore exactly the same results.
  */
-function ProductListingPage({ title = 'All products', defaultSort = 'featured' }) {
+function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts', defaultSort = 'featured' }) {
+  const { t } = useTranslation('catalog')
+  const title = titleProp ?? t(titleKey)
   const { categorySlug } = useParams()
   const [searchParams] = useSearchParams()
   const searchQuery = searchParams.get('q')?.trim() ?? ''
@@ -83,8 +86,8 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const subcategories = currentCategory ? childCategories(categories, currentCategory.slug) : []
 
   let heading = title
-  if (searchQuery) heading = `Results for "${correctedQuery ?? searchQuery}"`
-  else if (categorySlug) heading = currentCategory?.name ?? 'Category'
+  if (searchQuery) heading = t('listing.resultsFor', { query: correctedQuery ?? searchQuery })
+  else if (categorySlug) heading = currentCategory?.name ?? t('listing.category')
 
   // A new scope (search or category) = a new `key`, so React throws away the
   // old Catalog's local state (open quick view, mobile filter panel).
@@ -95,7 +98,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
   const meta = currentCategory
     ? {
         title: currentCategory.metaTitle ?? currentCategory.name,
-        description: toDescription(currentCategory.metaDescription ?? currentCategory.description ?? `Shop ${currentCategory.name} at BuyNest.`),
+        description: toDescription(currentCategory.metaDescription ?? currentCategory.description ?? t('listing.shopCategory', { name: currentCategory.name })),
         image: currentCategory.image,
         canonicalPath: ROUTES.category(currentCategory.slug),
       }
@@ -108,7 +111,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         {ancestors.length > 0 && (
           <Breadcrumb
             items={[
-              { label: 'All products', to: ROUTES.products },
+              { label: t('listing.allProducts'), to: ROUTES.products },
               ...ancestors.map((category) => ({ label: category.name, to: ROUTES.category(category.slug) })),
               { label: currentCategory.name },
             ]}
@@ -118,9 +121,9 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
         {/* Phase 10: the API searched for a corrected spelling; the shopper can still have their own words. */}
         {correctedQuery && (
           <p className="listing__correction">
-            Showing results for <strong>{correctedQuery}</strong>.{' '}
+            <Trans t={t} i18nKey="listing.showingFor" values={{ corrected: correctedQuery }} components={{ strong: <strong /> }} />{' '}
             <Link to={`${ROUTES.products}?${new URLSearchParams({ q: searchQuery, exact: '1' })}`}>
-              Search instead for <em>{searchQuery}</em>
+              <Trans t={t} i18nKey="listing.searchInstead" values={{ query: searchQuery }} components={{ em: <em /> }} />
             </Link>
           </p>
         )}
@@ -128,8 +131,8 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
           <CategoryNav categories={topLevelCategories(categories)} activeSlug={ancestors[0]?.slug ?? null} />
         )}
         {subcategories.length > 0 && (
-          <nav className="listing__subcategories" aria-label={`${currentCategory.name} subcategories`}>
-            <h2 className="listing__subcategories-title">Shop by subcategory</h2>
+          <nav className="listing__subcategories" aria-label={t('listing.subcategories', { name: currentCategory.name })}>
+            <h2 className="listing__subcategories-title">{t('listing.shopBySubcategory')}</h2>
             <ul className="listing__subcategory-list">
               {subcategories.map((category) => (
                 <li key={category.slug}>
@@ -146,7 +149,7 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
       {categorySlug && categoriesRequest.error ? (
         // Without the category list we can't tell a real category from a typo.
         <ErrorMessage
-          title="We couldn't load categories"
+          title={t('listing.categoriesFailed')}
           message={categoriesRequest.error.message}
           onRetry={categoriesRequest.refetch}
         />
@@ -169,17 +172,19 @@ function ProductListingPage({ title = 'All products', defaultSort = 'featured' }
 
 /** A category that doesn't exist: an admin redirect (phase 7, e.g. a renamed category) wins, else "not found". */
 function UnknownCategory({ slug }) {
+  const { t } = useTranslation('catalog')
   const { checking } = useStoreRedirect()
   if (checking) return <ProductGridSkeleton />
   return (
-    <EmptyState icon={LuSearchX} title="Category not found" message={`We don't have a category called "${slug}".`}>
-      <Button to={ROUTES.products}>Browse all products</Button>
+    <EmptyState icon={LuSearchX} title={t('listing.categoryNotFound')} message={t('listing.noCategory', { slug })}>
+      <Button to={ROUTES.products}>{t('listing.browseAll')}</Button>
     </EmptyState>
   )
 }
 
 /** Fetches one scope, then filters, sorts, and paginates it on the client. */
 function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, defaultSort }) {
+  const { t } = useTranslation('catalog')
   // Search and category are fetched on the server; each scope is cached separately.
   const request = useQuery(catalogQuery({ searchQuery, categorySlug, exact }))
   const [searchParams, setSearchParams] = useSearchParams()
@@ -250,25 +255,25 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
   if (searchQuery) {
     chips.push({
       id: 'q',
-      label: `Search: "${searchQuery}"`,
+      label: t('listing.chipSearch', { query: searchQuery }),
       onRemove: () => setSearchParams(withParam(withParam(withParam(searchParams, 'q', null), 'exact', null), 'page', null)),
     })
   }
   if (categorySlug) {
     chips.push({
       id: 'category',
-      label: `Category: ${categoryName ?? categorySlug}`,
+      label: t('listing.chipCategory', { name: categoryName ?? categorySlug }),
       onRemove: () => navigate({ pathname: ROUTES.products, search: withParam(searchParams, 'page', null).toString() }),
     })
   }
   if (effectiveFilters.minPrice !== '') {
-    chips.push({ id: 'min', label: `From ${formatBasePrice(Number(filters.minPrice))}`, onRemove: () => handleFiltersChange({ ...filters, minPrice: '' }) })
+    chips.push({ id: 'min', label: t('listing.chipFrom', { amount: formatBasePrice(Number(filters.minPrice)) }), onRemove: () => handleFiltersChange({ ...filters, minPrice: '' }) })
   }
   if (effectiveFilters.maxPrice !== '') {
-    chips.push({ id: 'max', label: `Up to ${formatBasePrice(Number(filters.maxPrice))}`, onRemove: () => handleFiltersChange({ ...filters, maxPrice: '' }) })
+    chips.push({ id: 'max', label: t('listing.chipUpTo', { amount: formatBasePrice(Number(filters.maxPrice)) }), onRemove: () => handleFiltersChange({ ...filters, maxPrice: '' }) })
   }
   if (filters.minRating > 0) {
-    chips.push({ id: 'rating', label: `${filters.minRating}★ & up`, onRemove: () => handleFiltersChange({ ...filters, minRating: 0 }) })
+    chips.push({ id: 'rating', label: t('listing.chipRating', { rating: filters.minRating }), onRemove: () => handleFiltersChange({ ...filters, minRating: 0 }) })
   }
   filters.brands.forEach((brand) => {
     chips.push({
@@ -278,7 +283,7 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
     })
   })
   if (filters.inStockOnly) {
-    chips.push({ id: 'available', label: 'Available to order', onRemove: () => handleFiltersChange({ ...filters, inStockOnly: false }) })
+    chips.push({ id: 'available', label: t('listing.chipAvailable'), onRemove: () => handleFiltersChange({ ...filters, inStockOnly: false }) })
   }
 
   function handleClearAllChips() {
@@ -291,18 +296,18 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
   if (request.isPending) return <ProductGridSkeleton count={8} />
 
   if (request.error) {
-    return <ErrorMessage title="We couldn't load products" message={request.error.message} onRetry={() => request.refetch()} />
+    return <ErrorMessage title={t('listing.productsFailed')} message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   if (products.length === 0) {
     return (
       <EmptyState
         icon={LuSearchX}
-        title={searchQuery ? `No results for "${searchQuery}"` : 'No products here yet'}
-        message={searchQuery ? 'Check the spelling or try a more general term.' : 'Try another category.'}
+        title={searchQuery ? t('listing.noResults', { query: searchQuery }) : t('listing.noProducts')}
+        message={t(searchQuery ? 'listing.checkSpelling' : 'listing.tryAnother')}
       >
         <Button to={ROUTES.products} variant="outline">
-          Browse all products
+          {t('listing.browseAll')}
         </Button>
       </EmptyState>
     )
@@ -322,7 +327,7 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
   return (
     <div className="listing__body">
       {/* Desktop: sticky sidebar. Hidden below 1024px, where the drawer is used instead. */}
-      <aside className="listing__filters" aria-label="Product filters">
+      <aside className="listing__filters" aria-label={t('listing.filtersLabel')}>
         {filterPanel(true)}
       </aside>
 
@@ -330,8 +335,8 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
         <div className="listing__toolbar" ref={toolbarRef}>
           <p className="listing__count" role="status">
             {visibleProducts.length === 0
-              ? '0 products'
-              : `Showing ${pagination.start}–${pagination.end} of ${visibleProducts.length} products`}
+              ? t('listing.zero', { n: 0 })
+              : t('listing.showing', { start: pagination.start, end: pagination.end, total: visibleProducts.length })}
           </p>
           <div className="listing__controls">
             <button
@@ -341,10 +346,10 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
               aria-haspopup="dialog"
             >
               <LuSlidersHorizontal aria-hidden="true" />
-              Filters{activeFilterCount > 0 && ` (${activeFilterCount})`}
+              {activeFilterCount > 0 ? t('listing.filtersCount', { count: activeFilterCount }) : t('listing.filters')}
             </button>
             {/* A search keeps the API's order by default: the most relevant first (BuyNest's API ranks results). */}
-            <SortSelect value={sortOption.value} onChange={handleSortChange} labels={searchQuery ? { featured: 'Best match' } : undefined} />
+            <SortSelect value={sortOption.value} onChange={handleSortChange} labels={searchQuery ? { featured: t('listing.bestMatch') } : undefined} />
             <ViewToggle value={layout} onChange={handleLayoutChange} />
           </div>
         </div>
@@ -352,9 +357,9 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
         <ActiveFilters chips={chips} onClearAll={handleClearAllChips} />
 
         {visibleProducts.length === 0 ? (
-          <EmptyState icon={LuFilterX} title="No products match your filters" message="Try removing a filter or widening the price range.">
+          <EmptyState icon={LuFilterX} title={t('listing.noMatchFilters')} message={t('listing.noMatchHint')}>
             <Button variant="outline" onClick={handleClearFilters}>
-              Clear all filters
+              {t('listing.clearFilters')}
             </Button>
           </EmptyState>
         ) : (
@@ -374,11 +379,11 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
       <Modal
         isOpen={areFiltersOpen}
         onClose={() => setAreFiltersOpen(false)}
-        title={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+        title={activeFilterCount > 0 ? t('listing.filtersCount', { count: activeFilterCount }) : t('listing.filters')}
         variant="drawer"
         footer={
           <Button fullWidth onClick={() => setAreFiltersOpen(false)}>
-            Show {visibleProducts.length} {visibleProducts.length === 1 ? 'product' : 'products'}
+            {t('listing.showProducts', { count: visibleProducts.length })}
           </Button>
         }
       >

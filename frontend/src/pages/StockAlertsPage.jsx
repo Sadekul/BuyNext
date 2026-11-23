@@ -14,6 +14,7 @@ import { SITE } from '../constants/site'
 import { formatDate } from '../utils/formatters'
 import './OrderPages.css'
 import './StockAlertsPage.css'
+import { useTranslation } from 'react-i18next'
 
 const alertName = (alert) => (alert.variantLabel ? `${alert.title} (${alert.variantLabel})` : alert.title)
 
@@ -23,6 +24,7 @@ const alertName = (alert) => (alert.variantLabel ? `${alert.title} (${alert.vari
  * the product (or the chosen variant) is back, then it's done.
  */
 function StockAlertsPage() {
+  const { t } = useTranslation('account')
   const { user, authorizedRequest } = useAuth()
   const queryClient = useQueryClient()
   const request = useQuery(stockAlertsQuery(user.id, authorizedRequest))
@@ -33,24 +35,24 @@ function StockAlertsPage() {
     mutationFn: (alert) => authorizedRequest(() => deleteStockAlert(alert.id)),
     onSuccess: (_, alert) => {
       queryClient.setQueryData(key, (current) => current?.filter((entry) => entry.id !== alert.id))
-      setMessage(`You won't get an email about ${alertName(alert)}.`)
+      setMessage(t('alerts.removed', { name: alertName(alert) }))
     },
-    onError: (error) => setMessage(`Couldn't remove the alert: ${error.message}`),
+    onError: (error) => setMessage(t('alerts.removeFailed', { reason: error.message })),
   })
 
-  if (request.isPending) return <Loader label="Loading your stock alerts…" />
+  if (request.isPending) return <Loader label={t('alerts.loading')} />
   if (request.error) {
-    return <ErrorMessage title="We couldn't load your stock alerts" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
+    return <ErrorMessage title={t('alerts.failed')} titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   const alerts = request.data
   return (
     <section className="orders stock-alerts" aria-labelledby="stock-alerts-title">
-      <title>{`Stock alerts | ${SITE.name}`}</title>
+      <title>{`${t('alerts.title')} | ${SITE.name}`}</title>
       <h2 id="stock-alerts-title" className="orders__title">
-        Stock alerts
+        {t('alerts.title')}
       </h2>
-      <p className="stock-alerts__note">The sold-out products you're waiting for. We email you once when one is back, and the alert is then done.</p>
+      <p className="stock-alerts__note">{t('alerts.note')}</p>
       <p className="stock-alerts__status" role="status">
         {message}
       </p>
@@ -59,10 +61,10 @@ function StockAlertsPage() {
         <EmptyState
           icon={LuBell}
           titleAs="h3"
-          title="No stock alerts"
-          message="On a sold-out product, choose “Email me when it's back” and we'll let you know when it returns."
+          title={t('alerts.empty')}
+          message={t('alerts.emptyMessage')}
         >
-          <Button to={ROUTES.products}>Browse products</Button>
+          <Button to={ROUTES.products}>{t('alerts.browse')}</Button>
         </EmptyState>
       ) : (
         <ul className="orders__list">
@@ -78,7 +80,7 @@ function StockAlertsPage() {
                   <span className="orders__id">{alert.title}</span>
                 )}
                 <span className="orders__meta">
-                  {[alert.variantLabel, alert.createdAt && `Asked ${formatDate(alert.createdAt)}`]
+                  {[alert.variantLabel, alert.createdAt && t('alerts.asked', { date: formatDate(alert.createdAt) })]
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
@@ -88,9 +90,9 @@ function StockAlertsPage() {
                 variant="ghost"
                 onClick={() => remove.mutate(alert)}
                 disabled={remove.isPending && remove.variables?.id === alert.id}
-                aria-label={`Remove the alert for ${alertName(alert)}`}
+                aria-label={t('alerts.removeLabel', { name: alertName(alert) })}
               >
-                <LuTrash2 aria-hidden="true" /> Remove
+                <LuTrash2 aria-hidden="true" /> {t('alerts.remove')}
               </Button>
             </li>
           ))}

@@ -1,13 +1,18 @@
+import { formatNumber } from '../../utils/formatters'
 import { FaRegStar, FaStar, FaStarHalfStroke } from 'react-icons/fa6'
 import './RatingStars.css'
+import { useTranslation } from 'react-i18next'
 
 const MAX_RATING = 5
+// "4.5" (one decimal), in Bangla digits in Bangla.
+const formatRating = (rating) => formatNumber(rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /**
  * Shows a 0–5 rating as stars, rounded to the nearest half star.
  * Screen readers get the exact value from `aria-label`; the icons are decorative.
  */
 function RatingStars({ rating, showValue = true }) {
+  const { t } = useTranslation('catalog')
   const roundedRating = Math.round(rating * 2) / 2
 
   // Build an array like ['full', 'full', 'full', 'half', 'empty'].
@@ -19,7 +24,7 @@ function RatingStars({ rating, showValue = true }) {
   })
 
   return (
-    <div className="rating-stars" role="img" aria-label={`Rated ${rating.toFixed(1)} out of ${MAX_RATING}`}>
+    <div className="rating-stars" role="img" aria-label={t('rating.label', { rating: formatRating(rating), max: formatNumber(MAX_RATING) })}>
       {/* Index keys are safe here: the list is fixed-length and never reordered. */}
       {stars.map((type, index) => {
         if (type === 'full') return <FaStar key={index} aria-hidden="true" />
@@ -28,7 +33,7 @@ function RatingStars({ rating, showValue = true }) {
       })}
       {showValue && (
         <span className="rating-stars__value" aria-hidden="true">
-          {rating.toFixed(1)}
+          {formatRating(rating)}
         </span>
       )}
     </div>

@@ -19,6 +19,7 @@ import { getPurchaseLimits } from '../utils/inventory'
 import { isGiftCardProduct } from '../utils/giftCards'
 import { MISSING, compareRows, valuesDiffer } from '../utils/compare'
 import './ComparePage.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * /compare (phase 11 §2): the picked products side by side. A real table:
@@ -29,6 +30,7 @@ import './ComparePage.css'
  * whose values aren't all the same.
  */
 function ComparePage() {
+  const { t } = useTranslation('catalog')
   const compare = useCompare()
   const ids = compare?.items.map((item) => item.id) ?? []
   const request = useQuery({ ...compareProductsQuery(ids), enabled: ids.length >= 2 })
@@ -36,21 +38,21 @@ function ComparePage() {
   if (ids.length < 2) {
     return (
       <div className="section container">
-        <PageMeta title="Compare products" noindex />
+        <PageMeta title={t('comparePage.title')} noindex />
         <EmptyState
           icon={LuGitCompareArrows}
-          title={ids.length === 0 ? 'Nothing to compare yet' : 'Add one more product to compare'}
+          title={t(ids.length === 0 ? 'comparePage.emptyTitle' : 'comparePage.oneMoreTitle')}
           titleAs="h1"
           message={
             ids.length === 0
-              ? 'Choose "Compare" on up to 4 products to see them side by side.'
-              : `${compare.items[0].title} is in your compare list. Choose "Compare" on another product to see them side by side.`
+              ? t('comparePage.emptyMessage', { max: 4 })
+              : t('comparePage.oneMoreMessage', { title: compare.items[0].title })
           }
         >
-          <Button to={ROUTES.products}>Browse products</Button>
+          <Button to={ROUTES.products}>{t('comparePage.browse')}</Button>
           {ids.length === 1 && (
             <Button variant="outline" onClick={compare.clear}>
-              Clear compare list
+              {t('comparePage.clearList')}
             </Button>
           )}
         </EmptyState>
@@ -61,7 +63,7 @@ function ComparePage() {
   if (request.isPending) {
     return (
       <div className="section container">
-        <Loader label="Loading products…" />
+        <Loader label={t('comparePage.loading')} />
       </div>
     )
   }
@@ -69,7 +71,7 @@ function ComparePage() {
   if (request.error && !request.data) {
     return (
       <div className="section container">
-        <ErrorMessage title="We couldn't load these products" titleAs="h1" message={request.error.message} onRetry={() => request.refetch()} />
+        <ErrorMessage title={t('comparePage.failed')} titleAs="h1" message={request.error.message} onRetry={() => request.refetch()} />
       </div>
     )
   }
@@ -80,6 +82,7 @@ function ComparePage() {
 }
 
 function CompareTable({ products, missingCount, onRemove, onClear }) {
+  const { t } = useTranslation('catalog')
   const { addItem } = useCart()
   const [highlight, setHighlight] = useState(false)
   const [message, setMessage] = useState('')
@@ -92,35 +95,35 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
 
   function handleAdd(product) {
     addItem(product)
-    setMessage(`${product.title} was added to your cart.`)
+    setMessage(t('comparePage.added', { title: product.title }))
   }
 
   function handleRemove(product) {
     onRemove(product.id)
-    setMessage(`${product.title} was removed from the comparison.`)
+    setMessage(t('comparePage.removed', { title: product.title }))
   }
 
   const rowClass = (differs) => cn(highlight && differs && 'compare-table__row--differs')
-  const differsNote = (differs) => highlight && differs && <span className="compare-table__differs"> (differs)</span>
+  const differsNote = (differs) => highlight && differs && <span className="compare-table__differs">{t('comparePage.differs')}</span>
 
   return (
     <div className="compare-page section container">
-      <PageMeta title="Compare products" noindex />
+      <PageMeta title={t('comparePage.title')} noindex />
       <header className="compare-page__header">
-        <h1>Compare products</h1>
+        <h1>{t('comparePage.title')}</h1>
         <div className="compare-page__tools">
           <label htmlFor={toggleId} className="compare-page__toggle">
             <input id={toggleId} type="checkbox" checked={highlight} onChange={(event) => setHighlight(event.target.checked)} />
-            Highlight differences
+            {t('comparePage.highlight')}
           </label>
           <Button variant="ghost" size="sm" onClick={onClear}>
-            Clear all
+            {t('comparePage.clearAll')}
           </Button>
         </div>
       </header>
       {missingCount > 0 && (
         <p className="compare-page__note">
-          {missingCount === 1 ? 'One product is' : `${missingCount} products are`} no longer available and {missingCount === 1 ? 'was' : 'were'} left out.
+          {t('comparePage.missing', { count: missingCount })}
         </p>
       )}
       <p className="visually-hidden" role="status">
@@ -131,7 +134,7 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
       <div className="compare-table__scroll" role="region" aria-labelledby={captionId} tabIndex={0}>
         <table className="compare-table">
           <caption id={captionId} className="compare-table__caption">
-            Comparing {products.length} products
+            {t('comparePage.caption', { count: products.length })}
           </caption>
           <thead>
             <tr>
@@ -145,7 +148,7 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
           </thead>
           <tbody>
             <tr>
-              <th scope="row">Image</th>
+              <th scope="row">{t('comparePage.image')}</th>
               {products.map((product) => (
                 <td key={product.id}>
                   {product.thumbnail ? <img className="compare-table__image" src={product.thumbnail} alt={product.title} width="160" height="160" loading="lazy" /> : MISSING}
@@ -153,7 +156,10 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
               ))}
             </tr>
             <tr className={rowClass(priceDiffers)}>
-              <th scope="row">Price{differsNote(priceDiffers)}</th>
+              <th scope="row">
+                {t('comparePage.price')}
+                {differsNote(priceDiffers)}
+              </th>
               {products.map((product, index) => (
                 <td key={product.id}>
                   <strong>{formatPrice(prices[index].salePrice)}</strong>
@@ -161,7 +167,7 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
                     <>
                       {' '}
                       <s className="compare-table__muted">
-                        <span className="visually-hidden">Original price: </span>
+                        <span className="visually-hidden">{t('comparePage.originalPrice')}</span>
                         {formatPrice(prices[index].originalPrice)}
                       </s>
                     </>
@@ -170,13 +176,16 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
               ))}
             </tr>
             <tr className={rowClass(ratingDiffers)}>
-              <th scope="row">Rating{differsNote(ratingDiffers)}</th>
+              <th scope="row">
+                {t('comparePage.rating')}
+                {differsNote(ratingDiffers)}
+              </th>
               {products.map((product) => (
                 <td key={product.id}>
                   {typeof product.rating === 'number' ? (
                     <>
                       <RatingStars rating={product.rating} />
-                      {typeof product.reviewCount === 'number' && <span className="compare-table__muted">{product.reviewCount} reviews</span>}
+                      {typeof product.reviewCount === 'number' && <span className="compare-table__muted">{t('comparePage.reviews', { count: product.reviewCount })}</span>}
                     </>
                   ) : (
                     MISSING
@@ -200,15 +209,15 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
             })}
             <tr>
               <th scope="row">
-                <span className="visually-hidden">Actions</span>
+                <span className="visually-hidden">{t('comparePage.actions')}</span>
               </th>
               {products.map((product) => (
                 <td key={product.id}>
                   <div className="compare-table__actions">
                     <AddButton product={product} onAdd={handleAdd} />
-                    <Button variant="ghost" size="sm" onClick={() => handleRemove(product)} aria-label={`Remove ${product.title} from comparison`}>
+                    <Button variant="ghost" size="sm" onClick={() => handleRemove(product)} aria-label={t('comparePage.removeLabel', { title: product.title })}>
                       <LuTrash2 aria-hidden="true" />
-                      Remove
+                      {t('comparePage.remove')}
                     </Button>
                   </div>
                 </td>
@@ -223,18 +232,19 @@ function CompareTable({ products, missingCount, onRemove, onClear }) {
 
 /** "Add to cart"; products with options (and gift cards) are bought on their page. */
 function AddButton({ product, onAdd }) {
+  const { t } = useTranslation('catalog')
   if (product.hasVariants || isGiftCardProduct(product)) {
     return (
-      <Button size="sm" to={ROUTES.productDetails(product.id)} aria-label={`Choose options for ${product.title}`}>
-        Choose options
+      <Button size="sm" to={ROUTES.productDetails(product.id)} aria-label={t('comparePage.chooseOptionsFor', { title: product.title })}>
+        {t('comparePage.chooseOptions')}
       </Button>
     )
   }
   const { canBuy } = getPurchaseLimits(product)
   return (
-    <Button size="sm" onClick={() => onAdd(product)} disabled={!canBuy} aria-label={`Add ${product.title} to cart`}>
+    <Button size="sm" onClick={() => onAdd(product)} disabled={!canBuy} aria-label={t('comparePage.addLabel', { title: product.title })}>
       <LuShoppingBag aria-hidden="true" />
-      {canBuy ? 'Add to cart' : 'Unavailable'}
+      {t(canBuy ? 'comparePage.addToCart' : 'comparePage.unavailable')}
     </Button>
   )
 }

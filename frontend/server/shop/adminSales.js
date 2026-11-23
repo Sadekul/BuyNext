@@ -5,6 +5,8 @@ import { failed } from './adminSystem.js'
 import { customerPoints } from './adminPhase11.js'
 // Phase 12 §1: each order's currency.
 import { withCurrency } from './adminPhase12.js'
+// Phase 13: the customer's language.
+import { customerLocale } from './adminPhase13.js'
 
 /*
  * Phase 6 of the admin (docs/backend/PHASE6_CONTRACT.md) from BuyNest's
@@ -126,6 +128,8 @@ export function customerRow(raw) {
     lastLoginAt: raw.last_login_at ?? null,
     // Phase 11 §4: the points balance (the grid's optional Points column).
     ...customerPoints(raw),
+    // Phase 13: the language of their emails and the store (en | bn; null = the store default).
+    ...customerLocale(raw),
   }
 }
 
@@ -142,7 +146,8 @@ export function customerProfile(raw) {
     live: true,
   }
 }
-const CUSTOMER_FIELDS = { firstName: 'first_name', lastName: 'last_name', email: 'email', phone: 'phone', groupId: 'group_id', isActive: 'is_active' }
+// Phase 13: + locale.
+const CUSTOMER_FIELDS = { firstName: 'first_name', lastName: 'last_name', email: 'email', phone: 'phone', groupId: 'group_id', isActive: 'is_active', locale: 'locale' }
 const toCustomerBody = (values) => Object.fromEntries(Object.entries(values).filter(([field]) => CUSTOMER_FIELDS[field]).map(([field, value]) => [CUSTOMER_FIELDS[field], value]))
 
 // ---- admin-created orders ----

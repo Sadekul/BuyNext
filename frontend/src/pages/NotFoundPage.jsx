@@ -1,4 +1,5 @@
 import { LuMapPinOff } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import PageMeta from '../components/common/PageMeta'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -13,26 +14,23 @@ import { useStoreRedirect } from '../hooks/useStoreRedirect'
  */
 function NotFoundPage() {
   const { checking } = useStoreRedirect()
+  const { t } = useTranslation('errors')
 
   if (checking) {
     return (
       <div className="section container">
-        <Loader label="Looking for this page…" />
+        <Loader label={t('notFound.looking')} />
       </div>
     )
   }
 
   return (
     <div className="section container">
-      <PageMeta title="Page not found" noindex />
-      <EmptyState
-        icon={LuMapPinOff}
-        title="Page not found"
-        message="The page you're looking for doesn't exist or has moved."
-      >
-        <Button to={ROUTES.home}>Go to homepage</Button>
+      <PageMeta title={t('notFound.title')} noindex />
+      <EmptyState icon={LuMapPinOff} title={t('notFound.title')} message={t('notFound.message')}>
+        <Button to={ROUTES.home}>{t('notFound.home')}</Button>
         <Button to={ROUTES.products} variant="outline">
-          Browse products
+          {t('notFound.browse')}
         </Button>
       </EmptyState>
     </div>

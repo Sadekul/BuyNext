@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { applyPageMeta } from '../utils/pageMeta'
 
 /**
@@ -11,10 +12,12 @@ import { applyPageMeta } from '../utils/pageMeta'
  */
 export function usePageMetaDefaults() {
   const { pathname } = useLocation()
+  // Phase 13: a language switch rewrites the default description and title too.
+  const { i18n } = useTranslation()
 
   useEffect(() => {
     applyPageMeta()
-  }, [pathname])
+  }, [pathname, i18n.language])
 
   useEffect(() => {
     if (typeof MutationObserver === 'undefined') return undefined

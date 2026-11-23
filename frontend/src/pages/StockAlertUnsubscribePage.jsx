@@ -7,8 +7,9 @@ import Loader from '../components/ui/Loader'
 import { ROUTES } from '../constants/routes'
 import { unsubscribeStockAlerts } from '../services/accountService'
 import './AuthPages.css'
+import { useTranslation } from 'react-i18next'
 
-const TITLE = 'Stop back-in-stock emails'
+// Phase 13: texts in marketing:stockUnsubscribe.*.
 
 /**
  * /stock-alerts/unsubscribe?token=… (REAL_SHOP, phase 9): the link in every
@@ -17,6 +18,7 @@ const TITLE = 'Stop back-in-stock emails'
  * the proof. Kept out of search results.
  */
 function StockAlertUnsubscribePage() {
+  const { t } = useTranslation('marketing')
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')?.trim() ?? ''
   const request = useMutation({ mutationFn: unsubscribeStockAlerts })
@@ -26,7 +28,7 @@ function StockAlertUnsubscribePage() {
   if (!token) {
     body = (
       <p className="auth-alert auth-alert--error" role="alert">
-        This link is incomplete. Open the link from the email again.
+        {t('stockUnsubscribe.incomplete')}
       </p>
     )
   } else if (request.isSuccess) {
@@ -42,13 +44,13 @@ function StockAlertUnsubscribePage() {
       </p>
     )
   } else if (request.isPending) {
-    body = <Loader label="Stopping your alerts…" />
+    body = <Loader label={t('stockUnsubscribe.stopping')} />
   } else {
     body = (
       <>
-        <p className="auth-card__subtitle">We'll stop every back-in-stock email we were waiting to send to this address.</p>
+        <p className="auth-card__subtitle">{t('stockUnsubscribe.explain')}</p>
         <Button onClick={() => request.mutate(token)} fullWidth>
-          Stop these emails
+          {t('stockUnsubscribe.stop')}
         </Button>
       </>
     )
@@ -56,13 +58,13 @@ function StockAlertUnsubscribePage() {
 
   return (
     <div className="auth-page section container">
-      <PageMeta title={TITLE} noindex />
+      <PageMeta title={t('stockUnsubscribe.title')} noindex />
       <div className="auth-card">
         <LuBellOff aria-hidden="true" size={32} />
-        <h1 className="auth-card__title">{TITLE}</h1>
+        <h1 className="auth-card__title">{t('stockUnsubscribe.title')}</h1>
         {body}
         <Button to={ROUTES.products} variant="ghost" fullWidth>
-          Continue shopping
+          {t('stockUnsubscribe.continue')}
         </Button>
       </div>
     </div>

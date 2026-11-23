@@ -15,7 +15,9 @@ import { formatPrice } from '../utils/formatters'
 import { getProductPricing } from '../utils/pricing'
 import { getPurchaseLimits } from '../utils/inventory'
 import { isGiftCardProduct } from '../utils/giftCards'
+import { availabilityLabel } from '../utils/catalogText'
 import './WishlistPage.css'
+import { useTranslation } from 'react-i18next'
 
 const isToken = (value) => /^[A-Za-z0-9_-]{16,128}$/.test(value ?? '')
 
@@ -30,6 +32,7 @@ const canAdd = (product) => !choosesOnPage(product) && getPurchaseLimits(product
  * Unknown or stopped links get a friendly "not found". Kept out of search engines.
  */
 function SharedWishlistPage() {
+  const { t } = useTranslation('catalog')
   const { token } = useParams()
   const valid = isToken(token)
   const request = useQuery({
@@ -43,7 +46,7 @@ function SharedWishlistPage() {
   if (valid && request.isPending) {
     return (
       <div className="section container">
-        <Loader label="Loading wishlist…" />
+        <Loader label={t('sharedWishlist.loading')} />
       </div>
     )
   }
@@ -51,9 +54,9 @@ function SharedWishlistPage() {
   if (!valid || request.error?.status === 404) {
     return (
       <div className="section container">
-        <PageMeta title="Wishlist not found" noindex />
-        <EmptyState icon={LuHeart} titleAs="h1" title="This wishlist link doesn't work" message="It may have been turned off or replaced with a new link. Ask the person who shared it for the latest link.">
-          <Button to={ROUTES.products}>Browse products</Button>
+        <PageMeta title={t('sharedWishlist.notFound')} noindex />
+        <EmptyState icon={LuHeart} titleAs="h1" title={t('sharedWishlist.badLink')} message={t('sharedWishlist.badLinkMessage')}>
+          <Button to={ROUTES.products}>{t('sharedWishlist.browse')}</Button>
         </EmptyState>
       </div>
     )
@@ -62,7 +65,7 @@ function SharedWishlistPage() {
   if (request.error) {
     return (
       <div className="section container">
-        <ErrorMessage titleAs="h1" title="We couldn't load this wishlist" message={request.error.message} onRetry={() => request.refetch()} />
+        <ErrorMessage titleAs="h1" title={t('sharedWishlist.failed')} message={request.error.message} onRetry={() => request.refetch()} />
       </div>
     )
   }
@@ -71,14 +74,15 @@ function SharedWishlistPage() {
 }
 
 function SharedWishlist({ wishlist }) {
+  const { t } = useTranslation('catalog')
   const { addItem } = useCart()
   const [status, setStatus] = useState('')
-  const title = wishlist.ownerFirstName ? `${wishlist.ownerFirstName}'s wishlist` : 'A shared wishlist'
+  const title = wishlist.ownerFirstName ? t('sharedWishlist.ownerTitle', { name: wishlist.ownerFirstName }) : t('sharedWishlist.anonymousTitle')
   const addable = wishlist.items.filter((item) => canAdd(item.product))
 
   function addAll() {
     for (const item of addable) addItem(item.product)
-    setStatus(`${addable.length} ${addable.length === 1 ? 'product was' : 'products were'} added to your cart.`)
+    setStatus(t('sharedWishlist.addedAll', { count: addable.length }))
   }
 
   return (
@@ -88,13 +92,13 @@ function SharedWishlist({ wishlist }) {
         <div>
           <h1>{title}</h1>
           <p className="wishlist-page__status">
-            {wishlist.items.length} saved {wishlist.items.length === 1 ? 'product' : 'products'}
+            {t('sharedWishlist.saved', { count: wishlist.items.length })}
           </p>
         </div>
         {addable.length > 0 && (
           <Button onClick={addAll}>
             <LuShoppingBag aria-hidden="true" />
-            Add all to cart
+            {t('sharedWishlist.addAll')}
           </Button>
         )}
       </header>
@@ -103,14 +107,14 @@ function SharedWishlist({ wishlist }) {
       </p>
 
       {wishlist.items.length === 0 ? (
-        <EmptyState icon={LuHeart} title="Nothing here yet" message="This wishlist has no products right now." />
+        <EmptyState icon={LuHeart} title={t('sharedWishlist.emptyTitle')} message={t('sharedWishlist.emptyMessage')} />
       ) : (
         <ul className="wishlist-page__grid">
           {wishlist.items.map((item) => (
             <li key={`${item.product.id}-${item.variantLabel ?? ''}`}>
               <SharedItem item={item} onAdd={(product) => {
                 addItem(product)
-                setStatus(`${product.title} was added to your cart.`)
+                setStatus(t('sharedWishlist.added', { title: product.title }))
               }} />
             </li>
           ))}
@@ -121,6 +125,7 @@ function SharedWishlist({ wishlist }) {
 }
 
 function SharedItem({ item, onAdd }) {
+  const { t } = useTranslation('catalog')
   const { product } = item
   const { salePrice, originalPrice, hasDiscount } = getProductPricing(product)
   const { canBuy } = getPurchaseLimits(product)
@@ -142,18 +147,18 @@ function SharedItem({ item, onAdd }) {
           {hasDiscount && <s>{formatPrice(originalPrice)}</s>}
         </p>
         <p className={canBuy || isGiftCardProduct(product) ? 'wishlist-item__stock' : 'wishlist-item__stock wishlist-item__stock--out'}>
-          {canBuy || isGiftCardProduct(product) ? (product.availabilityStatus ?? 'In Stock') : 'Out of stock'}
+          {canBuy || isGiftCardProduct(product) ? availabilityLabel(product.availabilityStatus ?? 'In Stock') : t('sharedWishlist.outOfStock')}
         </p>
         {item.note && <p className="wishlist-item__shared-note">“{item.note}”</p>}
         <div className="wishlist-item__actions">
           {choosesOnPage(product) ? (
-            <Button size="sm" to={ROUTES.productDetails(product.id)} aria-label={`Choose options for ${product.title}`}>
-              Choose options
+            <Button size="sm" to={ROUTES.productDetails(product.id)} aria-label={t('card.chooseOptionsFor', { title: product.title })}>
+              {t('card.chooseOptions')}
             </Button>
           ) : (
-            <Button size="sm" onClick={() => onAdd(product)} disabled={!canBuy} aria-label={`Add ${product.title} to cart`}>
+            <Button size="sm" onClick={() => onAdd(product)} disabled={!canBuy} aria-label={t('comparePage.addLabel', { title: product.title })}>
               <LuShoppingBag aria-hidden="true" />
-              Add to cart
+              {t('card.addToCart')}
             </Button>
           )}
         </div>

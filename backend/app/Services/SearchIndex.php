@@ -40,7 +40,7 @@ class SearchIndex
      */
     public static function words(?string $text): array
     {
-        $parts = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower((string) $text), -1, PREG_SPLIT_NO_EMPTY);
+        $parts = preg_split('/[^\p{L}\p{M}\p{N}]+/u', mb_strtolower((string) $text), -1, PREG_SPLIT_NO_EMPTY);
 
         return array_values(array_filter($parts ?: [], fn (string $word) => mb_strlen($word) <= self::MAX_WORD_LENGTH));
     }

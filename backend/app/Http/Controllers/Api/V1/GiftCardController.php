@@ -18,10 +18,10 @@ class GiftCardController extends Controller
      */
     public function check(Request $request, GiftCards $giftCards): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'max:40']], ['code.required' => 'Enter the gift card code.']);
+        $data = $request->validate(['code' => ['required', 'string', 'max:40']], ['code.required' => __('Enter the gift card code.')]);
         $card = $giftCards->usable($data['code']);
         if (! $card) {
-            throw ValidationException::withMessages(['code' => GiftCards::INVALID]);
+            throw ValidationException::withMessages(['code' => __(GiftCards::INVALID)]);
         }
 
         return response()->json(['data' => [

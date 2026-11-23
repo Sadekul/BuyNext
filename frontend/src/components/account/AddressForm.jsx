@@ -7,6 +7,7 @@ import Button from '../ui/Button'
 import { createSavedAddressSchema } from '../../schemas/checkoutSchema'
 import { applyServerFieldErrors } from '../../utils/serverErrors'
 import './AddressForm.css'
+import { useTranslation } from 'react-i18next'
 
 const FIELDS = ['firstName', 'lastName', 'phone', 'company', 'line1', 'line2', 'city', 'state', 'postalCode', 'country', 'isDefaultShipping', 'isDefaultBilling']
 // The shop service already turns the API's snake_case into these names.
@@ -34,7 +35,8 @@ const EMPTY_SAVED_ADDRESS = {
  * an address saved before its country was removed keeps showing it, and the
  * schema asks for a new one.
  */
-function AddressForm({ title, initialValues, countries, onSave, onCancel, submitLabel = 'Save address' }) {
+function AddressForm({ title, initialValues, countries, onSave, onCancel, submitLabel }) {
+  const { t } = useTranslation('account')
   const titleId = useId()
   const [schema] = useState(() => createSavedAddressSchema(countries))
   const defaults = { ...EMPTY_SAVED_ADDRESS, country: countries[0] ?? '', ...initialValues }
@@ -65,12 +67,12 @@ function AddressForm({ title, initialValues, countries, onSave, onCancel, submit
       </h3>
       <AddressFields prefix="" register={register} errors={errors} autoCompleteSection="shipping" countries={options} />
       <div className="address-form__extra">
-        <FormField label="Phone" type="tel" autoComplete="tel" hint="For the courier, if they need to reach you." {...register('phone')} error={errors.phone?.message} />
-        <FormField label="Company (optional)" autoComplete="organization" {...register('company')} error={errors.company?.message} />
+        <FormField label={t('addressForm.phone')} type="tel" autoComplete="tel" hint={t('addressForm.phoneHint')} {...register('phone')} error={errors.phone?.message} />
+        <FormField label={t('addressForm.company')} autoComplete="organization" {...register('company')} error={errors.company?.message} />
       </div>
       <div className="address-form__defaults">
-        <CheckboxField label="Use as my default shipping address" {...register('isDefaultShipping')} error={errors.isDefaultShipping?.message} />
-        <CheckboxField label="Use as my default billing address" {...register('isDefaultBilling')} error={errors.isDefaultBilling?.message} />
+        <CheckboxField label={t('addressForm.defaultShipping')} {...register('isDefaultShipping')} error={errors.isDefaultShipping?.message} />
+        <CheckboxField label={t('addressForm.defaultBilling')} {...register('isDefaultBilling')} error={errors.isDefaultBilling?.message} />
       </div>
       {errors.root?.server && (
         <p className="address-form__error" role="alert">
@@ -79,10 +81,10 @@ function AddressForm({ title, initialValues, countries, onSave, onCancel, submit
       )}
       <div className="address-form__actions">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : submitLabel}
+          {isSubmitting ? t('addressForm.saving') : (submitLabel ?? t('addressForm.save'))}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('addressForm.cancel')}
         </Button>
       </div>
     </form>

@@ -1,0 +1,127 @@
+{
+  "points_one": "{{points}} পয়েন্ট",
+  "points_other": "{{points}} পয়েন্ট",
+  "rewardTypes": {
+    "earn": "অর্ডারে অর্জিত",
+    "spend": "অর্ডারে ব্যবহৃত",
+    "cancel_return": "ফেরত: অর্ডার বাতিল হয়েছে",
+    "refund_return": "ফেরত: অর্ডারের রিফান্ড হয়েছে",
+    "refund_reverse": "ফিরিয়ে নেওয়া হয়েছে: অর্ডারের রিফান্ড হয়েছে",
+    "signup": "স্বাগতম বোনাস",
+    "review": "রিভিউ বোনাস",
+    "adjust": "আমাদের টিম সমন্বয় করেছে"
+  },
+  "giftCard": {
+    "recipient": "{{name}}-এর জন্য",
+    "recipientWithEmail": "{{name}}-এর জন্য ({{email}})",
+    "enterAmount": "একটি পরিমাণ লিখুন।",
+    "wholeCents": "পূর্ণ পয়সায় লিখুন, যেমন ৪০ বা ৪২.৫০।",
+    "amountRange": "{{min}} থেকে {{max}}-এর মধ্যে একটি পরিমাণ বেছে নিন।"
+  },
+  "sslcommerz": {
+    "visa": "ভিসা কার্ড",
+    "amex": "আমেরিকান এক্সপ্রেস কার্ড",
+    "unionpay": "ইউনিয়নপে কার্ড",
+    "internetBanking": "ইন্টারনেট ব্যাংকিং",
+    "cardOrBank": "কার্ড বা ব্যাংক"
+  },
+  "drawer": {
+    "title": "আপনার কার্ট ({{count, number}})",
+    "subtotal": "সাবটোটাল",
+    "blocker": "চেকআউট করতে পাওয়া যাচ্ছে না এমন পণ্যগুলো সরিয়ে দিন।",
+    "checkout": "চেকআউট",
+    "viewCart": "কার্ট দেখুন",
+    "emptyTitle": "আপনার কার্ট খালি",
+    "emptyMessage": "শুরু করতে পছন্দের কিছু পণ্য যোগ করুন।",
+    "startShopping": "কেনাকাটা শুরু করুন"
+  },
+  "line": {
+    "giftFor": "{{name}}-এর জন্য {{title}}",
+    "each": " প্রতিটি",
+    "groupDiscount": "আপনার {{percent}}% গ্রুপ ছাড় যুক্ত আছে",
+    "quantityFor": "{{name}}-এর পরিমাণ",
+    "removeLabel": "কার্ট থেকে {{name}} সরান",
+    "remove": "সরিয়ে দিন",
+    "itemSubtotal": "পণ্যের সাবটোটাল: "
+  },
+  "summary": {
+    "title": "অর্ডারের সারসংক্ষেপ",
+    "subtotal_one": "সাবটোটাল ({{count, number}}টি পণ্য)",
+    "subtotal_other": "সাবটোটাল ({{count, number}}টি পণ্য)",
+    "productSavings": "পণ্যে সাশ্রয় (যুক্ত আছে)",
+    "estimatedShipping": "আনুমানিক ডেলিভারি চার্জ",
+    "noShipping": "নেই (ইমেইলে পাঠানো হয়)",
+    "free": "ফ্রি",
+    "taxes": "ট্যাক্স",
+    "taxesLater": "চেকআউটে হিসাব করা হবে",
+    "estimatedTotal": "আনুমানিক মোট",
+    "note": "দাম, স্টক, ছাড় ও ডেলিভারি চার্জ চেকআউটের সময় আমাদের সার্ভার নিশ্চিত করে।"
+  },
+  "currencyNote": {
+    "approximate": "{{code}}-এ দেখানো দাম আনুমানিক।",
+    "chargedAmount": "আপনার কাছ থেকে {{amount}} {{code}} নেওয়া হবে।",
+    "chargedIn": "আপনার কাছ থেকে {{code}}-এ নেওয়া হবে।"
+  },
+  "coupon": {
+    "checking": "{{code}} যাচাই হচ্ছে…",
+    "checkingShort": " — যাচাই হচ্ছে…",
+    "removeLabel": "{{code}} কোডটি সরান",
+    "label": "ডিসকাউন্ট কোড",
+    "placeholder": "যেমন: NEST10",
+    "apply": "প্রয়োগ করুন",
+    "serverHint": "কোডগুলো আমাদের সার্ভারে যাচাই করা হয়।",
+    "demoHint": "ডেমো কোড: NEST10, SAVE20"
+  },
+  "coupons": {
+    "NEST10": "আপনার অর্ডারে ১০% ছাড়",
+    "SAVE20": "$১৫০ বা তার বেশি অর্ডারে $২০ ছাড়"
+  },
+  "discount": {
+    "freeShipping": "ফ্রি ডেলিভারি",
+    "label": "ছাড়",
+    "withCode": "ছাড় ({{code}})"
+  },
+  "freeShipping": {
+    "add": "ফ্রি ডেলিভারির জন্য আরও <strong>{{amount}}</strong>-এর পণ্য যোগ করুন",
+    "unlocked": "আপনি ফ্রি ডেলিভারি পেয়ে গেছেন",
+    "progress": "ফ্রি ডেলিভারির দিকে অগ্রগতি"
+  },
+  "group": {
+    "price": "{{group}} দাম: {{percent}} ছাড়",
+    "save": "। আপনি {{amount}} সাশ্রয় করছেন; এটি দামের মধ্যেই ধরা আছে।",
+    "included": "। এটি দামের মধ্যেই ধরা আছে।"
+  },
+  "page": {
+    "tabTitle": "কার্ট",
+    "tabTitleCount": "কার্ট ({{count, number}})",
+    "emptyTitle": "আপনার কার্ট খালি",
+    "emptyMessage": "ক্যাটালগ ঘুরে দেখুন আর পছন্দের পণ্য যোগ করুন।",
+    "startShopping": "কেনাকাটা শুরু করুন",
+    "title": "শপিং কার্ট",
+    "checking": "সর্বশেষ দাম ও স্টক দেখা হচ্ছে…",
+    "changed_one": "যোগ করার পর {{count, number}}টি পণ্যে পরিবর্তন হয়েছে। নিচের নোটগুলো দেখুন।",
+    "changed_other": "যোগ করার পর {{count, number}}টি পণ্যে পরিবর্তন হয়েছে। নিচের নোটগুলো দেখুন।",
+    "checkFailed": "সর্বশেষ দাম যাচাই করা যায়নি ({{reason}})",
+    "tryAgain": "আবার চেষ্টা করুন",
+    "items": "আপনার কার্টের পণ্য",
+    "continue": "কেনাকাটা চালিয়ে যান",
+    "clear": "কার্ট খালি করুন",
+    "pricesFailed": "দাম যাচাই করা যায়নি ({{reason}})। চেকআউটে মোট টাকা নিশ্চিত করা হবে।",
+    "removeUnavailable_one": "এগিয়ে যেতে পাওয়া যাচ্ছে না এমন পণ্যটি সরিয়ে দিন।",
+    "removeUnavailable_other": "এগিয়ে যেতে পাওয়া যাচ্ছে না এমন {{count, number}}টি পণ্য সরিয়ে দিন।",
+    "proceed": "চেকআউটে যান",
+    "crossSells": "অন্য ক্রেতারা আরও কিনেছেন"
+  },
+  "notices": {
+    "onlyAvailable": "মাত্র {{max, number}}টি আছে, তাই পরিমাণ {{quantity, number}} করা হয়েছে।",
+    "minimum": "সর্বনিম্ন অর্ডার {{min, number}}টি, তাই পরিমাণ {{quantity, number}} করা হয়েছে।",
+    "productGone": "এই পণ্যটি আর পাওয়া যাচ্ছে না।",
+    "optionGone": "এই অপশনটি আর পাওয়া যাচ্ছে না।",
+    "outOfStock": "এই পণ্যটির স্টক শেষ।",
+    "priceChanged": "দাম {{from}} থেকে বদলে {{to}} হয়েছে।"
+  },
+  "totals": {
+    "invalidCode": "এই কোডটি সঠিক নয়।",
+    "minSpend": "এই কোড ব্যবহার করতে কমপক্ষে ${{amount}}-এর কেনাকাটা করুন।"
+  }
+}

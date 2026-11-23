@@ -4,6 +4,7 @@
  * so base URL, headers, cookies, timeouts, and errors are handled once.
  */
 import { apiProvider } from './providers'
+import { currentLanguage, translate } from '../i18n'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
 
@@ -14,15 +15,9 @@ if (!API_BASE_URL && !apiProvider.request.sameOrigin) {
 
 const DEFAULT_TIMEOUT_MS = 15_000
 
-const STATUS_MESSAGES = {
-  400: 'The request was invalid.',
-  401: 'Please sign in to continue.',
-  403: "You don't have permission to do that.",
-  404: "We couldn't find what you were looking for.",
-  419: 'Your session expired. Please refresh the page and try again.', // Laravel CSRF mismatch
-  422: 'Please check the highlighted fields.', // Laravel validation
-  429: 'Too many requests. Please wait a moment and try again.',
-}
+// Phase 13: in the shopper's language (locales/<lang>/errors.json `api.*`). 419 = Laravel CSRF mismatch, 422 = validation.
+const STATUS_CODES = [400, 401, 403, 404, 419, 422, 429]
+const statusMessage = (status) => (STATUS_CODES.includes(status) ? translate(`errors:api.${status}`) : null)
 
 /**
  * Error thrown for failed requests. `status` is 0 for network/timeout failures.
@@ -68,7 +63,7 @@ function anySignal(signals) {
   return controller.signal
 }
 
-const TIMEOUT_MESSAGE = 'The server took too long to respond. Please try again.'
+const timeoutMessage = () => translate('errors:api.timeout')
 
 /**
  * Builds `${base}${path}?a=1&b=2`, skipping empty parameters. `sameOrigin`
@@ -76,6 +71,9 @@ const TIMEOUT_MESSAGE = 'The server took too long to respond. Please try again.'
  */
 function buildUrl(path, params = {}, sameOrigin = false) {
   const url = sameOrigin ? new URL(path, window.location.origin) : new URL(`${API_BASE_URL}${path}`)
+  // Phase 13: the public catalog is fetched without cookies (and cached by URL), so it names
+  // the language in the URL: `lang=bn` (no parameter = English, as before).
+  if (path.startsWith('/api/catalog/') && currentLanguage() === 'bn') url.searchParams.set('lang', 'bn')
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value))
@@ -116,9 +114,9 @@ async function request(
     })
   } catch (error) {
     // fetch() only rejects when no HTTP response arrived at all.
-    if (error.name === 'TimeoutError') throw new ApiError(TIMEOUT_MESSAGE)
+    if (error.name === 'TimeoutError') throw new ApiError(timeoutMessage())
     if (isAbortError(error)) throw error // cancelled on purpose: not a real failure
-    throw new ApiError('Network error. Check your internet connection and try again.')
+    throw new ApiError(translate('errors:api.network'))
   }
 
   const isJson = response.headers.get('content-type')?.includes('application/json')
@@ -128,15 +126,15 @@ async function request(
       data = await response.json()
     } catch (error) {
       if (isAbortError(error)) throw error
-      if (error.name === 'TimeoutError') throw new ApiError(TIMEOUT_MESSAGE)
-      throw new ApiError('The server sent a response we could not read.', { status: response.status })
+      if (error.name === 'TimeoutError') throw new ApiError(timeoutMessage())
+      throw new ApiError(translate('errors:api.unreadable'), { status: response.status })
     }
   }
 
   // fetch() does NOT reject on 4xx/5xx — we must check response.ok ourselves.
   if (!response.ok) {
-    const fallback = response.status >= 500 ? 'The server had a problem. Please try again later.' : 'Request failed.'
-    throw new ApiError(data?.message ?? STATUS_MESSAGES[response.status] ?? fallback, {
+    const fallback = translate(response.status >= 500 ? 'errors:api.server' : 'errors:api.failed')
+    throw new ApiError(data?.message ?? statusMessage(response.status) ?? fallback, {
       status: response.status,
       data,
     })
@@ -145,7 +143,7 @@ async function request(
   // Every BuyNest endpoint returns JSON; anything else (e.g. an HTML error
   // page from a proxy) would crash the adapters, so treat it as an error.
   if (!isJson) {
-    throw new ApiError('The server sent an unexpected response.', { status: response.status })
+    throw new ApiError(translate('errors:api.unexpected'), { status: response.status })
   }
 
   return data

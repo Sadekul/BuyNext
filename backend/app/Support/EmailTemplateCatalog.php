@@ -55,11 +55,18 @@ final class EmailTemplateCatalog
         return array_key_exists($key, self::definitions());
     }
 
-    /** One template: name, description, variables ([name => [label, kind]]), required ([[any of these], ...]), subject, body. */
-    public static function get(string $key): array
+    /**
+     * One template: name, description, variables ([name => [label, kind]]), required ([[any of these], ...]), subject, body.
+     * Phase 13: $locale "bn" gives the Bangla default subject and body (EmailTemplateCatalogBn); everything else is the same.
+     */
+    public static function get(string $key, string $locale = 'en'): array
     {
         $definition = self::definitions()[$key];
         $definition['variables'] = [...$definition['variables'], ...self::COMMON];
+        if ($locale !== 'en' && isset(EmailTemplateCatalogBn::templates()[$key]) && $locale === 'bn') {
+            $definition['subject'] = EmailTemplateCatalogBn::templates()[$key]['subject'];
+            $definition['body'] = EmailTemplateCatalogBn::templates()[$key]['body'];
+        }
 
         return $definition;
     }
@@ -431,98 +438,98 @@ final class EmailTemplateCatalog
         ];
     }
 
-    /** Sample values for the admin preview and test email (blocks built by EmailBlocks). */
+    /** Sample values for the admin preview and test email (blocks built by EmailBlocks), in the current language (phase 13). */
     public static function sample(string $key): array
     {
-        $items = [['Wireless Headphones', 1, '79.99'], ['Cotton Tee (Size: M / Color: Navy)', 2, '39.98']];
+        $items = [[__('Wireless Headphones'), 1, '79.99'], [__('Cotton Tee').' ('.__('Size').': M / '.__('Color').': '.__('Navy').')', 2, '39.98']];
         $address = ['first_name' => 'Ava', 'last_name' => 'Customer', 'line1' => '12 Market Street', 'line2' => null,
             'city' => 'Springfield', 'state' => 'Oregon', 'postal_code' => '29112', 'country' => 'United States'];
-        $note = EmailBlocks::note('Thanks for shopping with us!');
+        $note = EmailBlocks::note(__('Thanks for shopping with us!'));
 
         $values = match ($key) {
             'email_verification', 'password_reset', 'set_password' => [
-                'customer_first_name' => 'Ava', 'code' => '123456', 'expires_minutes' => '10',
+                'customer_first_name' => 'Ava', 'code' => '123456', 'expires_minutes' => Locale::digits('10'),
             ],
             'order_confirmation' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96',
-                'payment_method' => 'Cash on delivery', 'shipping_method' => 'Standard', 'delivery_estimate' => '3–5 business days',
-                'next_steps' => 'We are preparing your order now. Please pay the courier in cash when it arrives.',
+                'payment_method' => __('Cash on delivery'), 'shipping_method' => __('Standard'), 'delivery_estimate' => Locale::digits(__('3–5 business days')),
+                'next_steps' => __('We are preparing your order now. Please pay the courier in cash when it arrives.'),
                 'items_table' => EmailBlocks::itemsTable(
-                    array_map(fn ($i) => ["{$i[0]} × {$i[1]}", Currency::format($i[2])], $items),
-                    [['Subtotal', Currency::format('119.97')], ['Shipping (Standard)', Currency::format('4.99')], ['Tax', Currency::format('0.00')], ['Total', Currency::format('124.96'), true]],
+                    array_map(fn ($i) => [$i[0].' × '.Locale::digits($i[1]), self::money($i[2])], $items),
+                    [[__('Subtotal'), self::money('119.97')], [__('Shipping (:method)', ['method' => __('Standard')]), self::money('4.99')], [__('Tax'), self::money('0.00')], [__('Total'), self::money('124.96'), true]],
                 ),
                 'address' => EmailBlocks::address($address),
-                'reward_points_spent' => EmailBlocks::paragraph('You used 500 reward points ('.Currency::format('5.00').') on this order.'),
+                'reward_points_spent' => EmailBlocks::paragraph(__('You used :points reward points (:amount) on this order.', ['points' => Locale::number(500), 'amount' => self::money('5.00')])),
             ],
             'order_status' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96', 'status' => 'shipped',
-                'status_heading' => 'Your order is on its way', 'status_message' => 'Good news: your order has left our warehouse.',
+                'status_heading' => __('Your order is on its way'), 'status_message' => __('Good news: your order has left our warehouse.'),
                 'note' => $note,
             ],
             'payment_not_completed' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96',
                 'shop_url' => config('buynest.storefront_url'),
-                'button' => EmailBlocks::button(config('buynest.storefront_url'), 'Shop again'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url'), __('Shop again')),
             ],
             // Phase 9 (part A).
             'email_change_code' => [
-                'customer_first_name' => 'Ava', 'code' => '123456', 'expires_minutes' => '10', 'new_email' => 'ava.new@example.com',
+                'customer_first_name' => 'Ava', 'code' => '123456', 'expires_minutes' => Locale::digits('10'), 'new_email' => 'ava.new@example.com',
             ],
             'email_changed' => [
                 'customer_first_name' => 'Ava', 'old_email' => 'ava@example.com', 'new_email' => 'ava.new@example.com',
             ],
             'order_cancelled_by_customer' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96',
-                'reason' => EmailBlocks::paragraph('Your reason: Ordered the wrong size.'),
+                'reason' => EmailBlocks::paragraph(__('Your reason: :reason', ['reason' => __('Ordered the wrong size.')])),
             ],
             'account_deleted' => ['customer_first_name' => 'Ava'],
             'invoice' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'invoice_number' => 'INV-100001',
                 'invoice_amount' => '124.96', 'note' => $note,
-                'reward_points_earned' => EmailBlocks::paragraph('You earned 119 reward points with this order.'),
+                'reward_points_earned' => EmailBlocks::paragraph(trans_choice('You earned :count reward point with this order.|You earned :count reward points with this order.', 119, ['count' => Locale::number(119)])),
             ],
             'shipment' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'carrier' => 'UPS', 'tracking_number' => '1Z999AA10123456784',
                 'tracking_url' => 'https://www.ups.com/track?tracknum=1Z999AA10123456784',
                 'tracking' => EmailBlocks::tracking('UPS', '1Z999AA10123456784'),
-                'button' => EmailBlocks::button('https://www.ups.com/track?tracknum=1Z999AA10123456784', 'Track your parcel'),
+                'button' => EmailBlocks::button('https://www.ups.com/track?tracknum=1Z999AA10123456784', __('Track your parcel')),
                 'note' => $note,
             ],
             'credit_memo' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'credit_memo_number' => 'CM-100001',
-                'refund_total' => '84.98', 'payment_method' => 'Cash on delivery',
-                'items_table' => EmailBlocks::itemsTable([['Wireless Headphones × 1', Currency::format('79.99')], ['Shipping', Currency::format('4.99')]], [['Refund total', Currency::format('84.98'), true]]),
+                'refund_total' => '84.98', 'payment_method' => __('Cash on delivery'),
+                'items_table' => EmailBlocks::itemsTable([[__('Wireless Headphones').' × '.Locale::digits(1), self::money('79.99')], [__('Shipping'), self::money('4.99')]], [[__('Refund total'), self::money('84.98'), true]]),
                 'note' => $note,
             ],
             'return_status' => [
-                'customer_first_name' => 'Ava', 'return_number' => 'RMA-100001', 'order_number' => 'BN-100001', 'reason' => 'Damaged',
-                'status' => 'approved', 'status_heading' => 'Your return was approved',
-                'status_message' => 'Your return was approved. Please pack the items securely and send them back to us, with the return number on the parcel.',
-                'items_table' => EmailBlocks::list(['Wireless Headphones × 1']),
+                'customer_first_name' => 'Ava', 'return_number' => 'RMA-100001', 'order_number' => 'BN-100001', 'reason' => __('Damaged'),
+                'status' => 'approved', 'status_heading' => __('Your return was approved'),
+                'status_message' => __('Your return was approved. Please pack the items securely and send them back to us, with the return number on the parcel.'),
+                'items_table' => EmailBlocks::list([__('Wireless Headphones').' × '.Locale::digits(1)]),
                 'resolution' => '', 'note' => $note,
             ],
             'newsletter_confirmation' => [
                 'confirm_url' => config('buynest.storefront_url').'/newsletter/confirm?token=sample',
-                'button' => EmailBlocks::button(config('buynest.storefront_url').'/newsletter/confirm?token=sample', 'Confirm subscription'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url').'/newsletter/confirm?token=sample', __('Confirm subscription')),
             ],
             'abandoned_cart' => [
                 'customer_first_name' => 'Ava', 'cart_subtotal' => '119.97', 'cart_url' => config('buynest.storefront_url').'/cart',
-                'items_table' => EmailBlocks::itemsTable(array_map(fn ($i) => ["{$i[0]} × {$i[1]}", Currency::format($i[2])], $items), [['Subtotal', Currency::format('119.97'), true]]),
-                'button' => EmailBlocks::button(config('buynest.storefront_url').'/cart', 'Back to your cart'),
+                'items_table' => EmailBlocks::itemsTable(array_map(fn ($i) => [$i[0].' × '.Locale::digits($i[1]), self::money($i[2])], $items), [[__('Subtotal'), self::money('119.97'), true]]),
+                'button' => EmailBlocks::button(config('buynest.storefront_url').'/cart', __('Back to your cart')),
             ],
             // Phase 9 (part B).
             'back_in_stock' => [
-                'product_name' => 'Cotton Tee', 'variant_label' => '(Size: M / Color: Navy)',
+                'product_name' => __('Cotton Tee'), 'variant_label' => '('.__('Size').': M / '.__('Color').': '.__('Navy').')',
                 'product_url' => config('buynest.storefront_url').'/products/1',
                 'unsubscribe_url' => config('buynest.storefront_url').'/stock-alerts/unsubscribe?token=sample',
-                'button' => EmailBlocks::button(config('buynest.storefront_url').'/products/1', 'Shop now'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url').'/products/1', __('Shop now')),
             ],
             // Phase 10 (part B).
             'gift_card_received' => [
                 'recipient_name' => 'Sam', 'sender_name' => 'Ava Customer', 'amount' => '50.00', 'code' => 'ABCD-EFGH-JKMN-PQRS',
-                'message' => EmailBlocks::paragraph('“Happy birthday, Sam!”'), 'expires' => 'It doesn’t expire.',
+                'message' => EmailBlocks::paragraph('“'.__('Happy birthday, Sam!').'”'), 'expires' => __('It doesn’t expire.'),
                 'shop_url' => config('buynest.storefront_url'),
-                'button' => EmailBlocks::button(config('buynest.storefront_url'), 'Start shopping'),
+                'button' => EmailBlocks::button(config('buynest.storefront_url'), __('Start shopping')),
             ],
             'gift_card_purchased' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'recipient_name' => 'Sam', 'recipient_email' => 'sam@example.com',
@@ -531,5 +538,11 @@ final class EmailTemplateCatalog
         };
 
         return $values;
+    }
+
+    /** A sample amount in the store currency, written for the current language. */
+    private static function money(string $amount): string
+    {
+        return Currency::format($amount, null, Locale::current());
     }
 }

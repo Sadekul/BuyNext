@@ -14,11 +14,14 @@ import { useCategories } from '../hooks/useCategories'
 import { useCart } from '../hooks/useCart'
 import { ROUTES } from '../constants/routes'
 import { REAL_SHOP } from '../constants/shop'
-import { SITE } from '../constants/site'
-import { customerBenefits, featuredCategories, heroContent, homeCollectionIds, promoBanners } from '../data/homeContent'
+import { SITE, freeShippingAmount } from '../constants/site'
+import { useStoreSettings } from '../hooks/useStoreSettings'
+import { formatBasePrice } from '../utils/formatters'
+import { featuredCategories, homeCollectionIds, localizedBenefits, localizedHeroContent, localizedPromoBanners } from '../data/homeContent'
 import { allProductsQuery } from '../queries/productQueries'
 import { homeContentQuery } from '../queries/contentQueries'
 import { buildHomeCollections } from '../utils/productCollections'
+import { useTranslation } from 'react-i18next'
 
 const EMPTY_COLLECTIONS = { featured: [], newArrivals: [], bestSellers: [], specialOffers: [] }
 
@@ -27,18 +30,19 @@ const EMPTY_COLLECTIONS = { featured: [], newArrivals: [], bestSellers: [], spec
  * be loaded) the page keeps its h1 and the sections below still render.
  */
 function CmsHero({ request }) {
+  const { t } = useTranslation('marketing')
   if (request.data) return <HeroBanner content={request.data.hero} />
   return (
     <section className="hero section" aria-labelledby="hero-title">
       <div className="container">
         {request.error ? (
-          <ErrorMessage titleAs="h1" title="We couldn't load this page's highlights" message={request.error.message} onRetry={request.refetch} />
+          <ErrorMessage titleAs="h1" title={t('home.heroFailed')} message={request.error.message} onRetry={request.refetch} />
         ) : (
           <>
             <h1 id="hero-title" className="visually-hidden">
               {SITE.name}
             </h1>
-            <Loader label="Loading…" />
+            <Loader label={t('home.loading')} />
           </>
         )}
       </div>
@@ -60,13 +64,17 @@ const selectHomeCollections = (items) => buildHomeCollections(items, homeCollect
  * live API data. Loading, error, and retry states come from custom hooks.
  */
 function HomePage() {
+  const { t } = useTranslation('marketing')
   const collectionsRequest = useQuery({ ...allProductsQuery(), select: selectHomeCollections })
   // REAL_SHOP: hero, promo banners, and featured products come from the admin's CMS.
   const homeRequest = useQuery({ ...homeContentQuery(), enabled: REAL_SHOP })
   const cmsFeatured = homeRequest.data?.featuredProducts ?? []
-  const banners = REAL_SHOP ? (homeRequest.data?.banners ?? []) : promoBanners
+  const banners = REAL_SHOP ? (homeRequest.data?.banners ?? []) : localizedPromoBanners(t)
   const categoriesRequest = useCategories()
   const { addItem } = useCart()
+  // The free-shipping line names the store's own threshold and currency ("৳৫,০০০"), never a fixed "$50".
+  const { settings } = useStoreSettings()
+  const freeShipping = freeShippingAmount(settings.freeShippingThreshold, formatBasePrice)
 
   const collections = collectionsRequest.data ?? EMPTY_COLLECTIONS
   const isLoadingProducts = collectionsRequest.isPending
@@ -85,10 +93,10 @@ function HomePage() {
   const handleAddToCart = useCallback((product) => addItem(product), [addItem])
 
   const productsUnavailable = collectionsRequest.error && (
-    <section className="section section--muted" aria-label="Products">
+    <section className="section section--muted" aria-label={t('home.products')}>
       <div className="container">
         <ErrorMessage
-          title="We couldn't load products"
+          title={t('home.productsFailed')}
           message={collectionsRequest.error.message}
           onRetry={collectionsRequest.refetch}
         />
@@ -98,8 +106,8 @@ function HomePage() {
 
   return (
     <>
-      {REAL_SHOP ? <CmsHero request={homeRequest} /> : <HeroBanner content={heroContent} />}
-      <BenefitsSection benefits={customerBenefits} />
+      {REAL_SHOP ? <CmsHero request={homeRequest} /> : <HeroBanner content={localizedHeroContent(t, freeShipping)} />}
+      <BenefitsSection benefits={localizedBenefits(t, freeShipping)} />
       <FeaturedCategories
         categories={categories}
         isLoading={categoriesRequest.isPending}
@@ -109,8 +117,8 @@ function HomePage() {
 
       {REAL_SHOP && (homeRequest.isPending || cmsFeatured.length > 0) && (
         <ProductSection
-          eyebrow="Handpicked"
-          title="Featured products"
+          eyebrow={t('home.handpicked')}
+          title={t('home.featured')}
           products={cmsFeatured}
           isLoading={homeRequest.isPending}
           viewAllTo={ROUTES.products}
@@ -121,8 +129,8 @@ function HomePage() {
 
       {productsUnavailable || (!REAL_SHOP && (
         <ProductSection
-          eyebrow="Handpicked"
-          title="Featured products"
+          eyebrow={t('home.handpicked')}
+          title={t('home.featured')}
           products={collections.featured}
           isLoading={isLoadingProducts}
           viewAllTo={ROUTES.products}
@@ -132,7 +140,7 @@ function HomePage() {
       ))}
 
       {banners.length > 0 && (
-        <section className="section" aria-label="Promotions">
+        <section className="section" aria-label={t('home.promotions')}>
           <div className="container promo-section">
             {banners.map((banner) => (
               <PromoBanner key={banner.id} banner={banner} />
@@ -145,17 +153,17 @@ function HomePage() {
       {!collectionsRequest.error && (
         <>
           <ProductSection
-            eyebrow="Just landed"
-            title="New arrivals"
+            eyebrow={t('home.justLanded')}
+            title={t('home.newArrivals')}
             products={collections.newArrivals}
             isLoading={isLoadingProducts}
             viewAllTo={ROUTES.products}
             onAddToCart={handleAddToCart}
           />
           <ProductSection
-            eyebrow="Limited time"
-            title="Special offers"
-            description="Our biggest in-stock discounts right now."
+            eyebrow={t('home.limited')}
+            title={t('home.offers')}
+            description={t('home.offersDescription')}
             products={collections.specialOffers}
             isLoading={isLoadingProducts}
             skeletonCount={4}
@@ -164,8 +172,8 @@ function HomePage() {
             muted
           />
           <ProductSection
-            eyebrow="Customer favorites"
-            title="Best sellers"
+            eyebrow={t('home.favorites')}
+            title={t('home.bestSellers')}
             products={collections.bestSellers}
             isLoading={isLoadingProducts}
             viewAllTo={ROUTES.products}

@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Review;
 use App\Models\RewardTransaction;
+use App\Support\Locale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -87,10 +88,10 @@ class RewardPoints
     {
         $requested = max(0, (int) $requested);
         if (! $this->enabled()) {
-            return [null, 0, 0, $requested > 0 ? 'Reward points aren\'t available right now.' : null];
+            return [null, 0, 0, $requested > 0 ? __('Reward points aren\'t available right now.') : null];
         }
         if (! $customer) {
-            return [null, 0, 0, $requested > 0 ? 'Sign in to use reward points.' : null];
+            return [null, 0, 0, $requested > 0 ? __('Sign in to use reward points.') : null];
         }
         $query = Customer::whereKey($customer->id);
         $balance = (int) ($lock ? $query->lockForUpdate()->value('reward_points') : $query->value('reward_points'));
@@ -106,10 +107,10 @@ class RewardPoints
         $points = 0;
         if ($requested > 0) {
             $error = match (true) {
-                $requested > $balance => 'You have only '.number_format($balance).' '.($balance === 1 ? 'point' : 'points').'.',
-                $min > 0 && $requested < $min => 'Use at least '.number_format($min).' points.',
-                $maxPoints === 0 => 'Reward points can\'t be used on this order.',
-                $requested > $maxPoints => 'You can use at most '.number_format($maxPoints).' points on this order.',
+                $requested > $balance => $balance === 1 ? __('You have only 1 point.') : __('You have only :count points.', ['count' => Locale::number($balance)]),
+                $min > 0 && $requested < $min => __('Use at least :count points.', ['count' => Locale::number($min)]),
+                $maxPoints === 0 => __('Reward points can\'t be used on this order.'),
+                $requested > $maxPoints => __('You can use at most :count points on this order.', ['count' => Locale::number($maxPoints)]),
                 default => null,
             };
             $points = $error === null ? $requested : 0;
@@ -317,7 +318,7 @@ class RewardPoints
             }
             $after = (int) $balance + $points;
             if ($after < 0) {
-                throw ValidationException::withMessages([$insufficient => 'You have only '.number_format((int) $balance).' points.']);
+                throw ValidationException::withMessages([$insufficient => __('You have only :count points.', ['count' => Locale::number((int) $balance)])]);
             }
             Customer::whereKey($customerId)->update(['reward_points' => $after]);
 

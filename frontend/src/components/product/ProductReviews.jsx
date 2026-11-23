@@ -2,6 +2,7 @@ import { LuBadgeCheck } from 'react-icons/lu'
 import RatingStars from './RatingStars'
 import { formatDate } from '../../utils/formatters'
 import './ProductReviews.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Customer reviews from the API (with BuyNest's API: approved reviews only).
@@ -9,8 +10,9 @@ import './ProductReviews.css'
  * "Verified purchase": the reviewer has an order with this product.
  */
 function ProductReviews({ reviews }) {
+  const { t } = useTranslation('catalog')
   if (reviews.length === 0) {
-    return <p className="product-reviews__empty">No reviews yet.</p>
+    return <p className="product-reviews__empty">{t('reviews.empty')}</p>
   }
 
   return (
@@ -24,7 +26,7 @@ function ProductReviews({ reviews }) {
           <RatingStars rating={review.rating} showValue={false} />
           {review.verifiedPurchase && (
             <p className="product-reviews__verified">
-              <LuBadgeCheck aria-hidden="true" /> Verified purchase
+              <LuBadgeCheck aria-hidden="true" /> {t('reviews.verified')}
             </p>
           )}
           {review.title && <h3 className="product-reviews__title">{review.title}</h3>}

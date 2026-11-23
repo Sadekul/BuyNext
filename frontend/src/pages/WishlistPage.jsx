@@ -15,8 +15,12 @@ import { formatDate, formatPrice } from '../utils/formatters'
 import { getPurchaseLimits } from '../utils/inventory'
 import { getProductPricing } from '../utils/pricing'
 import './WishlistPage.css'
+import { useTranslation } from 'react-i18next'
+import { translate } from '../i18n'
+import { availabilityLabel } from '../utils/catalogText'
 
 function WishlistPage() {
+  const { t } = useTranslation('catalog')
   const wishlist = useWishlist()
   // Saved prices and stock can be weeks old: re-check once when the page opens.
   const refresh = useProductRefresh({
@@ -28,8 +32,8 @@ function WishlistPage() {
     return (
       <div className="section container">
         <title>{`Wishlist | ${SITE.name}`}</title>
-        <EmptyState icon={LuHeart} title="Your wishlist is empty" message="Tap the heart on any product to save it for later.">
-          <Button to={ROUTES.products}>Discover products</Button>
+        <EmptyState icon={LuHeart} title={t('wishlistPage.emptyTitle')} message={t('wishlistPage.emptyMessage')}>
+          <Button to={ROUTES.products}>{t('wishlistPage.discover')}</Button>
         </EmptyState>
       </div>
     )
@@ -37,18 +41,18 @@ function WishlistPage() {
 
   return (
     <div className="wishlist-page section container">
-      <title>{`Wishlist (${wishlist.count}) | ${SITE.name}`}</title>
+      <title>{`${t('wishlistPage.tabTitle', { count: wishlist.count })} | ${SITE.name}`}</title>
       <header className="wishlist-page__header">
         <div>
-          <h1>Wishlist</h1>
+          <h1>{t('wishlistPage.title')}</h1>
           <p className="wishlist-page__status" role="status">
             {refresh.isFetching
-              ? 'Checking the latest prices and stock…'
-              : `${wishlist.count} saved ${wishlist.count === 1 ? 'item' : 'items'}`}
+              ? t('wishlistPage.checking')
+              : t('wishlistPage.saved', { count: wishlist.count })}
           </p>
         </div>
         <Button variant="ghost" onClick={wishlist.clearWishlist}>
-          Clear wishlist
+          {t('wishlistPage.clear')}
         </Button>
       </header>
 
@@ -70,19 +74,20 @@ function WishlistPage() {
 
 /** Where the list is kept, in the shopper's words. */
 function storageNote(onServer) {
-  if (onServer) return 'Saved to your account, so it follows you to any device where you sign in.'
-  if (REAL_SHOP) return 'Saved on this device. Sign in to keep your wishlist in your account and share it.'
-  return 'Saved on this device only. Signing in to sync your wishlist arrives with the real backend.'
+  if (onServer) return translate('catalog:wishlistPage.noteAccount')
+  if (REAL_SHOP) return translate('catalog:wishlistPage.noteDevice')
+  return translate('catalog:wishlistPage.noteDemo')
 }
 
 function WishlistItem({ item, onMoveToCart, onRemove, onSaveNote }) {
+  const { t } = useTranslation('catalog')
   const { salePrice, originalPrice, hasDiscount } = getProductPricing(item)
   const { canBuy } = getPurchaseLimits(item)
   const isAvailable = !item.isUnavailable && canBuy
 
-  let availability = item.availabilityStatus ?? 'In Stock'
-  if (item.isUnavailable) availability = 'No longer available'
-  else if (!canBuy) availability = item.stock === 0 ? 'Out of stock' : 'Not enough stock for the minimum order'
+  let availability = availabilityLabel(item.availabilityStatus ?? 'In Stock')
+  if (item.isUnavailable) availability = t('wishlistPage.gone')
+  else if (!canBuy) availability = t(item.stock === 0 ? 'wishlistPage.outOfStock' : 'wishlistPage.notEnough')
 
   return (
     <article className="wishlist-item">
@@ -103,27 +108,27 @@ function WishlistItem({ item, onMoveToCart, onRemove, onSaveNote }) {
         <p className={isAvailable ? 'wishlist-item__stock' : 'wishlist-item__stock wishlist-item__stock--out'}>
           {availability}
         </p>
-        {item.addedAt && <p className="wishlist-item__date">Saved {formatDate(new Date(item.addedAt).toISOString())}</p>}
+        {item.addedAt && <p className="wishlist-item__date">{t('wishlistPage.savedOn', { date: formatDate(new Date(item.addedAt).toISOString()) })}</p>}
         {/* Phase 11: a note for yourself (or whoever you share the list with). */}
         {onSaveNote && <NoteEditor item={item} onSave={onSaveNote} />}
 
         <div className="wishlist-item__actions">
           {item.hasVariants && !item.isUnavailable ? (
             // Options (size, color) are chosen on the product page.
-            <Button size="sm" to={ROUTES.productDetails(item.productId)} aria-label={`Choose options for ${item.title}`}>
-              Choose options
+            <Button size="sm" to={ROUTES.productDetails(item.productId)} aria-label={t('wishlistPage.chooseOptionsFor', { title: item.title })}>
+              {t('wishlistPage.chooseOptions')}
             </Button>
           ) : (
             <Button size="sm" onClick={() => onMoveToCart(item)} disabled={!isAvailable}>
               <LuShoppingBag aria-hidden="true" />
-              Move to cart
+              {t('wishlistPage.moveToCart')}
             </Button>
           )}
           <button
             type="button"
             className="wishlist-item__remove"
             onClick={() => onRemove(item.productId)}
-            aria-label={`Remove ${item.title} from wishlist`}
+            aria-label={t('wishlistPage.remove', { title: item.title })}
           >
             <LuTrash2 aria-hidden="true" />
           </button>
@@ -135,6 +140,7 @@ function WishlistItem({ item, onMoveToCart, onRemove, onSaveNote }) {
 
 /** Phase 11: the item's note (up to 255 characters), saved with the server wishlist. */
 function NoteEditor({ item, onSave }) {
+  const { t } = useTranslation('catalog')
   const [draft, setDraft] = useState(item.note ?? '')
   const [status, setStatus] = useState('')
   const [saving, setSaving] = useState(false)
@@ -148,25 +154,25 @@ function NoteEditor({ item, onSave }) {
     setStatus('')
     const saved = await onSave(item.productId, draft)
     setSaving(false)
-    setStatus(saved ? (draft.trim() ? 'Note saved.' : 'Note removed.') : '')
+    setStatus(saved ? t(draft.trim() ? 'wishlistPage.noteSaved' : 'wishlistPage.noteRemoved') : '')
   }
 
   return (
     <form className="wishlist-item__note" onSubmit={handleSubmit}>
-      <label htmlFor={inputId}>Note</label>
+      <label htmlFor={inputId}>{t('wishlistPage.note')}</label>
       <div className="wishlist-item__note-row">
         <input
           id={inputId}
           value={draft}
           maxLength={MAX_NOTE_LENGTH}
-          placeholder="e.g. size M, for Sam's birthday"
+          placeholder={t('wishlistPage.notePlaceholder')}
           onChange={(event) => {
             setDraft(event.target.value)
             setStatus('')
           }}
         />
-        <Button type="submit" size="sm" variant="outline" disabled={!changed || saving} aria-label={`Save note for ${item.title}`}>
-          Save
+        <Button type="submit" size="sm" variant="outline" disabled={!changed || saving} aria-label={t('wishlistPage.saveNoteFor', { title: item.title })}>
+          {t('wishlistPage.save')}
         </Button>
       </div>
       <p className="wishlist-item__note-status" role="status">

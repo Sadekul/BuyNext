@@ -26,7 +26,7 @@ class PlaceOrderRequest extends FormRequest
     protected function failedAuthorization(): void
     {
         throw new HttpResponseException(response()->json([
-            'message' => 'Please sign in to check out.',
+            'message' => __('Please sign in to check out.'),
             'code' => 'guest_checkout_disabled',
         ], 403));
     }
@@ -90,12 +90,12 @@ class PlaceOrderRequest extends FormRequest
     {
         return [
             ...CartController::messages(),
-            'items.required' => 'Your cart is empty.',
-            'items.min' => 'Your cart is empty.',
+            'items.required' => __('Your cart is empty.'),
+            'items.min' => __('Your cart is empty.'),
             'payment_method.in' => self::paymentMethodMessage($this->input('payment_method')),
-            'phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',
-            '*.postal_code.regex' => 'The postal code is invalid.',
-            '*.country.in' => 'We don\'t deliver to that country yet.',
+            'phone.regex' => __('Enter the phone number with its country code, for example +1 555 010 0100.'),
+            '*.postal_code.regex' => __('The postal code is invalid.'),
+            '*.country.in' => __('We don\'t deliver to that country yet.'),
         ];
     }
 
@@ -105,7 +105,7 @@ class PlaceOrderRequest extends FormRequest
         foreach (['shipping_address', 'billing_address'] as $prefix) {
             foreach (['first_name' => 'first name', 'last_name' => 'last name', 'line1' => 'address', 'line2' => 'address line 2',
                 'city' => 'city', 'state' => 'state', 'postal_code' => 'postal code', 'country' => 'country'] as $key => $label) {
-                $attributes["{$prefix}.{$key}"] = $label;
+                $attributes["{$prefix}.{$key}"] = __($label);
             }
         }
 
@@ -116,9 +116,9 @@ class PlaceOrderRequest extends FormRequest
     public static function paymentMethodMessage(mixed $method): string
     {
         return match (true) {
-            $method === 'paypal' && ! Currency::paypalAccepts() => 'PayPal doesn\'t accept '.Currency::store().', so it isn\'t available in this store.',
-            $method === 'sslcommerz' && ! Currency::sslcommerzAccepts() => 'bKash, Nagad and cards (SSLCommerz) need the store currency BDT.',
-            default => 'Choose a payment method.',
+            $method === 'paypal' && ! Currency::paypalAccepts() => __('PayPal doesn\'t accept :currency, so it isn\'t available in this store.', ['currency' => Currency::store()]),
+            $method === 'sslcommerz' && ! Currency::sslcommerzAccepts() => __('bKash, Nagad and cards (SSLCommerz) need the store currency BDT.'),
+            default => __('Choose a payment method.'),
         };
     }
 

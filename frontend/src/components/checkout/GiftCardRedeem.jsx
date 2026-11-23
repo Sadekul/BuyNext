@@ -6,6 +6,7 @@ import { checkGiftCard } from '../../services/shopService'
 import { formatBasePrice } from '../../utils/formatters'
 import { normalizeGiftCardCode } from '../../utils/giftCards'
 import '../cart/CouponForm.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * The checkout's "Gift card" field (phase 10, one card per order). Apply
@@ -16,6 +17,7 @@ import '../cart/CouponForm.css'
  * Like the discount code, it is its own <form>, outside the checkout form.
  */
 function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabled = false, checking = false }) {
+  const { t } = useTranslation('checkout')
   const [draft, setDraft] = useState('')
   const inputId = useId()
   const hintId = useId()
@@ -37,16 +39,16 @@ function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabl
   }
 
   const card = check.data
-  let checkError = check.error ? (check.error.status === 429 ? 'Too many tries. Please wait a minute and try again.' : check.error.message) : null
-  if (!checkError && card && card.status !== 'active') checkError = card.status === 'expired' ? 'This gift card has expired.' : "This gift card can't be used."
-  if (!checkError && card && card.balance <= 0) checkError = 'This gift card has no balance left.'
+  let checkError = check.error ? (check.error.status === 429 ? t('giftCard.tooMany') : check.error.message) : null
+  if (!checkError && card && card.status !== 'active') checkError = t(card.status === 'expired' ? 'giftCard.expired' : 'giftCard.cantUse')
+  if (!checkError && card && card.balance <= 0) checkError = t('giftCard.empty')
   const last4 = appliedCode ? appliedCode.slice(-4) : null
 
   let message = null
-  if (appliedCode && checking && !applied && !error) message = 'Checking your gift card…'
-  else if (appliedCode && error) message = `Gift card ending ${last4}: ${error}`
+  if (appliedCode && checking && !applied && !error) message = t('giftCard.checkingCard')
+  else if (appliedCode && error) message = t('giftCard.endingError', { last4, error })
   else if (appliedCode && applied) {
-    message = `Gift card ending ${last4} pays ${formatBasePrice(applied.applied)}.${applied.remaining !== null ? ` ${formatBasePrice(applied.remaining)} stays on the card.` : ''}`
+    message = `${t('giftCard.endingPays', { last4, amount: formatBasePrice(applied.applied) })}${applied.remaining !== null ? ` ${t('giftCard.stays', { amount: formatBasePrice(applied.remaining) })}` : ''}`
   } else if (checkError) message = checkError
 
   return (
@@ -56,21 +58,21 @@ function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabl
           <p className={error ? 'coupon-form__error' : 'coupon-form__success'}>
             <LuGift aria-hidden="true" />
             <span>
-              Gift card <strong>•••• {last4}</strong>
-              {error ? ` — ${error}` : applied ? ` — pays ${formatBasePrice(applied.applied)}` : checking && ' — checking…'}
+              <Trans t={t} i18nKey="giftCard.appliedLabel" values={{ last4 }} components={{ strong: <strong /> }} />
+              {error ? ` — ${error}` : applied ? t('giftCard.pays', { amount: formatBasePrice(applied.applied) }) : checking && t('giftCard.checkingShort')}
               {!error && applied?.remaining !== null && applied?.remaining !== undefined && (
-                <span className="coupon-form__hint"> ({formatBasePrice(applied.remaining)} left on the card after this order)</span>
+                <span className="coupon-form__hint">{t('giftCard.left', { amount: formatBasePrice(applied.remaining) })}</span>
               )}
             </span>
           </p>
-          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={`Remove gift card ending ${last4}`}>
+          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={t('giftCard.removeLabel', { last4 })}>
             <LuX aria-hidden="true" />
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
           <fieldset disabled={disabled || check.isPending} className="coupon-form__fieldset">
-            <label htmlFor={inputId}>Gift card</label>
+            <label htmlFor={inputId}>{t('giftCard.label')}</label>
             <div className="coupon-form__row">
               <input
                 id={inputId}
@@ -79,18 +81,18 @@ function GiftCardRedeem({ appliedCode, applied, error, onApply, onRemove, disabl
                   setDraft(event.target.value)
                   if (check.data || check.error) check.reset()
                 }}
-                placeholder="Gift card code"
+                placeholder={t('giftCard.placeholder')}
                 autoComplete="off"
                 spellCheck={false}
                 aria-invalid={checkError ? true : undefined}
                 aria-describedby={[hintId, checkError && errorId].filter(Boolean).join(' ')}
               />
               <Button type="submit" variant="outline" size="sm">
-                {check.isPending ? 'Checking…' : 'Apply'}
+                {t(check.isPending ? 'giftCard.checking' : 'giftCard.apply')}
               </Button>
             </div>
             <p id={hintId} className="coupon-form__hint">
-              The 16-character code from your gift card email. One gift card per order.
+              {t('giftCard.hint')}
             </p>
             {checkError && (
               <p id={errorId} className="coupon-form__error">

@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient'
 import { REAL_ACCOUNTS } from '../constants/accounts'
+import { translate } from '../i18n'
 
 /*
  * Demo orders — SIMULATED (REAL_SHOP off, constants/shop.js). DummyJSON has
@@ -36,9 +37,9 @@ export async function verifyCartWithServer(items, userId, { signal } = {}) {
   const problems = []
   for (const item of items) {
     const serverLine = serverById.get(item.productId)
-    if (!serverLine) problems.push(`"${item.title}" is no longer available.`)
+    if (!serverLine) problems.push(translate('errors:demo.gone', { title: item.title }))
     else if (serverLine.price !== item.price || (serverLine.discountPercentage ?? 0) !== (item.discountPercentage ?? 0)) {
-      problems.push(`The price of "${item.title}" has changed.`)
+      problems.push(translate('errors:demo.priceChanged', { title: item.title }))
     }
   }
 

@@ -47,7 +47,7 @@ class CategoryTreeTest extends TestCase
         $tree = $this->asAdmin($this->admin, 'GET', '/api/admin/v1/categories')->assertOk()->json('data');
         $this->assertCount(1, $tree);
         $this->assertSame(['id', 'name', 'slug', 'parent_id', 'position', 'is_active', 'image_url', 'description', 'meta_title', 'meta_description',
-            'product_count', 'children'], array_keys($tree[0]));
+            'product_count', 'translations', 'bangla', 'children'], array_keys($tree[0])); // phase 13: translations, bangla
         $this->assertSame('Gadgets.', $tree[0]['description']);
         $this->assertSame(0, $tree[0]['product_count']); // direct products only
         $this->assertSame('phones', $tree[0]['children'][0]['slug']);

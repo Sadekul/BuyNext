@@ -270,3 +270,14 @@
 - Fraud signals: holding a risky payment for staff review instead of invoicing it
 - Expiring unpaid orders safely: ask the provider before cancelling
 - Fonts in PDFs: a font only draws the characters it contains, so the taka sign needs a font that has it (Noto Sans Bengali as a fallback)
+
+## Phase 13 (backend): The store in Bangla and English
+
+- Internationalisation (i18n) with i18next and react-i18next: namespaced catalogs, stable keys, interpolation, plurals, loading a second language lazily as its own chunk
+- Keeping two languages in step: tests that every key exists in both catalogs with the same variables, and that no hard-coded English is left on Bangla pages
+- Where the language comes from: a cookie, the customer's account (which wins after sign-in), the store default; `<html lang>` and `lang="en"` on text that fell back to English, for screen readers
+- Server side: a locale middleware reading `Accept-Language`, Laravel's `lang/` files for validation and the app's own messages, and caches that must vary by language
+- Translatable content in the database: translation tables with per-field fallback to the base language, full-text search over the translations
+- Formatting by locale with `Intl`, and when not to use it: Bangla digits, and keeping money in the same layout as emails and PDFs
+- Emails and PDFs in the recipient's language, and the limits of PDF engines with complex scripts (Bangla conjuncts in dompdf)
+- Never hard-code a number that belongs to a setting (the free-shipping "$50"): read it from the store and format it in the shopper's language

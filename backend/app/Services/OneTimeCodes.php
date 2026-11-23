@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Mail\OneTimeCodeMail;
+use App\Models\Customer;
 use App\Models\OneTimeCode;
+use App\Support\Locale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
@@ -44,7 +46,12 @@ class OneTimeCodes
             ]);
         });
 
-        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName, $setPassword, $email));
+        // Phase 13: codes the shopper asks for come in the language they are using (the request's); a code staff send
+        // (set_password, from the admin, which is English) uses the customer's saved language, else the store default.
+        $locale = $setPassword
+            ? (Locale::forCustomer(Customer::where('email', $email)->first()) ?? Locale::storeDefault())
+            : null;
+        Mail::to($email)->send(new OneTimeCodeMail($code, $purpose, $firstName, $setPassword, $email, $locale));
 
         return config('buynest.codes.resend_cooldown_seconds');
     }

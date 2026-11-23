@@ -1,0 +1,147 @@
+{
+  "site": {
+    "tagline": "Your Modern Shopping Destination",
+    "description": "BuyNest — Your Modern Shopping Destination. Shop electronics, fashion, beauty, and home essentials."
+  },
+  "announcements": {
+    "label": "Store announcements",
+    "freeShipping": "Free standard shipping on orders over {{amount}}",
+    "returns": "30-day hassle-free returns",
+    "earlyAccess": "Members get early access to seasonal sales"
+  },
+  "nav": {
+    "home": "Home",
+    "shopAll": "Shop all",
+    "smartphones": "Smartphones",
+    "laptops": "Laptops",
+    "fashion": "Fashion",
+    "fragrances": "Fragrances",
+    "homeLiving": "Home & living",
+    "deals": "Deals",
+    "more": "More",
+    "main": "Main",
+    "mobileMain": "Mobile main",
+    "subcategories": "{{label}} subcategories",
+    "menu": "Menu",
+    "myAccount": "My account",
+    "signIn": "Sign in",
+    "wishlist": "Wishlist",
+    "cart": "Cart"
+  },
+  "header": {
+    "openMenu": "Open menu",
+    "actions": "Account and shopping",
+    "greeting": "Hi, {{name}}",
+    "myAccountSuffix": ", my account",
+    "countItems_one": "{{label}}, {{count}} items",
+    "countItems_other": "{{label}}, {{count}} items",
+    "cartItems_one": "Cart, {{count}} items",
+    "cartItems_other": "Cart, {{count}} items"
+  },
+  "footer": {
+    "about": "Quality products, honest prices, and a shopping experience built around you.",
+    "rights": "© {{year}} {{store}}. All rights reserved.",
+    "cookieSettings": "Cookie settings",
+    "social": "Social media",
+    "socialLink": "{{site}} on {{network}}",
+    "groups": {
+      "shop": "Shop",
+      "account": "My account",
+      "help": "Help & info",
+      "learning": "Learning"
+    },
+    "links": {
+      "allProducts": "All products",
+      "account": "Account",
+      "trackOrder": "Track your order",
+      "giftCardBalance": "Check gift card balance",
+      "about": "About us",
+      "shippingReturns": "Shipping & returns",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "contact": "Contact us",
+      "componentLab": "Component lab"
+    }
+  },
+  "layout": {
+    "skipToContent": "Skip to main content",
+    "loadingPage": "Loading page…",
+    "offline": "You're offline. You can keep browsing, but prices and stock can't be updated until you reconnect."
+  },
+  "language": {
+    "label": "Language",
+    "hint": "This store is also available in Bangla.",
+    "hintDismiss": "Dismiss"
+  },
+  "currency": {
+    "showPricesIn": "Show prices in"
+  },
+  "ui": {
+    "somethingWrong": "Something went wrong",
+    "tryAgain": "Try again",
+    "loading": "Loading…",
+    "close": "Close",
+    "dismissNotification": "Dismiss notification"
+  },
+  "breadcrumb": {
+    "label": "Breadcrumb"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previous": "Previous page",
+    "next": "Next page",
+    "page": "Page {{page}}"
+  },
+  "section": {
+    "viewAll": "View all"
+  },
+  "search": {
+    "placeholder": "Search products and brands",
+    "submit": "Search",
+    "suggestions": "Search suggestions",
+    "noMatch": "No products match \"{{query}}\"",
+    "seeAll_one": "See all {{count}} results for \"{{query}}\"",
+    "seeAll_other": "See all {{count}} results for \"{{query}}\"",
+    "available_one": "{{count}} suggestions available",
+    "available_other": "{{count}} suggestions available",
+    "availableFor_one": "{{count}} suggestions available for {{query}}",
+    "availableFor_other": "{{count}} suggestions available for {{query}}",
+    "none": "No suggestions",
+    "label": "Search products",
+    "showingFor": "Showing suggestions for <strong>{{query}}</strong>"
+  },
+  "countries": {
+    "United States": "United States",
+    "Canada": "Canada",
+    "United Kingdom": "United Kingdom",
+    "Australia": "Australia",
+    "Germany": "Germany",
+    "Bangladesh": "Bangladesh",
+    "India": "India"
+  },
+  "form": {
+    "hidePassword": "Hide password",
+    "showPassword": "Show password"
+  },
+  "address": {
+    "firstName": "First name",
+    "lastName": "Last name",
+    "line1": "Street address",
+    "line2": "Apartment, suite, etc. (optional)",
+    "city": "City",
+    "state": "State / region",
+    "postalCode": "Postal code",
+    "country": "Country"
+  },
+  "cookies": {
+    "title": "Cookies and visitor statistics",
+    "text": "With your permission, we use Google Analytics to count visits and see which pages and products are popular. It sets cookies and tells Google how this site is used, never your name, email, or address. It stays off unless you accept. The cookies that keep you signed in and remember your cart are always on. <privacy>Privacy policy</privacy>",
+    "optional": "Optional cookies",
+    "statistics": "Statistics",
+    "statisticsHint": "Google Analytics 4: which pages are viewed, and which products are looked at, added to the cart, or bought. Off until you switch it on.",
+    "accept": "Accept all",
+    "reject": "Reject",
+    "save": "Save choices",
+    "settings": "Settings"
+  }
+}

@@ -2,6 +2,8 @@ import { json, laravelFile, readBody } from './http.js'
 import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from './shop/adminSystem.js'
 // Phase 11 §4: Settings → Reward points.
 import { REWARD_SETTING_RULES } from './adminPhase11Api.js'
+// Phase 13: the Bangla texts of pages and home blocks; Settings → General's language settings.
+import { LANGUAGE_SETTING_RULES, checkBangla } from './adminPhase13Api.js'
 
 /*
  * Phase 4 admin routes (docs/backend/PHASE4_CONTRACT.md), Laravel only:
@@ -122,6 +124,12 @@ export function validatePage(body, { partial }) {
   const { errors, values } = check(body, PAGE_RULES, partial ? [] : ['slug', 'title', 'body'])
   if (values.body !== undefined) values.body = body.body // HTML as typed; the API sanitizes it
   for (const field of ['metaTitle', 'metaDescription']) if (values[field] === '') values[field] = null
+  // Phase 13: bn: { title, body, metaTitle, metaDescription } (optional; '' = not translated).
+  if (body.bn !== undefined) {
+    const bangla = checkBangla(body.bn, 'page')
+    Object.assign(errors, bangla.errors)
+    if (Object.keys(bangla.values).length > 0) values.bn = bangla.values
+  }
   return result({ errors: partial ? nothingChanged(values, errors, 'title') : errors, values })
 }
 
@@ -159,6 +167,15 @@ export function validateHome(body) {
     imageAlt: textAt('hero.imageAlt', raw.imageAlt, 200),
     highlights: highlights.map((value, index) => textAt(`hero.highlights.${index}`, value, 80)).filter(Boolean),
   }
+  // Phase 13: the hero's and each banner's Bangla texts (optional).
+  const banglaAt = (path, value) => {
+    if (value === undefined) return undefined
+    const checked = checkBangla(value, path.startsWith('hero') ? 'hero' : 'banner', path)
+    Object.assign(errors, checked.errors)
+    return checked.values
+  }
+  const heroBn = banglaAt('hero.bn', raw.bn)
+  if (heroBn) hero.bn = heroBn
   if (hero.imageUrl && !hero.imageAlt && !errors['hero.imageAlt']) errors['hero.imageAlt'] = ['Describe the image for people who cannot see it.']
 
   if (body.banners !== undefined && (!Array.isArray(body.banners) || body.banners.length > MAX_BANNERS)) errors.banners = [`Use up to ${MAX_BANNERS} banners.`]
@@ -176,6 +193,8 @@ export function validateHome(body) {
       tone: BANNER_TONES.includes(banner?.tone) ? banner.tone : null,
       isActive: banner?.isActive !== false,
     }
+    const bn = banglaAt(`${path}.bn`, banner?.bn)
+    if (bn) item.bn = bn
     if (!item.tone) errors[`${path}.tone`] = ['Choose a color.']
     if (item.imageUrl && !item.imageAlt && !errors[`${path}.imageAlt`]) errors[`${path}.imageAlt`] = ['Describe the image for people who cannot see it.']
     return item
@@ -201,6 +220,8 @@ const SETTING_RULES = {
     supportEmail: (value) => (isEmail(value) ? null : 'Enter a valid email address.'),
     supportPhone: (value) => (isText(value, { max: 40 }) && /^[\d\s()+.-]*$/.test(value) ? null : 'Enter a phone number (digits, spaces, + ( ) - .).'),
     address: (value) => (isText(value, { max: 500 }) ? null : 'Keep the address under 500 characters.'),
+    // Phase 13.
+    ...LANGUAGE_SETTING_RULES,
   },
   shipping: {
     standardPrice: moneyRule,

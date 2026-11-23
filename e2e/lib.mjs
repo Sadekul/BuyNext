@@ -47,7 +47,8 @@ export async function launch() {
 /**
  * Empties an account's cart saved on the server (phase 7 restores it at sign-in on any device)
  * and, since phase 11, its wishlist saved on the server (also restored on any device), with
- * sharing off, so each suite starts from a known cart and wishlist however the previous run ended.
+ * sharing off, and since phase 13 its language (back to the store default), so each suite starts
+ * from a known cart, wishlist and language however the previous run (or a person) left them.
  */
 export async function clearSavedCart(account) {
   const call = async (path, init = {}) => {
@@ -68,6 +69,9 @@ export async function clearSavedCart(account) {
   const { data = [], meta = {} } = await listed.json()
   for (const item of data) await call(`/api/v1/me/wishlist/${item.id}`, { method: 'DELETE', headers: auth })
   if (meta.shared) await call('/api/v1/me/wishlist/share', { method: 'DELETE', headers: auth })
+  // Phase 13: the account's language follows it to every browser, so someone browsing in Bangla
+  // with a demo account would switch every suite's English pages to Bangla. Back to the default.
+  await call('/api/v1/me', { method: 'PATCH', headers: auth, body: JSON.stringify({ locale: null }) })
 }
 
 /** PASS/FAIL lines, printed at the end; any FAIL makes the process exit with 1. */

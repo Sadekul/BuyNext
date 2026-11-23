@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { resendCode } from '../../services/authService'
+import { useTranslation } from 'react-i18next'
 
 /**
  * "Send a new code" with a countdown: the server allows one code per minute,
@@ -7,6 +8,7 @@ import { resendCode } from '../../services/authService'
  * so screen reader users hear when a new code was sent.
  */
 function ResendCodeButton({ email, purpose, initialWait = 60 }) {
+  const { t } = useTranslation('auth')
   const [secondsLeft, setSecondsLeft] = useState(initialWait)
   const [status, setStatus] = useState({ sending: false, message: '' })
 
@@ -22,7 +24,7 @@ function ResendCodeButton({ email, purpose, initialWait = 60 }) {
     try {
       const result = await resendCode({ email, purpose })
       setSecondsLeft(result?.resendIn ?? 60)
-      setStatus({ sending: false, message: `We sent a new code to ${email}. Earlier codes no longer work.` })
+      setStatus({ sending: false, message: t('resend.sent', { email }) })
     } catch (error) {
       setStatus({ sending: false, message: error.message })
     }
@@ -31,7 +33,7 @@ function ResendCodeButton({ email, purpose, initialWait = 60 }) {
   return (
     <div className="auth-resend">
       <button type="button" className="auth-link" onClick={handleClick} disabled={waiting || status.sending}>
-        {status.sending ? 'Sending…' : waiting ? `Send a new code in ${secondsLeft}s` : 'Send a new code'}
+        {status.sending ? t('resend.sending') : waiting ? t('resend.wait', { seconds: secondsLeft }) : t('resend.send')}
       </button>
       <p className="auth-resend__status" aria-live="polite">
         {status.message}

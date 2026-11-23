@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Support\CategoryTree;
+use App\Support\Locale;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,9 @@ class CatalogSearch
     /** The FULLTEXT index's columns, exactly as the index lists them (MATCH must name the same ones). */
     private const MATCH_SQL = 'MATCH(products.name, products.description, products.search_text) AGAINST (? IN NATURAL LANGUAGE MODE)';
 
+    /** Phase 13: the Bangla (and other) translations' FULLTEXT index (product_translations_search_fulltext). */
+    private const TRANSLATION_MATCH_SQL = 'MATCH(product_translations.name, product_translations.description) AGAINST (? IN NATURAL LANGUAGE MODE)';
+
     /** Words with at least this many letters may be corrected. */
     private const MIN_CORRECTABLE = 4;
 
@@ -44,6 +48,10 @@ class CatalogSearch
             ->orWhere('products.search_text', 'like', $like)
             ->orWhereHas('brand', fn ($b) => $b->where('name', 'like', $like))
             ->orWhereHas('category', fn ($c) => $c->where('name', 'like', $like))
+            // Phase 13: Bangla names and descriptions (and Bangla category names) are searched too, in any language.
+            ->orWhereHas('translations', fn ($t) => $t->where(fn ($t) => $t->where('name', 'like', $like)->orWhere('description', 'like', $like)
+                ->when($fulltext !== '' && DB::getDriverName() === 'mysql', fn ($t) => $t->orWhereRaw(self::TRANSLATION_MATCH_SQL, [$fulltext]))))
+            ->orWhereHas('category.translations', fn ($c) => $c->where('name', 'like', $like))
             ->when($fulltext !== '', fn ($q) => $q->orWhereRaw(self::MATCH_SQL, [$fulltext])));
     }
 
@@ -54,18 +62,24 @@ class CatalogSearch
         $escaped = addcslashes($phrase, '%_\\');
         $words = array_values(array_unique(SearchIndex::words($phrase)));
 
+        // Phase 13: in another language the tiers use the translated name (the English one when it has none).
+        $locale = Locale::current();
+        $name = $locale === Locale::FALLBACK ? 'products.name'
+            : "COALESCE(NULLIF((SELECT pt.name FROM product_translations pt WHERE pt.product_id = products.id AND pt.locale = ? LIMIT 1), ''), products.name)";
+        $nameBindings = $locale === Locale::FALLBACK ? [] : [$locale];
         $allWords = $words
-            ? ' OR ('.implode(' AND ', array_fill(0, count($words), 'products.name LIKE ?')).')'
+            ? ' OR ('.implode(' AND ', array_fill(0, count($words), "{$name} LIKE ?")).')'
             : '';
         $tier = 'CASE'
             .' WHEN products.sku = ? OR EXISTS (SELECT 1 FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.sku = ?) THEN 0'
-            .' WHEN products.name = ? THEN 1'
-            .' WHEN products.name LIKE ? THEN 2'
-            .' WHEN products.name LIKE ? THEN 3'
-            .' WHEN products.name LIKE ?'.$allWords.' THEN 4'
+            ." WHEN {$name} = ? THEN 1"
+            ." WHEN {$name} LIKE ? THEN 2"
+            ." WHEN {$name} LIKE ? THEN 3"
+            ." WHEN {$name} LIKE ?".$allWords.' THEN 4'
             .' ELSE 5 END';
-        $bindings = [$phrase, $phrase, $phrase, $escaped.'%', '% '.$escaped.'%', '%'.$escaped.'%',
-            ...array_map(fn ($word) => '%'.addcslashes($word, '%_\\').'%', $words)];
+        $bindings = [$phrase, $phrase, ...$nameBindings, $phrase, ...$nameBindings, $escaped.'%', ...$nameBindings, '% '.$escaped.'%',
+            ...$nameBindings, '%'.$escaped.'%',
+            ...array_merge(...array_map(fn ($word) => [...$nameBindings, '%'.addcslashes($word, '%_\\').'%'], $words ?: []))];
 
         $query->orderByRaw($tier, $bindings);
         $fulltext = $this->fulltextQuery($phrase);
@@ -107,7 +121,8 @@ class CatalogSearch
     public function correctWord(string $word, ?CategoryTree $tree = null): ?string
     {
         $length = mb_strlen($word);
-        if ($length < self::MIN_CORRECTABLE || preg_match('/\p{N}/u', $word)) {
+        // Phase 13: Bangla words are never corrected (the vocabulary is English only; see the phase 13 notes).
+        if ($length < self::MIN_CORRECTABLE || preg_match('/\p{N}|\p{Bengali}/u', $word)) {
             return null;
         }
         $vocabulary = DB::table('search_vocabulary');

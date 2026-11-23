@@ -1,6 +1,8 @@
 import { laravel } from '../http.js'
 import { failed } from './adminSystem.js'
 import { camelPath } from './laravel.js'
+// Phase 13: each specification row's Bangla label and value.
+import { specificationBangla } from './adminPhase13.js'
 
 /*
  * Phase 11 admin data from BuyNest's Laravel API (docs/backend/PHASE11_CONTRACT.md
@@ -31,7 +33,11 @@ export const LINK_TYPES = ['related', 'upsell', 'crosssell']
 export function specifications(raw) {
   return (Array.isArray(raw) ? raw : [])
     .filter((row) => row && typeof row === 'object' && typeof row.label === 'string' && row.label.trim() !== '')
-    .map((row) => ({ label: row.label, value: typeof row.value === 'string' ? row.value : row.value === null || row.value === undefined ? '' : String(row.value) }))
+    .map((row) => ({
+      label: row.label,
+      value: typeof row.value === 'string' ? row.value : row.value === null || row.value === undefined ? '' : String(row.value),
+      ...((row.label_bn !== undefined || row.value_bn !== undefined || row.translations !== undefined) && specificationBangla(row)),
+    }))
 }
 
 /** A linked product: { id, name, sku, image, status }. */

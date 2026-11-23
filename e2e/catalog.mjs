@@ -131,7 +131,7 @@ try {
 
   // Edit in the dialog
   await admin.getByRole('button', { name: `Edit ${childName}` }).click()
-  await admin.getByRole('dialog').getByLabel('Meta title').fill(`Tees ${run} | BuyNest`)
+  await admin.getByRole('dialog').getByLabel('Meta title', { exact: true }).fill(`Tees ${run} | BuyNest`)
   await admin.getByRole('dialog').getByLabel('Description', { exact: true }).fill('Soft cotton tees in every size.')
   await axe(admin, 'category dialog')
   await admin.getByRole('dialog').getByRole('button', { name: 'Save category' }).click()
@@ -160,7 +160,7 @@ try {
 
   // ---------- 2. A Draft product in the subcategory: images, options, variants ----------
   await admin.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
-  await admin.getByLabel('Name').fill(productName)
+  await admin.getByLabel('Name', { exact: true }).fill(productName)
   await admin.getByLabel('Brand').fill('NestWorks')
   await admin.getByLabel('Category').selectOption(child.slug)
   await admin.getByLabel('Price (USD)').fill('20')

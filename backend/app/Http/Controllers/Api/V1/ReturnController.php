@@ -22,7 +22,7 @@ class ReturnController extends Controller
     {
         $order = Order::where('number', strtoupper($number))->where('customer_id', $request->user()->id)->first();
         if (! $order) {
-            return response()->json(['message' => 'Order not found.'], 404);
+            return response()->json(['message' => __('Order not found.')], 404);
         }
         $data = $request->validate(AdminReturnController::requestRules(), AdminReturnController::requestMessages());
         $return = $returns->create($order, $data);
@@ -45,7 +45,7 @@ class ReturnController extends Controller
     {
         $data = $this->resource($number, $request);
 
-        return $data ? response()->json(['data' => $data]) : response()->json(['message' => 'Return not found.'], 404);
+        return $data ? response()->json(['data' => $data]) : response()->json(['message' => __('Return not found.')], 404);
     }
 
     private function resource(string $number, Request $request): ?array

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { cn } from '../../utils/classNames'
 import { IMAGE_SIZES, responsiveImageProps, smallestImage } from '../../utils/images'
 import './ProductGallery.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Main image + clickable thumbnails. The selected index is local state;
@@ -12,10 +13,11 @@ import './ProductGallery.css'
  * srcset, the thumbnails the 320-pixel copy. Without them, the originals.
  */
 function ProductGallery({ images, title, alts, variants }) {
+  const { t } = useTranslation('catalog')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const selectedImage = images[selectedIndex]
   // The shop's own description of the image (BuyNest's API) when it has one.
-  const position = `image ${selectedIndex + 1} of ${images.length}`
+  const position = t('gallery.position', { index: selectedIndex + 1, total: images.length })
   const alt = alts?.[selectedIndex] ? (images.length > 1 ? `${alts[selectedIndex]} (${position})` : alts[selectedIndex]) : `${title}, ${position}`
 
   return (
@@ -32,7 +34,7 @@ function ProductGallery({ images, title, alts, variants }) {
       </div>
 
       {images.length > 1 && (
-        <ul className="gallery__thumbs" aria-label="Product images">
+        <ul className="gallery__thumbs" aria-label={t('gallery.images')}>
           {images.map((image, index) => (
             <li key={image}>
               <button
@@ -40,7 +42,7 @@ function ProductGallery({ images, title, alts, variants }) {
                 className={cn('gallery__thumb', index === selectedIndex && 'gallery__thumb--active')}
                 onClick={() => setSelectedIndex(index)}
                 aria-pressed={index === selectedIndex}
-                aria-label={`Show image ${index + 1} of ${images.length}`}
+                aria-label={t('gallery.show', { index: index + 1, total: images.length })}
               >
                 <img src={smallestImage(image, variants?.[index])} alt="" loading="lazy" width="80" height="80" />
               </button>

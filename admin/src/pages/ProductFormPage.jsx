@@ -4,7 +4,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuArrowLeft, LuBellRing, LuCopy } from 'react-icons/lu'
-import { adminKeys, createProduct, getCategories, getProduct, updateProduct } from '../api/admin'
+import { adminKeys, createProduct, getCategories, getProduct, saveProductOptions, updateProduct } from '../api/admin'
 import DemoNotice from '../components/DemoNotice'
 import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
@@ -23,6 +23,9 @@ import ProductSpecifications from '../components/ProductSpecifications'
 import ProductLinks from '../components/ProductLinks'
 import { duplicateProduct } from '../api/phase11'
 import { EMPTY_LINKS, changed, linkLists, specRow, specificationErrors, toLinkIds, toSpecifications } from '../utils/productLinks'
+// Phase 13 §4: the product's Bangla texts, option names and specification rows.
+import ProductBangla from '../components/ProductBangla'
+import { PRODUCT_BANGLA_FIELDS, banglaChanged, banglaValues, toBangla } from '../utils/bangla'
 
 /**
  * /products/new and /products/:id: one form for adding and editing. With real
@@ -75,7 +78,18 @@ function ProductFormPage() {
         key={productId ?? 'new'}
         productId={productId}
         initial={initial}
-        extras={isNew ? { specifications: [], links: EMPTY_LINKS } : { specifications: product.data.specifications ?? [], links: linkLists(product.data.links) }}
+        extras={
+          isNew
+            ? { specifications: [], links: EMPTY_LINKS, bangla: LIVE_DATA, bn: null, options: [] }
+            : {
+                specifications: product.data.specifications ?? [],
+                links: linkLists(product.data.links),
+                // Phase 13: only when the API has the Bangla texts (older answers: no Bangla section).
+                bangla: product.data.bn !== undefined,
+                bn: product.data.bn ?? null,
+                options: banglaOptions(product.data.options),
+              }
+        }
         categories={categories.data ?? []}
         hasVariants={!isNew && product.data.hasVariants === true}
       />
@@ -119,6 +133,29 @@ function DuplicateProductButton({ productId, title }) {
   )
 }
 
+/** Phase 13: the saved options (with ids) and their Bangla names, for the Bangla section. */
+const banglaOptions = (options) =>
+  (options ?? [])
+    .filter((option) => Number.isInteger(option.id))
+    .map((option) => ({
+      id: option.id,
+      name: option.name,
+      nameBn: option.nameBn ?? '',
+      values: option.values.filter((entry) => Number.isInteger(entry.id)).map((entry) => ({ id: entry.id, value: entry.value, valueBn: entry.valueBn ?? '' })),
+    }))
+/** Phase 13: what is sent for the options' Bangla names. */
+const toOptionTranslations = (options) => options.map((option) => ({ id: option.id, nameBn: option.nameBn.trim(), values: option.values.map((entry) => ({ id: entry.id, valueBn: entry.valueBn.trim() })) }))
+/** Phase 13: the saved options with their Bangla names, as PUT products/:id/options takes them (valuesBn in the values' order). */
+const toOptionsWithBangla = (options) =>
+  options.map((option) => ({ name: option.name, values: option.values.map((entry) => entry.value), nameBn: option.nameBn.trim(), valuesBn: option.values.map((entry) => entry.valueBn.trim()) }))
+/** Phase 13: server errors of the Bangla section ("bn.name", "options.0.nameBn"). */
+const banglaErrorsFrom = (fieldErrors) =>
+  Object.fromEntries(
+    Object.entries(fieldErrors ?? {})
+      .filter(([field]) => field.startsWith('bn.') || /^options\.\d+\.(nameBn|valuesBn)/.test(field))
+      .map(([field, messages]) => [field.startsWith('options.') ? 'optionTranslations' : field, messages[0]]),
+  )
+
 const FIELDS_FROM_SERVER = Object.keys(EMPTY_PRODUCT)
 // Phase 10 §5: the server's names for the gift card fields' errors ("giftCardAmounts.1" → the amounts field).
 const fieldOf = (field) => (field.startsWith('giftCardAmounts') ? 'giftCardAmounts' : field)
@@ -154,15 +191,30 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
   } = useForm({ resolver: zodResolver(productSchema), defaultValues: initial, mode: 'onSubmit', reValidateMode: 'onChange' })
 
   const isGiftCard = useWatch({ control, name: 'type' }) === 'gift_card'
+  // Phase 13: the English texts, shown where a Bangla one is empty (falls back to English).
+  const [title, description, metaTitle, metaDescription] = useWatch({ control, name: ['title', 'description', 'metaTitle', 'metaDescription'] })
+  const bangla = LIVE_DATA && extras.bangla
   // Phase 11 §2 and §3 (real data): kept here, sent only when they changed ("omitted = unchanged").
-  const [saved, setSaved] = useState(() => ({ specifications: toSpecifications(extras.specifications), links: toLinkIds(extras.links) }))
+  const [saved, setSaved] = useState(() => ({
+    specifications: toSpecifications(extras.specifications, { bangla }),
+    links: toLinkIds(extras.links),
+    bn: toBangla(banglaValues(extras.bn, PRODUCT_BANGLA_FIELDS), PRODUCT_BANGLA_FIELDS),
+  }))
   const [specs, setSpecs] = useState(() => extras.specifications.map(specRow))
   const [links, setLinks] = useState(extras.links)
-  const [extraErrors, setExtraErrors] = useState({ specifications: {}, links: {} })
-  const specsChanged = LIVE_DATA && changed(toSpecifications(specs), saved.specifications)
+  const [bn, setBn] = useState(() => banglaValues(extras.bn, PRODUCT_BANGLA_FIELDS))
+  // The saved options come from the product (they are saved in their own section): new or removed ones start over here.
+  const optionsKey = JSON.stringify(extras.options.map((option) => [option.id, option.values.map((entry) => entry.id)]))
+  const [optionState, setOptionState] = useState({ key: optionsKey, list: extras.options })
+  const optionNames = optionState.key === optionsKey ? optionState.list : extras.options
+  const setOptionNames = (list) => setOptionState({ key: optionsKey, list })
+  const [extraErrors, setExtraErrors] = useState({ specifications: {}, links: {}, bangla: {} })
+  const specsChanged = LIVE_DATA && changed(toSpecifications(specs, { bangla }), saved.specifications)
   const linksChanged = LIVE_DATA && changed(toLinkIds(links), saved.links)
+  const bnChanged = bangla && banglaChanged(toBangla(bn, PRODUCT_BANGLA_FIELDS), saved.bn)
+  const optionsChanged = bangla && banglaChanged(toOptionTranslations(optionNames), toOptionTranslations(extras.options))
   const save = useMutation({
-    mutationFn: (values) => {
+    mutationFn: async (values) => {
       // The demo has no product status or SEO fields: don't send them.
       const sent = LIVE_DATA
         ? // Phase 10 §5: the gift card text fields become numbers (and only gift cards send amounts).
@@ -170,15 +222,23 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
             ...Object.fromEntries(Object.entries(values).filter(([field]) => !GIFT_CARD_FIELDS.includes(field))),
             ...toGiftCardValues(values),
             // Phase 11: only when changed, so a save never replaces them by accident.
-            ...(specsChanged && { specifications: toSpecifications(specs) }),
+            ...(specsChanged && { specifications: toSpecifications(specs, { bangla }) }),
             ...(linksChanged && { links: toLinkIds(links) }),
+            // Phase 13: only when changed, like the specifications.
+            ...(bnChanged && { bn: toBangla(bn, PRODUCT_BANGLA_FIELDS) }),
           }
         : Object.fromEntries(Object.entries(values).filter(([field]) => !LIVE_ONLY_FIELDS.includes(field)))
-      return isNew ? createProduct(sent) : updateProduct(productId, sent)
+      const response = await (isNew ? createProduct(sent) : updateProduct(productId, sent))
+      // Phase 13: the options' Bangla names are saved with the options (their own route), right after.
+      if (!isNew && optionsChanged && response.live) {
+        const parts = await saveProductOptions(productId, toOptionsWithBangla(optionNames))
+        return { ...response, product: { ...response.product, ...parts } }
+      }
+      return response
     },
     onSuccess: (response, values) => {
-      setExtraErrors({ specifications: {}, links: {} })
-      if (LIVE_DATA) setSaved({ specifications: toSpecifications(specs), links: toLinkIds(links) })
+      setExtraErrors({ specifications: {}, links: {}, bangla: {} })
+      if (LIVE_DATA) setSaved({ specifications: toSpecifications(specs, { bangla }), links: toLinkIds(links), bn: toBangla(bn, PRODUCT_BANGLA_FIELDS) })
       if (response.live) {
         queryClient.invalidateQueries({ queryKey: ['products'] })
         queryClient.invalidateQueries({ queryKey: adminKeys.overview })
@@ -197,7 +257,7 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
       for (const [field, messages] of Object.entries(error.fieldErrors ?? {})) {
         if (FIELDS_FROM_SERVER.includes(fieldOf(field))) setError(fieldOf(field), { message: messages[0] })
       }
-      setExtraErrors(extraErrorsFrom(error.fieldErrors))
+      setExtraErrors({ ...extraErrorsFrom(error.fieldErrors), bangla: banglaErrorsFrom(error.fieldErrors) })
     },
   })
 
@@ -207,7 +267,7 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
       onSubmit={handleSubmit((values) => {
         // Phase 11: the specification rows are checked here first, like the other fields.
         const rows = LIVE_DATA ? specificationErrors(specs) : {}
-        setExtraErrors({ specifications: rows, links: {} })
+        setExtraErrors({ specifications: rows, links: {}, bangla: {} })
         if (rows.list || rows.rows) return
         save.mutate(values)
       })}
@@ -334,10 +394,23 @@ function ProductForm({ productId, initial, extras, categories, hasVariants }) {
           <ProductLinks productId={productId} lists={links} onChange={setLinks} errors={extraErrors.links} disabled={!can('products.edit')} />
         </>
       )}
+      {bangla && (
+        <ProductBangla
+          values={bn}
+          onChange={setBn}
+          english={{ title, description, metaTitle, metaDescription }}
+          specs={specs}
+          onSpecsChange={setSpecs}
+          options={optionNames}
+          onOptionsChange={setOptionNames}
+          errors={extraErrors.bangla}
+          disabled={!can('products.edit')}
+        />
+      )}
 
       <div className="form__actions">
         {can('products.edit') ? (
-          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty && !specsChanged && !linksChanged)}>
+          <button type="submit" className="btn btn--primary" disabled={save.isPending || (!isNew && !isDirty && !specsChanged && !linksChanged && !bnChanged && !optionsChanged)}>
             {save.isPending ? 'Saving…' : isNew ? 'Add product' : 'Save changes'}
           </button>
         ) : (

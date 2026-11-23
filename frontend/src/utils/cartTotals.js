@@ -1,5 +1,6 @@
 import { COUPONS, SHIPPING_METHODS, SHIPPING_RULES } from '../constants/store'
 import { getProductPricing } from './pricing'
+import { translate } from '../i18n'
 
 const DEMO_RULES = {
   shippingMethods: SHIPPING_METHODS,
@@ -20,10 +21,10 @@ export function evaluateCoupon(code, subtotalCents) {
   if (!code) return { coupon: null, discountCents: 0, error: null }
 
   const coupon = COUPONS[code.trim().toUpperCase()]
-  if (!coupon) return { coupon: null, discountCents: 0, error: 'This code is not valid.' }
+  if (!coupon) return { coupon: null, discountCents: 0, error: translate('cart:totals.invalidCode') }
 
   if (coupon.minSubtotal && subtotalCents < toCents(coupon.minSubtotal)) {
-    return { coupon, discountCents: 0, error: `Spend at least $${coupon.minSubtotal} to use this code.` }
+    return { coupon, discountCents: 0, error: translate('cart:totals.minSpend', { amount: coupon.minSubtotal }) }
   }
 
   const rawDiscount = coupon.type === 'percent' ? Math.round((subtotalCents * coupon.value) / 100) : toCents(coupon.value)

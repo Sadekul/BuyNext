@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\EmailTemplate;
 use App\Support\Currency;
 use App\Support\EmailTemplateCatalog;
+use App\Support\Locale;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -30,12 +31,19 @@ class EmailTemplates
 
     public function __construct(private HtmlSanitizer $sanitizer, private Settings $settings) {}
 
-    /** The subject and body in use: the saved customization, or the default. */
-    public function current(string $key): array
+    /**
+     * The subject and body in use: the saved customization, or the default.
+     * Phase 13: per language ($locale, the current one by default); a Bangla
+     * template without a customization uses the Bangla default (never the
+     * English customization).
+     */
+    public function current(string $key, ?string $locale = null): array
     {
-        $saved = Cache::rememberForever(self::CACHE_KEY, fn () => EmailTemplate::query()->get(['key', 'subject', 'body'])
-            ->keyBy('key')->map(fn ($row) => ['subject' => $row->subject, 'body' => $row->body])->all())[$key] ?? null;
-        $default = EmailTemplateCatalog::get($key);
+        $locale = Locale::normalize($locale) ?? Locale::current();
+        $saved = Cache::rememberForever(self::CACHE_KEY, fn () => EmailTemplate::query()->get(['key', 'locale', 'subject', 'body'])
+            ->mapWithKeys(fn ($row) => [$row->key.':'.($row->locale ?: 'en') => ['subject' => $row->subject, 'body' => $row->body]])
+            ->all())["{$key}:{$locale}"] ?? null;
+        $default = EmailTemplateCatalog::get($key, $locale);
 
         return $saved ?? ['subject' => $default['subject'], 'body' => $default['body']];
     }
@@ -47,8 +55,9 @@ class EmailTemplates
      */
     public function render(string $key, array $values, ?string $subject = null, ?string $body = null, array $layout = [], ?string $currency = null): array
     {
+        // Phase 13: in the current language (a mailable renders inside its locale, see RendersEmailTemplate).
         $template = $this->current($key);
-        $definition = EmailTemplateCatalog::get($key);
+        $definition = EmailTemplateCatalog::get($key, Locale::current());
         $values = [...$this->commonValues(), ...$values];
 
         $renderedSubject = $this->fill($subject ?? $template['subject'], $definition['variables'], $values, html: false, currency: $currency);
@@ -139,9 +148,10 @@ class EmailTemplates
         return preg_replace(self::TOKEN, '{{ $1 }}', $this->sanitizer->clean($body));
     }
 
-    public function save(string $key, string $subject, string $body, ?Admin $admin): EmailTemplate
+    /** Phase 13: $locale is the language version saved (en|bn). */
+    public function save(string $key, string $subject, string $body, ?Admin $admin, string $locale = 'en'): EmailTemplate
     {
-        $row = EmailTemplate::updateOrCreate(['key' => $key], [
+        $row = EmailTemplate::updateOrCreate(['key' => $key, 'locale' => $locale], [
             'subject' => $subject, 'body' => $body, 'is_customized' => true, 'updated_by_admin_id' => $admin?->id,
         ]);
         Cache::forget(self::CACHE_KEY);
@@ -149,9 +159,9 @@ class EmailTemplates
         return $row;
     }
 
-    public function reset(string $key): void
+    public function reset(string $key, string $locale = 'en'): void
     {
-        EmailTemplate::where('key', $key)->delete();
+        EmailTemplate::where('key', $key)->where('locale', $locale)->delete();
         Cache::forget(self::CACHE_KEY);
     }
 
@@ -174,7 +184,7 @@ class EmailTemplates
                 || ! is_numeric($values[$name] ?? null)) {
                 return $match[0];
             }
-            $value = Currency::format($values[$name], $currency);
+            $value = Currency::format($values[$name], $currency, Locale::current()); // phase 13: Bangla digits in Bangla (setting)
 
             return $html ? e($value) : $value;
         }, $text);

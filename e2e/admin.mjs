@@ -107,7 +107,7 @@ await axe(page, 'products')
 // Add, edit, delete. With the real shop the test only changes a product it created itself.
 await page.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
 const testName = `E2E Bamboo Desk Organizer ${Date.now()}`
-await page.getByLabel('Name').fill(testName)
+await page.getByLabel('Name', { exact: true }).fill(testName)
 await page.getByLabel('Brand').fill('NestWorks')
 await page.getByLabel('Category').selectOption('home-decoration')
 await page.getByLabel('Price (USD)').fill('24.5')

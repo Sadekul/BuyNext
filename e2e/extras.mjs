@@ -702,7 +702,7 @@ async function runChecks() {
     // A gift card product: Draft, then Active.
     const productName = `E2E Gift Card ${run}`
     await admin.goto(`${BASE}/admin/products/new`, { waitUntil: 'networkidle' })
-    await admin.getByLabel('Name').fill(productName)
+    await admin.getByLabel('Name', { exact: true }).fill(productName)
     await admin.getByLabel('Brand').fill('NestWorks')
     await admin.getByLabel('Category').selectOption('home-decoration')
     await admin.getByLabel('Price (USD)').fill('50')

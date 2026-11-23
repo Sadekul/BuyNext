@@ -144,13 +144,17 @@ const err = (errors, key) => errors[key]?.[0]
 
 function GeneralForm({ saved }) {
   const [values, setValues] = useState({ storeName: toText(saved.storeName), supportEmail: toText(saved.supportEmail), supportPhone: toText(saved.supportPhone), address: toText(saved.address) })
+  // Phase 13 §1: the store's default language and Bangla digits (only when the API has them).
+  const hasLanguage = saved.defaultLocale !== undefined || saved.banglaDigits !== undefined
+  const [language, setLanguage] = useState({ defaultLocale: saved.defaultLocale === 'bn' ? 'bn' : 'en', banglaDigits: saved.banglaDigits !== false })
   const [errors, setErrors] = useState({})
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.value })
   function toValues() {
     const found = {}
     if (!values.storeName.trim()) found.storeName = ['Enter the store name.']
     if (values.supportEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.supportEmail.trim())) found.supportEmail = ['Enter a valid email address.']
-    return Object.keys(found).length > 0 ? { errors: found } : { values: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.trim()])) }
+    const texts = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.trim()]))
+    return Object.keys(found).length > 0 ? { errors: found } : { values: hasLanguage ? { ...texts, ...language } : texts }
   }
   return (
     <SettingsGroup group="general" title="General" description="Shown to shoppers in the footer, emails, and on the contact page." toValues={toValues} errors={errors} setErrors={setErrors}>
@@ -168,6 +172,38 @@ function GeneralForm({ saved }) {
       <Field label="Address" error={err(errors, 'address')}>
         {(a11y) => <textarea {...a11y} rows={3} value={values.address} maxLength={500} onChange={set('address')} />}
       </Field>
+      {hasLanguage && (
+        <fieldset className="form__fieldset">
+          <legend>Store language</legend>
+          <Field
+            label="Default store language"
+            error={err(errors, 'defaultLocale')}
+            hint="What a first visit shows. Shoppers can switch at any time; signed-in customers keep their own choice. The admin stays in English."
+          >
+            {(a11y) => (
+              <select {...a11y} value={language.defaultLocale} onChange={(event) => setLanguage({ ...language, defaultLocale: event.target.value })}>
+                <option value="en">English</option>
+                <option value="bn">Bangla (বাংলা)</option>
+              </select>
+            )}
+          </Field>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={language.banglaDigits}
+              aria-describedby="general-bangla-digits-hint"
+              aria-invalid={err(errors, 'banglaDigits') ? true : undefined}
+              onChange={(event) => setLanguage({ ...language, banglaDigits: event.target.checked })}
+            />
+            Use Bangla digits
+          </label>
+          <p id="general-bangla-digits-hint" className="field__hint">
+            In Bangla, numbers, prices and dates are written with Bangla digits (<span lang="bn">৳১,২৫০.০০</span>) in the store, emails and PDFs. Off: Latin digits (
+            <span lang="bn">৳</span>1,250.00).
+          </p>
+          {err(errors, 'banglaDigits') && <span className="field__error">{err(errors, 'banglaDigits')}</span>}
+        </fieldset>
+      )}
     </SettingsGroup>
   )
 }

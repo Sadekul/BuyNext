@@ -91,7 +91,10 @@ class ImportCatalog extends Command
                 'description' => $item['description'] ?? null,
                 'category_id' => $categoryIds[$item['category']],
                 'brand_id' => $this->brandId($item['brand'] ?? null),
-                'min_order_quantity' => max(1, (int) ($item['minimumOrderQuantity'] ?? 1)),
+                // DummyJSON's minimumOrderQuantity is random demo data (AirPods: 4), so a shopper's one
+                // click added several. Imported products sell one at a time; staff set a real
+                // minimum per product in the admin when they need one.
+                'min_order_quantity' => 1,
                 'rating_average' => round((float) ($item['rating'] ?? 0), 2),
                 'thumbnail_url' => $item['thumbnail'] ?? null,
                 'warranty' => $item['warrantyInformation'] ?? null,

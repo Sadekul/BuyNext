@@ -93,15 +93,15 @@ class SslCommerzPayments
     public function payProblem(Order $order): ?string
     {
         return match (true) {
-            ! $this->enabled() => 'Online payments through SSLCommerz aren\'t available right now. We\'ll contact you about the payment.',
-            $order->payment_method !== 'sslcommerz' => 'This order isn\'t paid through SSLCommerz.',
-            $order->payment_status === 'review' => 'This order\'s payment was received and is being checked.',
-            $order->payment_status !== 'unpaid' => 'This order has already been paid.',
-            $order->status === 'cancelled' => 'This order was cancelled, so it can\'t be paid.',
-            $order->status !== 'pending_payment' => 'This order isn\'t waiting for a payment.',
-            ! Currency::sslcommerzAccepts($order->currencyCode()) => "This order is in {$order->currencyCode()}; SSLCommerz charges in BDT only.",
+            ! $this->enabled() => __('Online payments through SSLCommerz aren\'t available right now. We\'ll contact you about the payment.'),
+            $order->payment_method !== 'sslcommerz' => __('This order isn\'t paid through SSLCommerz.'),
+            $order->payment_status === 'review' => __('This order\'s payment was received and is being checked.'),
+            $order->payment_status !== 'unpaid' => __('This order has already been paid.'),
+            $order->status === 'cancelled' => __('This order was cancelled, so it can\'t be paid.'),
+            $order->status !== 'pending_payment' => __('This order isn\'t waiting for a payment.'),
+            ! Currency::sslcommerzAccepts($order->currencyCode()) => __('This order is in :currency; SSLCommerz charges in BDT only.', ['currency' => $order->currencyCode()]),
             blank($order->phone) => 'SSLCommerz needs a phone number for this order. Contact us to add one.',
-            $order->dueCents() <= 0 => 'There is nothing left to pay on this order.',
+            $order->dueCents() <= 0 => __('There is nothing left to pay on this order.'),
             default => null,
         };
     }
@@ -164,7 +164,7 @@ class SslCommerzPayments
                     'value_b' => (string) $attempt,
                 ], fn ($value) => $value !== null && $value !== ''));
             } catch (SslCommerzException $e) {
-                return ['provider' => 'sslcommerz', 'url' => null, 'expires_at' => null, 'error' => $e->getMessage()];
+                return ['provider' => 'sslcommerz', 'url' => null, 'expires_at' => null, 'error' => __($e->getMessage())];
             }
 
             $order->forceFill([
@@ -419,10 +419,10 @@ class SslCommerzPayments
     public function check(Order $order, Admin $admin): array
     {
         $problem = match (true) {
-            $order->payment_method !== 'sslcommerz' && $order->payment_provider !== 'sslcommerz' => 'This order isn\'t paid through SSLCommerz.',
+            $order->payment_method !== 'sslcommerz' && $order->payment_provider !== 'sslcommerz' => __('This order isn\'t paid through SSLCommerz.'),
             ! $this->gateway->configured() => 'SSLCommerz payments are not set up (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD are empty).',
             $order->payment_attempts < 1 => 'No SSLCommerz payment was started for this order yet.',
-            ! in_array($order->payment_status, ['unpaid', 'review'], true) => 'This order has already been paid.',
+            ! in_array($order->payment_status, ['unpaid', 'review'], true) => __('This order has already been paid.'),
             default => null,
         };
         if ($problem) {

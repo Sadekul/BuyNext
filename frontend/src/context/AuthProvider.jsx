@@ -7,6 +7,7 @@ import { userKeys } from '../queries/userQueries'
 import { LEGACY_KEYS, STORAGE_KEYS } from '../constants/storageKeys'
 import { removeAccountData } from '../utils/accountData'
 import { readJson, removeKey, writeJson } from '../utils/storage'
+import { translate } from '../i18n'
 
 /*
  * Who is signed in, for the whole app.
@@ -205,7 +206,7 @@ function AuthProvider({ children }) {
    */
   const authorizedRequest = useCallback(
     async (request) => {
-      if (session.status === 'anonymous') throw new ApiError('Please sign in to continue.', { status: 401 })
+      if (session.status === 'anonymous') throw new ApiError(translate('auth:session.signIn'), { status: 401 })
       try {
         return await request()
       } catch (error) {
@@ -218,7 +219,7 @@ function AuthProvider({ children }) {
         } catch (refreshError) {
           if (!isAuthFailure(refreshError)) throw refreshError
           setSession((current) => (current.status === 'anonymous' ? current : { ...ANONYMOUS, expired: true }))
-          throw new ApiError('Your session has expired. Please sign in again.', { status: 401 })
+          throw new ApiError(translate('auth:session.expired'), { status: 401 })
         }
         return request()
       }

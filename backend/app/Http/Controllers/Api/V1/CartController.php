@@ -78,14 +78,14 @@ class CartController extends Controller
     public static function messages(): array
     {
         return [
-            'items.max' => 'A cart can have at most 50 different products.',
-            'items.*.quantity.min' => 'The quantity must be at least 1.',
-            'items.*.quantity.max' => 'The quantity can be at most 999.',
-            'shipping_method.in' => 'Choose a shipping method.',
-            'items.*.gift_card.amount.required_with' => 'Choose a gift card amount.',
-            'items.*.gift_card.recipient_name.required_with' => 'Enter the recipient\'s name.',
-            'items.*.gift_card.recipient_email.required_with' => 'Enter the recipient\'s email.',
-            'items.*.gift_card.recipient_email.email' => 'Enter a valid email address for the recipient.',
+            'items.max' => __('A cart can have at most 50 different products.'),
+            'items.*.quantity.min' => __('The quantity must be at least 1.'),
+            'items.*.quantity.max' => __('The quantity can be at most 999.'),
+            'shipping_method.in' => __('Choose a shipping method.'),
+            'items.*.gift_card.amount.required_with' => __('Choose a gift card amount.'),
+            'items.*.gift_card.recipient_name.required_with' => __('Enter the recipient\'s name.'),
+            'items.*.gift_card.recipient_email.required_with' => __('Enter the recipient\'s email.'),
+            'items.*.gift_card.recipient_email.email' => __('Enter a valid email address for the recipient.'),
         ];
     }
 }

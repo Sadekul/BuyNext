@@ -30,7 +30,7 @@
   --color-star: #f59e0b;
 
   /* Typography */
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', 'Noto Sans Bengali', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Plus Jakarta Sans', var(--font-body);
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;

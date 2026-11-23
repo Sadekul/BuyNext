@@ -1,4 +1,5 @@
 import { json } from './http.js'
+import { serverMessage } from './i18n.js'
 
 /*
  * Sign-in sessions, kept in cookies (see authBff.js for why):
@@ -68,4 +69,5 @@ export const clearedCookies = (kind = CUSTOMER) => [
   ...legacyCleared(kind),
 ]
 
-export const notSignedIn = () => json({ message: 'Please sign in to continue.' }, 401)
+// Phase 13: in the shopper's language when the request is given (server/i18n.js).
+export const notSignedIn = (request) => json({ message: serverMessage(request, 'signIn') }, 401)

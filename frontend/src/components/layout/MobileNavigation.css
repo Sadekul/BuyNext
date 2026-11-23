@@ -46,3 +46,4 @@
   padding-block: var(--space-2);
   font-weight: 400;
 }
+.mobile-nav__language { align-self: flex-start; margin-top: var(--space-4); }

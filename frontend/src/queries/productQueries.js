@@ -8,15 +8,22 @@ import {
   getCompareProducts,
 } from '../services/productService'
 import { getCategories } from '../services/categoryService'
+import { currentLanguage } from '../i18n'
 
 /*
  * Query KEYS identify cached data, like a URL identifies a page. They're
  * arrays, from general to specific, so related entries can be invalidated
  * together: invalidateQueries({ queryKey: productKeys.all }) refreshes every
  * product query at once.
+ *
+ * Phase 13: the language is part of the key ("products", "bn"), because the API answers names and
+ * descriptions in it. Bangla and English are then cached apart, and a page that renders after the
+ * language changed asks for the new key itself, without relying on a refetch arriving in time.
  */
 export const productKeys = {
-  all: ['products'],
+  get all() {
+    return ['products', currentLanguage()]
+  },
   list: () => [...productKeys.all, 'list', 'all'],
   catalog: (scope) => [...productKeys.all, 'catalog', scope],
   detail: (id) => [...productKeys.all, 'detail', String(id)],
@@ -25,7 +32,11 @@ export const productKeys = {
   compare: (ids) => [...productKeys.all, 'compare', ids.join(',')],
 }
 
-export const categoryKeys = { all: ['categories'] }
+export const categoryKeys = {
+  get all() {
+    return ['categories', currentLanguage()]
+  },
+}
 
 /*
  * queryOptions() bundles key + fetch function + settings so every component

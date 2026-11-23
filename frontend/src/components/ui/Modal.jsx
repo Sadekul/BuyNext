@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { LuX } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../utils/classNames'
 import './Modal.css'
 
@@ -12,6 +13,7 @@ import './Modal.css'
  * or "drawer-right" (slides in from the right, used by the cart).
  */
 function Modal({ isOpen, onClose, title, variant = 'center', footer, children }) {
+  const { t } = useTranslation('common')
   const dialogRef = useRef(null)
   const pressStartedOnBackdropRef = useRef(false)
   const titleId = useId()
@@ -55,7 +57,7 @@ function Modal({ isOpen, onClose, title, variant = 'center', footer, children })
           <h2 id={titleId} className="modal__title">
             {title}
           </h2>
-          <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="modal__close" onClick={onClose} aria-label={t('ui.close')}>
             <LuX aria-hidden="true" />
           </button>
         </header>

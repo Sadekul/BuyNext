@@ -36,7 +36,7 @@ export function useNavLinks() {
     })
     const top = topLevelCategories(categories).map(toLink)
     const rest = top.slice(INLINE_CATEGORIES)
-    const more = rest.length > 0 ? [{ label: 'More', id: 'more', children: rest }] : []
+    const more = rest.length > 0 ? [{ label: 'More', labelKey: 'nav.more', id: 'more', children: rest }] : []
     return {
       links: [HOME, SHOP_ALL, ...top.slice(0, INLINE_CATEGORIES), ...more, DEALS],
       mobileLinks: [HOME, SHOP_ALL, ...top, DEALS],

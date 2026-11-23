@@ -32,6 +32,8 @@ import { orderSource, orderStatus, paymentStatus } from '../utils/orders'
 import { actionErrorMessage } from '../utils/permissions'
 // Phase 11: the saved wishlist and reward points.
 import { RewardsTab, WishlistTab } from '../components/CustomerLoyaltyTabs'
+// Phase 13: the customer's language (store and emails).
+import { languageName } from '../utils/bangla'
 
 const TABS = [
   { id: 'account', label: 'Account' },
@@ -155,6 +157,7 @@ function CustomerDetailPage() {
         <StatTile label="Lifetime spent" value={formatMoney(data.lifetimeSpent)} note="Orders not cancelled, minus refunds" />
         <StatTile label="Reviews" value={formatCount(data.reviewsCount)} />
         <StatTile label="Last sign-in" value={formatDate(data.lastLoginAt, 'Never')} note={`Joined ${formatDate(data.createdAt)}`} />
+        {data.locale !== undefined && <StatTile label="Language" value={languageName(data.locale, 'Store default')} note="Their store and emails" />}
       </dl>
 
       <Tabs label={`${name}'s details`} tabs={TABS} selected={tab} onSelect={setTab}>
@@ -212,7 +215,10 @@ function AccountTab({ customer, onSaved }) {
     email: customer.email,
     phone: customer.phone ?? '',
     groupId: customer.groupId ? String(customer.groupId) : '',
+    // Phase 13: '' = the store default.
+    locale: customer.locale ?? '',
   }))
+  const hasLocale = customer.locale !== undefined
   const [errors, setErrors] = useState({})
   const save = useMutation({
     mutationFn: (changes) => updateCustomer(customer.id, changes),
@@ -233,8 +239,15 @@ function AccountTab({ customer, onSaved }) {
     setErrors(found)
     if (Object.keys(found).length > 0) return
     // Only what changed: an unchanged email must not sign the customer out.
-    const next = { firstName: values.firstName.trim(), lastName: values.lastName.trim(), email: values.email.trim().toLowerCase(), phone: values.phone.trim() || null, groupId: values.groupId ? Number(values.groupId) : null }
-    const before = { firstName: customer.firstName, lastName: customer.lastName, email: customer.email, phone: customer.phone || null, groupId: customer.groupId ?? null }
+    const next = {
+      firstName: values.firstName.trim(),
+      lastName: values.lastName.trim(),
+      email: values.email.trim().toLowerCase(),
+      phone: values.phone.trim() || null,
+      groupId: values.groupId ? Number(values.groupId) : null,
+      ...(hasLocale && { locale: values.locale || null }),
+    }
+    const before = { firstName: customer.firstName, lastName: customer.lastName, email: customer.email, phone: customer.phone || null, groupId: customer.groupId ?? null, ...(hasLocale && { locale: customer.locale ?? null }) }
     const changes = Object.fromEntries(Object.entries(next).filter(([field, value]) => value !== before[field]))
     if (Object.keys(changes).length === 0) return onSaved('Nothing to save: no changes.')
     save.mutate(changes)
@@ -272,6 +285,17 @@ function AccountTab({ customer, onSaved }) {
               </select>
             )}
           </Field>
+          {hasLocale && (
+            <Field label="Language" error={err(errors, 'locale')} hint="The language of their store pages and emails. They can also change it themselves in the store.">
+              {(a11y) => (
+                <select {...a11y} value={values.locale} onChange={set('locale')}>
+                  <option value="">Store default</option>
+                  <option value="en">English</option>
+                  <option value="bn">Bangla (বাংলা)</option>
+                </select>
+              )}
+            </Field>
+          )}
         </div>
       </fieldset>
       {other && (

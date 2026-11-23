@@ -12,12 +12,14 @@ import { updateProfile } from '../services/authService'
 import { REAL_ACCOUNTS } from '../constants/accounts'
 import { SITE } from '../constants/site'
 import './ProfilePage.css'
+import { useTranslation } from 'react-i18next'
 
 /**
  * /account — the customer's profile, loaded from GET /api/auth/me with the
  * session cookie (authorizedRequest renews the session once if it has expired).
  */
 function ProfilePage() {
+  const { t } = useTranslation('account')
   const { user, authorizedRequest, updateUser } = useAuth()
   const request = useQuery(profileQuery(user.id, authorizedRequest))
   const queryClient = useQueryClient()
@@ -64,24 +66,24 @@ function ProfilePage() {
     },
   })
 
-  if (request.isPending) return <Loader label="Loading your profile…" />
+  if (request.isPending) return <Loader label={t('profile.loading')} />
   if (request.error) {
-    return <ErrorMessage title="We couldn't load your profile" message={request.error.message} onRetry={() => request.refetch()} />
+    return <ErrorMessage title={t('profile.failed')} message={request.error.message} onRetry={() => request.refetch()} />
   }
 
   const profile = request.data
   const { address } = profile
   const details = [
-    ['Name', `${profile.firstName} ${profile.lastName}`],
-    ['Username', profile.username],
-    ['Email', profile.email],
-    ['Phone', profile.phone],
-    ['Address', address && [address.line1, `${address.city}, ${address.state} ${address.postalCode}`, address.country].filter(Boolean).join(', ')],
+    [t('profile.name'), `${profile.firstName} ${profile.lastName}`],
+    [t('profile.username'), profile.username],
+    [t('profile.email'), profile.email],
+    [t('profile.phone'), profile.phone],
+    [t('profile.address'), address && [address.line1, `${address.city}, ${address.state} ${address.postalCode}`, address.country].filter(Boolean).join(', ')],
   ].filter(([, value]) => value)
 
   return (
     <section className="profile" aria-labelledby="profile-title">
-      <title>{`My account | ${SITE.name}`}</title>
+      <title>{`${t('profile.tabTitle')} | ${SITE.name}`}</title>
       <div className="profile__card">
         {profile.image && <img className="profile__avatar" src={profile.image} alt="" width="96" height="96" />}
         {isEditing ? (
@@ -101,16 +103,16 @@ function ProfilePage() {
             </h2>
             {profile.username && <p className="profile__username">@{profile.username}</p>}
             <button type="button" className="profile__edit" onClick={() => setIsEditing(true)}>
-              <LuPencil aria-hidden="true" /> {REAL_ACCOUNTS ? 'Edit details' : 'Edit name'}
+              <LuPencil aria-hidden="true" /> {t(REAL_ACCOUNTS ? 'profile.editDetails' : 'profile.editName')}
             </button>
           </div>
         )}
       </div>
 
       <p className="profile__status" role="status">
-        {rename.isPending && 'Saving…'}
-        {rename.isSuccess && (REAL_ACCOUNTS ? 'Your details were saved.' : 'Name updated (demo: DummyJSON forgets it after a reload).')}
-        {rename.isError && `Couldn't save your changes: ${rename.error.message} Your previous details were restored.`}
+        {rename.isPending && t('profile.saving')}
+        {rename.isSuccess && t(REAL_ACCOUNTS ? 'profile.saved' : 'profile.savedDemo')}
+        {rename.isError && t('profile.saveFailed', { reason: rename.error.message })}
       </p>
 
       <dl className="profile__details">
@@ -125,18 +127,18 @@ function ProfilePage() {
       {REAL_ACCOUNTS && typeof profile.newsletter === 'boolean' && (
         <section className="profile__newsletter" aria-labelledby="profile-newsletter-title">
           <h2 id="profile-newsletter-title" className="profile__section-title">
-            Newsletter
+            {t('profile.newsletter')}
           </h2>
           <CheckboxField
-            label="Email me new arrivals, deals, and style tips"
+            label={t('profile.newsletterLabel')}
             checked={newsletter.isPending ? newsletter.variables : profile.newsletter}
             disabled={newsletter.isPending}
             onChange={(event) => newsletter.mutate(event.target.checked)}
           />
           <p className="profile__status" role="status">
-            {newsletter.isPending && 'Saving…'}
-            {newsletter.isSuccess && (newsletter.data?.newsletter ?? newsletter.variables ? "You're subscribed to the newsletter." : "You're unsubscribed from the newsletter.")}
-            {newsletter.isError && `Couldn't change your newsletter setting: ${newsletter.error.message}`}
+            {newsletter.isPending && t('profile.saving')}
+            {newsletter.isSuccess && t(newsletter.data?.newsletter ?? newsletter.variables ? 'profile.subscribed' : 'profile.unsubscribed')}
+            {newsletter.isError && t('profile.newsletterFailed', { reason: newsletter.error.message })}
           </p>
         </section>
       )}
@@ -152,7 +154,7 @@ function ProfilePage() {
           }}
         />
       ) : (
-        <p className="profile__note">Profile editing needs a real backend (DummyJSON doesn't save changes). It arrives with the BuyNest API.</p>
+        <p className="profile__note">{t('profile.demoNote')}</p>
       )}
     </section>
   )

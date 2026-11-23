@@ -70,7 +70,7 @@ function AppRoutes() {
         <Route path="products" element={<ProductListingPage />} />
         <Route path="products/:productId" element={<ProductDetailsPage />} />
         <Route path="categories/:categorySlug" element={<ProductListingPage />} />
-        <Route path="deals" element={<ProductListingPage title="Deals" defaultSort="discount-desc" />} />
+        <Route path="deals" element={<ProductListingPage titleKey="listing.deals" defaultSort="discount-desc" />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="wishlist" element={<WishlistPage />} />
         {/* Phase 11: compare up to 4 products (demo too), and a wishlist someone shared (no sign-in). */}

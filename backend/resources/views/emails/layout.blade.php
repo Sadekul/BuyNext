@@ -1,6 +1,6 @@
 {{-- Phase 7: the store frame around every email body (templates and newsletters). $body is already safe HTML. --}}
 <!doctype html>
-<html lang="en">
+<html lang="{{ \App\Support\Locale::current() }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

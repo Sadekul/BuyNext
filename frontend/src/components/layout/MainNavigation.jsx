@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router'
 import { LuChevronDown } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../utils/classNames'
+import { linkLabel } from './navLabel'
 import './MainNavigation.css'
 
 /**
@@ -18,6 +20,7 @@ function MainNavigation({ links }) {
   const [openMenu, setOpenMenu] = useState(null)
   const navRef = useRef(null)
   const { pathname } = useLocation()
+  const { t } = useTranslation('common')
 
   // A new page closes any open submenu (adjusting state during render, not in an effect).
   const [lastPath, setLastPath] = useState(pathname)
@@ -36,7 +39,7 @@ function MainNavigation({ links }) {
   }, [openMenu])
 
   return (
-    <nav className="main-nav" aria-label="Main" ref={navRef}>
+    <nav className="main-nav" aria-label={t('nav.main')} ref={navRef}>
       <ul className="main-nav__list container">
         {links.map((link) => {
           const id = link.id ?? link.to
@@ -59,7 +62,9 @@ function MainNavigation({ links }) {
   )
 }
 
+
 function TopLink({ link }) {
+  const { t } = useTranslation('common')
   return (
     <NavLink
       to={link.to}
@@ -68,7 +73,7 @@ function TopLink({ link }) {
         cn('main-nav__link', isActive && 'main-nav__link--active', link.highlight && 'main-nav__link--highlight')
       }
     >
-      {link.label}
+      {linkLabel(t, link)}
     </NavLink>
   )
 }
@@ -76,6 +81,7 @@ function TopLink({ link }) {
 function SubmenuItem({ link, isOpen, onToggle, onClose }) {
   const menuId = useId()
   const buttonRef = useRef(null)
+  const { t } = useTranslation('common')
 
   function handleKeyDown(event) {
     if (event.key === 'Escape' && isOpen) {
@@ -100,7 +106,7 @@ function SubmenuItem({ link, isOpen, onToggle, onClose }) {
         aria-controls={menuId}
         onClick={onToggle}
       >
-        {link.to ? <span className="visually-hidden">{`${link.label} subcategories`}</span> : link.label}
+        {link.to ? <span className="visually-hidden">{t('nav.subcategories', { label: linkLabel(t, link) })}</span> : linkLabel(t, link)}
         <LuChevronDown aria-hidden="true" />
       </button>
       <ul id={menuId} className="main-nav__menu" hidden={!isOpen}>

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'gift_card_id', 'gift_card_amount', // phase 10 (part B)
     'reward_points_spent', 'reward_points_amount', 'reward_points_earned', // phase 11
     'currency', // phase 12
+    'locale', // phase 13: the language the order was placed in (en|bn)
 ])]
 class Order extends Model
 {

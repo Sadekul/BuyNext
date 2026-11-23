@@ -1,0 +1,127 @@
+{
+  "points_one": "{{points}} pt",
+  "points_other": "{{points}} pts",
+  "rewardTypes": {
+    "earn": "Earned on an order",
+    "spend": "Used on an order",
+    "cancel_return": "Returned: order cancelled",
+    "refund_return": "Returned: order refunded",
+    "refund_reverse": "Taken back: order refunded",
+    "signup": "Welcome bonus",
+    "review": "Review bonus",
+    "adjust": "Adjusted by our team"
+  },
+  "giftCard": {
+    "recipient": "For {{name}}",
+    "recipientWithEmail": "For {{name}} ({{email}})",
+    "enterAmount": "Enter an amount.",
+    "wholeCents": "Use whole cents, like 40 or 42.50.",
+    "amountRange": "Choose an amount from {{min}} to {{max}}."
+  },
+  "sslcommerz": {
+    "visa": "Visa card",
+    "amex": "American Express card",
+    "unionpay": "UnionPay card",
+    "internetBanking": "internet banking",
+    "cardOrBank": "card or bank"
+  },
+  "drawer": {
+    "title": "Your cart ({{count}})",
+    "subtotal": "Subtotal",
+    "blocker": "Remove unavailable items to check out.",
+    "checkout": "Checkout",
+    "viewCart": "View cart",
+    "emptyTitle": "Your cart is empty",
+    "emptyMessage": "Add a few favorites to get started.",
+    "startShopping": "Start shopping"
+  },
+  "line": {
+    "giftFor": "{{title}} for {{name}}",
+    "each": " each",
+    "groupDiscount": "Includes your {{percent}}% group discount",
+    "quantityFor": "Quantity for {{name}}",
+    "removeLabel": "Remove {{name}} from cart",
+    "remove": "Remove",
+    "itemSubtotal": "Item subtotal: "
+  },
+  "summary": {
+    "title": "Order summary",
+    "subtotal_one": "Subtotal ({{count}} item)",
+    "subtotal_other": "Subtotal ({{count}} items)",
+    "productSavings": "Product savings (included)",
+    "estimatedShipping": "Estimated shipping",
+    "noShipping": "None (sent by email)",
+    "free": "Free",
+    "taxes": "Taxes",
+    "taxesLater": "Calculated at checkout",
+    "estimatedTotal": "Estimated total",
+    "note": "Prices, stock, discounts, and shipping are confirmed by our servers at checkout."
+  },
+  "currencyNote": {
+    "approximate": "Prices in {{code}} are approximate.",
+    "chargedAmount": "You'll be charged {{amount}} {{code}}.",
+    "chargedIn": "You'll be charged in {{code}}."
+  },
+  "coupon": {
+    "checking": "Checking {{code}}…",
+    "checkingShort": " — checking…",
+    "removeLabel": "Remove code {{code}}",
+    "label": "Discount code",
+    "placeholder": "e.g. NEST10",
+    "apply": "Apply",
+    "serverHint": "Codes are checked by our server.",
+    "demoHint": "Demo codes: NEST10, SAVE20"
+  },
+  "coupons": {
+    "NEST10": "10% off your order",
+    "SAVE20": "$20 off orders of $150 or more"
+  },
+  "discount": {
+    "freeShipping": "Free shipping",
+    "label": "Discount",
+    "withCode": "Discount ({{code}})"
+  },
+  "freeShipping": {
+    "add": "Add <strong>{{amount}}</strong> more for free shipping",
+    "unlocked": "You've unlocked free shipping",
+    "progress": "Progress toward free shipping"
+  },
+  "group": {
+    "price": "{{group}} price: {{percent}} off",
+    "save": ". You save {{amount}}; it's already included in your prices.",
+    "included": ". It's already included in your prices."
+  },
+  "page": {
+    "tabTitle": "Cart",
+    "tabTitleCount": "Cart ({{count}})",
+    "emptyTitle": "Your cart is empty",
+    "emptyMessage": "Browse the catalog and add something you love.",
+    "startShopping": "Start shopping",
+    "title": "Shopping cart",
+    "checking": "Checking the latest prices and stock…",
+    "changed_one": "{{count}} item has changed since you added it. See the notes below.",
+    "changed_other": "{{count}} items have changed since you added them. See the notes below.",
+    "checkFailed": "We couldn't check the latest prices ({{reason}})",
+    "tryAgain": "Try again",
+    "items": "Items in your cart",
+    "continue": "Continue shopping",
+    "clear": "Clear cart",
+    "pricesFailed": "We couldn't check the prices ({{reason}}). The total is confirmed at checkout.",
+    "removeUnavailable_one": "Remove the unavailable item to continue.",
+    "removeUnavailable_other": "Remove {{count}} unavailable items to continue.",
+    "proceed": "Proceed to checkout",
+    "crossSells": "Customers also bought"
+  },
+  "notices": {
+    "onlyAvailable": "Only {{max}} available, so the quantity was set to {{quantity}}.",
+    "minimum": "Minimum order is {{min}}, so the quantity was set to {{quantity}}.",
+    "productGone": "This product is no longer available.",
+    "optionGone": "This option is no longer available.",
+    "outOfStock": "This product is out of stock.",
+    "priceChanged": "Price changed from {{from}} to {{to}}."
+  },
+  "totals": {
+    "invalidCode": "This code is not valid.",
+    "minSpend": "Spend at least ${{amount}} to use this code."
+  }
+}

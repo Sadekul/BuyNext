@@ -59,7 +59,7 @@ class ProductVariantTest extends TestCase
             ->assertJsonPath('data.options.0.name', 'Size')
             ->assertJsonPath('data.options.1.values.1.value', 'Blue')
             ->assertJsonPath('data.variants', []);
-        $this->assertSame(['id', 'name', 'position', 'values'], array_keys($response->json('data.options.0')));
+        $this->assertSame(['id', 'name', 'name_bn', 'position', 'values'], array_keys($response->json('data.options.0'))); // phase 13: name_bn
 
         $generated = $this->asAdmin($this->admin, 'POST', "/api/admin/v1/products/{$this->shirt->id}/variants/generate")->assertOk()
             ->assertJsonPath('meta.created', 4)->json('data.variants');

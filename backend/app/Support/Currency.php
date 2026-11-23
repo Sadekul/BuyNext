@@ -53,22 +53,28 @@ final class Currency
      * An API money string (or number) as a person reads it: "1250" → "৳1,250.00",
      * "-5" → "-৳5.00", null / not a number → "". $code: the order's currency
      * (the store currency by default).
+     *
+     * Phase 13: $locale "bn" writes Bangla digits when the store setting
+     * bangla_digits is on ("৳১,২৫০.০০"; same symbol place and grouping as
+     * English). null = English digits, so staff notes and audit text stay as
+     * they were; emails and PDFs pass their language.
      */
-    public static function format(string|int|float|null $amount, ?string $code = null): string
+    public static function format(string|int|float|null $amount, ?string $code = null, ?string $locale = null): string
     {
         if ($amount === null || $amount === '' || ! is_numeric($amount)) {
             return '';
         }
 
-        return self::formatCents(Pricing::toCents((string) $amount), $code);
+        return self::formatCents(Pricing::toCents((string) $amount), $code, $locale);
     }
 
     /** Cents as a person reads them (see format()). */
-    public static function formatCents(int $cents, ?string $code = null): string
+    public static function formatCents(int $cents, ?string $code = null, ?string $locale = null): string
     {
         $info = self::info($code);
+        $text = ($cents < 0 ? '-' : '').$info['symbol'].number_format(abs($cents) / 100, $info['decimals']);
 
-        return ($cents < 0 ? '-' : '').$info['symbol'].number_format(abs($cents) / 100, $info['decimals']);
+        return $locale === null ? $text : Locale::digits($text, $locale);
     }
 
     /** Does PayPal accept $code (the store currency by default)? */

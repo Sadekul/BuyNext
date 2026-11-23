@@ -1,0 +1,267 @@
+{
+  "status": {
+    "placed": "Placed",
+    "pending_payment": "Awaiting payment",
+    "processing": "Processing",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled",
+    "closed": "Closed (refunded)"
+  },
+  "payment": {
+    "unpaid": "Not paid yet",
+    "paid": "Paid",
+    "partially_refunded": "Partly refunded",
+    "refunded": "Refunded",
+    "review": "Being checked"
+  },
+  "returnStatus": {
+    "requested": {
+      "label": "Requested",
+      "help": "We've received your request and will reply by email, usually within two business days."
+    },
+    "approved": {
+      "label": "Approved",
+      "help": "Your return was approved. Send the items back as described in our email; we will let you know when they arrive."
+    },
+    "rejected": {
+      "label": "Not approved",
+      "help": "We couldn't accept this return. Our email explains why; reply to it if you have questions."
+    },
+    "received": {
+      "label": "Items received",
+      "help": "The items arrived and we're checking them. Your refund or replacement follows."
+    },
+    "refunded": {
+      "label": "Refunded",
+      "help": "Refunded by the method you paid with; your bank may take a few days to show it."
+    },
+    "closed": {
+      "label": "Closed",
+      "help": "This return is complete."
+    }
+  },
+  "notes": {
+    "giftCard": "Paid in full with a gift card. Thank you.",
+    "rewardPoints": "Paid in full with reward points. Thank you.",
+    "refunded": "Your payment was refunded in full, by the same method you paid with.",
+    "partlyRefunded": "Part of your payment was refunded, by the same method you paid with. See the refunds below.",
+    "cardOn": "Paid by card on {{date}}. Thank you.",
+    "card": "Paid by card. Thank you.",
+    "paypalOn": "Paid with PayPal on {{date}}. Thank you.",
+    "paypal": "Paid with PayPal. Thank you.",
+    "sslMethodOn": "Paid with {{method}} (SSLCommerz) on {{date}}. Thank you.",
+    "sslMethod": "Paid with {{method}} (SSLCommerz). Thank you.",
+    "sslOn": "Paid through SSLCommerz on {{date}}. Thank you.",
+    "ssl": "Paid through SSLCommerz. Thank you.",
+    "review": "We've received your payment and are checking it. We'll email you as soon as your order is confirmed.",
+    "paid": "Payment received. Thank you.",
+    "cancelled": "This order was cancelled, so nothing will be charged.",
+    "cod": "Pay the courier when your order arrives.",
+    "awaitPaypal": "Awaiting payment: nothing has been charged yet. Approve the payment on PayPal's site with Pay now. If it isn't completed in time, the order is cancelled and the items are released.",
+    "awaitSslcommerz": "Awaiting payment: nothing has been charged yet. Pay with bKash, Nagad, Rocket, or a card on SSLCommerz's secure page with Pay now. If it isn't completed in time, the order is cancelled and the items are released.",
+    "awaitStripe": "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released.",
+    "manual": "Nothing has been charged. Online payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
+  },
+  "history": {
+    "label": "Order history"
+  },
+  "steps": {
+    "label": "Order status",
+    "placed": "Order placed",
+    "processing": "Processing",
+    "shipped": "Shipped",
+    "delivered": "Delivered"
+  },
+  "items": {
+    "meta": "{{quantity}} × {{price}}"
+  },
+  "totals": {
+    "subtotal_one": "Subtotal ({{count}} item)",
+    "subtotal_other": "Subtotal ({{count}} items)",
+    "shipping": "Shipping",
+    "shippingWith": "Shipping ({{method}})",
+    "free": "Free",
+    "noShipping": "None (sent by email)",
+    "taxes": "Taxes",
+    "taxesServer": "Calculated by our servers",
+    "total": "Total",
+    "rewardPoints": "Reward points",
+    "rewardPointsWith": "Reward points ({{points}})",
+    "otherPayment": "By other payment",
+    "giftCard": "Paid by gift card",
+    "refunded": "Refunded"
+  },
+  "view": {
+    "shipment_one": "Shipment",
+    "shipment_other": "Shipments",
+    "tracking": " · tracking number {{number}}",
+    "noTracking": " · no tracking number",
+    "shippedOn": "Shipped {{date}}",
+    "trackWith": "Track with {{carrier}}",
+    "newTab": " (opens in a new tab)",
+    "invoice_one": "Invoice",
+    "invoice_other": "Invoices",
+    "invoiceNumber": "Invoice {{number}}",
+    "issued": "Issued {{date}}",
+    "refund_one": "Refund",
+    "refund_other": "Refunds",
+    "refundNumber": "Refund {{number}}",
+    "refundsNote": "Refunds are returned by the method you paid with; your bank may take a few days to show them.",
+    "status": "Status",
+    "placed": "Placed {{date}}",
+    "demo": "Demo order: no payment was taken and nothing will ship. Real orders move through these steps as the backend updates them.",
+    "delivery": "Delivery",
+    "byEmail": "Sent by email: nothing to ship.",
+    "payment": "Payment",
+    "giftCardPaid": "Gift card {{card}}paid {{amount}}.",
+    "pointsPaid": "{{points}} paid {{amount}}.",
+    "pointsEarned": "You earned {{points}} with this order.",
+    "notCharged": " (not charged)",
+    "billing": "Billing address",
+    "items": "Items",
+    "verified": "Prices verified with the server (DummyJSON cart #{{cart}}). Its own discounted total was {{total}}, rounded to whole dollars, before coupons and shipping."
+  },
+  "payNow": {
+    "noPage": "We couldn't open the secure payment page. Please try again in a moment.",
+    "opening": "Opening secure payment…",
+    "pay": "Pay now"
+  },
+  "cancel": {
+    "done": "Order {{number}} was cancelled. We've emailed you a confirmation.",
+    "button": "Cancel order",
+    "title": "Cancel order {{number}}?",
+    "keep": "Keep my order",
+    "cancelling": "Cancelling…",
+    "confirm": "Yes, cancel it",
+    "explain": "The items go back on sale, any discount code can be used again, and nothing is charged. We'll email you a confirmation.",
+    "why": "Why are you cancelling? <optional>(optional)</optional>",
+    "hint": "Up to {{max}} characters. It's kept with the order."
+  },
+  "pdf": {
+    "preparingLabel": "Preparing PDF of invoice {{number}}…",
+    "downloadLabel": "Download PDF of invoice {{number}}",
+    "preparing": "Preparing PDF…",
+    "download": "Download PDF"
+  },
+  "returnForm": {
+    "chooseItem": "Choose at least one item to return.",
+    "chooseReason": "Choose a reason for the return.",
+    "commentLong": "Keep the comment to {{max}} characters or fewer.",
+    "title": "Returns",
+    "returnNumber": "Return {{number}}",
+    "requested": "Return {{number}} was requested. We'll email you about the next steps.",
+    "see": "See the return",
+    "nothing": "Nothing on this order can be returned right now.",
+    "until": "You can ask to return items until {{date}}.",
+    "can": "You can ask to return items from this order.",
+    "request": "Request a return",
+    "items": "Items to return",
+    "quantityOf": "Quantity of {{name}} to return",
+    "upTo": "You can return up to {{returnable}} of {{ordered}}.",
+    "reason": "Reason",
+    "chooseReasonOption": "Choose a reason",
+    "comment": "Comment (optional)",
+    "commentHint": "Anything that helps us, like what is wrong with the item.",
+    "sending": "Sending…",
+    "send": "Send return request",
+    "cancel": "Cancel"
+  },
+  "list": {
+    "noOrders": "No orders yet",
+    "noOrdersMessage": "Orders you place will appear here.",
+    "startShopping": "Start shopping",
+    "order": "Order {{number}}",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
+    "tabTitle": "Orders",
+    "title": "Order history",
+    "demoNote": "Demo orders are saved on this device only.",
+    "loading": "Loading your orders…",
+    "failed": "We couldn't load your orders"
+  },
+  "details": {
+    "notFound": "Order not found",
+    "notFoundMessage": "This order doesn't exist or belongs to another account.",
+    "back": "Back to orders",
+    "allOrders": "All orders",
+    "loading": "Loading the order…",
+    "failed": "We couldn't load this order"
+  },
+  "returns": {
+    "loading": "Loading your returns…",
+    "failed": "We couldn't load your returns",
+    "none": "No returns",
+    "noneMessage": "To return something, open the order it came with and choose “Request a return”.",
+    "yourOrders": "Your orders",
+    "tabTitle": "Returns",
+    "title": "Returns",
+    "return": "Return {{number}}",
+    "orderPrefix": "Order {{number}} · ",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items"
+  },
+  "returnDetails": {
+    "notFound": "Return not found",
+    "notFoundMessage": "This return doesn't exist or belongs to another account.",
+    "back": "Back to returns",
+    "loading": "Loading the return…",
+    "failed": "We couldn't load this return",
+    "all": "All returns",
+    "status": "Status",
+    "requested": "Requested {{date}}",
+    "message": "Message from us",
+    "history": "History",
+    "historyLabel": "Return history",
+    "details": "Details",
+    "order": "Order",
+    "reason": "Reason",
+    "comment": "Your comment",
+    "resolution": "Resolution",
+    "refund": "Refund",
+    "items": "Items",
+    "condition": "Condition: {{condition}}",
+    "resolutions": {
+      "refund": "Refund",
+      "replace": "Replacement"
+    },
+    "conditions": {
+      "unopened": "Unopened",
+      "opened": "Opened",
+      "damaged": "Damaged"
+    }
+  },
+  "track": {
+    "invalidNumber": "Enter the order number from your confirmation email, like BN-100001.",
+    "title": "Track your order",
+    "intro": "Enter the order number from your confirmation email and the email address you used at checkout.",
+    "number": "Order number",
+    "email": "Email",
+    "looking": "Looking…",
+    "find": "Find my order"
+  },
+  "invoice": {
+    "loading": "Loading the invoice…",
+    "notFound": "Invoice not found",
+    "notFoundMessage": "This invoice doesn't exist or belongs to another account.",
+    "back": "Back to orders",
+    "failed": "We couldn't load this invoice",
+    "print": "Print",
+    "date": "Date",
+    "order": "Order",
+    "billTo": "Bill to",
+    "caption": "Items on invoice {{number}}",
+    "item": "Item",
+    "qty": "Qty",
+    "unitPrice": "Unit price",
+    "amount": "Amount",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "shipping": "Shipping",
+    "free": "Free",
+    "tax": "Tax",
+    "total": "Total",
+    "paid": "Amount paid",
+    "thanks": "Thank you for shopping with {{store}}. Questions about this invoice? Write to {{email}}."
+  }
+}

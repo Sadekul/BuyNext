@@ -124,7 +124,7 @@ class GiftCards
             return;
         }
         if (! $card->isUsable() || Pricing::toCents($card->balance) < $cents) {
-            throw ValidationException::withMessages(['gift_card_code' => self::INVALID]);
+            throw ValidationException::withMessages(['gift_card_code' => __(self::INVALID)]);
         }
         $this->change($card, -$cents, "Spent on order {$order->number}.", orderId: $order->id);
     }

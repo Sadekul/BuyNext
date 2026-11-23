@@ -94,7 +94,7 @@ class Wishlists
             }
             if (WishlistItem::where('customer_id', $customer->id)->count() >= WishlistItem::LIMIT) {
                 throw new HttpResponseException(response()->json([
-                    'message' => self::FULL, 'code' => 'wishlist_full', 'errors' => ['product_id' => [self::FULL]],
+                    'message' => __(self::FULL), 'code' => 'wishlist_full', 'errors' => ['product_id' => [__(self::FULL)]],
                 ], 422));
             }
             try {
@@ -162,12 +162,12 @@ class Wishlists
     {
         $product = Product::find($productId);
         if (! $product || ! $product->isForSale()) {
-            throw ValidationException::withMessages(['product_id' => 'This product isn\'t available.']);
+            throw ValidationException::withMessages(['product_id' => __('This product isn\'t available.')]);
         }
         if ($variantId !== null) {
             $variant = ProductVariant::find($variantId);
             if (! $variant || $variant->product_id !== $product->id || ! $variant->is_active || ! $product->has_variants) {
-                throw ValidationException::withMessages(['variant_id' => 'This option isn\'t available.']);
+                throw ValidationException::withMessages(['variant_id' => __('This option isn\'t available.')]);
             }
         }
     }

@@ -55,10 +55,11 @@ class ProductLinksTest extends TestCase
 
         $rows = [['label' => 'Battery', 'value' => '20 h'], ['label' => 'Weight', 'value' => '250 g']];
         $this->admin('PATCH', "/api/admin/v1/products/{$product->id}", ['specifications' => [['label' => ' Battery ', 'value' => '20 h '], $rows[1]]])
-            ->assertOk()->assertJsonPath('data.specifications', $rows);
+            ->assertOk()->assertJsonPath('data.specifications', array_map(fn ($row) => [...$row, 'label_bn' => null, 'value_bn' => null], $rows)); // phase 13: admin rows
         $this->getJson("/api/v1/products/{$product->id}")->assertOk()->assertJsonPath('data.specifications', $rows);
         // Left out: unchanged; null clears.
-        $this->admin('PATCH', "/api/admin/v1/products/{$product->id}", ['name' => 'Renamed'])->assertOk()->assertJsonPath('data.specifications', $rows);
+        $this->admin('PATCH', "/api/admin/v1/products/{$product->id}", ['name' => 'Renamed'])->assertOk()
+            ->assertJsonPath('data.specifications', array_map(fn ($row) => [...$row, 'label_bn' => null, 'value_bn' => null], $rows));
         $this->admin('PATCH', "/api/admin/v1/products/{$product->id}", ['specifications' => null])->assertOk()->assertJsonPath('data.specifications', []);
     }
 
@@ -176,7 +177,7 @@ class ProductLinksTest extends TestCase
         $csv = $this->get('/api/admin/v1/products/export.csv', $this->admin)->assertOk()->getContent();
         $lines = array_map(fn ($line) => str_getcsv($line, escape: ''), array_filter(explode("\n", trim($csv))));
         $header = $lines[0];
-        $this->assertSame(['specifications', 'related_skus', 'upsell_skus', 'crosssell_skus'], array_slice($header, -4));
+        $this->assertSame(['specifications', 'related_skus', 'upsell_skus', 'crosssell_skus'], array_slice($header, -9, 4)); // phase 13: 5 Bangla columns follow
         $row = collect($lines)->first(fn ($line) => $line[0] === 'AUD-1');
         $this->assertSame('Battery: 20 h | Weight: 250 g', $row[11]);
         $this->assertSame('AUD-2', $row[14]);
@@ -209,7 +210,7 @@ class ProductLinksTest extends TestCase
 
         $copy = $this->admin('POST', "/api/admin/v1/products/{$a->id}/duplicate")->assertCreated()
             ->assertJsonPath('data.name', 'Desk Lamp (copy)')->assertJsonPath('data.sku', 'LAMP-1-COPY')->assertJsonPath('data.status', 'draft')
-            ->assertJsonPath('data.price', '20.00')->assertJsonPath('data.specifications', [['label' => 'Power', 'value' => '5 W']])
+            ->assertJsonPath('data.price', '20.00')->assertJsonPath('data.specifications', [['label' => 'Power', 'value' => '5 W', 'label_bn' => null, 'value_bn' => null]])
             ->assertJsonPath('data.links.related.0.id', $b->id)->assertJsonPath('data.images.0.url', 'https://cdn.example.com/lamp.webp')->json('data');
         $this->assertNotSame($a->slug, Product::find($copy['id'])->slug);
         $this->admin('POST', "/api/admin/v1/products/{$a->id}/duplicate")->assertCreated()->assertJsonPath('data.sku', 'LAMP-1-COPY-2');

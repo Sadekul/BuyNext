@@ -30,7 +30,7 @@ class WishlistController extends Controller
             'product_id' => ['required', 'integer', 'min:1'],
             'variant_id' => ['nullable', 'integer', 'min:1'],
             'note' => ['nullable', 'string', 'max:255'],
-        ], ['note.max' => 'The note can be at most 255 characters.']);
+        ], ['note.max' => __('The note can be at most 255 characters.')]);
 
         [$item, $created] = $this->wishlists->add($request->user(), (int) $data['product_id'], isset($data['variant_id']) ? (int) $data['variant_id'] : null,
             self::note($data['note'] ?? null), array_key_exists('note', $data));
@@ -41,7 +41,7 @@ class WishlistController extends Controller
     /** PATCH /api/v1/me/wishlist/{id} { note } → { data: item } */
     public function update(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['note' => ['present', 'nullable', 'string', 'max:255']], ['note.max' => 'The note can be at most 255 characters.']);
+        $data = $request->validate(['note' => ['present', 'nullable', 'string', 'max:255']], ['note.max' => __('The note can be at most 255 characters.')]);
         $item = $this->own($request, $id);
         if (! $item) {
             return $this->notFound();
@@ -110,7 +110,7 @@ class WishlistController extends Controller
     {
         $customer = $this->wishlists->sharedBy($token);
         if (! $customer) {
-            return response()->json(['message' => 'This wishlist isn\'t shared any more.'], 404);
+            return response()->json(['message' => __('This wishlist isn\'t shared any more.')], 404);
         }
 
         return response()->json(['data' => [
@@ -146,6 +146,6 @@ class WishlistController extends Controller
 
     private function notFound(): JsonResponse
     {
-        return response()->json(['message' => 'Wishlist item not found.'], 404);
+        return response()->json(['message' => __('Wishlist item not found.')], 404);
     }
 }

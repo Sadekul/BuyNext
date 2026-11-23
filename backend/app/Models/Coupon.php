@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\Pricing;
 use App\Support\CategoryTree;
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -81,26 +82,31 @@ class Coupon extends Model
         bool $hasEligibleLines = true): ?string
     {
         if (! $this->is_active) {
-            return 'This code is not valid.';
+            return __('This code is not valid.');
         }
         if ($this->starts_at && $this->starts_at->isFuture()) {
-            return 'This code isn\'t active yet.';
+            return __('This code isn\'t active yet.');
         }
         if ($this->ends_at && $this->ends_at->isPast()) {
-            return 'This code has expired.';
+            return __('This code has expired.');
         }
         $groups = array_map('intval', $this->customer_group_ids ?? []);
         if ($groups !== [] && ! in_array($groupId, $groups, true)) {
-            return 'This code isn\'t available for your account.';
+            return __('This code isn\'t available for your account.');
         }
         if (! $hasEligibleLines && $this->applies_to !== 'all') {
-            return 'This code applies to '.$this->appliesToLabel().' only.';
+            return __('This code applies to :items only.', ['items' => $this->appliesToLabel()]);
         }
         if ($this->min_subtotal !== null && $subtotalCents < Pricing::toCents($this->min_subtotal)) {
-            return 'Spend $'.Pricing::format(Pricing::toCents($this->min_subtotal) - $subtotalCents).' more to use this code.';
+            $missing = Pricing::toCents($this->min_subtotal) - $subtotalCents;
+
+            // Phase 13: Bangla writes the store currency with Bangla digits; English keeps "$12.50" as before.
+            return __('Spend :amount more to use this code.', ['amount' => Locale::isBangla()
+                ? Currency::formatCents($missing, null, Locale::current())
+                : '$'.Pricing::format($missing)]);
         }
         if ($this->usage_limit !== null && $this->times_used >= $this->usage_limit) {
-            return 'This code has been fully used.';
+            return __('This code has been fully used.');
         }
         if ($this->usage_limit_per_customer !== null && ($customerId !== null || filled($email))) {
             $used = $this->redemptions()
@@ -109,7 +115,7 @@ class Coupon extends Model
                     fn ($q) => $q->where('email', mb_strtolower(trim($email))))
                 ->count();
             if ($used >= $this->usage_limit_per_customer) {
-                return 'You\'ve already used this code.';
+                return __('You\'ve already used this code.');
             }
         }
 
@@ -123,11 +129,11 @@ class Coupon extends Model
             ? Category::whereIn('id', $this->category_ids ?? [])->orderBy('name')->pluck('name')->all()
             : Product::withTrashed()->whereIn('id', $this->product_ids ?? [])->orderBy('name')->pluck('name')->all();
         if ($names === [] || ($this->applies_to === 'products' && count($names) > 3)) {
-            return $this->applies_to === 'categories' ? 'selected categories' : 'selected products';
+            return $this->applies_to === 'categories' ? __('selected categories') : __('selected products');
         }
         $last = array_pop($names);
 
-        return $names === [] ? $last : implode(', ', $names).' and '.$last;
+        return $names === [] ? $last : __(':items and :last', ['items' => implode(', ', $names), 'last' => $last]);
     }
 
     /**

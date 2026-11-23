@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Mail\Concerns\RendersEmailTemplate;
 use App\Models\OneTimeCode;
+use App\Support\Locale;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -18,7 +19,11 @@ class OneTimeCodeMail extends Mailable
     /** $setPassword (phase 6): the same reset code, worded for an account staff created or a reset staff sent. */
     /** $email (phase 9): the address the code goes to (the new address of an email change). */
     public function __construct(public string $code, public string $purpose, public string $firstName, public bool $setPassword = false,
-        public ?string $email = null) {}
+        public ?string $email = null, ?string $locale = null)
+    {
+        // Phase 13: the language given (a staff-sent code: the customer's), otherwise the language of the request that sends it.
+        $this->locale($locale ?? Locale::current());
+    }
 
     protected function templateKey(): string
     {
@@ -35,7 +40,7 @@ class OneTimeCodeMail extends Mailable
         return [
             'customer_first_name' => $this->firstName,
             'code' => $this->code,
-            'expires_minutes' => (string) config('buynest.codes.ttl_minutes'),
+            'expires_minutes' => Locale::digits((string) config('buynest.codes.ttl_minutes')),
             ...($this->purpose === OneTimeCode::EMAIL_CHANGE ? ['new_email' => (string) $this->email] : []),
         ];
     }

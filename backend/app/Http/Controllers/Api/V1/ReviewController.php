@@ -26,7 +26,7 @@ class ReviewController extends Controller
     {
         $product = Product::forSale()->find($id);
         if (! $product) {
-            return response()->json(['message' => 'Product not found.'], 404);
+            return response()->json(['message' => __('Product not found.')], 404);
         }
 
         // Plain text only: HTML is removed before the lengths are checked.
@@ -39,13 +39,13 @@ class ReviewController extends Controller
             'title' => ['nullable', 'string', 'max:120'],
             'comment' => ['required', 'string', 'min:10', 'max:2000'],
         ], [
-            'rating.required' => 'Choose a rating from 1 to 5 stars.',
-            'rating.min' => 'Choose a rating from 1 to 5 stars.',
-            'rating.max' => 'Choose a rating from 1 to 5 stars.',
-            'title.max' => 'The title can be at most 120 characters.',
-            'comment.required' => 'Write a few words about the product.',
-            'comment.min' => 'The review must be at least 10 characters.',
-            'comment.max' => 'The review can be at most 2,000 characters.',
+            'rating.required' => __('Choose a rating from 1 to 5 stars.'),
+            'rating.min' => __('Choose a rating from 1 to 5 stars.'),
+            'rating.max' => __('Choose a rating from 1 to 5 stars.'),
+            'title.max' => __('The title can be at most 120 characters.'),
+            'comment.required' => __('Write a few words about the product.'),
+            'comment.min' => __('The review must be at least 10 characters.'),
+            'comment.max' => __('The review can be at most 2,000 characters.'),
         ]);
 
         $customer = $request->user();
@@ -88,9 +88,9 @@ class ReviewController extends Controller
     private function alreadyReviewed(): JsonResponse
     {
         return response()->json([
-            'message' => 'You have already reviewed this product.',
+            'message' => __('You have already reviewed this product.'),
             'code' => 'already_reviewed',
-            'errors' => ['product' => ['You have already reviewed this product.']],
+            'errors' => ['product' => [__('You have already reviewed this product.')]],
         ], 422);
     }
 }

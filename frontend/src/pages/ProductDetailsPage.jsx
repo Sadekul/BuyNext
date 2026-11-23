@@ -41,6 +41,7 @@ import { trackViewItem } from '../utils/analytics'
 import { recordRecentlyViewed } from '../utils/recentlyViewed'
 import { earnEstimate } from '../utils/rewards'
 import './ProductDetailsPage.css'
+import { useTranslation } from 'react-i18next'
 
 const RELATED_LIMIT = 4
 
@@ -49,6 +50,7 @@ const RELATED_LIMIT = 4
  * decides which product to load, so a new :productId means a new request.
  */
 function ProductDetailsPage() {
+  const { t } = useTranslation('catalog')
   const { productId } = useParams()
   const isValidId = /^\d+$/.test(productId)
 
@@ -58,7 +60,7 @@ function ProductDetailsPage() {
   if (isValidId && request.isPending) {
     return (
       <div className="section container">
-        <Loader label="Loading product…" />
+        <Loader label={t('details.loading')} />
       </div>
     )
   }
@@ -69,7 +71,7 @@ function ProductDetailsPage() {
   if (request.error) {
     return (
       <div className="section container">
-        <ErrorMessage title="We couldn't load this product" message={request.error.message} onRetry={() => request.refetch()} />
+        <ErrorMessage title={t('details.failed')} message={request.error.message} onRetry={() => request.refetch()} />
       </div>
     )
   }
@@ -82,25 +84,27 @@ function ProductDetailsPage() {
 
 /** A missing product: an admin redirect (phase 7, e.g. for a deleted product) wins, else "not found". */
 function ProductNotFound() {
+  const { t } = useTranslation('catalog')
   const { checking } = useStoreRedirect()
   if (checking) {
     return (
       <div className="section container">
-        <Loader label="Loading product…" />
+        <Loader label={t('details.loading')} />
       </div>
     )
   }
   return (
     <div className="section container">
-      <PageMeta title="Product not found" noindex />
-      <EmptyState icon={LuPackageX} title="Product not found" message="This product doesn't exist or is no longer available.">
-        <Button to={ROUTES.products}>Browse all products</Button>
+      <PageMeta title={t('details.notFound')} noindex />
+      <EmptyState icon={LuPackageX} title={t('details.notFound')} message={t('details.notFoundMessage')}>
+        <Button to={ROUTES.products}>{t('details.browseAll')}</Button>
       </EmptyState>
     </div>
   )
 }
 
 function ProductDetails({ product }) {
+  const { t, i18n } = useTranslation('catalog')
   const navigate = useNavigate()
   const location = useLocation()
   const { addItem } = useCart()
@@ -144,7 +148,7 @@ function ProductDetails({ product }) {
   const images = product.images.length > 0 ? product.images : [product.thumbnail]
   // The category's real name from the tree (BuyNest's API), or the slug made readable.
   const category = categories?.find((candidate) => candidate.slug === product.category)
-  const categoryName = product.category ? (category?.name ?? formatSlug(product.category)) : null
+  const categoryName = product.category ? (category?.name ?? product.categoryName ?? formatSlug(product.category)) : null
   const parentCategories = category && categories ? categoryAncestors(categories, category.slug) : []
 
   // location.key is "default" when this page was the first one loaded
@@ -152,20 +156,20 @@ function ProductDetails({ product }) {
   const canGoBack = location.key !== 'default'
 
   const breadcrumbs = [
-    { label: 'Home', to: ROUTES.home },
+    { label: t('details.home'), to: ROUTES.home },
     ...parentCategories.map((parent) => ({ label: parent.name, to: ROUTES.category(parent.slug) })),
     ...(product.category ? [{ label: categoryName, to: ROUTES.category(product.category) }] : []),
     { label: product.title },
   ]
 
   const specifications = [
-    ['Brand', product.brand],
-    ['Category', categoryName],
-    ['SKU', purchasable.sku],
-    ['Warranty', product.warrantyInformation],
-    ['Shipping', product.shippingInformation],
-    ['Returns', product.returnPolicy],
-    ['Minimum order', minQuantity > 1 ? `${minQuantity} units` : null],
+    [t('details.spec.brand'), product.brand],
+    [t('details.spec.category'), categoryName],
+    [t('details.spec.sku'), purchasable.sku],
+    [t('details.spec.warranty'), product.warrantyInformation],
+    [t('details.spec.shipping'), product.shippingInformation],
+    [t('details.spec.returns'), product.returnPolicy],
+    [t('details.spec.minimum'), minQuantity > 1 ? t('details.units', { count: minQuantity }) : null],
   ].filter(([, value]) => value) // only show what the API actually provided
 
   function handleAddToCart() {
@@ -191,7 +195,7 @@ function ProductDetails({ product }) {
       <div className="product-details__top">
         {canGoBack ? (
           <button type="button" className="product-details__back" onClick={() => navigate(-1)}>
-            <LuArrowLeft aria-hidden="true" /> Back
+            <LuArrowLeft aria-hidden="true" /> {t('details.back')}
           </button>
         ) : null}
         <Breadcrumb items={breadcrumbs} />
@@ -207,12 +211,17 @@ function ProductDetails({ product }) {
 
         <div className="product-details__info">
           {product.brand && <p className="product-details__brand">{product.brand}</p>}
-          <h1 className="product-details__title">{product.title}</h1>
+          {/* Phase 13: a name the store hasn't translated yet is marked as English for screen readers. */}
+          <h1 className="product-details__title" lang={product.contentLocale && product.contentLocale !== i18n.language ? product.contentLocale : undefined}>
+            {product.title}
+          </h1>
+          {/* Phase 13: the Bangla short description (BuyNest's API, in Bangla only). */}
+          {product.translatedShortDescription && <p className="product-details__lead">{toDescription(product.translatedShortDescription, 1000)}</p>}
 
           {product.rating !== null && (
             <a href="#reviews" className="product-details__rating">
               <RatingStars rating={product.rating} />
-              <span>{product.reviews.length} reviews</span>
+              <span>{t('details.reviewsCount', { count: product.reviews.length })}</span>
             </a>
           )}
 
@@ -225,16 +234,16 @@ function ProductDetails({ product }) {
           <>
           <div className="product-details__price">
             <span className="product-details__price-current">
-              {showFrom && <span className="product-details__price-from">From </span>}
+              {showFrom && <span className="product-details__price-from">{t('details.from')}</span>}
               {formatPrice(salePrice)}
             </span>
             {hasDiscount && (
               <>
                 <s className="product-details__price-original">
-                  <span className="visually-hidden">Original price: </span>
+                  <span className="visually-hidden">{t('details.originalPrice')}</span>
                   {formatPrice(originalPrice)}
                 </s>
-                <ProductBadge variant="sale">Save {roundedDiscount}%</ProductBadge>
+                <ProductBadge variant="sale">{t('details.save', { percent: roundedDiscount })}</ProductBadge>
                 {/* Phase 7: the store-wide sale (catalog price rule) behind this price. */}
                 {product.priceRule && <span className="product-details__price-rule">{product.priceRule.name}</span>}
               </>
@@ -245,7 +254,7 @@ function ProductDetails({ product }) {
           <div aria-live="polite">
             {needsChoice ? (
               <p className="product-details__stock product-details__stock--choose" id={hintId}>
-                Choose {missingOptions.map((option) => option.name.toLowerCase()).join(' and ')} to add this to your cart
+                {t('details.chooseToAdd', { options: missingOptions.map((option) => option.name.toLowerCase()).join(t('details.and')) })}
               </p>
             ) : (
               <StockStatus product={purchasable} canBuy={canBuy} />
@@ -268,7 +277,7 @@ function ProductDetails({ product }) {
               aria-describedby={needsChoice ? hintId : undefined}
             >
               <LuShoppingBag aria-hidden="true" />
-              {canBuy || needsChoice ? 'Add to cart' : 'Unavailable'}
+              {t(canBuy || needsChoice ? 'details.addToCart' : 'details.unavailable')}
             </Button>
             <WishlistButton product={product} variant="button" />
             {/* Phase 11: add to the compare list (max 4). */}
@@ -276,10 +285,10 @@ function ProductDetails({ product }) {
           </div>
           {/* Phase 11: reward points this purchase would earn (signed in, when the store has points on). */}
           {isAuthenticated && settings.rewards && !needsChoice && earnEstimate(salePrice, settings.rewards) > 0 && (
-            <p className="product-details__note product-details__points">Earn about {earnEstimate(salePrice, settings.rewards)} reward points with this purchase.</p>
+            <p className="product-details__note product-details__points">{t('details.earnPoints', { points: earnEstimate(salePrice, settings.rewards) })}</p>
           )}
           {canBuy && minQuantity > 1 && (
-            <p className="product-details__note">Minimum order quantity: {minQuantity}</p>
+            <p className="product-details__note">{t('details.minimumQuantity', { count: minQuantity })}</p>
           )}
           {/* key: a new form (and message) for each variant. */}
           {REAL_SHOP && isSoldOut && (
@@ -312,7 +321,7 @@ function ProductDetails({ product }) {
       {product.specifications?.length > 0 && <SpecificationsTable rows={product.specifications} />}
 
       <section className="product-details__section" aria-labelledby="details-title">
-        <h2 id="details-title">Product details</h2>
+        <h2 id="details-title">{t('details.productDetails')}</h2>
         <dl className="product-details__specs">
           {specifications.map(([label, value]) => (
             <div key={label}>
@@ -324,10 +333,10 @@ function ProductDetails({ product }) {
       </section>
 
       {/* Phase 11: the admin's up-sells (BuyNest's API; the demo has none). */}
-      {product.upsells?.length > 0 && <LinkedProducts id="upsells-title" title="You may also like" products={product.upsells} />}
+      {product.upsells?.length > 0 && <LinkedProducts id="upsells-title" title={t('details.upsells')} products={product.upsells} />}
 
       <section className="product-details__section" id="reviews" aria-labelledby="reviews-title">
-        <h2 id="reviews-title">Customer reviews</h2>
+        <h2 id="reviews-title">{t('details.customerReviews')}</h2>
         <ProductReviews reviews={product.reviews} />
         {/* Writing reviews needs BuyNest's API and customer accounts. */}
         {REAL_SHOP && <ReviewForm productId={product.id} productTitle={product.title} />}
@@ -336,7 +345,7 @@ function ProductDetails({ product }) {
       {/* Phase 11: BuyNest's API answers the related products itself (the admin's links, or the same
           automatic choice as before); the demo keeps picking them from the category. */}
       {Array.isArray(product.related) ? (
-        product.related.length > 0 && <LinkedProducts id="related-title" title="Related products" products={product.related} />
+        product.related.length > 0 && <LinkedProducts id="related-title" title={t('details.related')} products={product.related} />
       ) : (
         product.category && <RelatedProducts productId={product.id} categorySlug={product.category} categoryName={categoryName} />
       )}
@@ -349,30 +358,32 @@ function ProductDetails({ product }) {
 }
 
 function StockStatus({ product, canBuy }) {
+  const { t } = useTranslation('catalog')
   if (product.stock === null) {
-    return <p className="product-details__stock product-details__stock--out">Stock information unavailable</p>
+    return <p className="product-details__stock product-details__stock--out">{t('details.stockUnknown')}</p>
   }
   if (product.stock === 0) {
-    return <p className="product-details__stock product-details__stock--out">Out of stock</p>
+    return <p className="product-details__stock product-details__stock--out">{t('details.outOfStock')}</p>
   }
   if (!canBuy) {
     return (
       <p className="product-details__stock product-details__stock--out">
-        Only {product.stock} left — below the minimum order of {product.minimumOrderQuantity}
+        {t('details.belowMinimum', { stock: product.stock, minimum: product.minimumOrderQuantity })}
       </p>
     )
   }
   if (product.availabilityStatus === 'Low Stock') {
-    return <p className="product-details__stock product-details__stock--low">Low stock — only {product.stock} left</p>
+    return <p className="product-details__stock product-details__stock--low">{t('details.lowStock', { stock: product.stock })}</p>
   }
-  return <p className="product-details__stock">In stock</p>
+  return <p className="product-details__stock">{t('details.inStock')}</p>
 }
 
 /** Phase 11: the product's specifications as a two-column table (row headers name each value). */
 function SpecificationsTable({ rows }) {
+  const { t } = useTranslation('catalog')
   return (
     <section className="product-details__section" aria-labelledby="specs-title">
-      <h2 id="specs-title">Specifications</h2>
+      <h2 id="specs-title">{t('details.specifications')}</h2>
       <table className="product-details__spec-table">
         <tbody>
           {rows.map((row) => (
@@ -399,6 +410,7 @@ function LinkedProducts({ id, title, products }) {
 
 /** Other products from the same category (server-side category request). */
 function RelatedProducts({ productId, categorySlug, categoryName }) {
+  const { t } = useTranslation('catalog')
   const request = useQuery(relatedProductsQuery(categorySlug, RELATED_LIMIT))
   const related = (request.data ?? []).filter((item) => item.id !== productId).slice(0, RELATED_LIMIT)
 
@@ -407,8 +419,8 @@ function RelatedProducts({ productId, categorySlug, categoryName }) {
   return (
     <section className="product-details__section" aria-labelledby="related-title">
       <div className="product-details__section-header">
-        <h2 id="related-title">More in {categoryName}</h2>
-        <Link to={ROUTES.category(categorySlug)}>View all</Link>
+        <h2 id="related-title">{t('details.moreIn', { category: categoryName })}</h2>
+        <Link to={ROUTES.category(categorySlug)}>{t('details.viewAll')}</Link>
       </div>
       {request.isPending ? <ProductGridSkeleton count={RELATED_LIMIT} /> : <ProductGrid products={related} />}
     </section>

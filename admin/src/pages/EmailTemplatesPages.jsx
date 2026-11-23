@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams, useSearchParams } from 'react-router'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuArrowLeft, LuPencil, LuRotateCcw, LuSend } from 'react-icons/lu'
-import { getEmailTemplate, getEmailTemplates, previewEmailTemplate, resetEmailTemplate, systemKeys, testEmailTemplate, updateEmailTemplate } from '../api/admin'
+import { getEmailTemplates, systemKeys } from '../api/admin'
+// Phase 13 §4: each template in English and Bangla, edited, previewed and reset per language.
+import { getEmailTemplateIn, phase13Keys, previewEmailTemplateIn, resetEmailTemplateIn, testEmailTemplateIn, updateEmailTemplateIn } from '../api/phase13'
+import Tabs from '../components/Tabs'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Field from '../components/Field'
 import PageHeader from '../components/PageHeader'
@@ -13,12 +16,26 @@ import { actionErrorMessage } from '../utils/permissions'
 
 const PREVIEW_DELAY_MS = 500
 const customizedStatus = (template) => (template.isCustomized ? { tone: 'info', label: 'Customized' } : { tone: 'neutral', label: 'Default' })
+const LANGUAGE_TABS = [
+  { id: 'en', label: 'English' },
+  {
+    id: 'bn',
+    label: (
+      <>
+        Bangla <span lang="bn">(বাংলা)</span>
+      </>
+    ),
+  },
+]
+const LANGUAGE_NAMES = { en: 'English', bn: 'Bangla' }
 /** Every {{ name }} in a text (the names). */
 const variablesIn = (text) => [...text.matchAll(/\{\{\s*([^{}]*?)\s*\}\}/g)].map((match) => match[1])
 
 /** Content → Email templates (Magento's Marketing → Email templates). Needs email_templates.manage. */
 export function EmailTemplatesPage() {
   const templates = useQuery({ queryKey: systemKeys.emailTemplates, queryFn: ({ signal }) => getEmailTemplates({ signal }) })
+  // Phase 13: each row's Bangla version (when the API lists the languages).
+  const hasLanguages = templates.data?.templates.some((template) => template.locales) ?? false
 
   return (
     <>
@@ -35,7 +52,8 @@ export function EmailTemplatesPage() {
               <tr>
                 <th scope="col">Email</th>
                 <th scope="col">Subject</th>
-                <th scope="col">Status</th>
+                <th scope="col">{hasLanguages ? 'English' : 'Status'}</th>
+                {hasLanguages && <th scope="col">Bangla</th>}
                 <th scope="col">Changed</th>
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
@@ -51,8 +69,15 @@ export function EmailTemplatesPage() {
                   </th>
                   <td>{template.subject}</td>
                   <td>
-                    <StatusBadge {...customizedStatus(template)} />
+                    <StatusBadge {...customizedStatus(template.locales?.en ?? template)} />
                   </td>
+                  {hasLanguages && (
+                    <td>
+                      <Link to={`/email-templates/${template.key}?lang=bn`} aria-label={`Bangla version of ${template.name}: ${template.locales?.bn?.isCustomized ? 'customized' : 'default'}`}>
+                        <StatusBadge {...customizedStatus(template.locales?.bn ?? { isCustomized: false })} />
+                      </Link>
+                    </td>
+                  )}
                   <td>{template.isCustomized ? formatDate(template.updatedAt) : '—'}</td>
                   <td className="table__actions">
                     <Link to={`/email-templates/${template.key}`} className="icon-button" aria-label={`Edit ${template.name}`}>
@@ -72,7 +97,15 @@ export function EmailTemplatesPage() {
 /** /email-templates/:templateKey. */
 export function EmailTemplateEditorPage() {
   const { templateKey } = useParams()
-  const template = useQuery({ queryKey: systemKeys.emailTemplate(templateKey), queryFn: ({ signal }) => getEmailTemplate(templateKey, { signal }) })
+  // Phase 13: the language being edited, in the address (?lang=bn), English by default.
+  const [params, setParams] = useSearchParams()
+  const locale = params.get('lang') === 'bn' ? 'bn' : 'en'
+  const template = useQuery({
+    queryKey: phase13Keys.emailTemplate(templateKey, locale),
+    queryFn: ({ signal }) => getEmailTemplateIn(templateKey, locale, { signal }),
+    // The header stays while the other language loads.
+    placeholderData: keepPreviousData,
+  })
   // Kept here: the editor below remounts after a save or reset, the message stays.
   const [notice, setNotice] = useState(null)
   const noticeRef = useRef(null)
@@ -82,8 +115,9 @@ export function EmailTemplateEditorPage() {
   }
 
   if (template.isPending) return <Loading label="Loading the template…" />
-  if (template.error) return <ErrorState error={template.error} onRetry={template.refetch} />
+  if (template.error && !template.data) return <ErrorState error={template.error} onRetry={template.refetch} />
   const saved = template.data
+  const switching = template.isPlaceholderData
   return (
     <>
       <title>{`${saved.name} | Email templates | BuyNest Admin`}</title>
@@ -113,8 +147,33 @@ export function EmailTemplateEditorPage() {
           </p>
         )}
       </div>
-      {/* Remounted after a save or reset, so the form starts from what the server has. */}
-      <TemplateEditor key={`${saved.key}|${saved.updatedAt}|${saved.isCustomized}`} saved={saved} say={say} />
+      <Tabs
+        label="Email language"
+        tabs={LANGUAGE_TABS}
+        selected={locale}
+        onSelect={(next) => {
+          setNotice(null)
+          setParams(next === 'bn' ? { lang: 'bn' } : {}, { replace: true })
+        }}
+      >
+        {() =>
+          switching ? (
+            <Loading label={`Loading the ${LANGUAGE_NAMES[locale]} version…`} />
+          ) : template.error ? (
+            <ErrorState error={template.error} onRetry={template.refetch} />
+          ) : (
+            <>
+              <p className="field__hint">
+                {locale === 'bn'
+                  ? 'Sent to customers who use the store in Bangla (and to guests whose order was placed in Bangla). Amounts and dates are written in Bangla.'
+                  : 'Sent to customers who use the store in English.'}
+              </p>
+              {/* Remounted after a save or reset (and per language), so the form starts from what the server has. */}
+              <TemplateEditor key={`${saved.key}|${locale}|${saved.updatedAt}|${saved.isCustomized}`} saved={saved} locale={locale} say={say} />
+            </>
+          )
+        }
+      </Tabs>
     </>
   )
 }
@@ -135,7 +194,7 @@ function useSettled(value, delay) {
  * frame, where no script can run), a test send to the admin's own address,
  * and reset to default.
  */
-function TemplateEditor({ saved, say }) {
+function TemplateEditor({ saved, locale, say }) {
   const queryClient = useQueryClient()
   const [values, setValues] = useState({ subject: saved.subject, body: saved.body })
   const [errors, setErrors] = useState({})
@@ -146,8 +205,10 @@ function TemplateEditor({ saved, say }) {
   const blocks = new Set(variables.filter((variable) => variable.kind === 'block').map((variable) => variable.name))
   const requiredGroups = saved.requiredGroups ?? variables.filter((variable) => variable.required).map((variable) => [variable.name])
 
+  const language = LANGUAGE_NAMES[locale]
+  const textLang = locale === 'bn' ? 'bn' : undefined
   const refresh = (template) => {
-    queryClient.setQueryData(systemKeys.emailTemplate(saved.key), { ...template, live: true })
+    queryClient.setQueryData(phase13Keys.emailTemplate(saved.key, locale), { ...template, live: true })
     queryClient.invalidateQueries({ queryKey: systemKeys.emailTemplates })
   }
   const failed = (error) => {
@@ -157,8 +218,8 @@ function TemplateEditor({ saved, say }) {
 
   const draft = useSettled(values, PREVIEW_DELAY_MS)
   const preview = useQuery({
-    queryKey: ['email-preview', saved.key, draft],
-    queryFn: ({ signal }) => previewEmailTemplate(saved.key, draft, { signal }),
+    queryKey: ['email-preview', saved.key, locale, draft],
+    queryFn: ({ signal }) => previewEmailTemplateIn(saved.key, locale, draft, { signal }),
     placeholderData: (previous) => previous,
     retry: false,
     staleTime: Infinity,
@@ -185,24 +246,24 @@ function TemplateEditor({ saved, say }) {
   }
 
   const save = useMutation({
-    mutationFn: () => updateEmailTemplate(saved.key, { subject: values.subject.trim(), body: values.body }),
+    mutationFn: () => updateEmailTemplateIn(saved.key, locale, { subject: values.subject.trim(), body: values.body }),
     onSuccess: ({ template }) => {
       const cleaned = template.body !== values.body ? ' Some HTML was removed by the safety filter.' : ''
-      say(`Template saved. New emails use it now.${cleaned}`)
+      say(locale === 'bn' ? `Bangla template saved. New emails in Bangla use it now.${cleaned}` : `Template saved. New emails use it now.${cleaned}`)
       refresh(template)
     },
     onError: failed,
   })
   const sendTest = useMutation({
-    mutationFn: () => testEmailTemplate(saved.key, { subject: values.subject.trim(), body: values.body }),
+    mutationFn: () => testEmailTemplateIn(saved.key, locale, { subject: values.subject.trim(), body: values.body }),
     onSuccess: (result) => say(result.message || `Test email sent to ${result.to}.`),
     onError: failed,
   })
   const reset = useMutation({
-    mutationFn: () => resetEmailTemplate(saved.key),
+    mutationFn: () => resetEmailTemplateIn(saved.key, locale),
     onSuccess: ({ template }) => {
       setConfirmReset(false)
-      say('Back to the default template.')
+      say(locale === 'bn' ? 'The Bangla version is back to the default template.' : 'Back to the default template.')
       refresh(template)
     },
     onError: (error) => {
@@ -237,11 +298,11 @@ function TemplateEditor({ saved, say }) {
         }}
       >
         <Field label="Subject" error={errors.subject?.[0]}>
-          {(a11y) => <input {...a11y} value={values.subject} maxLength={255} onChange={(event) => setValues({ ...values, subject: event.target.value })} />}
+          {(a11y) => <input {...a11y} lang={textLang} value={values.subject} maxLength={255} onChange={(event) => setValues({ ...values, subject: event.target.value })} />}
         </Field>
         <Field label="Body (HTML)" error={errors.body?.[0]} hint="Paragraphs, headings, lists, bold, italics, links, and tables. Scripts and styles are removed when saved.">
           {(a11y) => (
-            <textarea {...a11y} ref={bodyRef} className="editor__body" rows={16} value={values.body} spellCheck onChange={(event) => setValues({ ...values, body: event.target.value })} />
+            <textarea {...a11y} lang={textLang} ref={bodyRef} className="editor__body" rows={16} value={values.body} spellCheck onChange={(event) => setValues({ ...values, body: event.target.value })} />
           )}
         </Field>
 
@@ -280,7 +341,7 @@ function TemplateEditor({ saved, say }) {
           </button>
           {saved.isCustomized && (
             <button type="button" className="btn btn--outline" disabled={busy} onClick={() => setConfirmReset(true)}>
-              <LuRotateCcw aria-hidden="true" /> Reset to default
+              <LuRotateCcw aria-hidden="true" /> {locale === 'bn' ? 'Reset Bangla to default' : 'Reset to default'}
             </button>
           )}
           {unsaved && <span className="muted">Unsaved changes</span>}
@@ -300,20 +361,20 @@ function TemplateEditor({ saved, say }) {
         )}
         {preview.data && (
           <>
-            <p className="email-preview__subject">
+            <p className="email-preview__subject" lang={textLang}>
               <span className="muted">Subject: </span>
               <strong>{preview.data.subject}</strong>
             </p>
             {/* An empty sandbox: the server's rendered HTML can't run scripts, submit forms, or navigate this page. */}
-            <iframe className="email-preview" title={`Preview of ${saved.name}`} sandbox="" srcDoc={preview.data.html} />
+            <iframe className="email-preview" title={`Preview of ${saved.name}${locale === 'bn' ? ' in Bangla' : ''}`} sandbox="" srcDoc={preview.data.html} />
           </>
         )}
       </section>
 
       <ConfirmDialog
         isOpen={confirmReset}
-        title={`Reset "${saved.name}"?`}
-        message="Your changes to this email are deleted and BuyNest's default is used again. This can't be undone."
+        title={locale === 'bn' ? `Reset the Bangla "${saved.name}"?` : `Reset "${saved.name}"?`}
+        message={`Your changes to the ${language} version of this email are deleted and BuyNest's default is used again${locale === 'bn' ? '; the English version is kept' : ''}. This can't be undone.`}
         confirmLabel="Reset to default"
         busy={reset.isPending}
         onConfirm={() => reset.mutate()}

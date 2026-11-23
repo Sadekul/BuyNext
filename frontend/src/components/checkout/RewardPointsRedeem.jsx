@@ -4,6 +4,7 @@ import Button from '../ui/Button'
 import { formatBasePrice } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
 import '../cart/CouponForm.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * Phase 11 §4: "Use reward points" at checkout (signed-in customers, when the
@@ -13,6 +14,7 @@ import '../cart/CouponForm.css'
  * tax and before a gift card. Its own <form>, outside the checkout form.
  */
 function RewardPointsRedeem({ rewards, appliedPoints, applied, error, onApply, onRemove, disabled = false, checking = false }) {
+  const { t } = useTranslation('checkout')
   const [draft, setDraft] = useState('')
   const [localError, setLocalError] = useState('')
   const inputId = useId()
@@ -22,19 +24,19 @@ function RewardPointsRedeem({ rewards, appliedPoints, applied, error, onApply, o
   if (!rewards?.enabled || !(rewards.balance > 0)) return null
   const maxPoints = Math.max(0, Math.min(rewards.maxPoints ?? rewards.balance, rewards.balance))
   const minRedeem = rewards.minRedeem ?? 0
-  const worth = rewards.pointValue > 0 ? ` (worth ${formatBasePrice(Math.round(rewards.balance * rewards.pointValue * 100) / 100)})` : ''
+  const worth = rewards.pointValue > 0 ? t('points.worth', { amount: formatBasePrice(Math.round(rewards.balance * rewards.pointValue * 100) / 100) }) : ''
 
   function apply(points) {
     if (!Number.isInteger(points) || points <= 0) {
-      setLocalError('Enter a whole number of points.')
+      setLocalError(t('points.wholeNumber'))
       return
     }
     if (points > maxPoints) {
-      setLocalError(`You can use up to ${formatPoints(maxPoints)} on this order.`)
+      setLocalError(t('points.upTo', { points: formatPoints(maxPoints) }))
       return
     }
     if (minRedeem > 0 && points < minRedeem) {
-      setLocalError(`Use at least ${formatPoints(minRedeem)} at a time.`)
+      setLocalError(t('points.atLeast', { points: formatPoints(minRedeem) }))
       return
     }
     setLocalError('')
@@ -48,9 +50,9 @@ function RewardPointsRedeem({ rewards, appliedPoints, applied, error, onApply, o
   }
 
   let message = null
-  if (appliedPoints > 0 && checking && !applied && !error) message = 'Checking your reward points…'
-  else if (appliedPoints > 0 && error) message = `Reward points: ${error}`
-  else if (appliedPoints > 0 && applied) message = `${formatPoints(applied.points)} pay ${formatBasePrice(applied.amount)}.`
+  if (appliedPoints > 0 && checking && !applied && !error) message = t('points.checking')
+  else if (appliedPoints > 0 && error) message = t('points.error', { error })
+  else if (appliedPoints > 0 && applied) message = t('points.pays', { points: formatPoints(applied.points), amount: formatBasePrice(applied.amount) })
   else if (localError) message = localError
 
   return (
@@ -60,25 +62,24 @@ function RewardPointsRedeem({ rewards, appliedPoints, applied, error, onApply, o
           <p className={error ? 'coupon-form__error' : 'coupon-form__success'}>
             <LuCoins aria-hidden="true" />
             <span>
-              Reward points <strong>{formatPoints(applied?.points ?? appliedPoints)}</strong>
-              {error ? ` — ${error}` : applied ? ` — pay ${formatBasePrice(applied.amount)}` : checking && ' — checking…'}
+              <Trans t={t} i18nKey="points.appliedLabel" values={{ points: formatPoints(applied?.points ?? appliedPoints) }} components={{ strong: <strong /> }} />
+              {error ? ` — ${error}` : applied ? t('points.pay', { amount: formatBasePrice(applied.amount) }) : checking && t('points.checkingShort')}
             </span>
           </p>
-          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label="Stop using reward points">
+          <button type="button" className="coupon-form__remove" onClick={onRemove} disabled={disabled} aria-label={t('points.stop')}>
             <LuX aria-hidden="true" />
           </button>
         </div>
       ) : maxPoints <= 0 || (minRedeem > 0 && maxPoints < minRedeem) ? (
         <p className="coupon-form__hint">
-          <LuCoins aria-hidden="true" /> You have {formatPoints(rewards.balance)}
-          {worth}.{' '}
-          {minRedeem > 0 && rewards.balance < minRedeem ? `You can use them once you have ${formatPoints(minRedeem)}.` : "They can't be used on this order."}
+          <LuCoins aria-hidden="true" /> {t('points.youHave', { points: formatPoints(rewards.balance), worth })}{' '}
+          {minRedeem > 0 && rewards.balance < minRedeem ? t('points.onceYouHave', { points: formatPoints(minRedeem) }) : t('points.cantUse')}
         </p>
       ) : (
         // noValidate: our own messages (announced, linked to the field) instead of the browser's bubbles.
         <form onSubmit={handleSubmit} noValidate>
           <fieldset disabled={disabled} className="coupon-form__fieldset">
-            <label htmlFor={inputId}>Use reward points</label>
+            <label htmlFor={inputId}>{t('points.label')}</label>
             <div className="coupon-form__row">
               <input
                 id={inputId}
@@ -97,15 +98,16 @@ function RewardPointsRedeem({ rewards, appliedPoints, applied, error, onApply, o
                 aria-describedby={[hintId, localError && errorId].filter(Boolean).join(' ')}
               />
               <Button type="submit" variant="outline" size="sm">
-                Apply
+                {t('points.apply')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => apply(maxPoints)}>
-                Use all
+                {t('points.useAll')}
               </Button>
             </div>
             <p id={hintId} className="coupon-form__hint">
-              You have {formatPoints(rewards.balance)}
-              {worth}. Up to {formatPoints(maxPoints)} can be used on this order{minRedeem > 0 ? `, at least ${formatPoints(minRedeem)} at a time` : ''}.
+              {minRedeem > 0
+                ? t('points.hintMin', { points: formatPoints(rewards.balance), worth, max: formatPoints(maxPoints), min: formatPoints(minRedeem) })
+                : t('points.hint', { points: formatPoints(rewards.balance), worth, max: formatPoints(maxPoints) })}
             </p>
             {localError && (
               <p id={errorId} className="coupon-form__error">

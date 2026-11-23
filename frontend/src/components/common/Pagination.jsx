@@ -1,20 +1,23 @@
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
+import { formatNumber } from '../../utils/formatters'
 import { cn } from '../../utils/classNames'
 import { getPageItems } from '../../utils/pagination'
 import './Pagination.css'
 
 /** Accessible page navigation. The parent owns `currentPage` and handles `onPageChange`. */
 function Pagination({ currentPage, pageCount, onPageChange }) {
+  const { t } = useTranslation('common')
   if (pageCount <= 1) return null
 
   return (
-    <nav className="pagination" aria-label="Pagination">
+    <nav className="pagination" aria-label={t('pagination.label')}>
       <button
         type="button"
         className="pagination__button"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        aria-label="Previous page"
+        aria-label={t('pagination.previous')}
       >
         <LuChevronLeft aria-hidden="true" />
       </button>
@@ -32,9 +35,9 @@ function Pagination({ currentPage, pageCount, onPageChange }) {
                 className={cn('pagination__button', item === currentPage && 'pagination__button--current')}
                 onClick={() => onPageChange(item)}
                 aria-current={item === currentPage ? 'page' : undefined}
-                aria-label={`Page ${item}`}
+                aria-label={t('pagination.page', { page: item })}
               >
-                {item}
+                {formatNumber(item)}
               </button>
             </li>
           ),
@@ -46,7 +49,7 @@ function Pagination({ currentPage, pageCount, onPageChange }) {
         className="pagination__button"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === pageCount}
-        aria-label="Next page"
+        aria-label={t('pagination.next')}
       >
         <LuChevronRight aria-hidden="true" />
       </button>

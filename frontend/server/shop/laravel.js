@@ -1,4 +1,5 @@
 import { laravel, laravelPdf, pick } from '../http.js'
+import { serverMessage } from '../i18n.js'
 import { productCards } from './productCard.js'
 
 /*
@@ -571,7 +572,7 @@ export const laravelShop = {
   async capturePaypal(token, number, body, request) {
     const paypalToken = str(body.token)?.trim()
     if (!paypalToken || !/^[A-Za-z0-9_-]{6,64}$/.test(paypalToken)) {
-      const message = "This payment link isn't valid. Open your order and use Pay now."
+      const message = serverMessage(request, 'paymentLinkInvalid')
       return { ok: false, status: 422, body: { message, errors: { token: [message] } } }
     }
     const email = token ? undefined : str(body.email)?.trim().slice(0, 254)
@@ -590,7 +591,7 @@ export const laravelShop = {
    */
   async invoicePdf(token, number, invoice, body, request) {
     const email = token ? undefined : str(body?.email)?.trim().slice(0, 254)
-    if (!token && !email) return { ok: false, status: 401, body: { message: 'Please sign in to continue.' } }
+    if (!token && !email) return { ok: false, status: 401, body: { message: serverMessage(request, 'signIn') } }
     // The guest's email goes in a header, not the address, so it stays out of the API's request logs.
     const result = await laravelPdf(`/api/v1/orders/${encodeURIComponent(number)}/invoices/${encodeURIComponent(invoice)}.pdf`, {
       token,
@@ -605,7 +606,7 @@ export const laravelShop = {
   async checkGiftCard(body, request) {
     const code = toGiftCardCode(body.code)
     if (!code) {
-      const message = 'Enter the gift card code from your email.'
+      const message = serverMessage(request, 'giftCardCode')
       return { ok: false, status: 422, body: { message, errors: { code: [message] } } }
     }
     const result = await laravel('/api/v1/gift-cards/check', { method: 'POST', request, body: { code } })

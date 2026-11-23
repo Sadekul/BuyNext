@@ -127,7 +127,7 @@ class CatalogTest extends TestCase
     {
         Category::factory()->create(['slug' => 'empty', 'name' => 'Empty']);
         // Phase 5: each item is a tree node (top level here).
-        $node = fn (string $slug, string $name) => ['id' => Category::where('slug', $slug)->value('id'), 'slug' => $slug, 'name' => $name, 'image_url' => null,
+        $node = fn (string $slug, string $name) => ['id' => Category::where('slug', $slug)->value('id'), 'slug' => $slug, 'name' => $name, 'locale' => 'en', 'image_url' => null,
             'description' => null, 'meta_title' => null, 'meta_description' => null, 'parent_id' => null, 'children' => []];
 
         $this->getJson('/api/v1/categories')->assertOk()->assertExactJson(['data' => [
@@ -159,6 +159,8 @@ class CatalogTest extends TestCase
         $this->assertSame('GRO-BRD-APP-016', $apple->sku);
         $this->assertSame('groceries', $apple->category->slug);
         $this->assertSame(3, $apple->stock_quantity); // the shop's stock survives a re-run
+        // DummyJSON's minimumOrderQuantity (2 here) is demo data: imported products sell one at a time.
+        $this->assertSame(1, $apple->min_order_quantity);
         $this->assertCount(1, $apple->images);
         $this->assertCount(1, $apple->reviews);
         // Phase 5: imported reviews are approved (public), imported images are URLs (no file).

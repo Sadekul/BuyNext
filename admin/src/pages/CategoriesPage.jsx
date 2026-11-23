@@ -14,6 +14,9 @@ import { formatCount } from '../utils/format'
 // Phase 7: after a delete, offer a redirect from the category's address.
 import RedirectOffer from '../components/RedirectOffer'
 import { storePaths } from '../utils/redirects'
+// Phase 13 §4: the category's Bangla texts.
+import BanglaField from '../components/BanglaField'
+import { CATEGORY_BANGLA_FIELDS, banglaChanged, banglaValues, toBangla } from '../utils/bangla'
 
 const ACTIVE = { tone: 'success', label: 'Active' }
 const HIDDEN = { tone: 'neutral', label: 'Inactive' }
@@ -256,6 +259,11 @@ function CategoryDialog({ state, categories, onClose, onSaved }) {
       : { ...EMPTY, parentId: state?.parentId ?? '' },
   )
   const [slugTouched, setSlugTouched] = useState(Boolean(editing))
+  // Phase 13: shown for new categories and for answers that have the Bangla texts.
+  const hasBangla = !editing || editing.bn !== undefined
+  const savedBn = banglaValues(editing?.bn, CATEGORY_BANGLA_FIELDS)
+  const [bn, setBn] = useState(savedBn)
+  const setBnField = (field) => (text) => setBn((current) => ({ ...current, [field]: text }))
   const [errors, setErrors] = useState({})
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value })
 
@@ -286,6 +294,8 @@ function CategoryDialog({ state, categories, onClose, onSaved }) {
       imageUrl: values.imageUrl.trim() || null,
       metaTitle: values.metaTitle.trim() || null,
       metaDescription: values.metaDescription.trim() || null,
+      // Phase 13: only when changed ('' = not translated: the store shows the English text).
+      ...(hasBangla && banglaChanged(toBangla(bn, CATEGORY_BANGLA_FIELDS), toBangla(savedBn, CATEGORY_BANGLA_FIELDS)) && { bn: toBangla(bn, CATEGORY_BANGLA_FIELDS) }),
     }
     save.mutate(body)
   }
@@ -357,6 +367,27 @@ function CategoryDialog({ state, categories, onClose, onSaved }) {
           {(a11y) => <input {...a11y} value={values.metaDescription} maxLength={500} onChange={set('metaDescription')} />}
         </Field>
       </div>
+      {hasBangla && (
+        <fieldset className="form__fieldset bangla-section">
+          <legend>
+            Bangla <span lang="bn" className="muted">(বাংলা)</span>
+          </legend>
+          <p className="field__hint">Shown when shoppers use the store in Bangla. Empty fields show the English text.</p>
+          <div className="form__grid">
+            <BanglaField label="Name in Bangla" value={bn.name} english={values.name} onChange={setBnField('name')} maxLength={120} error={err(errors, 'bn.name')} />
+            <BanglaField label="Meta title in Bangla" value={bn.metaTitle} english={values.metaTitle || values.name} onChange={setBnField('metaTitle')} maxLength={190} error={err(errors, 'bn.metaTitle')} />
+          </div>
+          <BanglaField label="Description in Bangla" value={bn.description} english={values.description} onChange={setBnField('description')} maxLength={5000} multiline error={err(errors, 'bn.description')} />
+          <BanglaField
+            label="Meta description in Bangla"
+            value={bn.metaDescription}
+            english={values.metaDescription || values.description}
+            onChange={setBnField('metaDescription')}
+            maxLength={500}
+            error={err(errors, 'bn.metaDescription')}
+          />
+        </fieldset>
+      )}
     </FormDialog>
   )
 }

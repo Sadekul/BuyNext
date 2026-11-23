@@ -1,4 +1,5 @@
 import { laravel, laravelDownload } from '../http.js'
+import { serverMessage } from '../i18n.js'
 import { customerProfile } from '../accounts/laravel.js'
 import { failed } from './laravel.js'
 
@@ -26,11 +27,11 @@ const toId = (value) => {
 const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) ? { ok: true, status: result.status, data: map(result.data) } : failed(result))
 
 /** "We emailed a code" → { email, expiresIn, resendIn, message } (seconds). */
-const codeSent = (data = {}) => ({
+const codeSent = (data = {}, request) => ({
   email: str(data.data?.email) ?? null,
   expiresIn: Number.isInteger(data.data?.expires_in) ? data.data.expires_in : null,
   resendIn: Number.isInteger(data.data?.resend_in) ? data.data.resend_in : null,
-  message: str(data.message) ?? 'We emailed a code to your new address.',
+  message: str(data.message) ?? serverMessage(request, 'emailCodeSent'),
 })
 
 // Only addresses the page may show: the store's own /media/… photos, or https.
@@ -66,7 +67,7 @@ export const laravelAccount = {
       request,
       body: { email: trimmed(body.email, 254), password: str(body.password) },
     })
-    return answer(result, [200, 201, 202], codeSent)
+    return answer(result, [200, 201, 202], (data) => codeSent(data, request))
   },
 
   /** { code } → the profile with its new email (other sessions are signed out by the API). */
@@ -91,7 +92,7 @@ export const laravelAccount = {
       request,
       body: { password: str(body.password), confirm: str(body.confirm) },
     })
-    return answer(result, [200, 202, 204], (data) => ({ message: str(data?.message) ?? 'Your account was deleted.' }))
+    return answer(result, [200, 202, 204], (data) => ({ message: str(data?.message) ?? serverMessage(request, 'accountDeleted') }))
   },
 
   /**
@@ -115,13 +116,13 @@ export const laravelAccount = {
   async unsubscribeStockAlerts(body, request) {
     const value = str(body.token)?.trim()
     if (!value || !/^\d{1,20}\.[A-Za-z0-9_-]{20,128}$/.test(value)) {
-      const message = "This link isn't valid. Open the link from the email again."
+      const message = serverMessage(request, 'alertLinkInvalid')
       return { ok: false, status: 422, body: { message, errors: { token: [message] } } }
     }
     const result = await laravel('/api/v1/stock-alerts/unsubscribe', { method: 'POST', request, body: { token: value } })
     return answer(result, [200], (data) => {
       const removed = Number.isInteger(data?.data?.removed) ? data.data.removed : 0
-      return { removed, message: removed > 0 ? "You won't get any more back-in-stock emails for these products." : 'There were no alerts left to stop.' }
+      return { removed, message: serverMessage(request, removed > 0 ? 'alertsStopped' : 'noAlertsLeft') }
     })
   },
 

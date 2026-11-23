@@ -59,6 +59,6 @@ class AddressController extends Controller
 
     private function notFound(): JsonResponse
     {
-        return response()->json(['message' => 'Address not found.'], 404);
+        return response()->json(['message' => __('Address not found.')], 404);
     }
 }

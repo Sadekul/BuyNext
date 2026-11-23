@@ -1,4 +1,5 @@
 import { json, laravel, pick } from './http.js'
+import { serverMessage } from './i18n.js'
 
 /*
  * BuyNest catalog, at /api/catalog/* (storefront, VITE_API_PROVIDER=laravel).
@@ -69,15 +70,18 @@ function upstreamPath(segments, url) {
 
 export async function handleCatalogRequest(request, segments) {
   const path = upstreamPath(segments, new URL(request.url))
-  if (!path) return json({ message: 'Not found.' }, 404)
+  if (!path) return json({ message: serverMessage(request, 'notFound') }, 404)
   if (request.method !== 'GET') {
-    const response = json({ message: 'The catalog is read-only.' }, 405)
+    const response = json({ message: serverMessage(request, 'catalogReadOnly') }, 405)
     response.headers.set('Allow', 'GET')
     return response
   }
 
-  const { status, data } = await laravel(path, { request })
-  if (status !== 200) return json({ message: data?.message ?? 'The catalog could not be loaded.' }, status)
+  // Phase 13: the catalog's language comes from the URL (`lang=bn`; none = English), never from the
+  // cookie alone, because these answers are cached by URL (the browser, a CDN).
+  const language = new URL(request.url).searchParams.get('lang') === 'bn' ? 'bn' : 'en'
+  const { status, data } = await laravel(path, { request, language })
+  if (status !== 200) return json({ message: data?.message ?? serverMessage(request, 'catalogFailed') }, status)
   // Only the documented keys: Laravel's `links`, `meta.links`, and `meta.path` hold the API's internal address.
   const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query']) }) }
   const response = json(body)

@@ -62,6 +62,7 @@ class SettingsTest extends TestCase
     {
         $this->getJson('/api/v1/store')->assertOk()->assertExactJson(['data' => [
             'store_name' => 'BuyNest',
+            'locales' => ['en', 'bn'], 'default_locale' => 'en', 'bangla_digits' => true, // phase 13
             'support_email' => 'support@buynest.example.com',
             'support_phone' => '+1 (555) 010-2030',
             'shipping_methods' => [

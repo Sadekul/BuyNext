@@ -1,6 +1,8 @@
 import { json, laravelFile, multipartType, readBody, readLimitedBody } from './http.js'
 import { failed } from './shop/adminSystem.js'
 import { laravelCatalogData } from './shop/adminCatalog.js'
+// Phase 13: the Bangla texts of a category.
+import { checkBangla, optionBangla } from './adminPhase13Api.js'
 
 /*
  * Phase 5 admin routes (docs/backend/PHASE5_CONTRACT.md), Laravel only:
@@ -103,6 +105,12 @@ const CATEGORY_RULES = {
 export function validateCategory(body, { partial }) {
   const { errors, values } = check(body, CATEGORY_RULES, partial ? [] : ['name', 'slug'])
   for (const field of ['imageUrl', 'description', 'metaTitle', 'metaDescription']) if (values[field] === '') values[field] = null
+  // Phase 13: bn: { name, description, metaTitle, metaDescription } (optional; '' = not translated).
+  if (body.bn !== undefined) {
+    const bangla = checkBangla(body.bn, 'category')
+    Object.assign(errors, bangla.errors)
+    if (Object.keys(bangla.values).length > 0) values.bn = bangla.values
+  }
   if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) errors.name = ['Change at least one field.']
   return result({ errors, values })
 }
@@ -130,7 +138,8 @@ export function validateOptions(body) {
     if (!raw || values.length < 1 || values.length > 20) errors[`options.${index}.values`] = ['Give the option 1 to 20 values.']
     else if (values.some((value) => !isText(value, { min: 1, max: 40 }))) errors[`options.${index}.values`] = ['Each value needs 1 to 40 characters.']
     else if (seen.size !== values.length) errors[`options.${index}.values`] = ['Each value can appear once.']
-    return { name, values }
+    // Phase 13: the Bangla names (optional; left out = the saved ones stay): nameBn, and valuesBn in the values' order.
+    return { name, values, ...optionBangla(option, index, values.length, errors) }
   })
   return Object.keys(errors).length > 0 ? { errors } : { values: { options } }
 }

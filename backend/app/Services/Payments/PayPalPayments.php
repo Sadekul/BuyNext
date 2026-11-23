@@ -89,12 +89,12 @@ class PayPalPayments
     public function payProblem(Order $order): ?string
     {
         return match (true) {
-            ! Currency::paypalAccepts() => 'PayPal doesn\'t accept '.Currency::store().', so it isn\'t available in this store.', // phase 12
-            ! $this->enabled() => 'Online PayPal payments aren\'t available right now. We\'ll contact you about the payment.',
-            $order->payment_method !== 'paypal' => 'This order isn\'t paid with PayPal.',
-            $order->payment_status !== 'unpaid' => 'This order has already been paid.',
-            $order->status === 'cancelled' => 'This order was cancelled, so it can\'t be paid.',
-            $order->status !== 'pending_payment' => 'This order isn\'t waiting for a payment.',
+            ! Currency::paypalAccepts() => __('PayPal doesn\'t accept :currency, so it isn\'t available in this store.', ['currency' => Currency::store()]), // phase 12
+            ! $this->enabled() => __('Online PayPal payments aren\'t available right now. We\'ll contact you about the payment.'),
+            $order->payment_method !== 'paypal' => __('This order isn\'t paid with PayPal.'),
+            $order->payment_status !== 'unpaid' => __('This order has already been paid.'),
+            $order->status === 'cancelled' => __('This order was cancelled, so it can\'t be paid.'),
+            $order->status !== 'pending_payment' => __('This order isn\'t waiting for a payment.'),
             default => null,
         };
     }
@@ -138,14 +138,14 @@ class PayPalPayments
                     ]]],
                 ], "order-{$order->id}-paypal-{$attempt}");
             } catch (PayPalException $e) {
-                return ['provider' => 'paypal', 'url' => null, 'expires_at' => null, 'error' => $e->getMessage()];
+                return ['provider' => 'paypal', 'url' => null, 'expires_at' => null, 'error' => __($e->getMessage())];
             }
 
             $approve = collect($paypalOrder['links'] ?? [])->first(fn ($link) => in_array($link['rel'] ?? null, ['payer-action', 'approve'], true));
             if (! is_string($paypalOrder['id'] ?? null) || ! is_string($approve['href'] ?? null)) {
                 Log::warning('PayPal created an order without an approval link.', ['order' => $order->number, 'paypal_order' => $paypalOrder['id'] ?? null]);
 
-                return ['provider' => 'paypal', 'url' => null, 'expires_at' => null, 'error' => 'PayPal could not start the payment. Please try again in a moment.'];
+                return ['provider' => 'paypal', 'url' => null, 'expires_at' => null, 'error' => __('PayPal could not start the payment. Please try again in a moment.')];
             }
 
             $order->forceFill([
@@ -201,26 +201,26 @@ class PayPalPayments
             $samePayPalOrder = $order->payment_session_id !== null && hash_equals($order->payment_session_id, $token);
             if ($order->payment_status !== 'unpaid') {
                 return $samePayPalOrder && $order->payment_provider === 'paypal' && $order->payment_reference
-                    ? ['already_paid', null] : [null, 'This order has already been paid.'];
+                    ? ['already_paid', null] : [null, __('This order has already been paid.')];
             }
             if ($problem = $this->payProblem($order)) {
                 return [null, $problem];
             }
             if (! $samePayPalOrder) {
-                return [null, 'This PayPal payment doesn\'t belong to this order.'];
+                return [null, __('This PayPal payment doesn\'t belong to this order.')];
             }
 
             try {
                 $outcome = $this->captureLocked($order, $mail);
             } catch (PayPalException $e) {
-                return [null, $e->unreachable ? $e->getMessage() : 'PayPal declined the payment: '.rtrim($e->getMessage(), '.').'. You can try again with Pay now.'];
+                return [null, $e->unreachable ? __($e->getMessage()) : __('PayPal declined the payment: :reason. You can try again with Pay now.', ['reason' => rtrim($e->getMessage(), '.')])];
             }
 
             return match ($outcome) {
                 'paid', 'already_paid' => [$outcome, null],
-                'pending' => [null, 'PayPal is still processing this payment. We\'ll email you as soon as it\'s confirmed.'],
-                'declined' => [null, 'PayPal declined the payment. You can try again with Pay now.'],
-                default => [null, 'We couldn\'t confirm this payment. Our team has been told and will contact you.'],
+                'pending' => [null, __('PayPal is still processing this payment. We\'ll email you as soon as it\'s confirmed.')],
+                'declined' => [null, __('PayPal declined the payment. You can try again with Pay now.')],
+                default => [null, __('We couldn\'t confirm this payment. Our team has been told and will contact you.')],
             };
         });
 

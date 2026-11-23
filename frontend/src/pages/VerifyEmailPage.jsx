@@ -10,6 +10,7 @@ import { SITE } from '../constants/site'
 import { validateCode } from '../utils/validation'
 import { safeRedirectPath } from '../utils/safeRedirect'
 import './AuthPages.css'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * /verify-email — step 2 of sign-up: the customer types the 6-digit code we
@@ -18,6 +19,7 @@ import './AuthPages.css'
  * (location.state carries { email, resendIn, from }).
  */
 function VerifyEmailPage() {
+  const { t } = useTranslation('auth')
   const { verifyEmail } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -31,12 +33,15 @@ function VerifyEmailPage() {
   if (!email) {
     return (
       <div className="auth-page section container">
-        <title>{`Confirm your email | ${SITE.name}`}</title>
+        <title>{`${t('verify.tabTitle')} | ${SITE.name}`}</title>
         <div className="auth-card">
-          <h1 className="auth-card__title">Confirm your email</h1>
+          <h1 className="auth-card__title">{t('verify.title')}</h1>
           <p className="auth-card__subtitle">
-            Start by <Link to={ROUTES.register} className="auth-link">creating an account</Link> or{' '}
-            <Link to={ROUTES.login} className="auth-link">signing in</Link>: we'll email you a code.
+            <Trans
+              t={t}
+              i18nKey="verify.start"
+              components={{ register: <Link to={ROUTES.register} className="auth-link" />, signin: <Link to={ROUTES.login} className="auth-link" /> }}
+            />
           </p>
         </div>
       </div>
@@ -66,13 +71,13 @@ function VerifyEmailPage() {
 
   return (
     <div className="auth-page section container">
-      <title>{`Confirm your email | ${SITE.name}`}</title>
+      <title>{`${t('verify.tabTitle')} | ${SITE.name}`}</title>
       <div className="auth-card">
         <header>
           <LuMailCheck size={40} color="var(--color-primary)" aria-hidden="true" />
-          <h1 className="auth-card__title">Check your email</h1>
+          <h1 className="auth-card__title">{t('verify.check')}</h1>
           <p className="auth-card__subtitle">
-            We sent a 6-digit code to <strong>{email}</strong>. Enter it below to confirm your email. The code expires in 10 minutes.
+            <Trans t={t} i18nKey="verify.sent" values={{ email }} components={{ strong: <strong /> }} />
           </p>
         </header>
 
@@ -84,7 +89,7 @@ function VerifyEmailPage() {
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField
-            label="6-digit code"
+            label={t('verify.code')}
             name="code"
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -94,18 +99,18 @@ function VerifyEmailPage() {
             maxLength={6}
             className="auth-code"
           />
-          <CheckboxField label="Keep me signed in" name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+          <CheckboxField label={t('verify.remember')} name="remember" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
           <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? 'Confirming…' : 'Confirm and sign in'}
+            {t(isSubmitting ? 'verify.confirming' : 'verify.submit')}
           </Button>
         </form>
 
         <ResendCodeButton email={email} purpose="verify_email" initialWait={location.state?.resendIn ?? 60} />
 
         <p className="auth-card__footer">
-          Wrong email?{' '}
+          {t('verify.wrong')}{' '}
           <Link to={ROUTES.register} className="auth-link">
-            Sign up again
+            {t('verify.again')}
           </Link>
         </p>
       </div>

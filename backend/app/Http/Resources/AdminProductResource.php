@@ -31,8 +31,10 @@ class AdminProductResource extends ProductResource
             $base['options'] = $this->when($this->relationLoaded('options'), fn () => $this->options->map(fn ($option) => [
                 'id' => $option->id,
                 'name' => $option->name,
+                'name_bn' => $option->translationsForAdmin()['bn']['name'], // phase 13: null = English is shown
                 'position' => $option->position,
-                'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->value, 'position' => $value->position])->values(),
+                'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->value,
+                    'value_bn' => $value->translationsForAdmin()['bn']['value'], 'position' => $value->position])->values(),
             ])->values());
             $base['variants'] = $this->when($this->relationLoaded('variants'), function () {
                 $map = $this->resource->optionValueMap();
@@ -65,6 +67,11 @@ class AdminProductResource extends ProductResource
             // Phase 7: SEO fields (null = the storefront uses the name and description).
             'meta_title' => $this->meta_title,
             'meta_description' => $this->meta_description,
+            // Phase 13: the Bangla text (null = the store shows English), rows with label_bn/value_bn, and completeness.
+            'specifications' => $this->resource->specificationRowsForAdmin(),
+            'translations' => ['bn' => $this->resource->translationFields('bn')],
+            'bangla' => $this->resource->banglaStatus(),
+            'bangla_complete' => $this->resource->banglaStatus()['complete'],
             'status' => $this->status,
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'updated_at' => $this->updated_at?->toIso8601ZuluString(),

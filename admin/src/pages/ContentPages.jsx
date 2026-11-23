@@ -14,6 +14,9 @@ import { formatCount, formatDate } from '../utils/format'
 // Phase 7: after a delete or an address change, offer a redirect from the old address.
 import RedirectOffer from '../components/RedirectOffer'
 import { storePaths } from '../utils/redirects'
+// Phase 13 §4: the page's Bangla texts.
+import BanglaField from '../components/BanglaField'
+import { PAGE_BANGLA_FIELDS, banglaChanged, banglaValues, toBangla } from '../utils/bangla'
 
 const LIMIT = 20
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -137,6 +140,11 @@ function PageEditor({ saved }) {
     isPublished: saved?.isPublished ?? false,
   })
   const [slugTouched, setSlugTouched] = useState(!isNew)
+  // Phase 13: new pages, and answers that have the Bangla texts; sent only when changed.
+  const hasBangla = isNew || saved.bn !== undefined
+  const [savedBn, setSavedBn] = useState(() => toBangla(banglaValues(saved?.bn, PAGE_BANGLA_FIELDS), PAGE_BANGLA_FIELDS, { raw: ['body'] }))
+  const [bn, setBn] = useState(() => banglaValues(saved?.bn, PAGE_BANGLA_FIELDS))
+  const setBnField = (field) => (text) => setBn((current) => ({ ...current, [field]: text }))
   const [errors, setErrors] = useState({})
   const location = useLocation()
   // After "Create page" the editor reopens at the page's address, carrying the message.
@@ -160,6 +168,11 @@ function PageEditor({ saved }) {
       queryClient.invalidateQueries({ queryKey: ['pages'] })
       // The server's cleaned HTML replaces what was typed, so the textarea shows what the store shows.
       setValues((current) => ({ ...current, body: page.body }))
+      if (page.bn) {
+        const next = banglaValues(page.bn, PAGE_BANGLA_FIELDS)
+        setBn(next)
+        setSavedBn(toBangla(next, PAGE_BANGLA_FIELDS, { raw: ['body'] }))
+      }
       const cleaned = page.body !== values.body ? ' Some HTML was removed by the safety filter (scripts, styles, or unsupported tags).' : ''
       const text = `${isNew ? 'Page created' : 'Saved'}${page.isPublished ? ' and published' : ' as a draft'}.${cleaned}`
       if (isNew) return navigate(`/pages/${page.id}`, { replace: true, state: { notice: text } })
@@ -199,6 +212,7 @@ function PageEditor({ saved }) {
       metaTitle: values.metaTitle.trim() || null,
       metaDescription: values.metaDescription.trim() || null,
       isPublished: values.isPublished,
+      ...(hasBangla && banglaChanged(toBangla(bn, PAGE_BANGLA_FIELDS, { raw: ['body'] }), savedBn) && { bn: toBangla(bn, PAGE_BANGLA_FIELDS, { raw: ['body'] }) }),
     })
   }
 
@@ -261,6 +275,41 @@ function PageEditor({ saved }) {
                 {(a11y) => <textarea {...a11y} rows={2} value={values.metaDescription} maxLength={500} onChange={set('metaDescription')} />}
               </Field>
             </div>
+            {hasBangla && (
+              <fieldset className="form__fieldset bangla-section">
+                <legend>
+                  Bangla{' '}
+                  <span lang="bn" className="muted">
+                    (বাংলা)
+                  </span>
+                </legend>
+                <p className="field__hint">Shown when shoppers use the store in Bangla. Empty fields show the English text. The same HTML is allowed as in the English content.</p>
+                <BanglaField label="Title in Bangla" value={bn.title} english={values.title} onChange={setBnField('title')} maxLength={160} error={errors['bn.title']?.[0]} />
+                <BanglaField
+                  label="Content in Bangla (HTML)"
+                  value={bn.body}
+                  english={values.body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')}
+                  onChange={setBnField('body')}
+                  multiline
+                  rows={10}
+                  error={errors['bn.body']?.[0]}
+                  inputProps={{ className: 'editor__body', spellCheck: true }}
+                />
+                <div className="form__grid">
+                  <BanglaField label="Meta title in Bangla (optional)" value={bn.metaTitle} english={values.metaTitle || values.title} onChange={setBnField('metaTitle')} maxLength={160} error={errors['bn.metaTitle']?.[0]} />
+                  <BanglaField
+                    label="Meta description in Bangla (optional)"
+                    value={bn.metaDescription}
+                    english={values.metaDescription}
+                    onChange={setBnField('metaDescription')}
+                    multiline
+                    rows={2}
+                    maxLength={300}
+                    error={errors['bn.metaDescription']?.[0]}
+                  />
+                </div>
+              </fieldset>
+            )}
             <label className="checkbox">
               <input type="checkbox" checked={values.isPublished} onChange={set('isPublished')} />
               Published (visible in the store and linked from the footer)
@@ -295,6 +344,13 @@ function PageEditor({ saved }) {
               </p>
               {/* Safe: this is the server's sanitized body (allow-listed tags, no scripts or event attributes), never the draft. */}
               <article className="cms-preview" dangerouslySetInnerHTML={{ __html: saved.body }} />
+              {/* Phase 13: the Bangla content as saved, also cleaned by the server's allow-list sanitizer. */}
+              {saved.bn?.body && (
+                <>
+                  <h3 className="cms-preview-label">Bangla</h3>
+                  <article lang="bn" className="cms-preview" dangerouslySetInnerHTML={{ __html: saved.bn.body }} />
+                </>
+              )}
             </>
           ) : (
             <p className="muted">Save the page to see a preview of its cleaned HTML.</p>

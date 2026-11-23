@@ -164,7 +164,7 @@ class StockAlerts
     {
         return [
             'id' => $alert->id,
-            'product' => ['id' => $alert->product_id, 'name' => $alert->product?->name, 'thumbnail_url' => $alert->product?->thumbnail_url],
+            'product' => ['id' => $alert->product_id, 'name' => $alert->product?->translated('name'), 'thumbnail_url' => $alert->product?->thumbnail_url],
             'variant_id' => $alert->variant_id,
             'variant_label' => self::variantLabel($alert),
             'created_at' => $alert->created_at?->toIso8601ZuluString(),

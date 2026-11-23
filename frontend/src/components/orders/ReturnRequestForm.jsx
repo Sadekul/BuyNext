@@ -12,9 +12,10 @@ import { orderKeys } from '../../queries/orderQueries'
 import { customerKeys } from '../../queries/customerQueries'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
-import { formatDate } from '../../utils/formatters'
+import { formatDate, formatNumber } from '../../utils/formatters'
 import { applyServerFieldErrors } from '../../utils/serverErrors'
 import './ReturnRequestForm.css'
+import { useTranslation } from 'react-i18next'
 
 const COMMENT_MAX = 1000
 const quantityField = (item) => `quantities.q${item.orderItemId}`
@@ -29,6 +30,7 @@ const quantityField = (item) => `quantities.q${item.orderItemId}`
  * server checks everything again and answers 422 when something changed.
  */
 function ReturnRequestForm({ order }) {
+  const { t } = useTranslation('orders')
   const { user, authorizedRequest } = useAuth()
   const queryClient = useQueryClient()
   const id = useId()
@@ -68,15 +70,15 @@ function ReturnRequestForm({ order }) {
       .filter(({ quantity }) => quantity > 0)
     let invalid = false
     if (chosen.length === 0) {
-      setError('root.items', { message: 'Choose at least one item to return.' })
+      setError('root.items', { message: t('returnForm.chooseItem') })
       invalid = true
     }
     if (!values.reason) {
-      setError('reason', { message: 'Choose a reason for the return.' })
+      setError('reason', { message: t('returnForm.chooseReason') })
       invalid = true
     }
     if (values.comment.trim().length > COMMENT_MAX) {
-      setError('comment', { message: `Keep the comment to ${COMMENT_MAX} characters or fewer.` })
+      setError('comment', { message: t('returnForm.commentLong', { max: COMMENT_MAX }) })
       invalid = true
     }
     if (invalid) return
@@ -109,13 +111,13 @@ function ReturnRequestForm({ order }) {
 
   return (
     <section className="return-request order-view__card" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`}>Returns</h2>
+      <h2 id={`${id}-title`}>{t('returnForm.title')}</h2>
       {order.returns?.length > 0 && (
         <ul className="return-request__existing">
           {order.returns.map((entry) => (
             <li key={entry.number}>
               <Link to={ROUTES.returnDetails(entry.number)} className="order-view__link">
-                Return {entry.number}
+                {t('returnForm.returnNumber', { number: entry.number })}
               </Link>
               <OrderStatusBadge kind="return" status={entry.status} />
             </li>
@@ -124,27 +126,26 @@ function ReturnRequestForm({ order }) {
       )}
       {created && (
         <p className="return-request__success" role="status">
-          Return {created.number} was requested. We&apos;ll email you about the next steps.{' '}
-          <Link to={ROUTES.returnDetails(created.number)}>See the return</Link>
+          {t('returnForm.requested', { number: created.number })} <Link to={ROUTES.returnDetails(created.number)}>{t('returnForm.see')}</Link>
         </p>
       )}
       {items.length === 0 || reasons.length === 0 ? (
-        !created && eligibility && <p className="order-view__muted">{eligibility.message ?? 'Nothing on this order can be returned right now.'}</p>
+        !created && eligibility && <p className="order-view__muted">{eligibility.message ?? t('returnForm.nothing')}</p>
       ) : (
         <>
           <p className="order-view__muted">
-            {eligibility.deadline ? `You can ask to return items until ${formatDate(eligibility.deadline)}.` : 'You can ask to return items from this order.'}
+            {eligibility.deadline ? t('returnForm.until', { date: formatDate(eligibility.deadline) }) : t('returnForm.can')}
           </p>
           {!isOpen ? (
             <div>
               <Button variant="outline" onClick={() => setIsOpen(true)}>
-                <LuUndo2 aria-hidden="true" /> Request a return
+                <LuUndo2 aria-hidden="true" /> {t('returnForm.request')}
               </Button>
             </div>
           ) : (
             <form className="return-request__form" onSubmit={handleSubmit(submit)} noValidate>
               <fieldset className={cn('return-request__items', errors.root?.items && 'return-request__items--invalid')} aria-describedby={errors.root?.items ? `${id}-items-error` : undefined}>
-                <legend className="form-field__label">Items to return</legend>
+                <legend className="form-field__label">{t('returnForm.items')}</legend>
                 <ul>
                   {items.map((item) => {
                     const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title
@@ -154,13 +155,13 @@ function ReturnRequestForm({ order }) {
                       <li key={item.orderItemId} className="return-request__item">
                         {item.thumbnail ? <img src={item.thumbnail} alt="" width="48" height="48" loading="lazy" /> : <span />}
                         <SelectField
-                          label={`Quantity of ${name} to return`}
-                          options={Array.from({ length: item.returnable + 1 }, (_, count) => String(count))}
+                          label={t('returnForm.quantityOf', { name })}
+                          options={Array.from({ length: item.returnable + 1 }, (_, count) => ({ value: String(count), label: formatNumber(count) }))}
                           error={error}
                           {...register(field)}
                         />
                         <span className="order-view__muted">
-                          You can return up to {item.returnable} of {item.ordered}.
+                          {t('returnForm.upTo', { returnable: item.returnable, ordered: item.ordered })}
                         </span>
                       </li>
                     )
@@ -173,11 +174,11 @@ function ReturnRequestForm({ order }) {
                 )}
               </fieldset>
 
-              <SelectField label="Reason" options={[{ value: '', label: 'Choose a reason' }, ...reasons]} error={errors.reason?.message} {...register('reason')} />
+              <SelectField label={t('returnForm.reason')} options={[{ value: '', label: t('returnForm.chooseReasonOption') }, ...reasons]} error={errors.reason?.message} {...register('reason')} />
 
               <div className={cn('form-field', errors.comment && 'form-field--invalid')}>
                 <label htmlFor={`${id}-comment`} className="form-field__label">
-                  Comment (optional)
+                  {t('returnForm.comment')}
                 </label>
                 <textarea
                   id={`${id}-comment`}
@@ -189,7 +190,7 @@ function ReturnRequestForm({ order }) {
                   {...register('comment')}
                 />
                 <p id={`${id}-comment-hint`} className="form-field__hint">
-                  Anything that helps us, like what is wrong with the item.
+                  {t('returnForm.commentHint')}
                 </p>
                 {errors.comment && (
                   <p id={`${id}-comment-error`} className="form-field__error">
@@ -205,10 +206,10 @@ function ReturnRequestForm({ order }) {
               )}
               <div className="return-request__actions">
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Sending…' : 'Send return request'}
+                  {t(isSubmitting ? 'returnForm.sending' : 'returnForm.send')}
                 </Button>
                 <Button variant="ghost" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-                  Cancel
+                  {t('returnForm.cancel')}
                 </Button>
               </div>
             </form>

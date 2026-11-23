@@ -8,7 +8,7 @@
     character from the first font that has it. Loaded from the local disk.
 --}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ $locale ?? 'en' }}">
 <head>
 <meta charset="utf-8">
 <title>@yield('title')</title>
@@ -16,7 +16,12 @@
     @page { margin: 18mm 16mm; }
     @font-face { font-family: "Noto Sans Bengali"; font-style: normal; font-weight: normal; src: url("{{ resource_path('fonts/NotoSansBengali-Regular.ttf') }}") format("truetype"); }
     @font-face { font-family: "Noto Sans Bengali"; font-style: normal; font-weight: bold; src: url("{{ resource_path('fonts/NotoSansBengali-Bold.ttf') }}") format("truetype"); }
+    {{-- Phase 13: Bangla documents take Bangla letters (and the conjuncts dompdf can draw) from Noto Sans Bengali first. --}}
+    @if (($locale ?? 'en') === 'bn')
+    * { font-family: "Noto Sans Bengali", "DejaVu Sans", sans-serif; }
+    @else
     * { font-family: "DejaVu Sans", "Noto Sans Bengali", sans-serif; }
+    @endif
     body { font-size: 9.5pt; color: #1f2933; line-height: 1.4; margin: 0; }
     h1 { font-size: 17pt; margin: 0 0 4pt; color: #111827; }
     h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #52606d; margin: 0 0 4pt; }
@@ -64,19 +69,19 @@
 <table class="boxes">
     <tr>
         <td>
-            <h2>Bill to</h2>
+            <h2>{{ __('Bill to') }}</h2>
             @include('documents.address', ['address' => $order['billing_address']])
         </td>
         <td>
-            <h2>Ship to</h2>
+            <h2>{{ __('Ship to') }}</h2>
             @include('documents.address', ['address' => $order['shipping_address']])
         </td>
         <td>
-            <h2>Payment</h2>
+            <h2>{{ __('Payment') }}</h2>
             <div>{{ $order['payment_method'] }}@if ($order['payment_provider']) ({{ $order['payment_provider'] }})@endif</div>
             <div class="muted">{{ $order['payment_status'] }}</div>
             @if ($order['shipping_method'])
-                <h2 style="margin-top: 8pt;">Shipping</h2>
+                <h2 style="margin-top: 8pt;">{{ __('Shipping') }}</h2>
                 <div>{{ $order['shipping_method'] }}</div>
             @endif
         </td>
@@ -86,7 +91,7 @@
 @yield('content')
 
 <div class="footer">
-    Thank you for shopping with {{ $store['name'] }}.@if ($store['email']) Questions about this document? Write to {{ $store['email'] }}.@endif
+    {{ __('Thank you for shopping with :store.', ['store' => $store['name']]) }}@if ($store['email']) {{ __('Questions about this document? Write to :email.', ['email' => $store['email']]) }}@endif
 </div>
 </body>
 </html>

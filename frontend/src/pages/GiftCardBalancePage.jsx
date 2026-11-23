@@ -9,8 +9,9 @@ import { SITE } from '../constants/site'
 import { formatDate, formatBasePrice } from '../utils/formatters'
 import { normalizeGiftCardCode } from '../utils/giftCards'
 import './OrderPages.css'
+import { useTranslation } from 'react-i18next'
 
-const STATUS_TEXT = { expired: 'This gift card has expired.', disabled: "This gift card can't be used." }
+const STATUS_KEYS = { expired: 'balance.expired', disabled: 'balance.disabled' }
 
 /**
  * /gift-cards/balance (REAL_SHOP, phase 10): anyone with a gift card code can
@@ -19,13 +20,14 @@ const STATUS_TEXT = { expired: 'This gift card has expired.', disabled: "This gi
  * may ask. The result is announced (role=status), errors as alerts.
  */
 function GiftCardBalancePage() {
+  const { t } = useTranslation('checkout')
   const [code, setCode] = useState('')
   const [touched, setTouched] = useState(false)
   const check = useMutation({ mutationFn: (value) => checkGiftCard(value) })
   const normalized = normalizeGiftCardCode(code)
-  const fieldError = touched && normalized.length < 4 ? 'Enter the gift card code from your email.' : null
+  const fieldError = touched && normalized.length < 4 ? t('balance.codeRequired') : null
   const card = check.data
-  const requestError = check.error ? (check.error.status === 429 ? 'Too many tries. Please wait a minute and try again.' : (check.error.fieldErrors?.code?.[0] ?? check.error.message)) : null
+  const requestError = check.error ? (check.error.status === 429 ? t('balance.tooMany') : (check.error.fieldErrors?.code?.[0] ?? check.error.message)) : null
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -41,21 +43,21 @@ function GiftCardBalancePage() {
   if (card) {
     result =
       card.status === 'active'
-        ? `Balance: ${formatBasePrice(card.balance, card.currency)}.${card.expiresAt ? ` Use it by ${formatDate(card.expiresAt)}.` : ' It never expires.'}`
-        : (STATUS_TEXT[card.status] ?? STATUS_TEXT.disabled)
+        ? `${t('balance.result', { amount: formatBasePrice(card.balance, card.currency) })} ${card.expiresAt ? t('balance.useBy', { date: formatDate(card.expiresAt) }) : t('balance.never')}`
+        : t(STATUS_KEYS[card.status] ?? STATUS_KEYS.disabled)
   }
 
   return (
     <div className="track-order section container">
-      <title>{`Check gift card balance | ${SITE.name}`}</title>
+      <title>{`${t('balance.title')} | ${SITE.name}`}</title>
       <header>
-        <h1>Check gift card balance</h1>
-        <p>Enter the code from your gift card email to see what's left on it. Use the card at checkout: it pays as much of your order as its balance covers.</p>
+        <h1>{t('balance.title')}</h1>
+        <p>{t('balance.intro')}</p>
       </header>
 
       <form className="track-order__form" onSubmit={handleSubmit} noValidate>
         <FormField
-          label="Gift card code"
+          label={t('balance.code')}
           name="code"
           autoComplete="off"
           spellCheck={false}
@@ -64,7 +66,7 @@ function GiftCardBalancePage() {
             setCode(event.target.value)
             if (check.data || check.error) check.reset()
           }}
-          hint="16 letters and numbers. Spaces and dashes are fine."
+          hint={t('balance.hint')}
           error={fieldError}
         />
         {requestError && (
@@ -73,7 +75,7 @@ function GiftCardBalancePage() {
           </p>
         )}
         <Button type="submit" disabled={check.isPending}>
-          <LuGift aria-hidden="true" /> {check.isPending ? 'Checking…' : 'Check balance'}
+          <LuGift aria-hidden="true" /> {t(check.isPending ? 'balance.checking' : 'balance.check')}
         </Button>
       </form>
 
@@ -84,7 +86,7 @@ function GiftCardBalancePage() {
             <p className="gift-card-balance__amount">{result}</p>
             {card.status === 'active' && card.balance > 0 && (
               <Button to={ROUTES.products} variant="outline" size="sm">
-                Start shopping
+                {t('balance.startShopping')}
               </Button>
             )}
           </>

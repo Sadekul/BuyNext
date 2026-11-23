@@ -1,5 +1,6 @@
 import { formatBasePrice } from './formatters'
 import { storedNumber, storedText } from './storedValues'
+import { translate } from '../i18n'
 
 /*
  * Gift cards (docs/backend/PHASE10_CONTRACT.md §5), with BuyNest's API.
@@ -73,7 +74,12 @@ export function storedGiftCard(value) {
 }
 
 /** "For Sam Lee (sam@example.com)" */
-export const recipientLabel = (giftCard) => (giftCard ? `For ${giftCard.recipientName}${giftCard.recipientEmail ? ` (${giftCard.recipientEmail})` : ''}` : '')
+export const recipientLabel = (giftCard) =>
+  giftCard
+    ? giftCard.recipientEmail
+      ? translate('cart:giftCard.recipientWithEmail', { name: giftCard.recipientName, email: giftCard.recipientEmail })
+      : translate('cart:giftCard.recipient', { name: giftCard.recipientName })
+    : ''
 
 /** What the API needs for a gift card line (the browser never sends a price). */
 export const giftCardPayload = (giftCard) => ({
@@ -88,9 +94,9 @@ export const giftCardPayload = (giftCard) => ({
  */
 export function customAmountError(value, custom) {
   const amount = Number(value)
-  if (value === '' || !Number.isFinite(amount)) return 'Enter an amount.'
-  if (Math.round(amount * 100) !== amount * 100) return 'Use whole cents, like 40 or 42.50.'
-  if (amount < custom.min || amount > custom.max) return `Choose an amount from ${formatBasePrice(custom.min)} to ${formatBasePrice(custom.max)}.`
+  if (value === '' || !Number.isFinite(amount)) return translate('cart:giftCard.enterAmount')
+  if (Math.round(amount * 100) !== amount * 100) return translate('cart:giftCard.wholeCents')
+  if (amount < custom.min || amount > custom.max) return translate('cart:giftCard.amountRange', { min: formatBasePrice(custom.min), max: formatBasePrice(custom.max) })
   return null
 }
 

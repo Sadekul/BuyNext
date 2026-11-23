@@ -1,4 +1,5 @@
 import { laravel } from '../http.js'
+import { serverMessage } from '../i18n.js'
 import { failed, fromCart } from './laravel.js'
 
 /*
@@ -40,7 +41,7 @@ async function withDetails(saved, request) {
   if (items.length === 0) return { ok: true, status: 200, data: { ...base, items: [] } }
 
   const priced = await laravel('/api/v1/cart/validate', { method: 'POST', request, body: { items, coupon_code: null, shipping_method: 'standard' } })
-  if (priced.status !== 200) return { ok: false, status: priced.status === 422 ? 502 : priced.status, body: { message: 'Your saved cart could not be loaded. Please try again.' } }
+  if (priced.status !== 200) return { ok: false, status: priced.status === 422 ? 502 : priced.status, body: { message: serverMessage(request, 'savedCartFailed') } }
   const cart = fromCart(priced.data?.data)
   const lines = cart.lines
     .filter((line) => line.available && positive(line.productId))

@@ -16,6 +16,7 @@ use App\Services\Pricing;
 use App\Services\RewardPoints;
 use App\Services\Settings;
 use App\Support\Currency;
+use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
 
 /** Public content: the home page, content pages, and the store's rules (no sign-in). */
@@ -33,9 +34,9 @@ class ContentController extends Controller
     /** GET /api/v1/pages/{slug} - published pages only; drafts are "not found". */
     public function page(string $slug): PageResource|JsonResponse
     {
-        $page = Page::where('slug', $slug)->where('is_published', true)->first();
+        $page = Page::where('slug', $slug)->where('is_published', true)->with('translations')->first();
 
-        return $page ? (new PageResource($page))->forStorefront() : response()->json(['message' => 'Page not found.'], 404);
+        return $page ? (new PageResource($page))->forStorefront() : response()->json(['message' => __('Page not found.')], 404);
     }
 
     /**
@@ -47,12 +48,16 @@ class ContentController extends Controller
     {
         return response()->json(['data' => [
             'store_name' => $settings->get('store_name'),
+            // Phase 13: the store's languages, the one a first visit gets, and Bangla digits (০–৯) in Bangla.
+            'locales' => Locale::SUPPORTED,
+            'default_locale' => Locale::storeDefault(),
+            'bangla_digits' => Locale::banglaDigitsEnabled(),
             'support_email' => $settings->get('support_email'),
             'support_phone' => $settings->get('support_phone'),
             'shipping_methods' => array_values(array_map(fn (array $method) => [
                 'id' => $method['id'],
-                'label' => $method['label'],
-                'eta' => $method['eta'],
+                'label' => __($method['label']), // phase 13: in the request language (ids stay)
+                'eta' => __($method['eta']),
                 'price' => Pricing::format($method['price_cents']),
             ], $settings->shippingMethods())),
             'free_shipping_threshold' => Pricing::format($settings->cents('free_shipping_threshold')),

@@ -9,6 +9,7 @@ import { useCart } from '../hooks/useCart'
 import { getPurchaseLimits } from '../utils/inventory'
 import { ownerStorageKey, readJson, removeKey, writeJson } from '../utils/storage'
 import { addWishlistItem, getWishlist, mergeWishlist, removeWishlistItem, updateWishlistNote } from '../services/wishlistService'
+import { translate } from '../i18n'
 
 /*
  * Phase 11 (REAL_SHOP): guest items that still have to be sent to the
@@ -39,9 +40,9 @@ const STORAGE_OPTIONS = {
 
 /** The shopper-facing reason a wishlist change didn't stick. */
 function failureMessage(error, fallback) {
-  if (error?.data?.code === 'wishlist_full') return error.message || 'Your wishlist is full (100 items). Remove something to save this.'
-  if (error?.status === 0) return `${fallback} Check your connection and try again.`
-  return `${fallback} Please try again.`
+  if (error?.data?.code === 'wishlist_full') return error.message || translate('catalog:wishlistSync.full', { max: 100 })
+  if (error?.status === 0) return translate('catalog:wishlistSync.offline', { reason: fallback })
+  return translate('catalog:wishlistSync.retry', { reason: fallback })
 }
 
 /*
@@ -117,7 +118,7 @@ function WishlistProvider({ children }) {
         })
         .catch((error) => {
           dispatch({ type: WISHLIST_ACTIONS.REMOVED, productId: product.id })
-          setSyncError(failureMessage(error, `We couldn't save ${product.title} to your wishlist.`))
+          setSyncError(failureMessage(error, translate('catalog:wishlistSync.save', { title: product.title })))
           return null
         })
         .finally(() => pendingAdds.current.delete(product.id))
@@ -142,7 +143,7 @@ function WishlistProvider({ children }) {
         } catch (error) {
           if (error?.status === 404) return // already gone (removed on another device)
           dispatch({ type: WISHLIST_ACTIONS.RESTORED, item: { ...item, serverId }, index })
-          setSyncError(failureMessage(error, `We couldn't remove ${item.title} from your wishlist.`))
+          setSyncError(failureMessage(error, translate('catalog:wishlistSync.remove', { title: item.title })))
         }
       }
       run()
@@ -178,7 +179,7 @@ function WishlistProvider({ children }) {
         return true
       } catch (error) {
         dispatch({ type: WISHLIST_ACTIONS.NOTE_SET, productId, note: previous })
-        setSyncError(failureMessage(error, `We couldn't save your note on ${item.title}.`))
+        setSyncError(failureMessage(error, translate('catalog:wishlistSync.note', { title: item.title })))
         return false
       }
     },

@@ -7,6 +7,7 @@ use App\Http\Resources\PageResource;
 use App\Models\Page;
 use App\Services\Audit;
 use App\Services\HtmlSanitizer;
+use App\Support\TranslationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -29,7 +30,7 @@ class PageController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $pages = Page::query()
+        $pages = Page::query()->with('translations')
             ->when($data['search'] ?? null, function ($query, $search) {
                 $like = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(fn ($q) => $q->where('title', 'like', $like)->orWhere('slug', 'like', $like));
@@ -56,9 +57,10 @@ class PageController extends Controller
         $data = $this->validated($request, null);
 
         $page = DB::transaction(function () use ($data) {
-            $page = Page::create([...$data, 'is_published' => $data['is_published'] ?? true]);
+            $page = Page::create([...TranslationInput::strip($data), 'is_published' => $data['is_published'] ?? true]);
             $this->audit->record('page.created', "Page \"{$page->title}\" (/pages/{$page->slug}) created.", 'page', $page->id,
                 Audit::created(Audit::fieldsOf($page, array_diff(self::FIELDS, ['body']))));
+            $this->saveBangla($page, $data);
 
             return $page;
         });
@@ -77,12 +79,13 @@ class PageController extends Controller
 
         DB::transaction(function () use ($page, $data) {
             $before = Audit::fieldsOf($page, self::FIELDS);
-            $page->fill($data)->save();
+            $page->fill(TranslationInput::strip($data))->save();
             $changes = Audit::diff($before, Audit::fieldsOf($page, self::FIELDS));
             if ($changes) {
                 $this->audit->record('page.updated', "Page \"{$page->title}\" (/pages/{$page->slug}) updated.", 'page', $page->id,
                     $this->withoutBodies($changes));
             }
+            $this->saveBangla($page, $data);
         });
 
         return new PageResource($page->fresh());
@@ -118,6 +121,8 @@ class PageController extends Controller
             'meta_title' => ['nullable', 'string', 'max:160'],
             'meta_description' => ['nullable', 'string', 'max:300'],
             'is_published' => ['sometimes', 'boolean'],
+            // Phase 13: translations.bn.{title, body, meta_title, meta_description}.
+            ...TranslationInput::rules(['title' => 160, 'body' => null, 'meta_title' => 160, 'meta_description' => 300]),
         ], [
             'slug.regex' => 'The address can only have lower-case letters, digits, and single dashes (for example "shipping-and-returns").',
             'slug.unique' => 'Another page already uses this address.',
@@ -128,6 +133,15 @@ class PageController extends Controller
         }
 
         return $data;
+    }
+
+    /** Phase 13: saves translations.bn and logs which Bangla fields changed. */
+    private function saveBangla(Page $page, array $data): void
+    {
+        $fields = TranslationInput::save($page, $data, html: ['body']);
+        if ($fields) {
+            $this->audit->record('page.translated', "Page \"{$page->title}\" Bangla text updated (".implode(', ', $fields).').', 'page', $page->id);
+        }
     }
 
     /** A body can be long: the log says it changed and how long it is, not the whole text twice. */

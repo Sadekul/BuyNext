@@ -1,9 +1,10 @@
 import { LuBadgePercent } from 'react-icons/lu'
-import { formatPrice } from '../../utils/formatters'
+import { formatNumber, formatPrice } from '../../utils/formatters'
 import './GroupDiscountNote.css'
+import { useTranslation } from 'react-i18next'
 
 /** "10%" or "7.5%": no trailing zeros. */
-const percent = (value) => `${Number(value.toFixed(2))}%`
+const percent = (value) => `${formatNumber(Number(value.toFixed(2)))}%`
 
 /**
  * A signed-in customer's group price (REAL_SHOP, phase 6), e.g. "Wholesale
@@ -13,15 +14,16 @@ const percent = (value) => `${Number(value.toFixed(2))}%`
  * `format`: formatPrice (cart) or formatBasePrice (checkout: the charged amounts).
  */
 function GroupDiscountNote({ group, amount, format = formatPrice }) {
+  const { t } = useTranslation('cart')
   if (!group || !(group.discountPercent > 0)) return null
   return (
     <p className="group-discount">
       <LuBadgePercent aria-hidden="true" />
       <span>
         <strong>
-          {group.name} price: {percent(group.discountPercent)} off
+          {t('group.price', { group: group.name, percent: percent(group.discountPercent) })}
         </strong>
-        {amount > 0 ? `. You save ${format(amount)}; it's already included in your prices.` : ". It's already included in your prices."}
+        {amount > 0 ? t('group.save', { amount: format(amount) }) : t('group.included')}
       </span>
     </p>
   )

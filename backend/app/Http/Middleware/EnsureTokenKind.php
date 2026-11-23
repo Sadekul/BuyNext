@@ -33,23 +33,23 @@ class EnsureTokenKind
         $token = $account?->currentAccessToken();
 
         if (! $account || ! $token || collect($token->abilities)->contains(fn ($ability) => str_starts_with($ability, 'refresh:'))) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => __('Unauthenticated.')], 401);
         }
         // Phase 9 (part A): a limited setup token has "admin:setup" instead of "admin".
         $limited = $account instanceof Admin && TokenPairs::isLimited($token);
         if (TokenPairs::kindOf($account) !== $kind || (! $limited && ! $token->can($kind))) {
-            return response()->json(['message' => 'This action is unauthorized.'], 403);
+            return response()->json(['message' => __('This action is unauthorized.')], 403);
         }
         if (! $account->is_active) {
             $account->tokens()->delete();
 
-            return response()->json(['message' => 'This account has been disabled.', 'code' => 'account_disabled'], 403);
+            return response()->json(['message' => __('This account has been disabled.'), 'code' => 'account_disabled'], 403);
         }
         if ($account instanceof Admin && $allow !== 'setup' && ($limited || app(TwoFactor::class)->setupRequired($account))) {
             return response()->json(['message' => 'Set up two-step sign-in to continue.', 'code' => 'two_factor_setup_required'], 403);
         }
         if ($account instanceof Customer && ! $account->hasVerifiedEmail()) {
-            return response()->json(['message' => 'Please verify your email first.', 'code' => 'email_unverified'], 403);
+            return response()->json(['message' => __('Please verify your email first.'), 'code' => 'email_unverified'], 403);
         }
 
         return $next($request);

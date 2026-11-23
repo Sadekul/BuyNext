@@ -10,13 +10,15 @@ import { SITE } from '../constants/site'
 import { safeRedirectPath } from '../utils/safeRedirect'
 import { validateLogin } from '../utils/validation'
 import './AuthPages.css'
+import { useTranslation } from 'react-i18next'
 
 // BuyNest accounts sign in with an email; DummyJSON's demo users with a username.
 const ID_FIELD = REAL_ACCOUNTS
-  ? { name: 'email', label: 'Email', type: 'email', autoComplete: 'email' }
-  : { name: 'username', label: 'Username', type: 'text', autoComplete: 'username' }
+  ? { name: 'email', labelKey: 'login.email', type: 'email', autoComplete: 'email' }
+  : { name: 'username', labelKey: 'login.username', type: 'text', autoComplete: 'username' }
 
 function LoginPage() {
+  const { t } = useTranslation('auth')
   const { login, sessionExpired } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -70,11 +72,11 @@ function LoginPage() {
 
   return (
     <div className="auth-page section container">
-      <title>{`Sign in | ${SITE.name}`}</title>
+      <title>{`${t('login.tabTitle')} | ${SITE.name}`}</title>
       <div className="auth-card">
         <header>
-          <h1 className="auth-card__title">Welcome back</h1>
-          <p className="auth-card__subtitle">Sign in to see your orders and saved details.</p>
+          <h1 className="auth-card__title">{t('login.title')}</h1>
+          <p className="auth-card__subtitle">{t('login.subtitle')}</p>
         </header>
 
         {location.state?.notice && !serverError && (
@@ -84,7 +86,7 @@ function LoginPage() {
         )}
         {sessionExpired && !serverError && !location.state?.notice && (
           <p className="auth-alert auth-alert--info" role="status">
-            Your session has expired. Please sign in again.
+            {t('login.expired')}
           </p>
         )}
         {serverError && (
@@ -96,17 +98,17 @@ function LoginPage() {
         {DEMO_ACCOUNT && (
           <div className="auth-demo">
             <span>
-              Demo account: <code>{DEMO_ACCOUNT[ID_FIELD.name]}</code> / <code>{DEMO_ACCOUNT.password}</code>
+              {t('login.demo')} <code>{DEMO_ACCOUNT[ID_FIELD.name]}</code> / <code>{DEMO_ACCOUNT.password}</code>
             </span>
             <button type="button" className="auth-link" onClick={() => setValues((current) => ({ ...current, ...DEMO_ACCOUNT }))}>
-              Use demo account
+              {t('login.useDemo')}
             </button>
           </div>
         )}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <FormField
-            label={ID_FIELD.label}
+            label={t(ID_FIELD.labelKey)}
             name={ID_FIELD.name}
             type={ID_FIELD.type}
             value={values[ID_FIELD.name]}
@@ -117,7 +119,7 @@ function LoginPage() {
             spellCheck={false}
           />
           <FormField
-            label="Password"
+            label={t('login.password')}
             name="password"
             type="password"
             revealable
@@ -127,20 +129,20 @@ function LoginPage() {
             autoComplete="current-password"
           />
           <div className="auth-form__options">
-            <CheckboxField label="Keep me signed in" name="remember" checked={values.remember} onChange={handleChange} />
+            <CheckboxField label={t('login.remember')} name="remember" checked={values.remember} onChange={handleChange} />
             <Link to={ROUTES.forgotPassword} className="auth-link">
-              Forgot password?
+              {t('login.forgot')}
             </Link>
           </div>
           <Button type="submit" size="lg" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
+            {t(isSubmitting ? 'login.signingIn' : 'login.submit')}
           </Button>
         </form>
 
         <p className="auth-card__footer">
-          New to {SITE.name}?{' '}
+          {t('login.newTo', { store: SITE.name })}{' '}
           <Link to={ROUTES.register} className="auth-link">
-            Create an account
+            {t('login.create')}
           </Link>
         </p>
       </div>

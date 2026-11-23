@@ -18,25 +18,28 @@ import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import './OrderPages.css'
+import { useTranslation } from 'react-i18next'
 
 function NotFound() {
+  const { t } = useTranslation('orders')
   return (
-    <EmptyState icon={LuPackageX} titleAs="h2" title="Order not found" message="This order doesn't exist or belongs to another account.">
-      <Button to={ROUTES.orders}>Back to orders</Button>
+    <EmptyState icon={LuPackageX} titleAs="h2" title={t('details.notFound')} message={t('details.notFoundMessage')}>
+      <Button to={ROUTES.orders}>{t('details.back')}</Button>
     </EmptyState>
   )
 }
 
 function OrderSection({ order, invoiceLink, invoicePdf, payAction, actions = null, children }) {
+  const { t } = useTranslation('orders')
   const id = order.number ?? order.id
   return (
     <section className="orders" aria-labelledby="order-details-title">
-      <title>{`Order ${id} | ${SITE.name}`}</title>
+      <title>{`${t('list.order', { number: id })} | ${SITE.name}`}</title>
       <Link to={ROUTES.orders} className="orders__back">
-        <LuArrowLeft aria-hidden="true" /> All orders
+        <LuArrowLeft aria-hidden="true" /> {t('details.allOrders')}
       </Link>
       <h2 id="order-details-title" className="orders__title">
-        Order {id}
+        {t('list.order', { number: id })}
       </h2>
       {actions}
       <OrderDetailsView order={order} invoiceLink={invoiceLink} invoicePdf={invoicePdf} payAction={payAction} />
@@ -54,6 +57,7 @@ function DemoOrderDetailsPage() {
 
 /** BuyNest's API: the server only returns the customer's own orders (someone else's → 404). */
 function ServerOrderDetailsPage() {
+  const { t } = useTranslation('orders')
   const { orderId } = useParams()
   const { user, authorizedRequest } = useAuth()
   const request = useQuery(orderQuery(user.id, orderId, authorizedRequest))
@@ -66,9 +70,9 @@ function ServerOrderDetailsPage() {
     queryClient.invalidateQueries({ queryKey: ['orders', user.id, 'list'] })
   }
 
-  if (request.isPending) return <Loader label="Loading the order…" />
+  if (request.isPending) return <Loader label={t('details.loading')} />
   if (request.error?.status === 404) return <NotFound />
-  if (request.error) return <ErrorMessage title="We couldn't load this order" titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
+  if (request.error) return <ErrorMessage title={t('details.failed')} titleAs="h2" message={request.error.message} onRetry={() => request.refetch()} />
   // The customer's own order: its invoices open as printable pages, and items can be returned (phase 6).
   return (
     <OrderSection

@@ -1,6 +1,8 @@
 import { json, laravelFile, readBody } from './http.js'
 import { failed } from './shop/adminSystem.js'
 import { laravelSalesData } from './shop/adminSales.js'
+// Phase 13: the customer's language.
+import { localeRule } from './adminPhase13Api.js'
 
 /*
  * Phase 6 admin routes (docs/backend/PHASE6_CONTRACT.md), Laravel only:
@@ -111,6 +113,8 @@ const CUSTOMER_RULES = {
   phone: nullable((value) => (isPhone(value) && value.trim() !== '' ? null : 'Enter a phone number with its country code, for example +1 555 010 0100.')),
   groupId: nullable((value) => (isId(value) ? null : 'Choose a customer group.')),
   isActive: (value) => (typeof value === 'boolean' ? null : 'Choose whether the account is active.'),
+  // Phase 13: en | bn | null (the store default).
+  locale: localeRule,
 }
 export function validateCustomer(body, { partial }) {
   const rules = partial ? CUSTOMER_RULES : Object.fromEntries(Object.entries(CUSTOMER_RULES).filter(([field]) => field !== 'isActive'))

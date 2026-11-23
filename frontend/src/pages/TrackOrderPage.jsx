@@ -12,9 +12,11 @@ import { canPayOrder } from '../utils/payment'
 import { SITE } from '../constants/site'
 import { validateEmail } from '../utils/validation'
 import './OrderPages.css'
+import { useTranslation } from 'react-i18next'
+import { translate } from '../i18n'
 
 const NUMBER_PATTERN = /^BN-?\d{6,12}$/i
-const validateNumber = (value) => (NUMBER_PATTERN.test(value.trim()) ? null : 'Enter the order number from your confirmation email, like BN-100001.')
+const validateNumber = (value) => (NUMBER_PATTERN.test(value.trim()) ? null : translate('orders:track.invalidNumber'))
 
 /**
  * /track-order (REAL_SHOP): guests find an order with its number AND the
@@ -22,6 +24,7 @@ const validateNumber = (value) => (NUMBER_PATTERN.test(value.trim()) ? null : 'E
  * either is wrong, so nobody can probe order numbers.
  */
 function TrackOrderPage() {
+  const { t } = useTranslation('orders')
   const [values, setValues] = useState({ number: '', email: '' })
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const resultRef = useRef(null)
@@ -56,29 +59,29 @@ function TrackOrderPage() {
 
   return (
     <div className="track-order section container">
-      <title>{`Track your order | ${SITE.name}`}</title>
+      <title>{`${t('track.title')} | ${SITE.name}`}</title>
       <header>
-        <h1>Track your order</h1>
-        <p>Enter the order number from your confirmation email and the email address you used at checkout.</p>
+        <h1>{t('track.title')}</h1>
+        <p>{t('track.intro')}</p>
       </header>
 
       <form className="track-order__form" onSubmit={handleSubmit} noValidate>
-        <FormField label="Order number" name="number" placeholder="BN-100001" autoComplete="off" value={values.number} onChange={handleChange} error={errors.number} />
-        <FormField label="Email" name="email" type="email" autoComplete="email" value={values.email} onChange={handleChange} error={errors.email} />
+        <FormField label={t('track.number')} name="number" placeholder="BN-100001" autoComplete="off" value={values.number} onChange={handleChange} error={errors.number} />
+        <FormField label={t('track.email')} name="email" type="email" autoComplete="email" value={values.email} onChange={handleChange} error={errors.email} />
         {lookup.error && (
           <p className="track-order__error" role="alert">
             {lookup.error.message}
           </p>
         )}
         <Button type="submit" disabled={lookup.isPending}>
-          <LuSearch aria-hidden="true" /> {lookup.isPending ? 'Looking…' : 'Find my order'}
+          <LuSearch aria-hidden="true" /> {t(lookup.isPending ? 'track.looking' : 'track.find')}
         </Button>
       </form>
 
       {order && (
         <section className="track-order__result" aria-labelledby="track-result-title">
           <h2 id="track-result-title" ref={resultRef} tabIndex={-1}>
-            Order {order.number}
+            {t('list.order', { number: order.number })}
           </h2>
           {/* Phase 9: an unpaid order can be cancelled; the email that found it proves it is theirs. */}
           <CancelOrderButton order={order} email={lookup.variables?.email} onCancelled={setCancelled} />
