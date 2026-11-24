@@ -183,30 +183,50 @@ function HeroSlider({ slides, settings = {}, heading }) {
 
       {several && (
         <div className="hero-slider__controls container" onKeyDown={onControlsKeyDown}>
-          {canRotate && (
-            <button type="button" className="hero-slider__button" onClick={togglePlaying} aria-label={playing ? t('home.slider.pause') : t('home.slider.play')}>
-              {playing ? <LuPause aria-hidden="true" /> : <LuPlay aria-hidden="true" />}
-            </button>
-          )}
-          <button type="button" className="hero-slider__button" onClick={() => show(index - 1)} aria-controls="hero-slider-slides" aria-label={t('home.slider.previous')}>
-            <LuChevronLeft aria-hidden="true" />
-          </button>
-          <div ref={dotsRef} className="hero-slider__dots" role="group" aria-label={t('home.slider.choose')}>
-            {slides.map((slide, position) => (
-              <button
-                key={slide.id}
-                type="button"
-                className="hero-slider__dot"
-                onClick={() => show(position)}
-                aria-controls="hero-slider-slides"
-                aria-current={position === index ? 'true' : undefined}
-                aria-label={t('home.slider.show', { number: position + 1 })}
-              />
-            ))}
+          {/* A progress timeline: one slim bar per slide; the shown one fills while the slider plays. */}
+          <div className="hero-slider__progress">
+            <div ref={dotsRef} className="hero-slider__dots" role="group" aria-label={t('home.slider.choose')}>
+              {slides.map((slide, position) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  className={cn('hero-slider__dot', position < index && 'hero-slider__dot--done')}
+                  onClick={() => show(position)}
+                  aria-controls="hero-slider-slides"
+                  aria-current={position === index ? 'true' : undefined}
+                  aria-label={t('home.slider.show', { number: position + 1 })}
+                >
+                  <span className="hero-slider__track" aria-hidden="true">
+                    {position === index && (
+                      <span
+                        key={`${index}-${rotating}`}
+                        className={cn('hero-slider__fill', rotating && 'hero-slider__fill--running')}
+                        style={rotating ? { animationDuration: `${intervalSeconds}s` } : undefined}
+                      />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="hero-slider__counter" aria-hidden="true">
+              <span className="hero-slider__counter-current">{t('home.slider.number', { value: index + 1 })}</span>
+              <span className="hero-slider__counter-sep">/</span>
+              <span>{t('home.slider.number', { value: total })}</span>
+            </p>
           </div>
-          <button type="button" className="hero-slider__button" onClick={() => show(index + 1)} aria-controls="hero-slider-slides" aria-label={t('home.slider.next')}>
-            <LuChevronRight aria-hidden="true" />
-          </button>
+          <div className="hero-slider__nav">
+            {canRotate && (
+              <button type="button" className="hero-slider__button hero-slider__button--play" onClick={togglePlaying} aria-label={playing ? t('home.slider.pause') : t('home.slider.play')}>
+                {playing ? <LuPause aria-hidden="true" /> : <LuPlay aria-hidden="true" />}
+              </button>
+            )}
+            <button type="button" className="hero-slider__button hero-slider__button--prev" onClick={() => show(index - 1)} aria-controls="hero-slider-slides" aria-label={t('home.slider.previous')}>
+              <LuChevronLeft aria-hidden="true" />
+            </button>
+            <button type="button" className="hero-slider__button hero-slider__button--next" onClick={() => show(index + 1)} aria-controls="hero-slider-slides" aria-label={t('home.slider.next')}>
+              <LuChevronRight aria-hidden="true" />
+            </button>
+          </div>
         </div>
       )}
     </section>

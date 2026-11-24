@@ -48,7 +48,12 @@ try {
   if (!owner) throw new Error('the demo Owner could not sign in to the API')
   saved = (await admin$('/home')).body?.data
   if (!saved || !Array.isArray(saved.slides)) throw new Error('the API has no home slides (slider migration not run?)')
-  log(saved.hero_mode === 'banner' && saved.slides.length >= 1, `the store starts with the single banner and ${saved.slides.length} saved slides`)
+  log(saved.slides.length >= 1, `${saved.slides.length} saved slides (the store is on "${saved.hero_mode}"; put back at the end)`)
+  // Start from the single banner whatever staff chose (the content is put back at the end).
+  if (saved.hero_mode !== 'banner') {
+    const reset = await admin$('/home', { method: 'PUT', body: { ...homeBody(saved), hero_mode: 'banner' } })
+    if (reset.status !== 200) throw new Error(`could not switch to the single banner (${reset.status})`)
+  }
   browser = await launch()
   await runChecks()
 } catch (error) {

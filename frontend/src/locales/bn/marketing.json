@@ -59,7 +59,8 @@
       "show": "স্লাইড {{number, number}} দেখান",
       "pause": "স্লাইড থামান",
       "play": "স্লাইড চালান",
-      "choose": "একটি স্লাইড বেছে নিন"
+      "choose": "একটি স্লাইড বেছে নিন",
+      "number": "{{value, number}}"
     }
   },
   "categories": {

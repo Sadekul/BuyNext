@@ -59,7 +59,8 @@
       "show": "Show slide {{number, number}}",
       "pause": "Pause slides",
       "play": "Play slides",
-      "choose": "Choose a slide"
+      "choose": "Choose a slide",
+      "number": "{{value, number}}"
     }
   },
   "categories": {

@@ -82,11 +82,11 @@ describe('HeroSlider', () => {
     expect(focusables.map((element) => element.textContent || element.getAttribute('aria-label'))).toEqual([
       'Shop now',
       'Explore deals',
-      'Pause slides',
-      'Previous slide',
       'Show slide 1',
       'Show slide 2',
       'Show slide 3',
+      'Pause slides',
+      'Previous slide',
       'Next slide',
     ])
   })

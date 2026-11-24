@@ -65,7 +65,7 @@
 /* Room at the bottom for the controls, which sit over the slides. */
 .hero-slider__inner {
   width: 100%;
-  padding-block: var(--space-10) calc(var(--space-16) + var(--space-4));
+  padding-block: var(--space-10) calc(var(--space-16) + var(--space-12));
 }
 
 .hero-slider__copy {
@@ -119,78 +119,211 @@
   filter: drop-shadow(0 24px 32px rgb(0 0 0 / 0.35));
 }
 
+/*
+ * Controls over the slides: a progress timeline with a counter on the left,
+ * frosted-glass Pause / Previous / Next on the right. On phones the two
+ * groups wrap onto two rows (no sideways scroll, even with 8 slides).
+ */
 .hero-slider__controls {
   position: absolute;
   inset-inline: 0;
-  bottom: var(--space-4);
+  bottom: var(--space-5);
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
 }
 
-.hero-slider__button {
-  display: inline-grid;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  font-size: var(--text-lg);
-  color: var(--color-secondary);
-  background: var(--color-bg);
-  border: 0;
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.hero-slider__button:hover {
-  background: var(--color-primary-soft);
+.hero-slider__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .hero-slider__dots {
   display: flex;
   align-items: center;
+  gap: var(--space-1);
 }
 
-/*
- * A 24px target around a 12px dot (WCAG 2.5.8): with 8 slides the whole row
- * (3 buttons + 8 dots) is 336px, so it stays on one line at 390px.
- */
+/* Each bar sits in a 24px-high target (WCAG 2.5.8). */
 .hero-slider__dot {
-  display: inline-grid;
-  place-items: center;
-  width: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  width: 1.75rem;
   height: 1.5rem;
   padding: 0;
   background: none;
   border: 0;
-  border-radius: var(--radius-full);
   cursor: pointer;
 }
 
-.hero-slider__dot::before {
-  content: '';
-  width: 0.75rem;
-  height: 0.75rem;
-  border: 2px solid var(--color-text-inverse);
+.hero-slider__track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.3);
   border-radius: var(--radius-full);
-  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.35);
   transition:
-    width var(--transition-fast),
+    height var(--transition-fast),
     background-color var(--transition-fast);
 }
 
-.hero-slider__dot[aria-current='true']::before {
-  width: 1.25rem;
+.hero-slider__dot:hover .hero-slider__track {
+  height: 6px;
+  background: rgb(255 255 255 / 0.5);
+}
+
+.hero-slider__dot--done .hero-slider__track,
+.hero-slider__fill {
   background: var(--color-text-inverse);
+}
+
+.hero-slider__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+}
+
+[dir='rtl'] .hero-slider__fill {
+  transform-origin: right center;
+}
+
+.hero-slider__fill--running {
+  animation: hero-slider-fill linear forwards;
+}
+
+@keyframes hero-slider-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.hero-slider__counter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 0.75);
+  white-space: nowrap;
+}
+
+.hero-slider__counter-current {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-inverse);
+}
+
+.hero-slider__counter-sep {
+  opacity: 0.6;
+}
+
+.hero-slider__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+.hero-slider__button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.25rem;
+  color: var(--color-text-inverse);
+  background: rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: var(--radius-full);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.18);
+  backdrop-filter: blur(12px) saturate(140%);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.hero-slider__button svg {
+  transition: transform var(--transition-fast);
+}
+
+.hero-slider__button:hover {
+  color: var(--color-secondary);
+  background: var(--color-text-inverse);
+  border-color: var(--color-text-inverse);
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.28);
+  transform: translateY(-2px);
+}
+
+.hero-slider__button--prev:hover svg {
+  transform: translateX(-2px);
+}
+
+.hero-slider__button--next:hover svg {
+  transform: translateX(2px);
+}
+
+.hero-slider__button:active {
+  transform: translateY(0) scale(0.95);
+}
+
+/* Pause / Play: a little smaller and quieter than the arrows. */
+.hero-slider__button--play {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-inline-end: var(--space-1);
+  font-size: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-slider__fill--running {
+    animation: none;
+  }
+
+  .hero-slider__button,
+  .hero-slider__button svg,
+  .hero-slider__track {
+    transition: none;
+  }
+
+  .hero-slider__button:hover,
+  .hero-slider__button:hover svg {
+    transform: none;
+  }
 }
 
 @media (min-width: 768px) {
   .hero-slider__slides {
     min-height: 30rem;
+  }
+
+  .hero-slider__dot {
+    width: 2.75rem;
+  }
+
+  .hero-slider__button {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .hero-slider__button--play {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
   .hero-slider__visual {
@@ -205,6 +338,7 @@
 
   .hero-slider__inner {
     grid-template-columns: 1.1fr 1fr;
+    padding-bottom: calc(var(--space-16) + var(--space-8));
   }
 
   /* No image: the text takes the whole width. */
