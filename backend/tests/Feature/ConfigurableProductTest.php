@@ -286,6 +286,47 @@ class ConfigurableProductTest extends TestCase
         $this->assertSame(['প্রিজম কালো', 'প্রিজম সাদা', 'প্রিজম নীল'], array_column($card['swatches'], 'value'));
     }
 
+    public function test_category_rules_give_every_other_demo_product_choices(): void
+    {
+        $cat = fn (string $slug) => Category::factory()->create(['slug' => $slug])->id;
+        [$shirts, $phones, $laptops, $watches, $beauty] = [$cat('mens-shirts'), $cat('smartphones'), $cat('laptops'), $cat('womens-watches'), $cat('beauty')];
+        $demo = fn (int $id, string $sku, string $name, int $category, int $stock = 40) => $this->product(['id' => $id, 'sku' => $sku, 'name' => $name,
+            'category_id' => $category, 'price' => '100.00', 'discount_percent' => '0.00', 'stock_quantity' => $stock]);
+        $tee = $demo(84, 'MEN-GIG-GIG-084', 'Gigabyte Aorus Men Tshirt', $shirts);
+        $gray = $demo(86, 'MEN-MAN-MAN-086', 'Man Gray Short Sleeve Shirt', $shirts);
+        $oppo = $demo(125, 'SMA-OPP-OPP-125', 'Oppo A57', $phones);
+        $yoga = $demo(81, 'LAP-LEN-LEN-081', 'Lenovo Yoga 920', $laptops);
+        $watch = $demo(194, 'WOM-WOM-WOM-194', "Women's Wrist Watch", $watches);
+        $iphoneX = $demo(124, 'SMA-APP-IPH-124', 'iPhone X', $phones);
+        $mascara = $demo(1, 'BEA-ESS-ESS-001', 'Essence Mascara', $beauty);
+        $staff = $this->product(['sku' => 'OUR-TEE-1', 'name' => 'Our own tee', 'category_id' => $shirts]);
+
+        (new ConfigurableDemoSeeder)->run();
+        (new ConfigurableDemoSeeder)->run();
+
+        $optionsOf = fn ($product) => $product->fresh()->options()->with('values')->get()
+            ->map(fn ($option) => $option->name.':'.$option->type.':'.$option->values->pluck('value')->implode(','))->all();
+        $this->assertSame(['Color:color:White,Black,Navy,Grey', 'Size:text:S,M,L,XL,XXL'], $optionsOf($tee));
+        $this->assertSame(['Color:color:Grey,White,Black,Navy', 'Size:text:S,M,L,XL,XXL'], $optionsOf($gray), 'a colour in the name comes first');
+        $this->assertSame(['Storage:text:64 GB,128 GB,256 GB', 'Color:color:Black,Silver,Blue,Green'], $optionsOf($oppo));
+        $this->assertSame(['RAM:text:8 GB,16 GB,32 GB', 'Storage:text:512 GB,1 TB'], $optionsOf($yoga));
+        $this->assertSame(['Color:color:Silver,Gold,Rose Gold'], $optionsOf($watch));
+        $this->assertCount(20, $tee->fresh()->variants);
+        $this->assertSame(40, $tee->fresh()->stock_quantity, 'the stock is split, not added');
+        $this->assertSame(1, ProductVariant::where('product_id', $tee->id)->where('stock_quantity', 0)->count(), 'one sold-out combination');
+        $this->assertSame('#F9FAFB', $tee->fresh()->options()->first()->values()->first()->swatch);
+        $this->assertSame('সাদা', $tee->fresh()->options()->first()->values()->first()->translatedValue('bn'));
+        $this->assertNotNull(ProductVariant::where('product_id', $yoga->id)->where('sku', 'LAP-LEN-LEN-081-32-GB-1-TB')->value('price'));
+
+        // Kept simple: the suites' products, other categories, and staff products.
+        foreach ([$iphoneX, $mascara, $staff] as $simple) {
+            $this->assertFalse($simple->fresh()->has_variants, $simple->name);
+            $this->assertSame(0, $simple->options()->count());
+        }
+        $this->assertTrue(ConfigurableDemoSeeder::isDemo($tee));
+        $this->assertFalse(ConfigurableDemoSeeder::isDemo($staff));
+    }
+
     public function test_viewers_cannot_change_options_or_image_choices(): void
     {
         $this->configure();

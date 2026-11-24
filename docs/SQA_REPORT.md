@@ -314,6 +314,16 @@ Asked by the user. Built by three agents in parallel (backend; admin with its si
 
 Checks: backend 568 feature tests (Pint clean); frontend 871 unit tests; admin 222; browser checks 1,841 on the dev server (full run, with the storefront, accounts, and catalog suites rerun alone after C2/C3: 55, 19, 116) and 1,834 on the production build (full run, with the marketing and payments suites rerun alone: 187, 83). Not automated in the browser: hovering a colour dot to change a card's photo (pointer only), uploading a new photo and assigning it (the suite assigns an existing one), and a staff colour option with no swatches yet (refused by design until colours are set).
 
+### Phase 16 follow-up: choices for every fitting demo product — 2026-11-24
+
+Asked by the user ("many products have no variation; it should be sizes and colors"). Category rules in `ConfigurableDemoSeeder` give every other imported demo product choices: shirts, tops, dresses, and shoes Color × Size; phones and tablets Storage × Color; laptops RAM × Storage; watches, sunglasses, and bags Color (67 configurable products). Only imported demo products are changed (their DummyJSON SKU ends with their own id), never staff products; four products the browser suites buy as simple items stay simple; the demo photos stay shared (they are other angles, not colours). Backend test for the rules (569 feature tests).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| C6 | Test | The system suite edits the single banner's "Headline"; with the store set to the slider (as the user chose) the hero form is hidden and the suite stopped | It switches to the single banner through the API first; the home content is put back at the end as before |
+
+Checks: browser checks 1,841 on the dev server (full run, with the system suite rerun alone after C6: 40). Not rerun on the production build: no storefront code changed since its last full run.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

@@ -37,6 +37,10 @@ const owner = await signInApi(ADMIN_USER.email, ADMIN_USER.password)
 const settingsBefore = (await api('/api/admin/v1/settings', { token: owner })).body.data
 const about = (await api('/api/admin/v1/pages?search=about', { token: owner })).body.data.find((page) => page.slug === 'about')
 const homeBefore = (await api('/api/admin/v1/home', { token: owner })).body.data
+// The home page editor checks below edit the single banner: start from it whatever staff chose (put back at the end).
+if (homeBefore.hero_mode !== 'banner') {
+  await api('/api/admin/v1/home', { method: 'PUT', token: owner, body: { hero_mode: 'banner', hero: homeBefore.hero, banners: homeBefore.banners, slides: homeBefore.slides, slider: homeBefore.slider, featured_product_ids: homeBefore.featured_product_ids } })
+}
 
 const browser = await launch()
 const errors = []
