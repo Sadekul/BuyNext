@@ -94,7 +94,11 @@
     "soldOut": "Sold out",
     "addToCart": "Add to cart",
     "unavailable": "Unavailable",
-    "minimum": "Minimum order: {{count, number}} (adds {{count, number}} at once)"
+    "minimum": "Minimum order: {{count, number}} (adds {{count, number}} at once)",
+    "from": "From ",
+    "colours_one": "{{count}} colour",
+    "colours_other": "{{count}} colours",
+    "moreSwatches": "+{{count}}"
   },
   "quickView": {
     "title": "Quick view",
@@ -103,7 +107,8 @@
   },
   "variants": {
     "soldOut": " (sold out)",
-    "unavailable": " (unavailable)"
+    "unavailable": " (unavailable)",
+    "chosen": ": {{value}}"
   },
   "reviews": {
     "empty": "No reviews yet.",
@@ -269,8 +274,6 @@
     "from": "From ",
     "originalPrice": "Original price: ",
     "save": "Save {{percent}}%",
-    "chooseToAdd": "Choose {{options}} to add this to your cart",
-    "and": " and ",
     "addToCart": "Add to cart",
     "unavailable": "Unavailable",
     "earnPoints": "Earn about {{points}} reward points with this purchase.",
@@ -286,7 +289,8 @@
     "inStock": "In stock",
     "specifications": "Specifications",
     "moreIn": "More in {{category}}",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "pleaseSelect": "Please select {{option}}."
   },
   "comparePage": {
     "title": "Compare products",

@@ -147,9 +147,14 @@ export function uploadProductImages(productId, files) {
   return api.post(`/api/admin/products/${productId}/images`, form, { timeout: UPLOAD_TIMEOUT })
 }
 export const updateProductImage = (productId, imageId, alt) => api.patch(`/api/admin/products/${productId}/images/${imageId}`, { alt })
+/** Phase 16: the option value the image is shown for (null = every choice) → { images }. */
+export const updateProductImageChoice = (productId, imageId, optionValueId) => api.patch(`/api/admin/products/${productId}/images/${imageId}`, { optionValueId })
 export const deleteProductImage = (productId, imageId) => api.delete(`/api/admin/products/${productId}/images/${imageId}`)
 export const reorderProductImages = (productId, ids) => api.post(`/api/admin/products/${productId}/images/reorder`, { ids })
-/** { options: [{ name, values: [text] }] } replaces the options; variants without their values are deactivated. */
+/**
+ * { options: [{ name, values: [text] }] } replaces the options; variants without their values are deactivated.
+ * Phase 16: + type (text | color) and, for color, values as [{ value, swatch: '#RRGGBB' }].
+ */
 export const saveProductOptions = (productId, options) => api.put(`/api/admin/products/${productId}/options`, { options })
 /** Creates the missing combinations (inactive, stock 0). */
 export const generateVariants = (productId) => api.post(`/api/admin/products/${productId}/variants/generate`, {})

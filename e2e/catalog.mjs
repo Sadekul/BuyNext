@@ -287,7 +287,9 @@ try {
   log((await sizes.getByRole('radio').count()) === 2 && (await colors.getByRole('radio').count()) === 2, 'option radio groups: Size (S, M) and Color (Red, Blue)')
   const addButton = details.getByRole('button', { name: /add to cart/i }).first()
   const price = details.locator('.product-details__price-current')
-  log((await addButton.isDisabled()) && (await visible(shop.getByText('Choose size and color to add this to your cart'))), 'add to cart disabled until size and color are chosen')
+  // Phase 16 (Magento): Add to cart stays enabled; clicking it before a full choice asks for each missing option.
+  await addButton.click()
+  log((await visible(shop.getByText('Please select Size.').first())) && (await visible(shop.getByText('Please select Color.').first())), 'add to cart before a choice: "Please select Size." and "Please select Color."')
   log(/From\s*\$20\.00/.test(await price.innerText()), `before a choice: "${(await price.innerText()).trim()}"`)
   await sizes.getByText('M', { exact: true }).click()
   // Phase 9: a sold-out combination can be chosen (to ask for a back-in-stock email) but not added to the cart.

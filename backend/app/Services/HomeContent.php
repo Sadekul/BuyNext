@@ -85,7 +85,7 @@ class HomeContent
                 array_filter($content['banners'], fn ($banner) => $banner['is_active']))),
             'slides' => $slides,
             'slider' => $content['slider'],
-            'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand', ...CatalogController::translationRelations()])),
+            'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand', ...Product::CARD_RELATIONS, ...CatalogController::translationRelations()])),
         ];
     }
 

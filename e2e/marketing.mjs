@@ -980,7 +980,13 @@ try {
   const leftRedirects = (await admin$(`/redirects?search=${encodeURIComponent(run)}`)).body?.data ?? []
   const leftTerms = (await admin$(`/search-terms?search=${encodeURIComponent(run)}`)).body?.data ?? []
   const grid = (await admin$('/preferences/products_grid')).body?.data?.value ?? null
-  const unreadAfter = (await admin$('/notifications?unread=1&per_page=50')).body?.data?.map((item) => item.id) ?? []
+  // Every page, like unreadBefore (unread notifications from earlier runs can pass 50).
+  const unreadAfter = []
+  for (let page = 1; page <= 10; page++) {
+    const { body } = await admin$(`/notifications?unread=1&per_page=50&page=${page}`)
+    unreadAfter.push(...(body?.data ?? []).map((item) => item.id))
+    if (!body?.meta || page >= body.meta.last_page) break
+  }
   const leftGroup = ((await admin$('/customer-groups')).body?.data ?? []).some((item) => item.name === groupName)
   const leftProducts = (await admin$(`/products?search=${marker}`)).body?.data ?? []
   const leftCategory = made.category && (await admin$('/categories')).body?.data?.some((item) => item.id === made.category)

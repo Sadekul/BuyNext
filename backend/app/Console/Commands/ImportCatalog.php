@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use Database\Seeders\ConfigurableDemoSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -40,6 +41,10 @@ class ImportCatalog extends Command
         $products = Http::acceptJson()->timeout(60)->retry(2, 1000)->get(self::SOURCE.'/products', ['limit' => 0])->throw()->json('products');
 
         $counts = DB::transaction(fn () => $this->import($categories, $products));
+
+        // Phase 16: some demo products become configurable (colour swatches, sizes, storage); only ones
+        // with no options yet, so a re-run never touches what staff set up.
+        (new ConfigurableDemoSeeder)->run();
 
         $this->info(sprintf(
             'Imported %d products (%d new, %d updated, %d skipped), %d categories, %d brands.',
@@ -122,11 +127,16 @@ class ImportCatalog extends Command
             }
 
             // Imported images and reviews are replaced as a whole. Images staff uploaded (with a file)
-            // and reviews by real customers are kept.
+            // and reviews by real customers are kept. Phase 16: an imported image keeps the choice
+            // ("Blue") it was shown for.
+            $choices = $product->images()->whereNull('path')->whereNotNull('option_value_id')->pluck('option_value_id', 'url');
             $product->images()->whereNull('path')->delete();
             foreach (array_values($item['images'] ?? []) as $position => $url) {
-                $product->images()->create(['url' => $url, 'path' => null, 'alt' => $item['title'], 'position' => $position]);
+                $product->images()->create(['url' => $url, 'path' => null, 'alt' => $item['title'], 'position' => $position,
+                    'option_value_id' => $choices[$url] ?? null]);
             }
+            // Phase 16: with --overwrite the stock was reset; a configurable product's stock stays its variants' sum.
+            $product->syncVariantStock();
             if ($product->images()->whereNotNull('path')->exists()) {
                 $product->syncThumbnail(); // with uploads, the thumbnail follows the first image
             }

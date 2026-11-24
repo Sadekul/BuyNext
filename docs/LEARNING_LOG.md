@@ -300,3 +300,11 @@
 - A safe fallback in the public API: slider mode with no active slide shows the banner instead of an empty slider
 - "Replace everything" saves need the client to send every key back, or the server's defaults wipe data: the admin always sends slides and settings
 - Data migrations that only fill empty fields whose English is still the demo text, so staff edits are never overwritten
+
+## Phase 16: configurable products (2026-11-24)
+
+- Building on an existing model (options and variants from phase 5) instead of a new one: types, swatches and image links are small additions
+- Language-independent codes for URLs: names are translated, codes are not, so a shared link works in every language
+- Magento's product page rules: nothing pre-selected, "From" prices, a message per missing option with focus moved there, no cart call until the choice is complete
+- Accessible swatches: real radio inputs behind the colour circles, the value name as their accessible name, "sold out" in the name instead of colour alone
+- Listing performance: eager loading the relations every card needs, with a test that the query count doesn't grow with the number of products

@@ -68,12 +68,12 @@ describe('product options and variants', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Classic Tee' })).toBeInTheDocument()
     const add = screen.getByRole('button', { name: 'Add to cart' })
-    expect(add).toBeDisabled()
-    expect(add).toHaveAccessibleDescription('Choose size and color to add this to your cart')
+    // Phase 16: enabled before a full choice; a click says what is missing instead.
+    expect(add).toBeEnabled()
     expect(screen.getByText('From')).toBeInTheDocument() // variants cost $20 or $24
 
-    const size = screen.getByRole('group', { name: 'Size' })
-    const color = screen.getByRole('group', { name: 'Color' })
+    const size = screen.getByRole('group', { name: /^Size/ })
+    const color = screen.getByRole('group', { name: /^Color/ })
     await user.click(within(size).getByRole('radio', { name: 'M' }))
     // M / Red is sold out: still selectable (phase 9), to ask for a back-in-stock email.
     expect(within(color).getByRole('radio', { name: /Red.*sold out/ })).toBeEnabled()

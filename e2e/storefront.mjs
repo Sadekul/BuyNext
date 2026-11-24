@@ -83,9 +83,10 @@ await page.waitForURL(/\/products\?q=iphone/)
 log((await resultCount()) > 0, `search: results page for "iphone" (${await resultCount()})`)
 
 // ---------- Product page ----------
-await page.goto(`${BASE}/products/123`, { waitUntil: 'networkidle' })
+// A simple product (phase 16 made the iPhone 13 Pro configurable: configurable.mjs covers choosing first).
+await page.goto(`${BASE}/products/124`, { waitUntil: 'networkidle' })
 const details = page.locator('.product-details')
-log(await visible(page.getByRole('heading', { name: 'iPhone 13 Pro', level: 1 })), 'product: title')
+log(await visible(page.getByRole('heading', { name: 'iPhone X', level: 1 })), 'product: title')
 log(await visible(page.getByRole('navigation', { name: 'Breadcrumb' })), 'product: breadcrumb')
 const thumbs = page.getByRole('button', { name: /Show image/ })
 if ((await thumbs.count()) > 1) {

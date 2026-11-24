@@ -37,7 +37,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([...self::filterRules(), 'per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        return AdminProductResource::collection(self::filtered($data)->with(['category', 'brand', 'translations'])
+        return AdminProductResource::collection(self::filtered($data)->with(['category', 'brand', 'translations', ...Product::CARD_RELATIONS])
             ->paginate($data['per_page'] ?? 20)
             ->withQueryString());
     }

@@ -95,7 +95,7 @@ function ProductFormPage() {
       />
       {LIVE_DATA && !isNew && product.data.live && (
         <>
-          <ProductImages productId={productId} images={product.data.imageList ?? []} editable={can('products.edit')} />
+          <ProductImages productId={productId} images={product.data.imageList ?? []} options={product.data.options ?? []} editable={can('products.edit')} />
           <ProductVariants
             key={`variants-${productId}`}
             productId={productId}
@@ -140,14 +140,23 @@ const banglaOptions = (options) =>
     .map((option) => ({
       id: option.id,
       name: option.name,
+      // Phase 16: kept so saving the Bangla names doesn't change the option's type or colours.
+      ...(option.type !== undefined && { type: option.type }),
       nameBn: option.nameBn ?? '',
-      values: option.values.filter((entry) => Number.isInteger(entry.id)).map((entry) => ({ id: entry.id, value: entry.value, valueBn: entry.valueBn ?? '' })),
+      values: option.values.filter((entry) => Number.isInteger(entry.id)).map((entry) => ({ id: entry.id, value: entry.value, swatch: entry.swatch ?? null, valueBn: entry.valueBn ?? '' })),
     }))
 /** Phase 13: what is sent for the options' Bangla names. */
 const toOptionTranslations = (options) => options.map((option) => ({ id: option.id, nameBn: option.nameBn.trim(), values: option.values.map((entry) => ({ id: entry.id, valueBn: entry.valueBn.trim() })) }))
 /** Phase 13: the saved options with their Bangla names, as PUT products/:id/options takes them (valuesBn in the values' order). */
 const toOptionsWithBangla = (options) =>
-  options.map((option) => ({ name: option.name, values: option.values.map((entry) => entry.value), nameBn: option.nameBn.trim(), valuesBn: option.values.map((entry) => entry.valueBn.trim()) }))
+  options.map((option) => ({
+    name: option.name,
+    // Phase 16: the type and colours as saved (only when the API has them).
+    ...(option.type !== undefined && { type: option.type }),
+    values: option.values.map((entry) => (option.type === 'color' ? { value: entry.value, swatch: entry.swatch } : entry.value)),
+    nameBn: option.nameBn.trim(),
+    valuesBn: option.values.map((entry) => entry.valueBn.trim()),
+  }))
 /** Phase 13: server errors of the Bangla section ("bn.name", "options.0.nameBn"). */
 const banglaErrorsFrom = (fieldErrors) =>
   Object.fromEntries(

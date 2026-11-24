@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeCategories, normalizeProductDetail, normalizeProductPage } from './laravelAdapter'
+import { normalizeCategories, normalizeProduct, normalizeProductDetail, normalizeProductPage } from './laravelAdapter'
 
 const resource = {
   id: 123,
@@ -43,5 +43,32 @@ describe('Laravel adapter (API contract → BuyNest shapes)', () => {
     const page = normalizeProductPage({ data: [resource], meta: { current_page: 3, per_page: 12, total: 30 } })
     expect(page).toMatchObject({ total: 30, skip: 24, limit: 12 })
     expect(normalizeCategories({ data: [{ slug: 'a', name: 'A', image_url: null }] })).toEqual([{ slug: 'a', name: 'A', parentSlug: null, depth: 0 }])
+  })
+})
+
+describe('phase 16 fields', () => {
+  it('maps option types, swatches, per-value images, price ranges and card swatches', () => {
+    const product = normalizeProduct({
+      id: 1, name: 'Shirt', price: '20.00',
+      images: [{ url: '/a.webp', option_value_id: null }, { url: '/b.webp', option_value_id: '22' }],
+      options: [
+        { id: 2, name: 'Color', code: 'color', type: 'color', values: [{ id: 21, value: 'Red', swatch: '#cc0000', code: 'red' }, { id: 22, value: 'Blue', swatch: 'blue', code: '' }] },
+        { id: 1, name: 'Size', values: [{ id: 11, value: 'S' }] },
+      ],
+      price_range: { min: '20.00', max: '24.50' },
+      swatches: [{ value_id: 21, value: 'Red', swatch: '#CC0000', image_url: '/b.webp' }, { value_id: 22, value: 'Blue', swatch: null }, { nope: true }],
+    })
+    expect(product.options).toEqual([
+      { id: 2, name: 'Color', code: 'color', type: 'color', values: [{ id: 21, value: 'Red', swatch: '#cc0000', code: 'red' }, { id: 22, value: 'Blue', swatch: null, code: null }] },
+      { id: 1, name: 'Size', code: null, type: 'text', values: [{ id: 11, value: 'S', swatch: null, code: null }] },
+    ])
+    expect(product.imageOptionValueIds).toEqual([null, 22])
+    expect(product.priceRange).toEqual({ min: 20, max: 24.5 })
+    expect(product.swatches).toEqual([
+      { valueId: 21, value: 'Red', swatch: '#CC0000', imageUrl: '/b.webp' },
+      { valueId: 22, value: 'Blue', swatch: null, imageUrl: null },
+    ])
+    expect(normalizeProduct({ id: 2, name: 'Mug', price: '5.00', price_range: null })).toMatchObject({ priceRange: null })
+    expect(normalizeProduct({ id: 2, name: 'Mug', price: '5.00' })).not.toHaveProperty('swatches')
   })
 })

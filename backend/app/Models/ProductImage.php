@@ -16,15 +16,18 @@ use Illuminate\Support\Facades\Storage;
  * Phase 9 (part B): `variants` holds the resized copies of an upload
  * ({ "320": url, "960": url }, see App\Support\ImageVariants); they are
  * deleted with the original.
+ *
+ * Phase 16: `option_value_id` = the choice ("Blue") the image belongs to;
+ * null = shown for every choice (set back to null when the value is deleted).
  */
-#[Fillable(['product_id', 'url', 'path', 'variants', 'alt', 'position'])]
+#[Fillable(['product_id', 'option_value_id', 'url', 'path', 'variants', 'alt', 'position'])]
 class ProductImage extends Model
 {
     public $timestamps = false;
 
     protected function casts(): array
     {
-        return ['position' => 'integer', 'variants' => 'array'];
+        return ['position' => 'integer', 'variants' => 'array', 'option_value_id' => 'integer'];
     }
 
     public function product(): BelongsTo

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductOption;
 use App\Services\Audit;
 use App\Services\ImageResizer;
 use App\Support\ImageSniffer;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -24,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * The product's thumbnail follows the first image.
  *
  * Every answer is { data: [image items] } in gallery order:
- * { id, url, alt, position, is_upload, variants }.
+ * { id, url, alt, position, is_upload, variants, option_value_id }.
  * Phase 9 (part B): with GD installed, uploads also get resized copies
  * (App\Services\ImageResizer), listed in `variants`.
  */
@@ -121,22 +123,43 @@ class ProductImageController extends Controller
         return response()->json(['data' => $this->items($product)], 201);
     }
 
-    /** PATCH /api/admin/v1/products/{id}/images/{image} { alt } */
+    /**
+     * PATCH /api/admin/v1/products/{id}/images/{image} { alt?, option_value_id? } (at least one).
+     * Phase 16: option_value_id = the choice ("Blue") the image belongs to, null = every choice;
+     * it must be a value of one of this product's options (422 option_value_id otherwise).
+     */
     public function update(Request $request, int $id, int $image): JsonResponse
     {
         $found = $this->findImage($id, $image);
         if (! $found) {
             return $this->notFound();
         }
-        $data = $request->validate(['alt' => ['present', 'nullable', 'string', 'max:190']]);
-        $alt = trim((string) $data['alt']) ?: null;
+        $data = $request->validate([
+            'alt' => [Rule::requiredIf(! $request->has('option_value_id') && ! $request->has('alt')), 'nullable', 'string', 'max:190'],
+            'option_value_id' => ['sometimes', 'nullable', 'integer',
+                Rule::exists('product_option_values', 'id')->using(fn ($query) => $query->whereIn('option_id', ProductOption::where('product_id', $id)->select('id')))],
+        ], [
+            'alt.required' => 'Send the alt text or the choice the image is shown for.',
+            'option_value_id.integer' => 'Choose a value of this product\'s options.',
+            'option_value_id.exists' => 'Choose a value of this product\'s options.',
+        ]);
 
-        DB::transaction(function () use ($found, $alt) {
-            $before = $found->alt;
-            $found->update(['alt' => $alt]);
-            if ($before !== $alt) {
-                $this->audit->record('product.image_updated', "Image alt text changed on product {$found->product->sku}.", 'product', $found->product_id,
-                    ['before' => ['alt' => $before, 'url' => $found->url], 'after' => ['alt' => $alt, 'url' => $found->url]]);
+        DB::transaction(function () use ($found, $data) {
+            $fields = ['alt', 'option_value_id'];
+            $before = Audit::fieldsOf($found, $fields);
+            if (array_key_exists('alt', $data)) {
+                $found->alt = trim((string) $data['alt']) ?: null;
+            }
+            if (array_key_exists('option_value_id', $data)) {
+                $found->option_value_id = $data['option_value_id'] === null ? null : (int) $data['option_value_id'];
+            }
+            $found->save();
+            $after = Audit::fieldsOf($found, $fields);
+            if ($before !== $after) {
+                $what = $before['alt'] !== $after['alt'] && $before['option_value_id'] !== $after['option_value_id'] ? 'alt text and choice'
+                    : ($before['alt'] !== $after['alt'] ? 'alt text' : 'choice');
+                $this->audit->record('product.image_updated', "Image {$what} changed on product {$found->product->sku}.", 'product', $found->product_id,
+                    ['before' => [...$before, 'url' => $found->url], 'after' => [...$after, 'url' => $found->url]]);
             }
         });
 

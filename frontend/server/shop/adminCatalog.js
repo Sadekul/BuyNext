@@ -125,17 +125,31 @@ export function imageVariants(raw) {
 
 /** { id, url, alt, position, isUpload, variants? } (isUpload false: an imported external address; variants: phase 9 answers). */
 export function adminImage(raw) {
-  return { id: raw.id ?? null, url: text(raw.url), alt: text(raw.alt), position: raw.position ?? 0, isUpload: raw.is_upload !== false, ...(raw.variants !== undefined && { variants: imageVariants(raw.variants) }) }
+  return {
+    id: raw.id ?? null,
+    url: text(raw.url),
+    alt: text(raw.alt),
+    position: raw.position ?? 0,
+    isUpload: raw.is_upload !== false,
+    ...(raw.variants !== undefined && { variants: imageVariants(raw.variants) }),
+    // Phase 16 §2: the option value the image is shown for (null = every choice); only when the API sends it.
+    ...(raw.option_value_id !== undefined && { optionValueId: Number.isInteger(raw.option_value_id) ? raw.option_value_id : null }),
+  }
 }
 const images = (raw) => list(raw).map(adminImage).sort((a, b) => a.position - b.position)
 
 // Phase 13: only answers that have the Bangla names carry them (older answers: nothing).
 const hasBangla = (raw) => raw.name_bn !== undefined || raw.value_bn !== undefined || raw.translations !== undefined
 
+// Phase 16 §1: an option's type (text | color) and a value's swatch (#RRGGBB or null), only when the API sends them.
+const optionType = (raw) => (raw.type !== undefined ? { type: raw.type === 'color' ? 'color' : 'text' } : {})
+const valueSwatch = (raw) => (raw.swatch !== undefined ? { swatch: typeof raw.swatch === 'string' && /^#[0-9a-f]{6}$/i.test(raw.swatch) ? raw.swatch.toUpperCase() : null } : {})
+
 export function adminOption(raw) {
   return {
     id: raw.id ?? null,
     name: text(raw.name),
+    ...optionType(raw),
     // Phase 13: the Bangla name of the option and of each value ('' = the English one is shown).
     ...(hasBangla(raw) && { nameBn: optionNameBangla(raw) }),
     position: raw.position ?? 0,
@@ -143,7 +157,7 @@ export function adminOption(raw) {
       .map((value) =>
         typeof value === 'string'
           ? { id: null, value, position: 0 }
-          : { id: value.id ?? null, value: text(value.value), ...(hasBangla(value) && { valueBn: optionValueBangla(value) }), position: value.position ?? 0 },
+          : { id: value.id ?? null, value: text(value.value), ...valueSwatch(value), ...(hasBangla(value) && { valueBn: optionValueBangla(value) }), position: value.position ?? 0 },
       )
       .sort((a, b) => a.position - b.position),
   }
@@ -178,6 +192,17 @@ export function productParts(raw) {
 
 /** An answer that may be the product, a list of images, or { images }. */
 const imagesFrom = (data) => images(Array.isArray(data?.data) ? data.data : (data?.data?.images ?? []))
+
+/*
+ * A validated option → the API's (phase 13's body, plus phase 16's type and
+ * values as { value, swatch } when the type was sent; otherwise plain text
+ * values exactly as before).
+ */
+export function toOptionLookBody({ type, swatches, ...option }) {
+  const body = toOptionBody(option)
+  if (type === undefined) return body
+  return { ...body, type, values: option.values.map((value, index) => ({ value, swatch: swatches?.[index] ?? null })) }
+}
 
 const VARIANT_FIELDS = { sku: 'sku', price: 'price', stock: 'stock_quantity', isActive: 'is_active' }
 const toVariantBody = (values) => {
@@ -267,8 +292,9 @@ export const laravelCatalogData = {
     return answer(result, [200, 201], (data) => ({ images: imagesFrom(data), live: true }))
   },
   // Every image answer is the product's whole gallery, in order.
-  async updateImage(token, id, imageId, { alt }, request) {
-    return answer(await call(`/products/${id}/images/${imageId}`, token, request, { method: 'PATCH', body: { alt } }), [200], (data) => ({ images: imagesFrom(data), live: true }))
+  async updateImage(token, id, imageId, { alt, optionValueId }, request) {
+    const body = { ...(alt !== undefined && { alt }), ...(optionValueId !== undefined && { option_value_id: optionValueId }) }
+    return answer(await call(`/products/${id}/images/${imageId}`, token, request, { method: 'PATCH', body }), [200], (data) => ({ images: imagesFrom(data), live: true }))
   },
   async deleteImage(token, id, imageId, request) {
     return answer(await call(`/products/${id}/images/${imageId}`, token, request, { method: 'DELETE' }), [200, 204], (data) => ({ id: Number(imageId), deleted: true, images: imagesFrom(data), live: true }))
@@ -278,7 +304,7 @@ export const laravelCatalogData = {
   },
 
   async saveOptions(token, id, { options }, request) {
-    const result = await call(`/products/${id}/options`, token, request, { method: 'PUT', body: { options: options.map(toOptionBody) } })
+    const result = await call(`/products/${id}/options`, token, request, { method: 'PUT', body: { options: options.map(toOptionLookBody) } })
     return answer(result, [200], (data) => ({ ...productParts(data?.data ?? {}), live: true }))
   },
   async generateVariants(token, id, request) {

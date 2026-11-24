@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { LuArrowLeft, LuPackageX, LuRotateCcw, LuShieldCheck, LuShoppingBag, LuTruck } from 'react-icons/lu'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -35,7 +35,7 @@ import { getProductPricing } from '../utils/pricing'
 import { toDescription } from '../utils/pageMeta'
 import { clampQuantity, getPurchaseLimits } from '../utils/inventory'
 import { categoryAncestors } from '../utils/categories'
-import { chooseValue, findVariant, hasVariants, initialSelection, variantPriceRange, withVariant } from '../utils/variants'
+import { chooseValue, findVariant, galleryOrder, hasVariants, initialSelection, searchForSelection, selectionFromSearch, variantPriceRange, withVariant } from '../utils/variants'
 import { isGiftCardProduct } from '../utils/giftCards'
 import { trackViewItem } from '../utils/analytics'
 import { recordRecentlyViewed } from '../utils/recentlyViewed'
@@ -118,17 +118,29 @@ function ProductDetails({ product }) {
   const isGiftCard = isGiftCardProduct(product)
   // The category tree (BuyNest's API) names the breadcrumb's parents; the demo needs no extra request.
   const { data: categories } = useQuery({ ...categoriesQuery(), enabled: HAS_CATEGORY_TREE })
-  const hintId = useId()
 
   // Configurable products (BuyNest's API): price, stock, and the cart follow
   // the chosen variant; buying needs a full selection. Other products (and
   // every DummyJSON product) skip this.
   const isConfigurable = hasVariants(product)
-  const [selection, setSelection] = useState(() => initialSelection(product))
+  // Phase 16: a shared link (?color=blue&size=m) opens with that choice; otherwise nothing is
+  // chosen while there is a real choice to make (Magento).
+  const [selection, setSelection] = useState(() => selectionFromSearch(product, location.search, { soldOut: REAL_SHOP }) ?? initialSelection(product))
+  // Phase 16: "Please select Size." per option, after Add to cart without a full choice.
+  const [optionErrors, setOptionErrors] = useState({})
+  const optionsRef = useRef(null)
   const variant = isConfigurable ? findVariant(product, selection) : null
   const purchasable = variant ? withVariant(product, variant) : product
   const needsChoice = isConfigurable && !variant
-  const missingOptions = needsChoice ? product.options.filter((option) => selection[option.id] === undefined) : []
+
+  // Phase 16: the address follows a full choice (replaceState: no extra history entries), so it can be shared.
+  useEffect(() => {
+    if (!isConfigurable) return
+    const search = searchForSelection(product, selection, window.location.search)
+    if (search !== window.location.search) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`)
+    }
+  }, [isConfigurable, product, selection])
 
   const limits = getPurchaseLimits(purchasable)
   const { min: minQuantity } = limits
@@ -140,12 +152,17 @@ function ProductDetails({ product }) {
   // A newly chosen variant may have less stock than the quantity picked before.
   const shownQuantity = canBuy ? clampQuantity(quantity, limits) : quantity
 
-  // Before a choice, variants with different prices show the lowest ("From …").
+  // Before a choice, variants with different prices show the lowest final price ("From …");
+  // variants that all cost the same show that price (with its discount) as usual.
   const priceRange = isConfigurable ? variantPriceRange(product) : null
   const showFrom = needsChoice && priceRange.min !== priceRange.max
-  const priced = needsChoice ? { ...product, price: priceRange.min } : purchasable
+  const priced = needsChoice ? (showFrom ? { ...product, price: priceRange.min, discountPercentage: 0 } : withVariant(product, product.variants[0])) : purchasable
   const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(priced)
-  const images = product.images.length > 0 ? product.images : [product.thumbnail]
+  // Phase 16: photos of the chosen colour (or value) first, then the shared ones.
+  const gallery = product.images.length > 0 ? galleryOrder(product, selection) : null
+  const images = gallery ? gallery.indexes.map((index) => product.images[index]) : [product.thumbnail]
+  const imageAlts = gallery && product.imageAlts ? gallery.indexes.map((index) => product.imageAlts[index]) : undefined
+  const imageVariants = gallery ? gallery.indexes.map((index) => product.imageVariants?.[index] ?? null) : [product.thumbnailVariants ?? null]
   // The category's real name from the tree (BuyNest's API), or the slug made readable.
   const category = categories?.find((candidate) => candidate.slug === product.category)
   const categoryName = product.category ? (category?.name ?? product.categoryName ?? formatSlug(product.category)) : null
@@ -173,12 +190,29 @@ function ProductDetails({ product }) {
   ].filter(([, value]) => value) // only show what the API actually provided
 
   function handleAddToCart() {
+    if (needsChoice) {
+      // Phase 16: say what is missing and go to the first missing option; nothing reaches the cart.
+      const missing = product.options.filter((option) => selection[option.id] === undefined)
+      // Every option chosen but no variant (can't happen with the selector's rules): ask for the last one again.
+      const asked = missing.length > 0 ? missing : product.options.slice(-1)
+      setOptionErrors(Object.fromEntries(asked.map((option) => [option.id, t('details.pleaseSelect', { option: option.name })])))
+      const group = optionsRef.current?.querySelector(`[data-option-id="${asked[0].id}"]`)
+      const target = group?.querySelector('input:checked:not(:disabled)') ?? group?.querySelector('input:not(:disabled)')
+      target?.focus()
+      return
+    }
     addItem(purchasable, shownQuantity)
   }
 
   function handleOptionChange(optionId, valueId) {
     // With BuyNest's API a sold-out variant can be chosen too, to ask for a stock alert.
     setSelection((current) => chooseValue(product, current, optionId, valueId, { soldOut: REAL_SHOP }))
+    setOptionErrors((current) => {
+      if (!(optionId in current)) return current
+      const next = { ...current }
+      delete next[optionId]
+      return next
+    })
   }
 
   return (
@@ -202,11 +236,13 @@ function ProductDetails({ product }) {
       </div>
 
       <div className="product-details__main">
+        {/* key: a new set of photos (a colour with its own) starts at its first photo. */}
         <ProductGallery
+          key={gallery?.valueId ?? 'all'}
           images={images}
           title={product.title}
-          alts={product.images.length > 0 ? product.imageAlts : undefined}
-          variants={product.images.length > 0 ? product.imageVariants : [product.thumbnailVariants ?? null]}
+          alts={imageAlts}
+          variants={imageVariants}
         />
 
         <div className="product-details__info">
@@ -250,20 +286,16 @@ function ProductDetails({ product }) {
             )}
           </div>
 
-          {/* Live region: the stock line changes as options are chosen. */}
-          <div aria-live="polite">
-            {needsChoice ? (
-              <p className="product-details__stock product-details__stock--choose" id={hintId}>
-                {t('details.chooseToAdd', { options: missingOptions.map((option) => option.name.toLowerCase()).join(t('details.and')) })}
-              </p>
-            ) : (
-              <StockStatus product={purchasable} canBuy={canBuy} />
-            )}
-          </div>
+          {/* Live region: the stock line appears once a full choice is made (phase 16: hidden before). */}
+          <div aria-live="polite">{!needsChoice && <StockStatus product={purchasable} canBuy={canBuy} />}</div>
 
           {product.description && <p className="product-details__description">{product.description}</p>}
 
-          {isConfigurable && <VariantSelector product={product} selection={selection} onChange={handleOptionChange} allowSoldOut={REAL_SHOP} />}
+          {isConfigurable && (
+            <div ref={optionsRef}>
+              <VariantSelector product={product} selection={selection} onChange={handleOptionChange} allowSoldOut={REAL_SHOP} errors={optionErrors} />
+            </div>
+          )}
 
           <div className="product-details__purchase">
             {canBuy && (
@@ -272,9 +304,9 @@ function ProductDetails({ product }) {
             <Button
               size="lg"
               onClick={handleAddToCart}
-              disabled={!canBuy}
+              // Phase 16: enabled before a full choice; a click says which option is missing.
+              disabled={!canBuy && !needsChoice}
               className="product-details__add"
-              aria-describedby={needsChoice ? hintId : undefined}
             >
               <LuShoppingBag aria-hidden="true" />
               {t(canBuy || needsChoice ? 'details.addToCart' : 'details.unavailable')}

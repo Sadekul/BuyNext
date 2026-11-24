@@ -1709,6 +1709,92 @@
   width: 100%;
 }
 
+/* Phase 16: option type, colour swatches per value, "Shown for" per image, Bangla variant labels */
+.option-row select,
+.image-item__for select {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.option-row .option-row__type {
+  flex: 1 1 9rem;
+}
+
+.swatch-fields {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.swatch-fields legend {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.swatch-fields__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swatch-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.swatch-field__value {
+  min-width: 3rem;
+  font-weight: 600;
+}
+
+.option-row .swatch-field input[type='color'] {
+  width: 2.5rem;
+  height: 2.25rem;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.option-row .swatch-field input:not([type='color']) {
+  width: 7rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.swatch-field .field__error {
+  flex-basis: 100%;
+}
+
+.image-item__for {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.image-item__for label {
+  font-weight: 600;
+}
+
+.variant-label-bn {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
 .variant-table input[aria-label^='SKU'] {
   min-width: 13rem;
 }

@@ -9,6 +9,7 @@ import { productQuery } from '../../queries/productQueries'
 import { ROUTES } from '../../constants/routes'
 import { formatPrice, formatSlug } from '../../utils/formatters'
 import { getProductPricing } from '../../utils/pricing'
+import { fromPrice } from '../../utils/variants'
 import { getPurchaseLimits } from '../../utils/inventory'
 import { isGiftCardProduct } from '../../utils/giftCards'
 import { availabilityLabel } from '../../utils/catalogText'
@@ -43,7 +44,9 @@ function QuickViewContent({ product, onAddToCart }) {
   }
 
   const details = request.data
-  const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(details)
+  // Phase 16: a configurable product whose variants cost differently shows "From ৳x" (options are chosen on its page).
+  const from = fromPrice(details)
+  const { hasDiscount, roundedDiscount, salePrice, originalPrice } = getProductPricing(from === null ? details : { price: from, discountPercentage: 0 })
   const { canBuy } = getPurchaseLimits(details)
 
   return (
@@ -64,7 +67,10 @@ function QuickViewContent({ product, onAddToCart }) {
         {details.rating !== null && <RatingStars rating={details.rating} />}
 
         <p className="quick-view__price">
-          <span className="quick-view__price-current">{formatPrice(salePrice)}</span>
+          <span className="quick-view__price-current">
+            {from !== null && t('card.from')}
+            {formatPrice(salePrice)}
+          </span>
           {hasDiscount && (
             <>
               <s>{formatPrice(originalPrice)}</s>

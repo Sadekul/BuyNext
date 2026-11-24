@@ -32,9 +32,11 @@ class AdminProductResource extends ProductResource
                 'id' => $option->id,
                 'name' => $option->name,
                 'name_bn' => $option->translationsForAdmin()['bn']['name'], // phase 13: null = English is shown
+                'code' => $option->code(), // phase 16: slug of the English name (computed)
+                'type' => $option->typeName(), // phase 16: text | color
                 'position' => $option->position,
                 'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->value,
-                    'value_bn' => $value->translationsForAdmin()['bn']['value'], 'position' => $value->position])->values(),
+                    'value_bn' => $value->translationsForAdmin()['bn']['value'], 'code' => $value->code(), 'swatch' => $value->swatch, 'position' => $value->position])->values(),
             ])->values());
             $base['variants'] = $this->when($this->relationLoaded('variants'), function () {
                 $map = $this->resource->optionValueMap();
@@ -78,7 +80,10 @@ class AdminProductResource extends ProductResource
         ];
     }
 
-    /** An image item: { id, url, alt, position, is_upload, variants } (phase 9 part B: variants = resized copies, {} if none). */
+    /**
+     * An image item: { id, url, alt, position, is_upload, variants, option_value_id }
+     * (phase 9 part B: variants = resized copies, {} if none; phase 16: option_value_id = the choice it is shown for, null = all).
+     */
     public static function image($image): array
     {
         return [
@@ -88,6 +93,7 @@ class AdminProductResource extends ProductResource
             'position' => $image->position,
             'is_upload' => $image->path !== null,
             'variants' => ImageVariants::forApi($image->variants),
+            'option_value_id' => $image->option_value_id,
         ];
     }
 }

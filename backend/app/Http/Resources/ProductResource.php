@@ -83,11 +83,16 @@ class ProductResource extends JsonResource
             'availability' => $this->availability(),
             'min_order_quantity' => $this->min_order_quantity,
             'has_variants' => $this->has_variants,
+            // Phase 16: { min, max } final prices of the active variants (null for simple products), and the
+            // colour option's active values for card dots ([{ value_id, value, swatch, image_url }], at most 12).
+            'price_range' => $this->priceRange($rules),
+            'swatches' => $this->swatches($locale),
             'thumbnail_url' => $this->thumbnail_url,
             // Phase 9 (part B): resized copies for srcset ({} when there are none).
             'thumbnail_variants' => ImageVariants::forApi($this->thumbnail_variants),
             'images' => $this->when($this->detail && $this->relationLoaded('images'), fn () => $this->images
-                ->map(fn ($image) => ['url' => $image->url, 'alt' => $image->alt, 'variants' => ImageVariants::forApi($image->variants)])->values()),
+                ->map(fn ($image) => ['url' => $image->url, 'alt' => $image->alt, 'variants' => ImageVariants::forApi($image->variants),
+                    'option_value_id' => $image->option_value_id])->values()), // phase 16: null = shown for every choice
             'tags' => $this->tags ?? [],
             'warranty' => $this->warranty,
             'shipping_info' => $this->shipping_info,
@@ -107,7 +112,10 @@ class ProductResource extends JsonResource
                 ->map(fn ($option) => [
                     'id' => $option->id,
                     'name' => $option->translatedName($locale),
-                    'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->translatedValue($locale)])->values(),
+                    'code' => $option->code(), // phase 16: slug of the English name, the same in every language (URL parameters)
+                    'type' => $option->typeName(), // phase 16: text | color
+                    'values' => $option->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->translatedValue($locale),
+                        'code' => $value->code(), 'swatch' => $value->swatch])->values(),
                 ])->values() : []),
             'variants' => $this->when($this->detail && $this->relationLoaded('variants'), fn () => $this->has_variants ? $this->variants
                 ->filter(fn (ProductVariant $variant) => $variant->is_active)
@@ -121,6 +129,65 @@ class ProductResource extends JsonResource
                     'in_stock' => $variant->stock_quantity > 0,
                 ])->values() : []),
         ];
+    }
+
+    /** Phase 16: list cards show at most this many swatches' data (the card itself draws 5 and "+n"). */
+    public const MAX_SWATCHES = 12;
+
+    /** The active variants of a configurable product (none for a simple one). Uses Product::CARD_RELATIONS when loaded. */
+    private function activeVariants()
+    {
+        if (! $this->has_variants) {
+            return collect();
+        }
+        $this->resource->loadMissing('variants');
+
+        return $this->variants->filter(fn (ProductVariant $variant) => $variant->is_active)->values();
+    }
+
+    /** Phase 16: { min, max } of the active variants' final prices (rules for everyone included); null for simple products. */
+    private function priceRange(CatalogRules $rules): ?array
+    {
+        $cents = $this->activeVariants()->map(fn (ProductVariant $variant) => $rules->publicPrice($this->resource, $variant)[0]);
+        if ($cents->isEmpty()) {
+            return null;
+        }
+
+        return ['min' => Pricing::format($cents->min()), 'max' => Pricing::format($cents->max())];
+    }
+
+    /**
+     * Phase 16: the colour option's values used by an active variant, in option order:
+     * [{ value_id, value (request language), swatch (#RRGGBB|null), image_url (its first own image|null) }].
+     */
+    private function swatches(string $locale): array
+    {
+        $variants = $this->activeVariants();
+        if ($variants->isEmpty()) {
+            return [];
+        }
+        $this->resource->loadMissing('options.values');
+        $color = $this->options->first(fn ($option) => $option->typeName() === 'color');
+        if (! $color) {
+            return [];
+        }
+        $used = array_flip($variants->flatMap(fn (ProductVariant $variant) => $variant->option_value_ids ?? [])->map(fn ($id) => (int) $id)->all());
+        // The product page has every image loaded; cards load only the images that belong to a choice.
+        $images = $this->relationLoaded('images') ? $this->images : ($this->resource->loadMissing('optionImages')->optionImages);
+        $firstImage = [];
+        foreach ($images as $image) {
+            if ($image->option_value_id !== null) {
+                $firstImage[$image->option_value_id] ??= $image->url;
+            }
+        }
+
+        return $color->values->filter(fn ($value) => isset($used[$value->id]))->take(self::MAX_SWATCHES)
+            ->map(fn ($value) => [
+                'value_id' => $value->id,
+                'value' => $value->translatedValue($locale),
+                'swatch' => $value->swatch,
+                'image_url' => $firstImage[$value->id] ?? null,
+            ])->values()->all();
     }
 
     /** A review as shoppers see it. */

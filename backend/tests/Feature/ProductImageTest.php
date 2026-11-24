@@ -56,7 +56,7 @@ class ProductImageTest extends TestCase
 
         $images = $response->json('data');
         $this->assertCount(3, $images);
-        $this->assertSame(['id', 'url', 'alt', 'position', 'is_upload', 'variants'], array_keys($images[0])); // phase 9 (part B): variants
+        $this->assertSame(['id', 'url', 'alt', 'position', 'is_upload', 'variants', 'option_value_id'], array_keys($images[0])); // phase 9 (part B): variants; phase 16: option_value_id
         $this->assertSame([0, 1, 2], array_column($images, 'position'));
         $this->assertSame([true, true, true], array_column($images, 'is_upload'));
         $this->assertSame($this->product->name, $images[0]['alt']);
@@ -76,7 +76,7 @@ class ProductImageTest extends TestCase
 
         // The admin detail lists them with ids; the storefront with url and alt.
         $this->asAdmin($this->admin, 'GET', "/api/admin/v1/products/{$this->product->id}")->assertJsonPath('data.images.0.id', $images[0]['id']);
-        $this->getJson("/api/v1/products/{$this->product->id}")->assertJsonPath('data.images.0', ['url' => $images[0]['url'], 'alt' => $this->product->name, 'variants' => []]);
+        $this->getJson("/api/v1/products/{$this->product->id}")->assertJsonPath('data.images.0', ['url' => $images[0]['url'], 'alt' => $this->product->name, 'variants' => [], 'option_value_id' => null]);
     }
 
     public function test_files_are_judged_by_their_contents_not_their_names(): void

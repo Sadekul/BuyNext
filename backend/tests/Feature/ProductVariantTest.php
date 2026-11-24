@@ -59,7 +59,7 @@ class ProductVariantTest extends TestCase
             ->assertJsonPath('data.options.0.name', 'Size')
             ->assertJsonPath('data.options.1.values.1.value', 'Blue')
             ->assertJsonPath('data.variants', []);
-        $this->assertSame(['id', 'name', 'name_bn', 'position', 'values'], array_keys($response->json('data.options.0'))); // phase 13: name_bn
+        $this->assertSame(['id', 'name', 'name_bn', 'code', 'type', 'position', 'values'], array_keys($response->json('data.options.0'))); // phase 13: name_bn; phase 16: type
 
         $generated = $this->asAdmin($this->admin, 'POST', "/api/admin/v1/products/{$this->shirt->id}/variants/generate")->assertOk()
             ->assertJsonPath('meta.created', 4)->json('data.variants');
@@ -133,8 +133,8 @@ class ProductVariantTest extends TestCase
 
         $data = $this->getJson("/api/v1/products/{$this->shirt->id}")->assertOk()->json('data');
         $this->assertTrue($data['has_variants']);
-        $this->assertSame(['id', 'name', 'values'], array_keys($data['options'][0]));
-        $this->assertSame(['id', 'value'], array_keys($data['options'][0]['values'][0]));
+        $this->assertSame(['id', 'name', 'code', 'type', 'values'], array_keys($data['options'][0])); // phase 16: code, type, swatch
+        $this->assertSame(['id', 'value', 'code', 'swatch'], array_keys($data['options'][0]['values'][0]));
         $this->assertSame(['id' => $medium->id, 'sku' => $medium->sku, 'option_value_ids' => $medium->option_value_ids,
             'price' => '30.00', 'final_price' => '27.00', 'stock_quantity' => 5, 'in_stock' => true], $data['variants'][1]);
         $this->assertFalse($data['variants'][0]['in_stock']);

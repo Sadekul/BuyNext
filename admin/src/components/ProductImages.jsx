@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LuArrowDown, LuArrowUp, LuImagePlus, LuTrash2, LuUpload } from 'react-icons/lu'
-import { adminKeys, deleteProductImage, reorderProductImages, updateProductImage, uploadProductImages } from '../api/admin'
+import { adminKeys, deleteProductImage, reorderProductImages, updateProductImage, updateProductImageChoice, uploadProductImages } from '../api/admin'
 import { actionErrorMessage } from '../utils/permissions'
 import ConfirmDialog from './ConfirmDialog'
 
@@ -10,6 +10,17 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_PER_UPLOAD = 10
 const MAX_IMAGES = 12
+
+/*
+ * Phase 16 §2: the option whose values an image can be shown for: the color
+ * option, else the first one (saved values only). null when there's none.
+ */
+function photoOption(options = []) {
+  const saved = options.filter((option) => Number.isInteger(option.id) && option.values.some((value) => Number.isInteger(value.id)))
+  const option = saved.find((entry) => entry.type === 'color') ?? saved[0]
+  return option ? { ...option, values: option.values.filter((value) => Number.isInteger(value.id)) } : null
+}
+const allLabel = (option) => (option.type === 'color' ? 'All colours' : 'All choices')
 
 const size = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`)
 
@@ -30,7 +41,7 @@ function checkFiles(files, existing) {
  * order (the first image is the product's main picture), delete. Changes are
  * saved right away, separately from the product's other fields.
  */
-function ProductImages({ productId, images, editable }) {
+function ProductImages({ productId, images, editable, options = [] }) {
   const queryClient = useQueryClient()
   const inputId = useId()
   const fileInput = useRef(null)
@@ -41,6 +52,8 @@ function ProductImages({ productId, images, editable }) {
   const [toDelete, setToDelete] = useState(null)
   const [message, setMessage] = useState(null) // { tone, text }
 
+  const forOption = photoOption(options)
+  const valueName = (valueId) => options.flatMap((option) => option.values).find((value) => value.id === valueId)?.value ?? `value #${valueId}`
   const shown = order ? order.map((id) => images.find((image) => image.id === id)).filter(Boolean) : images
   const problems = checkFiles(files, images.length)
 
@@ -69,6 +82,16 @@ function ProductImages({ productId, images, editable }) {
       await refresh()
       setAlts((current) => Object.fromEntries(Object.entries(current).filter(([id]) => Number(id) !== image.id)))
       setMessage({ tone: 'success', text: `Description of image ${position} saved.` })
+    },
+    onError: fail,
+  })
+
+  // Phase 16: which choice the image is shown for (null = every choice); saved right away.
+  const saveShownFor = useMutation({
+    mutationFn: ({ image, optionValueId }) => updateProductImageChoice(productId, image.id, optionValueId),
+    onSuccess: async (_, { optionValueId, position }) => {
+      await refresh()
+      setMessage({ tone: 'success', text: optionValueId === null ? `Image ${position} is shown for ${allLabel(forOption).toLowerCase()}.` : `Image ${position} is shown for ${valueName(optionValueId)}.` })
     },
     onError: fail,
   })
@@ -143,6 +166,18 @@ function ProductImages({ productId, images, editable }) {
                           ? 'No resized copies: the original is used everywhere.'
                           : 'External address: shown as it is.'}
                     </p>
+                  )}
+                  {forOption && (
+                    <ShownFor
+                      id={`${inputId}-for-${image.id}`}
+                      position={index + 1}
+                      option={forOption}
+                      value={image.optionValueId ?? null}
+                      valueName={valueName}
+                      editable={editable}
+                      busy={saveShownFor.isPending}
+                      onChange={(optionValueId) => saveShownFor.mutate({ image, optionValueId, position: index + 1 })}
+                    />
                   )}
                   {editable ? (
                     <form
@@ -261,6 +296,28 @@ function ProductImages({ productId, images, editable }) {
         onCancel={() => setToDelete(null)}
       />
     </section>
+  )
+}
+
+/** Phase 16: "Shown for image N": All colours (or All choices) / each value of the option; read-only text for a viewer. */
+function ShownFor({ id, position, option, value, valueName, editable, busy, onChange }) {
+  const label = value === null ? allLabel(option) : valueName(value)
+  if (!editable) return <p className="image-item__for muted">Shown for: {label}</p>
+  // A value of another option (saved earlier) stays choosable until changed.
+  const known = value === null || option.values.some((entry) => entry.id === value)
+  return (
+    <div className="image-item__for">
+      <label htmlFor={id}>Shown for image {position}</label>
+      <select id={id} value={value === null ? '' : String(value)} disabled={busy} onChange={(event) => onChange(event.target.value === '' ? null : Number(event.target.value))}>
+        <option value="">{allLabel(option)}</option>
+        {option.values.map((entry) => (
+          <option key={entry.id} value={String(entry.id)}>
+            {entry.value}
+          </option>
+        ))}
+        {!known && <option value={String(value)}>{label}</option>}
+      </select>
+    </div>
   )
 }
 

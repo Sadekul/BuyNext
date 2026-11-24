@@ -300,6 +300,20 @@ Asked by the user. Built by three agents in parallel (backend; admin with its si
 
 Checks: backend 561 feature tests (Pint clean); frontend 844 unit tests; admin 213; browser checks 1,796 on the dev server (full run, with the slider suite rerun alone after fixing S1: 41; the system suite rerun too: 40) and 1,789 on the production build (full run, all passing).
 
+## Phase 16 (configurable products like Magento's product page) — 2026-11-24
+
+Asked by the user. Built by three agents in parallel (backend; admin with its sign-in service routes; storefront) against [backend/PHASE16_CONTRACT.md](backend/PHASE16_CONTRACT.md), resumed once after a usage limit (no file had been touched), then verified with the new `configurable.mjs` browser suite (45 checks). Builds on phase 5's options and variants. Checks: option types (text buttons or colour swatches, one colour option per product, `#RRGGBB` required), photos per colour, language-independent `code`s for options and values, `price_range` and colour `swatches` on every product list (query count independent of the number of products); the product page with nothing pre-selected, "From" prices, "Please select Size." with focus, "Color: Blue", price / stock / SKU / photo following the choice, sold-out values crossed and named "(sold out)", shareable links that work in both languages; cards with colour dots and "Choose options"; the admin's option type, colour picker, and "Shown for" per image; six demo products made configurable without touching staff products. Products without options are unchanged.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| C1 | Low | The first storefront build wrote the choice into the link with the shown (translated) names, so a link copied on a Bangla page didn't select anything in English | The API gives each option and value a code from its English name; links use the codes in both languages, and old name-based links are still read |
+| C2 | Test | The storefront and accounts suites added the iPhone 13 Pro straight to the cart; it is now a configurable demo product that needs a choice first | They use a simple product (iPhone X); the configurable page is still checked by axe, and `configurable.mjs` covers choosing |
+| C3 | Test | The catalog suite expected Add to cart to be disabled before a choice; like Magento it now stays enabled and asks for each missing option | The suite checks the "Please select Size." / "Please select Color." messages |
+| C4 | Test | The marketing suite's cleanup read every page of unread admin notifications before the run but only the first 50 after it; once earlier runs had left 52 unread, it reported a notification "left" | It reads every page both times |
+| C5 | Test | On the production build the payments suite's "guest card payment" part timed out loading a page twice (once in the full run, once alone), then passed 83/83 on the next run with no change; it uses no configurable product | Not changed; watched in the next runs |
+
+Checks: backend 568 feature tests (Pint clean); frontend 871 unit tests; admin 222; browser checks 1,841 on the dev server (full run, with the storefront, accounts, and catalog suites rerun alone after C2/C3: 55, 19, 116) and 1,834 on the production build (full run, with the marketing and payments suites rerun alone: 187, 83). Not automated in the browser: hovering a colour dot to change a card's photo (pointer only), uploading a new photo and assigning it (the suite assigns an existing one), and a staff colour option with no swatches yet (refused by design until colours are set).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

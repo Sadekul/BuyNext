@@ -10,9 +10,40 @@ const MAX_VALUES = 20
 
 let rowKey = 0
 const withKey = (option) => ({ ...option, key: `option-${rowKey++}` })
-const toRows = (options) => options.map((option) => withKey({ name: option.name, values: option.values.map((value) => value.value).join(', ') }))
+// Phase 16: type = text (buttons) | color (swatches); swatches by value (lower-cased) → '#RRGGBB' as typed.
+const typeOf = (option) => (option.type === 'color' ? 'color' : 'text')
+const swatchesOf = (option) => Object.fromEntries(option.values.filter((value) => value.swatch).map((value) => [value.value.toLowerCase(), value.swatch]))
+const toRows = (options) =>
+  options.map((option) => withKey({ name: option.name, type: typeOf(option), values: option.values.map((value) => value.value).join(', '), swatches: swatchesOf(option) }))
 const splitValues = (text) => text.split(',').map((value) => value.trim()).filter(Boolean)
 const hasCents = (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
+const isHexColour = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim())
+const swatchOf = (row, value) => (row.swatches[value.toLowerCase()] ?? '').trim()
+
+/** One row as PUT products/:id/options takes it: color → { type, values: [{ value, swatch }] }; text → plain values (+ type when the API knows types). */
+function toOption(row, typed) {
+  const name = row.name.trim()
+  const values = splitValues(row.values)
+  if (row.type === 'color') return { name, type: 'color', values: values.map((value) => ({ value, swatch: swatchOf(row, value).toUpperCase() })) }
+  return { name, ...(typed && { type: 'text' }), values }
+}
+/** What the form holds, compared as the server stores it (trimmed, split, swatches upper-cased). */
+const rowState = (row) => [row.name.trim(), row.type, splitValues(row.values).map((value) => [value, row.type === 'color' ? swatchOf(row, value).toUpperCase() : null])]
+const savedState = (option) => [option.name, typeOf(option), option.values.map((value) => [value.value, typeOf(option) === 'color' ? (value.swatch ?? '').toUpperCase() : null])]
+
+/** "Size: M / Color: Red" in Bangla where the names are set (null when nothing is translated). */
+function variantLabelBn(variant, options) {
+  let translated = false
+  const parts = options.map((option) => {
+    const value = option.values.find((item) => variant.optionValueIds.includes(item.id))
+    if (!value) return null
+    if (option.nameBn || value.valueBn) translated = true
+    return `${option.nameBn || option.name}: ${value.valueBn || value.value}`
+  })
+  return translated ? parts.filter(Boolean).join(' / ') : null
+}
+/** The accessible name of a value's colour fields: "Color value Red: swatch colour". */
+const colourName = (row, index, value) => `${row.name.trim() || `Option ${index + 1}`} value ${value}`
 
 /** "Size: M / Color: Red" from the variant's option value ids. */
 function variantLabel(variant, options) {
@@ -38,6 +69,12 @@ function checkOptions(rows) {
     if (values.length === 0 || values.length > MAX_VALUES) problem.values = `Give 1 to ${MAX_VALUES} values, separated by commas.`
     else if (values.some((value) => value.length > 40)) problem.values = 'Keep each value to 40 characters or fewer.'
     else if (new Set(values.map((value) => value.toLowerCase())).size !== values.length) problem.values = 'Each value can appear once.'
+    // Phase 16: every value of a color option needs its colour as #RRGGBB.
+    if (row.type === 'color') {
+      const swatches = Object.fromEntries(values.filter((value) => !isHexColour(swatchOf(row, value))).map((value) => [value.toLowerCase(), `Pick a colour for ${value} as #RRGGBB (for example #1E40AF).`]))
+      if (Object.keys(swatches).length > 0) problem.swatches = swatches
+    }
+    if (row.type === 'color' && rows.some((other) => other.type === 'color' && rows.indexOf(other) < rows.indexOf(row))) problem.type = 'Only one option can use colour swatches.'
     if (Object.keys(problem).length > 0) errors[row.key] = problem
   }
   return errors
@@ -57,23 +94,32 @@ function ProductVariants({ productId, product, editable }) {
   const [message, setMessage] = useState(null)
   const [announcement, setAnnouncement] = useState('')
   // Changed since the last save (compared as the server stores them: trimmed, split).
-  const dirty = JSON.stringify(rows.map((row) => [row.name.trim(), splitValues(row.values)])) !== JSON.stringify(product.options.map((option) => [option.name, option.values.map((value) => value.value)]))
+  const dirty = JSON.stringify(rows.map(rowState)) !== JSON.stringify(product.options.map(savedState))
+  // Phase 16: the API knows option types (it sent them), so text options say so too.
+  const typed = product.options.some((option) => option.type !== undefined)
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: adminKeys.product(productId) })
   const fail = (error) => setMessage({ tone: 'error', text: error.fieldErrors ? 'The server refused the options: check the messages below.' : actionErrorMessage(error) })
 
   const saveOptions = useMutation({
-    mutationFn: () => saveProductOptions(productId, rows.map((row) => ({ name: row.name.trim(), values: splitValues(row.values) }))),
+    mutationFn: () => saveProductOptions(productId, rows.map((row) => toOption(row, typed))),
     onSuccess: async () => {
       await refresh()
       setErrors({})
       setMessage({ tone: 'success', text: 'Options saved. Variants whose values were removed are no longer sold. Generate combinations to add the new ones.' })
     },
     onError: (error) => {
-      // Server errors come as options.0.name / options.0.values.
+      // Server errors come as options.0.name / options.0.values / options.0.type / options.0.values.1.swatch.
       const found = {}
       for (const [field, messages] of Object.entries(error.fieldErrors ?? {})) {
-        const match = /^options\.(\d+)\.(name|values)/.exec(field)
+        const swatch = /^options\.(\d+)\.values\.(\d+)\.swatch$/.exec(field)
+        if (swatch) {
+          const row = rows[Number(swatch[1])]
+          const value = row && splitValues(row.values)[Number(swatch[2])]
+          if (value) found[row.key] = { ...found[row.key], swatches: { ...found[row.key]?.swatches, [value.toLowerCase()]: messages[0] } }
+          continue
+        }
+        const match = /^options\.(\d+)\.(name|values|type)/.exec(field)
         const row = match && rows[Number(match[1])]
         if (row) found[row.key] = { ...found[row.key], [match[2]]: messages[0] }
       }
@@ -102,7 +148,7 @@ function ProductVariants({ productId, product, editable }) {
     saveOptions.mutate()
   }
   function addOption() {
-    const row = withKey({ name: '', values: '' })
+    const row = withKey({ name: '', type: 'text', values: '', swatches: {} })
     setRows([...rows, row])
     setAnnouncement('Option added.')
     requestAnimationFrame(() => document.getElementById(`${id}-${row.key}-name`)?.focus())
@@ -112,6 +158,7 @@ function ProductVariants({ productId, product, editable }) {
     setRows(rows.filter((_, position) => position !== index))
   }
   const setRow = (index, change) => setRows(rows.map((row, position) => (position === index ? { ...row, ...change } : row)))
+  const setSwatch = (index, value, swatch) => setRow(index, { swatches: { ...rows[index].swatches, [value.toLowerCase()]: swatch } })
 
   return (
     <section className="panel panel--padded product-section" aria-labelledby={`${id}-title`}>
@@ -135,6 +182,7 @@ function ProductVariants({ productId, product, editable }) {
             const rowErrors = errors[row.key] ?? {}
             const nameId = `${id}-${row.key}-name`
             const valuesId = `${id}-${row.key}-values`
+            const typeId = `${id}-${row.key}-type`
             return (
               <div key={row.key} className="option-row">
                 <div className="field">
@@ -173,10 +221,31 @@ function ProductVariants({ productId, product, editable }) {
                     </span>
                   )}
                 </div>
+                <div className="field option-row__type">
+                  <label htmlFor={typeId}>Option {index + 1} type</label>
+                  <select
+                    id={typeId}
+                    value={row.type}
+                    aria-invalid={rowErrors.type ? true : undefined}
+                    aria-describedby={rowErrors.type ? `${typeId}-error` : undefined}
+                    onChange={(event) => setRow(index, { type: event.target.value })}
+                  >
+                    <option value="text">Text buttons</option>
+                    <option value="color">Color swatches</option>
+                  </select>
+                  {rowErrors.type && (
+                    <span id={`${typeId}-error`} className="field__error">
+                      {rowErrors.type}
+                    </span>
+                  )}
+                </div>
                 {editable && (
                   <button type="button" className="icon-button icon-button--danger" aria-label={`Remove option ${row.name || index + 1}`} onClick={() => removeOption(index)}>
                     <LuTrash2 aria-hidden="true" />
                   </button>
+                )}
+                {row.type === 'color' && (
+                  <SwatchFields row={row} index={index} baseId={`${id}-${row.key}`} errors={rowErrors.swatches ?? {}} onChange={(value, swatch) => setSwatch(index, value, swatch)} />
                 )}
               </div>
             )
@@ -224,7 +293,15 @@ function ProductVariants({ productId, product, editable }) {
             </thead>
             <tbody>
               {product.variants.map((variant) => (
-                <VariantRow key={variant.id} productId={productId} variant={variant} label={variantLabel(variant, product.options)} productPrice={product.price} editable={editable} />
+                <VariantRow
+                  key={variant.id}
+                  productId={productId}
+                  variant={variant}
+                  label={variantLabel(variant, product.options)}
+                  labelBn={variantLabelBn(variant, product.options)}
+                  productPrice={product.price}
+                  editable={editable}
+                />
               ))}
             </tbody>
           </table>
@@ -234,10 +311,59 @@ function ProductVariants({ productId, product, editable }) {
   )
 }
 
+/**
+ * Phase 16: a color option's values, each with a native colour picker and a
+ * #RRGGBB text field (both named "<Option> value <Value>: …"). The picker
+ * shows black until a colour is set; the text field holds what is saved.
+ */
+function SwatchFields({ row, index, baseId, errors, onChange }) {
+  const values = splitValues(row.values)
+  return (
+    <fieldset className="swatch-fields">
+      <legend>Colours of option {index + 1}</legend>
+      {values.length === 0 ? (
+        <p className="muted">Type the values first, then pick their colours.</p>
+      ) : (
+        <ul className="swatch-fields__list">
+          {values.map((value, position) => {
+            const swatch = row.swatches[value.toLowerCase()] ?? ''
+            const name = colourName(row, index, value)
+            const hexId = `${baseId}-swatch-${position}`
+            const error = errors[value.toLowerCase()]
+            return (
+              <li key={value.toLowerCase()} className="swatch-field">
+                <span className="swatch-field__value">{value}</span>
+                <input type="color" aria-label={`${name}: swatch colour`} value={isHexColour(swatch) ? swatch.trim().toLowerCase() : '#000000'} onChange={(event) => onChange(value, event.target.value.toUpperCase())} />
+                <input
+                  id={hexId}
+                  aria-label={`${name}: hex code`}
+                  value={swatch}
+                  maxLength={7}
+                  placeholder="#1E40AF"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? `${hexId}-error` : undefined}
+                  onChange={(event) => onChange(value, event.target.value)}
+                />
+                {error && (
+                  <span id={`${hexId}-error`} className="field__error">
+                    {error}
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </fieldset>
+  )
+}
+
 const toForm = (variant) => ({ sku: variant.sku, price: variant.price === null ? '' : String(variant.price), stock: String(variant.stock), isActive: variant.isActive })
 
 /** One variant: its own small form (saved on its own). */
-function VariantRow({ productId, variant, label, productPrice, editable }) {
+function VariantRow({ productId, variant, label, labelBn, productPrice, editable }) {
   const queryClient = useQueryClient()
   const [values, setValues] = useState(() => toForm(variant))
   const [errors, setErrors] = useState({})
@@ -302,7 +428,14 @@ function VariantRow({ productId, variant, label, productPrice, editable }) {
 
   return (
     <tr className={variant.isActive ? undefined : 'is-muted'}>
-      <th scope="row">{label}</th>
+      <th scope="row">
+        {label}
+        {labelBn && (
+          <span className="variant-label-bn muted" lang="bn">
+            {labelBn}
+          </span>
+        )}
+      </th>
       <td>{input('sku', { label: 'SKU', attrs: { maxLength: 64 } })}</td>
       <td>{input('price', { label: 'Price', attrs: { type: 'number', inputMode: 'decimal', min: '0.01', step: '0.01', placeholder: formatMoney(productPrice ?? 0) } })}</td>
       <td>{input('stock', { label: 'Units in stock', attrs: { type: 'number', inputMode: 'numeric', min: '0', step: '1' } })}</td>

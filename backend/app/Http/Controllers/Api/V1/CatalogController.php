@@ -56,7 +56,7 @@ class CatalogController extends Controller
             : null;
         $phrase = $correctedQuery ?? $search;
 
-        $query = Product::forSale($tree)->with(['category', 'brand', ...self::translationRelations()])
+        $query = Product::forSale($tree)->with(['category', 'brand', ...Product::CARD_RELATIONS, ...self::translationRelations()])
             ->when($phrase !== null, fn ($query) => $this->search->filter($query, $phrase))
             // A category includes its subcategories' products.
             ->when($data['category'] ?? null, function ($query, $slug) use ($tree) {
@@ -124,7 +124,7 @@ class CatalogController extends Controller
         if (count($parts) === 0 || array_filter($parts, fn ($part) => ! ctype_digit($part)) !== [] || count($ids) < 2 || count($ids) > 4) {
             throw ValidationException::withMessages(['ids' => __('Choose 2 to 4 products to compare.')]);
         }
-        $products = Product::forSale()->with(['category', 'brand', 'options.values', ...self::translationRelations()])->whereIn('id', $ids)->get()->keyBy('id');
+        $products = Product::forSale()->with(['category', 'brand', ...Product::CARD_RELATIONS, ...self::translationRelations()])->whereIn('id', $ids)->get()->keyBy('id');
 
         $data = [];
         foreach ($ids as $id) {

@@ -40,6 +40,8 @@ export function normalizeProduct(raw) {
     thumbnailVariants: thumbnailVariants(raw),
     // The admin's alt text per image (phase 5), in the same order; null when none was written.
     imageAlts: (raw.images ?? []).map((image) => (typeof image.alt === 'string' && image.alt.trim() ? image.alt.trim() : null)),
+    // Phase 16: the option value each image is shown for (null = every choice), in the same order.
+    imageOptionValueIds: (raw.images ?? []).map((image) => (image.option_value_id === null || image.option_value_id === undefined ? null : Number(image.option_value_id))),
     sku: raw.sku ?? null,
     // Phase 10: gift cards are sold by amount, to a recipient (no stock, no shipping).
     ...(raw.type === 'gift_card' && { type: 'gift_card', giftCard: normalizeGiftCardOptions(raw) }),
@@ -57,6 +59,9 @@ export function normalizeProduct(raw) {
     hasVariants: raw.has_variants === true || (raw.variants?.length ?? 0) > 0,
     ...(raw.options !== undefined && { options: normalizeOptions(raw.options) }),
     ...(raw.variants !== undefined && { variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant, raw)) }),
+    // Phase 16 (list items): the variants' final price range ("From ৳x") and the colour swatches.
+    ...(raw.price_range !== undefined && { priceRange: normalizePriceRange(raw.price_range) }),
+    ...(raw.swatches !== undefined && { swatches: normalizeSwatches(raw.swatches) }),
     // Phase 11: the category's name (compare table), the product's specifications table,
     // its weight, review count and short description (compare), and its linked products.
     ...(typeof raw.category?.name === 'string' && { categoryName: raw.category.name }),
@@ -123,14 +128,49 @@ export function normalizeReview(review) {
   }
 }
 
-/** `options: [{ id, name, values: [{ id, value }] }]`, in the API's order. */
+/** Phase 16: a swatch colour, only as `#RRGGBB` (anything else → null, a neutral swatch). */
+const toSwatch = (value) => (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : null)
+
+/** Phase 16: an option/value `code` ("color", "128-gb"); anything else → null (the name's slug is used). */
+const toCode = (value) => (typeof value === 'string' && value.trim() ? value.trim().toLowerCase().slice(0, 100) : null)
+
+/**
+ * `options: [{ id, name, type, values: [{ id, value, swatch }] }]`, in the API's
+ * order. `type` (phase 16): "color" (round swatches) or "text" (buttons, also
+ * for answers from before phase 16).
+ */
 function normalizeOptions(raw) {
   return (raw ?? []).map((option) => ({
     id: option.id,
     name: option.name,
+    // Phase 16: the language-independent URL key ("color"), the same on English and Bangla pages.
+    code: toCode(option.code),
+    type: option.type === 'color' ? 'color' : 'text',
     // The compare list (phase 11) may name the values only: ["S", "M"].
-    values: (option.values ?? []).map((value) => (typeof value === 'string' ? { id: null, value } : { id: value.id, value: value.value })),
+    values: (option.values ?? []).map((value) =>
+      typeof value === 'string' ? { id: null, value, swatch: null, code: null } : { id: value.id, value: value.value, swatch: toSwatch(value.swatch), code: toCode(value.code) },
+    ),
   }))
+}
+
+/** Phase 16: `price_range: { min, max }` (strings) → numbers; null for simple products or a broken range. */
+function normalizePriceRange(raw) {
+  const min = toNumberOrNull(raw?.min)
+  const max = toNumberOrNull(raw?.max)
+  return min !== null && max !== null && Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null
+}
+
+/** Phase 16: `swatches: [{ value_id, value, swatch, image_url }]` (colour option, max 12). */
+function normalizeSwatches(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((item) => item && typeof item.value === 'string')
+    .slice(0, 12)
+    .map((item) => ({
+      valueId: item.value_id ?? null,
+      value: item.value,
+      swatch: toSwatch(item.swatch),
+      imageUrl: typeof item.image_url === 'string' && item.image_url ? item.image_url : null,
+    }))
 }
 
 /**

@@ -30,7 +30,7 @@ class Wishlists
     public function items(Customer $customer, bool $visibleOnly = true): Collection
     {
         $items = WishlistItem::where('customer_id', $customer->id)
-            ->with(['product.category', 'product.brand', 'product.options.values', 'variant'])
+            ->with(['product.category', 'product.brand', 'product.options.values', 'product.variants', 'product.optionImages', 'variant'])
             ->orderByDesc('id')->get();
         if (! $visibleOnly) {
             return $items;

@@ -37,7 +37,7 @@ const save = async (p, id) => {
 // 0. A guest saves one product and adds one to the cart
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
 await save(page, 2)
-await addToCart(page, 123)
+await addToCart(page, 124) // a simple product (123 is configurable since phase 16)
 
 // 1. The first shopper signs in: her guest items come with her
 await storefrontSignIn(page, SHOPPER)

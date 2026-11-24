@@ -178,6 +178,18 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('position')->orderBy('id');
     }
 
+    /** Phase 16: the images that belong to one choice (for the swatches of product cards). */
+    public function optionImages(): HasMany
+    {
+        return $this->images()->whereNotNull('option_value_id');
+    }
+
+    /**
+     * Phase 16: what a product card needs for configurable products (price_range, swatches).
+     * Add to every list query's with() so cards don't load them one product at a time.
+     */
+    public const CARD_RELATIONS = ['options.values', 'variants', 'optionImages'];
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class)->orderBy('created_at')->orderBy('id');

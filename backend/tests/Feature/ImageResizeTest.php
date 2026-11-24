@@ -100,7 +100,7 @@ class ImageResizeTest extends TestCase
         // A tiny PNG (no GD needed to make it).
         $png = UploadedFile::fake()->createWithContent('a.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='));
         $image = $this->upload([$png])->assertCreated()->json('data.0');
-        $this->assertSame(['id', 'url', 'alt', 'position', 'is_upload', 'variants'], array_keys($image));
+        $this->assertSame(['id', 'url', 'alt', 'position', 'is_upload', 'variants', 'option_value_id'], array_keys($image)); // phase 16: option_value_id
         $this->assertSame([], $image['variants']); // {} in JSON
         $this->assertStringContainsString('"variants":{}', $this->upload([$png])->getContent());
     }
@@ -133,7 +133,7 @@ class ImageResizeTest extends TestCase
         $public = $this->getJson("/api/v1/products/{$this->product->id}")->assertOk();
         $public->assertJsonPath('data.thumbnail_variants', $big['variants']);
         $public->assertJsonPath('data.images.0.variants', $big['variants']);
-        $this->assertSame(['url', 'alt', 'variants'], array_keys($public->json('data.images.0')));
+        $this->assertSame(['url', 'alt', 'variants', 'option_value_id'], array_keys($public->json('data.images.0'))); // phase 16: option_value_id
         $this->getJson('/api/v1/products')->assertOk(); // lists include thumbnail_variants without loading images
 
         // Deleting the image deletes its copies.

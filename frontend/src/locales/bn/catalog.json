@@ -94,7 +94,11 @@
     "soldOut": "বিক্রি শেষ",
     "addToCart": "কার্টে যোগ করুন",
     "unavailable": "পাওয়া যাচ্ছে না",
-    "minimum": "সর্বনিম্ন অর্ডার: {{count, number}}টি (একবারে {{count, number}}টি যোগ হবে)"
+    "minimum": "সর্বনিম্ন অর্ডার: {{count, number}}টি (একবারে {{count, number}}টি যোগ হবে)",
+    "from": "শুরু ",
+    "colours_one": "{{count, number}}টি রং",
+    "colours_other": "{{count, number}}টি রং",
+    "moreSwatches": "+{{count, number}}"
   },
   "quickView": {
     "title": "এক নজরে দেখুন",
@@ -103,7 +107,8 @@
   },
   "variants": {
     "soldOut": " (বিক্রি শেষ)",
-    "unavailable": " (পাওয়া যাচ্ছে না)"
+    "unavailable": " (পাওয়া যাচ্ছে না)",
+    "chosen": ": {{value}}"
   },
   "reviews": {
     "empty": "এখনো কোনো রিভিউ নেই।",
@@ -269,8 +274,6 @@
     "from": "শুরু ",
     "originalPrice": "আগের দাম: ",
     "save": "{{percent, number}}% সাশ্রয়",
-    "chooseToAdd": "কার্টে যোগ করতে {{options}} বেছে নিন",
-    "and": " ও ",
     "addToCart": "কার্টে যোগ করুন",
     "unavailable": "পাওয়া যাচ্ছে না",
     "earnPoints": "এই কেনাকাটায় প্রায় {{points, number}} রিওয়ার্ড পয়েন্ট পাবেন।",
@@ -286,7 +289,8 @@
     "inStock": "স্টকে আছে",
     "specifications": "স্পেসিফিকেশন",
     "moreIn": "{{category}}-এ আরও",
-    "viewAll": "সব দেখুন"
+    "viewAll": "সব দেখুন",
+    "pleaseSelect": "{{option}} বেছে নিন।"
   },
   "comparePage": {
     "title": "পণ্য তুলনা",
