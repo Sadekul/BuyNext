@@ -184,7 +184,7 @@ try {
   // Put everything back
   await api('/api/admin/v1/settings', { method: 'PATCH', token: owner, body: { checkout: settingsBefore.checkout, tax: settingsBefore.tax } })
   await api(`/api/admin/v1/pages/${about.id}`, { method: 'PATCH', token: owner, body: { body: about.body } })
-  await api('/api/admin/v1/home', { method: 'PUT', token: owner, body: { hero: homeBefore.hero, banners: homeBefore.banners, featured_product_ids: homeBefore.featured_product_ids } })
+  await api('/api/admin/v1/home', { method: 'PUT', token: owner, body: { hero_mode: homeBefore.hero_mode, hero: homeBefore.hero, banners: homeBefore.banners, slides: homeBefore.slides, slider: homeBefore.slider, featured_product_ids: homeBefore.featured_product_ids } })
   const restored = (await api('/api/admin/v1/settings', { token: owner })).body.data
   log(JSON.stringify(restored.checkout) === JSON.stringify(settingsBefore.checkout) && JSON.stringify(restored.tax) === JSON.stringify(settingsBefore.tax), 'settings, page, and home content put back')
 }

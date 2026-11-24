@@ -48,7 +48,19 @@
     "offers": "বিশেষ অফার",
     "offersDescription": "এই মুহূর্তে স্টকে থাকা পণ্যে আমাদের সবচেয়ে বড় ছাড়।",
     "favorites": "ক্রেতাদের পছন্দ",
-    "bestSellers": "সর্বাধিক বিক্রিত"
+    "bestSellers": "সর্বাধিক বিক্রিত",
+    "slider": {
+      "label": "বিশেষ আকর্ষণ",
+      "roleCarousel": "ক্যারোসেল",
+      "roleSlide": "স্লাইড",
+      "slideOf": "{{total, number}}টির মধ্যে {{current, number}}",
+      "previous": "আগের স্লাইড",
+      "next": "পরের স্লাইড",
+      "show": "স্লাইড {{number, number}} দেখান",
+      "pause": "স্লাইড থামান",
+      "play": "স্লাইড চালান",
+      "choose": "একটি স্লাইড বেছে নিন"
+    }
   },
   "categories": {
     "eyebrow": "দেখুন",

@@ -30,7 +30,8 @@ import { LOCALES, isLocale, laravelPhase13Data } from './shop/adminPhase13.js'
  *   categories (POST/PATCH)        + bn: { name, description, metaTitle, metaDescription }
  *   pages (POST/PATCH)             + bn: { title, body, metaTitle, metaDescription }
  *   PUT home                       + hero.bn: { eyebrow, title, description, primaryCtaLabel, secondaryCtaLabel, imageAlt, highlights },
- *                                    banners[].bn: { eyebrow, title, description, ctaLabel, imageAlt }
+ *                                    banners[].bn: { eyebrow, title, description, ctaLabel, imageAlt },
+ *                                    slides[].bn: { eyebrow, title, description, primaryCtaLabel, secondaryCtaLabel, imageAlt } (home slider)
  *   GET/PATCH customers/:id        + locale: en | bn | null (null = the store default)
  *   GET orders/:number             + locale: the language the order was placed in
  *   GET/PATCH settings             + general.defaultLocale (en | bn), general.banglaDigits (boolean)
@@ -50,6 +51,8 @@ export const BANGLA_LIMITS = {
   page: { title: 160, body: 100_000, metaTitle: 160, metaDescription: 300 },
   hero: { eyebrow: 60, title: 120, description: 300, primaryCtaLabel: 40, secondaryCtaLabel: 40, imageAlt: 200 },
   banner: { eyebrow: 60, title: 120, description: 300, ctaLabel: 40, imageAlt: 200 },
+  // Home slider (docs/backend/HOME_SLIDER_CONTRACT.md §1): a slide's image description is up to 160.
+  slide: { eyebrow: 60, title: 120, description: 300, primaryCtaLabel: 40, secondaryCtaLabel: 40, imageAlt: 160 },
 }
 const MAX_HIGHLIGHTS = 3
 

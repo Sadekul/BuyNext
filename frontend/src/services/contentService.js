@@ -12,7 +12,7 @@ import { applyBanglaDigits } from '../i18n'
 
 const CATALOG = { sameOrigin: true }
 
-/** GET /api/catalog/home → { hero, banners, featuredProducts }. */
+/** GET /api/catalog/home → { hero, banners, featuredProducts, heroMode, slides, slider }. */
 export async function getHomeContent({ signal } = {}) {
   return normalizeHome(await apiClient.get('/api/catalog/home', { ...CATALOG, signal }))
 }

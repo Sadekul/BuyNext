@@ -3,7 +3,7 @@ import { camelPath } from './laravel.js'
 // Phase 12 §5: the store currency and payment providers (settings), other currencies (sales report).
 import { salesCurrencies, settingsStore } from './adminPhase12.js'
 // Phase 13: the Bangla texts of CMS pages and home blocks.
-import { banglaOf, heroBangla, toBannerBangla, toHeroBangla, withBanglaBody } from './adminPhase13.js'
+import { banglaOf, banglaTexts, heroBangla, toBannerBangla, toHeroBangla, toSlideBangla, withBanglaBody } from './adminPhase13.js'
 
 /*
  * Phase 4 of the admin (docs/backend/PHASE4_CONTRACT.md) from BuyNest's
@@ -162,10 +162,42 @@ const PAGE_FIELDS = { slug: 'slug', title: 'title', body: 'body', metaTitle: 'me
 
 const cta = (raw) => (raw && typeof raw === 'object' ? { label: text(raw.label), url: text(raw.url) } : null)
 
-/** Home content (hero, banners, featured products) → camelCase. */
+const SLIDE_TONES = ['navy', 'emerald', 'amber', 'rose']
+const DEFAULT_SLIDE_SECONDS = 6
+
+/** Home slider (docs/backend/HOME_SLIDER_CONTRACT.md): a stored slide → camelCase, its Bangla texts always in `bn` ('' = English is shown). */
+export function homeSlide(slide = {}) {
+  return {
+    id: typeof slide.id === 'string' ? slide.id : null,
+    eyebrow: text(slide.eyebrow),
+    title: text(slide.title),
+    description: text(slide.description),
+    primaryCta: cta(slide.primary_cta),
+    secondaryCta: cta(slide.secondary_cta),
+    imageUrl: text(slide.image_url),
+    imageAlt: text(slide.image_alt),
+    tone: SLIDE_TONES.includes(slide.tone) ? slide.tone : 'navy',
+    position: Number.isInteger(slide.position) ? slide.position : 0,
+    isActive: slide.is_active !== false,
+    bn: banglaTexts(slide, 'slide'),
+  }
+}
+
+/** Home slider: the top of the page (banner | slider), the slides by position, and the slider settings; defaults when the API has none. */
+function homeSlider(raw) {
+  const seconds = raw.slider?.interval_seconds
+  return {
+    heroMode: raw.hero_mode === 'slider' ? 'slider' : 'banner',
+    slides: (Array.isArray(raw.slides) ? raw.slides : []).map(homeSlide).sort((a, b) => a.position - b.position),
+    slider: { autoplay: raw.slider?.autoplay !== false, intervalSeconds: Number.isInteger(seconds) ? seconds : DEFAULT_SLIDE_SECONDS },
+  }
+}
+
+/** Home content (hero, banners, featured products; home slider: heroMode, slides, slider) → camelCase. */
 export function homeContent(raw = {}) {
   const hero = raw.hero ?? {}
   return {
+    ...homeSlider(raw),
     hero: {
       eyebrow: text(hero.eyebrow),
       title: text(hero.title),
@@ -234,6 +266,25 @@ export function toHomeBody(home) {
       ...toBannerBangla(banner.bn),
     })),
     featured_product_ids: home.featuredProductIds,
+    // Home slider: only what the admin sent (an older client sends none; the API keeps its values).
+    ...(home.heroMode !== undefined && { hero_mode: home.heroMode }),
+    ...(home.slides !== undefined && {
+      slides: home.slides.map((slide, index) => ({
+        ...(slide.id && { id: slide.id }),
+        eyebrow: slide.eyebrow,
+        title: slide.title,
+        description: slide.description,
+        primary_cta: toCta(slide.primaryCta) ?? null,
+        secondary_cta: toCta(slide.secondaryCta) ?? null,
+        image_url: slide.imageUrl,
+        image_alt: slide.imageAlt,
+        tone: slide.tone,
+        position: index, // the list order is the position
+        is_active: slide.isActive,
+        ...toSlideBangla(slide.bn),
+      })),
+    }),
+    ...(home.slider !== undefined && { slider: { autoplay: home.slider.autoplay, interval_seconds: home.slider.intervalSeconds } }),
   }
 }
 

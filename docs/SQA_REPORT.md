@@ -289,6 +289,17 @@ Built by three agents in parallel (backend; storefront with its sign-in service;
 
 Checks: backend 550 feature tests (Pint clean); frontend 817 unit tests; admin 207; browser checks 1,755 on the dev server and 1,748 on the production build (full runs, plus the orders, Bangla and delivery suites rerun alone after the test fixes above), all passing (new `delivery.mjs`: 175). Not automated in the browser: a real SSLCommerz advance payment (stand-in only), printing packing slips on a real printer, importing the courier CSV into a courier's own system (column presets per courier are not claimed), and how dompdf draws Bangla conjuncts on packing slips (the known limit from phase 13). The Bangla thana names still need a native speaker's review.
 
+## Home page: single banner or slider, and Bangla demo content — 2026-11-24
+
+Asked by the user. Built by three agents in parallel (backend; admin with its sign-in service routes; storefront) against [backend/HOME_SLIDER_CONTRACT.md](backend/HOME_SLIDER_CONTRACT.md), then verified with the new `slider.mjs` browser suite (41 checks). Checks: the admin chooses "Single banner" or "Slider" (both kept), up to 8 slides with English and Bangla texts, colour, image, two buttons, active, order, autoplay and seconds per slide; the store's carousel follows the WAI-ARIA pattern (labels, Previous / Next, dots with `aria-current`, Pause / Play, arrow keys, swipe, hidden slides inert, no autoplay with reduced motion, no layout shift); slider mode needs an active slide and the public API falls back to the banner otherwise. Bangla drafts for the demo home texts, slides, and the 24 category names are filled only where the Bangla is empty and the English is still the demo text (listed in [I18N.md](I18N.md) for review).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| S1 | Medium | The home page save replaced everything: a save that left out the slider keys (an older client, script, or the system suite's cleanup) reset them and deleted every slide — found by the full browser run, where the slider suite started with 0 slides | A save without `hero_mode`, `slides`, or `slider` keeps what is stored (backend test); the system suite puts every key back |
+| S2 | Test | "Featured" (the carousel) also matched the home page's "Featured products" region | The suite matches the carousel's name exactly |
+
+Checks: backend 561 feature tests (Pint clean); frontend 844 unit tests; admin 213; browser checks 1,796 on the dev server (full run, with the slider suite rerun alone after fixing S1: 41; the system suite rerun too: 40) and 1,789 on the production build (full run, all passing).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

@@ -39,5 +39,8 @@ class DatabaseSeeder extends Seeder
         if (app()->environment('local') && Product::withTrashed()->doesntExist()) {
             $this->command?->call('buynest:import-catalog');
         }
+
+        // Bangla drafts for the demo categories and home content (only empty fields; see the seeder).
+        $this->call(BanglaDemoContentSeeder::class);
     }
 }

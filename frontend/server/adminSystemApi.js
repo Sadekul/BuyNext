@@ -34,8 +34,10 @@ import { COD_SETTING_RULES, defaultCountryRule } from './adminPhase14Api.js'
  *   GET    /api/admin/pages/:id
  *   PATCH  /api/admin/pages/:id                     → { page } (body comes back sanitized)
  *   DELETE /api/admin/pages/:id
- *   GET    /api/admin/home                          → { hero, banners, featuredProductIds, featuredProducts }
- *   PUT    /api/admin/home                          { hero, banners, featuredProductIds } → { home }
+ *   GET    /api/admin/home                          → { hero, banners, featuredProductIds, featuredProducts, heroMode, slides, slider }
+ *   PUT    /api/admin/home                          { hero, banners, featuredProductIds, heroMode?, slides?, slider? } → { home }
+ *          (home slider, docs/backend/HOME_SLIDER_CONTRACT.md: heroMode "banner" | "slider"; slides[] up to 8,
+ *           errors by path like "slides.0.title"; slider { autoplay, intervalSeconds 3–15 })
  *   GET    /api/admin/reports/sales|products|customers|coupons|low-stock?from&to&groupBy&limit
  *   GET    /api/admin/reports/sales.csv|products.csv  → the CSV file, with the API's Content-Type and Content-Disposition
  *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog, returns, security (phase 9) }
@@ -138,6 +140,12 @@ export function validatePage(body, { partial }) {
 export const BANNER_TONES = ['navy', 'emerald', 'amber', 'rose']
 const MAX_BANNERS = 10
 const MAX_FEATURED = 8
+// Home slider (docs/backend/HOME_SLIDER_CONTRACT.md): the top of the home page is the single banner (hero) or a slider.
+export const HERO_MODES = ['banner', 'slider']
+export const MAX_SLIDES = 8
+export const SLIDER_SECONDS = { min: 3, max: 15, default: 6 }
+// A slide's image: an http(s) address (up to 2048 characters), or none.
+const isImageAddress = (value) => typeof value === 'string' && value.length <= 2048 && (value === '' || /^https?:\/\/\S+$/i.test(value))
 
 /** PUT /home: the whole home content, every field checked; errors by path ("banners.0.title"). */
 export function validateHome(body) {
@@ -202,12 +210,61 @@ export function validateHome(body) {
     return item
   })
 
+  // Home slider: heroMode, slides and slider are optional (an older client sends none; the API keeps its defaults).
+  const extra = {}
+  if (body.heroMode !== undefined) {
+    if (HERO_MODES.includes(body.heroMode)) extra.heroMode = body.heroMode
+    else errors.heroMode = ['Choose a single banner or a slider.']
+  }
+  if (body.slides !== undefined && (!Array.isArray(body.slides) || body.slides.length > MAX_SLIDES)) errors.slides = [`Use up to ${MAX_SLIDES} slides.`]
+  if (Array.isArray(body.slides)) {
+    extra.slides = body.slides.slice(0, MAX_SLIDES).map((slide, index) => {
+      const path = `slides.${index}`
+      const id = slide?.id
+      const imageUrl = typeof slide?.imageUrl === 'string' ? slide.imageUrl.trim() : ''
+      if (!isImageAddress(slide?.imageUrl ?? '')) errors[`${path}.imageUrl`] = ['Use an https:// image address.']
+      const item = {
+        id: typeof id === 'string' && /^[a-z0-9-]{1,60}$/.test(id) ? id : null,
+        eyebrow: textAt(`${path}.eyebrow`, slide?.eyebrow, 60),
+        title: textAt(`${path}.title`, slide?.title, 120, { min: 1 }),
+        description: textAt(`${path}.description`, slide?.description, 300),
+        primaryCta: ctaAt(`${path}.primaryCta`, slide?.primaryCta, { optional: true }),
+        secondaryCta: ctaAt(`${path}.secondaryCta`, slide?.secondaryCta, { optional: true }),
+        imageUrl,
+        imageAlt: textAt(`${path}.imageAlt`, slide?.imageAlt, 160),
+        tone: slide?.tone === undefined || slide?.tone === null ? 'navy' : BANNER_TONES.includes(slide.tone) ? slide.tone : null,
+        isActive: slide?.isActive !== false,
+      }
+      if (slide?.bn !== undefined) {
+        const checked = checkBangla(slide.bn, 'slide', `${path}.bn`)
+        Object.assign(errors, checked.errors)
+        item.bn = checked.values
+      }
+      if (!item.tone) errors[`${path}.tone`] = ['Choose a color.']
+      if (item.imageUrl && !item.imageAlt && !errors[`${path}.imageAlt`]) errors[`${path}.imageAlt`] = ['Describe the image for people who cannot see it.']
+      return item
+    })
+  }
+  if (extra.heroMode === 'slider' && !errors.slides && !(extra.slides ?? []).some((slide) => slide.isActive)) {
+    errors.slides = ['Add at least one active slide, or show the single banner instead.']
+  }
+  if (body.slider !== undefined) {
+    const slider = body.slider
+    if (!slider || typeof slider !== 'object' || Array.isArray(slider)) errors.slider = ['Send the slider settings as fields.']
+    else {
+      const seconds = slider.intervalSeconds ?? SLIDER_SECONDS.default
+      if (slider.autoplay !== undefined && typeof slider.autoplay !== 'boolean') errors['slider.autoplay'] = ['Choose whether the slides play automatically.']
+      if (!Number.isInteger(seconds) || seconds < SLIDER_SECONDS.min || seconds > SLIDER_SECONDS.max) errors['slider.intervalSeconds'] = [`Choose ${SLIDER_SECONDS.min} to ${SLIDER_SECONDS.max} seconds.`]
+      extra.slider = { autoplay: slider.autoplay !== false, intervalSeconds: seconds }
+    }
+  }
+
   const ids = body.featuredProductIds
   if (ids !== undefined && (!Array.isArray(ids) || ids.length > MAX_FEATURED || !ids.every((id) => Number.isInteger(id) && id > 0))) {
     errors.featuredProductIds = [`Choose up to ${MAX_FEATURED} products.`]
   }
   const featuredProductIds = Array.isArray(ids) ? [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, MAX_FEATURED) : []
-  return Object.keys(errors).length > 0 ? { errors } : { values: { hero, banners, featuredProductIds } }
+  return Object.keys(errors).length > 0 ? { errors } : { values: { hero, banners, featuredProductIds, ...extra } }
 }
 
 const SHIPPING_METHODS = ['standard', 'express', 'nextDay']

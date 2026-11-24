@@ -48,3 +48,5 @@ export const BANGLA_STATUSES = {
   complete: { tone: 'success', label: 'Complete' },
   missing: { tone: 'warning', label: 'Missing' },
 }
+// Home slider (docs/backend/HOME_SLIDER_CONTRACT.md): a slide's Bangla texts.
+export const SLIDE_BANGLA_FIELDS = ['eyebrow', 'title', 'description', 'primaryCtaLabel', 'secondaryCtaLabel', 'imageAlt']

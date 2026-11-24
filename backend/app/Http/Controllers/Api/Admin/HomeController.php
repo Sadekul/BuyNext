@@ -11,7 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/** The home page editor: hero, banners (any status, by position), and featured products. */
+/** The home page editor: hero or slider (hero_mode), slides and banners (any status, by position), and featured products. */
 class HomeController extends Controller
 {
     public function __construct(private HomeContent $home, private Audit $audit) {}
@@ -22,9 +22,16 @@ class HomeController extends Controller
         return response()->json(['data' => $this->payload($this->home->get())]);
     }
 
-    /** PUT /api/admin/v1/home { hero, banners, featured_product_ids } - replaces the whole content. */
+    /** PUT /api/admin/v1/home { hero_mode?, hero, banners, slides?, slider?, featured_product_ids } - replaces the whole content. */
     public function update(Request $request): JsonResponse
     {
+        // A save that leaves out the slider keys (an older client or script) keeps what is stored,
+        // instead of resetting them: leaving out `slides` must never delete the slides.
+        $stored = $this->home->get();
+        $request->merge(collect(['hero_mode', 'slides', 'slider'])
+            ->reject(fn (string $key) => $request->exists($key))
+            ->mapWithKeys(fn (string $key) => [$key => $stored[$key]])
+            ->all());
         $data = $request->validate($this->home->rules(), $this->home->messages());
         $content = $this->home->normalize($data);
 

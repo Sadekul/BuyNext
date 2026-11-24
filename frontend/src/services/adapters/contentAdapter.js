@@ -63,13 +63,56 @@ function normalizeBanners(raw = []) {
     }))
 }
 
-/** GET /home `{ data: { hero, banners, featured_products } }` → `{ hero, banners, featuredProducts }`. */
+/**
+ * Home slider (docs/backend/HOME_SLIDER_CONTRACT.md): slide → the HeroSlider
+ * `slides[]` item, same field names as the HeroBanner `content` prop
+ * (`image`, `imageAlt`, `primaryCta: { label, to }`). The API already sends
+ * active slides only, in order; a stray inactive one is dropped anyway.
+ */
+function normalizeSlides(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((slide) => slide && slide.is_active !== false && slide.title)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((slide, index) => ({
+      id: slide.id ?? `slide-${index}`,
+      eyebrow: slide.eyebrow ?? '',
+      title: slide.title,
+      description: slide.description ?? '',
+      primaryCta: toCta(slide.primary_cta),
+      secondaryCta: toCta(slide.secondary_cta),
+      image: slide.image_url || null,
+      imageAlt: slide.image_alt ?? '',
+      tone: TONES.includes(slide.tone) ? slide.tone : 'navy',
+    }))
+}
+
+export const DEFAULT_SLIDER = { autoplay: true, intervalSeconds: 6 }
+
+/** `slider: { autoplay, interval_seconds }` → `{ autoplay, intervalSeconds }` (3–15 s, default 6). */
+function normalizeSlider(raw) {
+  const seconds = Number(raw?.interval_seconds)
+  return {
+    autoplay: typeof raw?.autoplay === 'boolean' ? raw.autoplay : DEFAULT_SLIDER.autoplay,
+    intervalSeconds: Number.isInteger(seconds) ? Math.min(15, Math.max(3, seconds)) : DEFAULT_SLIDER.intervalSeconds,
+  }
+}
+
+/**
+ * GET /home `{ data: { hero, banners, featured_products, hero_mode, slides, slider } }`
+ * → `{ hero, banners, featuredProducts, heroMode, slides, slider }`. An answer
+ * without `hero_mode` (older API) or a slider without slides is banner mode.
+ */
 export function normalizeHome(raw) {
   const data = raw?.data ?? {}
+  const slides = normalizeSlides(data.slides)
   return {
     hero: normalizeHero(data.hero),
     banners: normalizeBanners(data.banners),
     featuredProducts: (data.featured_products ?? []).map(normalizeProduct),
+    heroMode: data.hero_mode === 'slider' && slides.length > 0 ? 'slider' : 'banner',
+    slides,
+    slider: normalizeSlider(data.slider),
   }
 }
 

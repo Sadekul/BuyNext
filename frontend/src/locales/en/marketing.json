@@ -48,7 +48,19 @@
     "offers": "Special offers",
     "offersDescription": "Our biggest in-stock discounts right now.",
     "favorites": "Customer favorites",
-    "bestSellers": "Best sellers"
+    "bestSellers": "Best sellers",
+    "slider": {
+      "label": "Featured",
+      "roleCarousel": "carousel",
+      "roleSlide": "slide",
+      "slideOf": "{{current, number}} of {{total, number}}",
+      "previous": "Previous slide",
+      "next": "Next slide",
+      "show": "Show slide {{number, number}}",
+      "pause": "Pause slides",
+      "play": "Play slides",
+      "choose": "Choose a slide"
+    }
   },
   "categories": {
     "eyebrow": "Browse",

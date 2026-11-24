@@ -32,6 +32,8 @@ export const BANGLA_FIELDS = {
   page: { title: 'title', body: 'body', metaTitle: 'meta_title', metaDescription: 'meta_description' },
   hero: { eyebrow: 'eyebrow', title: 'title', description: 'description', primaryCtaLabel: 'primary_cta_label', secondaryCtaLabel: 'secondary_cta_label', imageAlt: 'image_alt' },
   banner: { eyebrow: 'eyebrow', title: 'title', description: 'description', ctaLabel: 'cta_label', imageAlt: 'image_alt' },
+  // Home slider (docs/backend/HOME_SLIDER_CONTRACT.md): a slide's texts, kept in its `bn` like the hero's.
+  slide: { eyebrow: 'eyebrow', title: 'title', description: 'description', primaryCtaLabel: 'primary_cta_label', secondaryCtaLabel: 'secondary_cta_label', imageAlt: 'image_alt' },
 }
 
 /** The API record's Bangla texts → { field: text } in the admin's names ('' = falls back to English). Home blocks keep them in `bn`. */
@@ -52,7 +54,7 @@ export const withBanglaBody = (body, values, kind) => (values.bn ? { ...body, ..
 /** `{ bn }` of a record when the API sent its translations (older answers: nothing). */
 export const banglaOf = (raw, kind) =>
   raw && (raw.translations !== undefined || (HOME_KINDS.includes(kind) && raw.bn !== undefined) || Object.values(BANGLA_FIELDS[kind]).some((api) => raw[`${api}_bn`] !== undefined)) ? { bn: banglaTexts(raw, kind) } : {}
-const HOME_KINDS = ['hero', 'banner']
+const HOME_KINDS = ['hero', 'banner', 'slide']
 
 /** The home hero's Bangla texts (+ highlights), when the API sent them. */
 export function heroBangla(raw) {
@@ -69,6 +71,8 @@ export function toHeroBangla(bn) {
   return { bn: out }
 }
 export const toBannerBangla = (bn) => (bn ? { bn: toBanglaBody(bn, 'banner').translations.bn } : {})
+/** Home slider: a validated slide's Bangla texts → the API's `slides[].bn` (snake_case; null = English is shown). */
+export const toSlideBangla = (bn) => (bn ? { bn: toBanglaBody(bn, 'slide').translations.bn } : {})
 
 // ---- products ----
 

@@ -10,13 +10,10 @@ import { formatMoney } from '../utils/format'
 // Phase 13 §4: the hero's and banners' Bangla texts.
 import BanglaField from '../components/BanglaField'
 import { BANNER_BANGLA_FIELDS, HERO_BANGLA_FIELDS, banglaValues, toBangla } from '../utils/bangla'
+// Home page: single banner or slider (docs/backend/HOME_SLIDER_CONTRACT.md §4).
+import { BanglaGroup, HeroModeChoice, SlidesEditor } from '../components/HomeSlides'
+import { TONES, slideErrors, slideForm, sliderForm, toSlider, toSlides } from '../utils/homeSlides'
 
-const TONES = [
-  { value: 'navy', label: 'Navy' },
-  { value: 'emerald', label: 'Emerald' },
-  { value: 'amber', label: 'Amber' },
-  { value: 'rose', label: 'Rose' },
-]
 const MAX_BANNERS = 10
 const MAX_FEATURED = 8
 const LINK = /^(\/(?!\/)|https?:\/\/)\S*$/i
@@ -28,23 +25,7 @@ const emptyBanner = (bangla = false) =>
   withKey({ id: null, eyebrow: '', title: '', description: '', cta: { label: '', url: '' }, imageUrl: '', imageAlt: '', tone: 'navy', isActive: true, ...(bangla && { bn: banglaValues(null, BANNER_BANGLA_FIELDS) }) })
 const heroBangla = (bn) => ({ ...banglaValues(bn, HERO_BANGLA_FIELDS), highlights: [0, 1, 2].map((index) => bn?.highlights?.[index] ?? '') })
 
-/** Phase 13: a "Bangla (বাংলা)" group of fields inside a hero or banner. */
-function BanglaGroup({ children }) {
-  return (
-    <fieldset className="form__fieldset bangla-section">
-      <legend>
-        Bangla{' '}
-        <span lang="bn" className="muted">
-          (বাংলা)
-        </span>
-      </legend>
-      <p className="field__hint">Shown when shoppers use the store in Bangla. Empty fields show the English text.</p>
-      {children}
-    </fieldset>
-  )
-}
-
-/** Content → Home page: hero, promo banners (ordered), and featured products. Needs content.view; saving content.edit. */
+/** Content → Home page: the top of the page (single banner or slider), promo banners (ordered), and featured products. Needs content.view; saving content.edit. */
 function HomeEditorPage() {
   const home = useQuery({ queryKey: adminKeys.home, queryFn: ({ signal }) => getHome({ signal }) })
   if (home.isPending) return <Loading label="Loading the home page…" />
@@ -68,6 +49,10 @@ function HomeEditor({ saved }) {
   const setHeroBn = (field) => (text) => setHero((current) => ({ ...current, bn: { ...current.bn, [field]: text } }))
   const setBannerBn = (banner, field) => (text) => setBanner(banner.key, { bn: { ...banner.bn, [field]: text } })
   const [featured, setFeatured] = useState(() => saved.featuredProductIds.map((id) => saved.featuredProducts.find((product) => product.id === id) ?? { id, title: `Product #${id}` }))
+  // Home slider: which one the store shows at the top; both the hero and the slides are kept and saved.
+  const [heroMode, setHeroMode] = useState(saved.heroMode === 'slider' ? 'slider' : 'banner')
+  const [slides, setSlides] = useState(() => (Array.isArray(saved.slides) ? saved.slides : []).map(slideForm))
+  const [slider, setSlider] = useState(() => sliderForm(saved.slider))
   const [errors, setErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [announcement, setAnnouncement] = useState('') // reorder/add/remove, for screen readers
@@ -124,10 +109,22 @@ function HomeEditor({ saved }) {
     },
     onError: (error) => {
       setErrors(error.fieldErrors ?? {})
-      setNotice({ tone: 'error', text: error.fieldErrors ? 'Please check the highlighted fields.' : error.message })
+      setNotice({ tone: 'error', text: error.fieldErrors ? checkText(error.fieldErrors) : error.message })
       requestAnimationFrame(() => noticeRef.current?.focus())
     },
   })
+
+  // A problem in the part that is not shown (the hero in slider mode, a slide in banner mode) says where to find it.
+  function checkText(found) {
+    const paths = Object.keys(found)
+    if (heroMode === 'slider' && paths.some((path) => path.startsWith('hero.'))) return 'Please check the highlighted fields. The single banner has a problem too: choose “Single banner” to see it.'
+    if (heroMode === 'banner' && paths.some((path) => path.startsWith('slides') || path.startsWith('slider'))) return 'Please check the highlighted fields. A slide has a problem too: choose “Slider” to see it.'
+    return 'Please check the highlighted fields.'
+  }
+  function chooseMode(mode) {
+    setHeroMode(mode)
+    setErrors((current) => Object.fromEntries(Object.entries(current).filter(([path]) => path !== 'heroMode' && path !== 'slides')))
+  }
 
   function submit(event) {
     event.preventDefault()
@@ -141,9 +138,11 @@ function HomeEditor({ saved }) {
       if (!banner.cta.label.trim()) found[`banners.${index}.cta.label`] = ['Enter the button text.']
       if (!LINK.test(banner.cta.url)) found[`banners.${index}.cta.url`] = ['Use a store path like /products or an https:// address.']
     })
+    Object.assign(found, slideErrors(heroMode, slides, slider))
     setErrors(found)
     if (Object.keys(found).length > 0) {
-      setNotice({ tone: 'error', text: 'Please check the highlighted fields.' })
+      setNotice({ tone: 'error', text: checkText(found) })
+      requestAnimationFrame(() => noticeRef.current?.focus())
       return
     }
     const secondary = hero.secondaryCta.label.trim() || hero.secondaryCta.url.trim() ? hero.secondaryCta : null
@@ -167,6 +166,9 @@ function HomeEditor({ saved }) {
         ...(banner.bn && { bn: toBangla(banner.bn, BANNER_BANGLA_FIELDS) }),
       })),
       featuredProductIds: featured.map((product) => product.id),
+      heroMode,
+      slides: toSlides(slides),
+      slider: toSlider(slider),
     })
   }
 
@@ -175,7 +177,7 @@ function HomeEditor({ saved }) {
   return (
     <>
       <title>Home page | BuyNest Admin</title>
-      <PageHeader title="Home page" description="The store's front page: the hero, promo banners, and featured products." />
+      <PageHeader title="Home page" description="The store's front page: a single banner or a slider at the top, promo banners, and featured products." />
       <div role={notice?.tone === 'error' ? 'alert' : 'status'}>
         {notice && (
           <p ref={noticeRef} tabIndex={-1} className={notice.tone === 'success' ? 'notice notice--success' : 'form-error'}>
@@ -189,7 +191,13 @@ function HomeEditor({ saved }) {
 
       <form className="form" noValidate onSubmit={submit}>
         <fieldset disabled={!editable} className="form__fieldset">
-          <section className="panel" aria-labelledby="hero-title">
+          <HeroModeChoice mode={heroMode} onChange={chooseMode} error={err('heroMode')} />
+
+          {heroMode === 'slider' && (
+            <SlidesEditor slides={slides} setSlides={setSlides} slider={slider} setSlider={setSlider} err={err} announce={setAnnouncement} clearErrors={() => setErrors({})} />
+          )}
+
+          <section className="panel" aria-labelledby="hero-title" hidden={heroMode !== 'banner'}>
             <h2 id="hero-title" className="panel__title">
               Hero
             </h2>

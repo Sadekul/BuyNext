@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import HeroBanner from '../components/home/HeroBanner'
+import HeroSlider from '../components/home/HeroSlider'
 import FeaturedCategories from '../components/home/FeaturedCategories'
 import ProductSection from '../components/home/ProductSection'
 import PromoBanner from '../components/home/PromoBanner'
@@ -26,11 +27,15 @@ import { useTranslation } from 'react-i18next'
 const EMPTY_COLLECTIONS = { featured: [], newArrivals: [], bestSellers: [], specialOffers: [] }
 
 /**
- * REAL_SHOP: the hero from the admin's CMS. While it loads (or if it can't
+ * REAL_SHOP: the hero (single banner or slider) from the admin's CMS. While it loads (or if it can't
  * be loaded) the page keeps its h1 and the sections below still render.
  */
-function CmsHero({ request }) {
+function CmsHero({ request, storeName }) {
   const { t } = useTranslation('marketing')
+  // The admin's choice (HOME_SLIDER_CONTRACT.md): the slider when it has a slide, the single banner otherwise.
+  if (request.data?.heroMode === 'slider' && request.data.slides?.length > 0) {
+    return <HeroSlider slides={request.data.slides} settings={request.data.slider} heading={storeName || SITE.name} />
+  }
   if (request.data) return <HeroBanner content={request.data.hero} />
   return (
     <section className="hero section" aria-labelledby="hero-title">
@@ -106,7 +111,7 @@ function HomePage() {
 
   return (
     <>
-      {REAL_SHOP ? <CmsHero request={homeRequest} /> : <HeroBanner content={localizedHeroContent(t, freeShipping)} />}
+      {REAL_SHOP ? <CmsHero request={homeRequest} storeName={settings.storeName} /> : <HeroBanner content={localizedHeroContent(t, freeShipping)} />}
       <BenefitsSection benefits={localizedBenefits(t, freeShipping)} />
       <FeaturedCategories
         categories={categories}

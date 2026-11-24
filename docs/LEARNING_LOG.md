@@ -292,3 +292,11 @@
 - Cash on delivery as a payment state machine: advance paid online, partly paid, cash collected (in full or short), invoiced at the end
 - Operational workflows for staff: a phone-confirmation queue with a log, and a guarded override with a reason
 - Files for other systems: PDFs for printing and CSV for couriers (UTF-8 BOM for Excel, formula-injection guard, local phone format)
+
+## Home page: single banner or slider (2026-11-24)
+
+- One stored content with a mode switch (`hero_mode`), so switching back never loses the other design
+- A carousel built to the WAI-ARIA pattern: roledescription, "2 of 3" slide labels, Pause / Play, no autoplay with reduced motion, hidden slides made `inert`
+- A safe fallback in the public API: slider mode with no active slide shows the banner instead of an empty slider
+- "Replace everything" saves need the client to send every key back, or the server's defaults wipe data: the admin always sends slides and settings
+- Data migrations that only fill empty fields whose English is still the demo text, so staff edits are never overwritten

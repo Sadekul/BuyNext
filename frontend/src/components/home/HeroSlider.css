@@ -1,0 +1,218 @@
+/*
+ * Home page slider: each slide is the hero's layout (HeroBanner.css: hero__inner,
+ * hero__copy, hero__title…) on a promo-banner tone (PromoBanner.css).
+ * Every slide sits in the same grid cell, so the slider keeps the height of its
+ * tallest slide (never less than the min-height below) and nothing shifts.
+ */
+
+.hero-slider {
+  position: relative;
+  overflow: hidden;
+  color: var(--color-text-inverse);
+  background: var(--color-secondary);
+}
+
+.hero-slider__slides {
+  display: grid;
+  min-height: 36rem;
+}
+
+.hero-slider__slide {
+  display: flex;
+  grid-area: 1 / 1;
+  align-items: center;
+  min-width: 0;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 400ms ease,
+    visibility 0s linear 400ms;
+}
+
+.hero-slider__slide--active {
+  visibility: visible;
+  opacity: 1;
+  transition:
+    opacity 400ms ease,
+    visibility 0s;
+}
+
+/* The same tones as the promo banners: dark enough for white text (WCAG AA). */
+.hero-slider__slide--navy {
+  background:
+    radial-gradient(circle at 85% 20%, rgb(52 211 153 / 0.16), transparent 45%),
+    linear-gradient(135deg, var(--color-secondary), #1e3a5f);
+}
+
+.hero-slider__slide--emerald {
+  background:
+    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.12), transparent 45%),
+    linear-gradient(135deg, var(--color-primary), #065f46);
+}
+
+.hero-slider__slide--amber {
+  background:
+    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.1), transparent 45%),
+    linear-gradient(135deg, #92400e, #b45309);
+}
+
+.hero-slider__slide--rose {
+  background:
+    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.1), transparent 45%),
+    linear-gradient(135deg, #9f1239, #be123c);
+}
+
+/* Room at the bottom for the controls, which sit over the slides. */
+.hero-slider__inner {
+  width: 100%;
+  padding-block: var(--space-10) calc(var(--space-16) + var(--space-4));
+}
+
+.hero-slider__copy {
+  min-width: 0;
+}
+
+.hero-slider__title {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.hero-slider__description {
+  color: inherit;
+  opacity: 0.9;
+}
+
+.hero-slider .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.hero-slider__secondary {
+  color: var(--color-text-inverse);
+  border-color: rgb(255 255 255 / 0.7);
+}
+
+.hero-slider__secondary:hover:not(:disabled) {
+  border-color: var(--color-text-inverse);
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+/* White focus ring: the site's green ring would vanish on the emerald slide. */
+.hero-slider :focus-visible {
+  outline-color: var(--color-text-inverse);
+  box-shadow: 0 0 0 6px rgb(15 23 42 / 0.6);
+}
+
+.hero-slider__visual {
+  display: grid;
+  place-items: center;
+  width: min(100%, 16rem);
+  margin-inline: auto;
+}
+
+.hero-slider__image {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 24px 32px rgb(0 0 0 / 0.35));
+}
+
+.hero-slider__controls {
+  position: absolute;
+  inset-inline: 0;
+  bottom: var(--space-4);
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.hero-slider__button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: var(--text-lg);
+  color: var(--color-secondary);
+  background: var(--color-bg);
+  border: 0;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.hero-slider__button:hover {
+  background: var(--color-primary-soft);
+}
+
+.hero-slider__dots {
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * A 24px target around a 12px dot (WCAG 2.5.8): with 8 slides the whole row
+ * (3 buttons + 8 dots) is 336px, so it stays on one line at 390px.
+ */
+.hero-slider__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.hero-slider__dot::before {
+  content: '';
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--color-text-inverse);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.35);
+  transition:
+    width var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.hero-slider__dot[aria-current='true']::before {
+  width: 1.25rem;
+  background: var(--color-text-inverse);
+}
+
+@media (min-width: 768px) {
+  .hero-slider__slides {
+    min-height: 30rem;
+  }
+
+  .hero-slider__visual {
+    width: min(100%, 20rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero-slider__slides {
+    min-height: 32rem;
+  }
+
+  .hero-slider__inner {
+    grid-template-columns: 1.1fr 1fr;
+  }
+
+  /* No image: the text takes the whole width. */
+  .hero-slider__inner--text {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-slider__visual {
+    width: min(100%, 26rem);
+  }
+}
