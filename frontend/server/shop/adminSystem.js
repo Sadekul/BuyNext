@@ -309,7 +309,8 @@ const SETTINGS = {
     default_weight_grams: 'defaultWeightGrams',
   },
   tax: { tax_enabled: 'taxEnabled', tax_rates: 'taxRates', prices_include_tax: 'pricesIncludeTax' },
-  checkout: { allowed_countries: 'allowedCountries', guest_checkout: 'guestCheckout', enabled_payment_methods: 'enabledPaymentMethods' },
+  // Phase 14 §2: + the country new addresses start with (null = none).
+  checkout: { allowed_countries: 'allowedCountries', guest_checkout: 'guestCheckout', enabled_payment_methods: 'enabledPaymentMethods', default_country: 'defaultCountry' },
   inventory: { low_stock_threshold: 'lowStockThreshold' },
   // Phase 5: reviews wait for approval unless this is off.
   catalog: { reviews_require_approval: 'reviewsRequireApproval' },
@@ -330,15 +331,19 @@ const SETTINGS = {
     signup_bonus: 'signupBonus',
     review_bonus: 'reviewBonus',
   },
+  // Phase 14 §4: Payment methods → Cash on delivery.
+  cod: { max_order_total: 'maxOrderTotal', fee: 'fee', advance: 'advance', zones: 'zones', require_confirmation: 'requireConfirmation' },
 }
 export const SETTINGS_GROUPS = Object.fromEntries(Object.entries(SETTINGS).map(([group, keys]) => [group, Object.values(keys)]))
 const MONEY_SETTINGS = ['standardPrice', 'freeShippingThreshold', 'expressPrice', 'nextDayPrice']
 // Phase 11 §4: decimal settings the API may send as strings ("1.00", "0.0100").
 const NUMBER_SETTINGS = ['earnRate', 'pointValue']
+// Phase 14 §4: the COD limit (null = none) and fee, money strings.
+const COD_MONEY = ['maxOrderTotal', 'fee']
 
 export function storeSettings(raw = {}) {
   const fromValue = (key, value) => {
-    if (MONEY_SETTINGS.includes(key) || NUMBER_SETTINGS.includes(key)) return money(value)
+    if (MONEY_SETTINGS.includes(key) || NUMBER_SETTINGS.includes(key) || COD_MONEY.includes(key)) return money(value)
     if (key === 'taxRates') return (Array.isArray(value) ? value : []).map((rate) => ({ country: text(rate?.country), rate: money(rate?.rate) ?? 0 }))
     return value ?? null
   }
@@ -358,6 +363,7 @@ export function toSettingsBody(changes) {
     // Phase 11 §4: like the API answers them ("1.00", "0.0100").
     if (key === 'earnRate') return value.toFixed(2)
     if (key === 'pointValue') return value.toFixed(4)
+    if (COD_MONEY.includes(key)) return value === null ? null : value.toFixed(2)
     if (key === 'taxRates') return value.map((rate) => ({ country: rate.country, rate: rate.rate.toFixed(2) }))
     return value
   }

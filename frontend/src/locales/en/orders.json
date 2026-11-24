@@ -13,7 +13,8 @@
     "paid": "Paid",
     "partially_refunded": "Partly refunded",
     "refunded": "Refunded",
-    "review": "Being checked"
+    "review": "Being checked",
+    "partially_paid": "Partly paid"
   },
   "returnStatus": {
     "requested": {
@@ -61,7 +62,10 @@
     "awaitPaypal": "Awaiting payment: nothing has been charged yet. Approve the payment on PayPal's site with Pay now. If it isn't completed in time, the order is cancelled and the items are released.",
     "awaitSslcommerz": "Awaiting payment: nothing has been charged yet. Pay with bKash, Nagad, Rocket, or a card on SSLCommerz's secure page with Pay now. If it isn't completed in time, the order is cancelled and the items are released.",
     "awaitStripe": "Awaiting payment: nothing has been charged yet. Pay by card on Stripe's secure page; BuyNest never sees your card number. If the payment isn't completed in time, the order is cancelled and the items are released.",
-    "manual": "Nothing has been charged. Online payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile."
+    "manual": "Nothing has been charged. Online payments happen on the provider's secure page, which BuyNest hasn't connected yet: we'll email you about paying, and your items stay reserved meanwhile.",
+    "codPartlyPaid": "Delivery charge of {{advance}} paid in advance. Please keep {{due}} ready to pay in cash on delivery.",
+    "codAdvanceDue": "Pay the delivery charge online to confirm this order; the rest is paid in cash on delivery. Nothing has been charged yet.",
+    "codDue": "Please keep {{due}} ready to pay in cash on delivery."
   },
   "history": {
     "label": "Order history"
@@ -90,7 +94,11 @@
     "rewardPointsWith": "Reward points ({{points}})",
     "otherPayment": "By other payment",
     "giftCard": "Paid by gift card",
-    "refunded": "Refunded"
+    "refunded": "Refunded",
+    "codFee": "Cash on delivery fee",
+    "advancePaid": "Paid in advance",
+    "advanceDue": "Pay now (delivery charge)",
+    "codDue": "Due in cash on delivery"
   },
   "view": {
     "shipment_one": "Shipment",
@@ -120,12 +128,14 @@
     "notCharged": " (not charged)",
     "billing": "Billing address",
     "items": "Items",
-    "verified": "Prices verified with the server (DummyJSON cart #{{cart}}). Its own discounted total was {{total}}, rounded to whole dollars, before coupons and shipping."
+    "verified": "Prices verified with the server (DummyJSON cart #{{cart}}). Its own discounted total was {{total}}, rounded to whole dollars, before coupons and shipping.",
+    "zone": "Delivery zone: {{zone}}"
   },
   "payNow": {
     "noPage": "We couldn't open the secure payment page. Please try again in a moment.",
     "opening": "Opening secure payment…",
-    "pay": "Pay now"
+    "pay": "Pay now",
+    "payAdvance": "Pay the delivery charge"
   },
   "cancel": {
     "done": "Order {{number}} was cancelled. We've emailed you a confirmation.",
@@ -263,5 +273,14 @@
     "total": "Total",
     "paid": "Amount paid",
     "thanks": "Thank you for shopping with {{store}}. Questions about this invoice? Write to {{email}}."
+  },
+  "phoneConfirmation": {
+    "title": "Phone confirmation",
+    "pending": "We'll call you to confirm",
+    "pendingLine": "We'll call {{phone}} to confirm this order before we send it.",
+    "unreachable": "We couldn't reach you yet",
+    "unreachableLine": "We'll call {{phone}} again. Please keep your phone nearby.",
+    "confirmed": "Confirmed",
+    "confirmedLine": "Thanks for confirming by phone. We're preparing your order."
   }
 }

@@ -42,6 +42,10 @@ class OrderPlacedMail extends Mailable
         }
         $totals[] = [__('Shipping (:method)', ['method' => __((string) $order->shipping_label)]), $this->money($order->shipping_total)];
         $totals[] = [__('Tax'), $this->money($order->tax_total)];
+        // Phase 14: the cash on delivery fee.
+        if ((float) $order->cod_fee > 0) {
+            $totals[] = [__('Cash on delivery fee'), $this->money($order->cod_fee)];
+        }
         $totals[] = [__('Total'), $this->money($order->grand_total), true];
         // Phase 11: the part reward points paid (before the gift card).
         $points = (int) $order->reward_points_spent;
@@ -55,6 +59,14 @@ class OrderPlacedMail extends Mailable
         if ((float) $order->gift_card_amount > 0 || $points > 0) {
             $totals[] = [__('Amount due'), $this->money(Pricing::format($order->dueCents())), true];
         }
+        // Phase 14: the advance delivery charge (paid online first) and the cash to pay on delivery.
+        if ($order->hasAdvance()) {
+            $totals[] = [(float) $order->advance_paid > 0 ? __('Advance paid online') : __('Advance to pay online'), $this->money($order->advance_amount)];
+        }
+        if ($order->usesBangladeshCod()) {
+            $totals[] = [__('To pay on delivery'), $this->money(Pricing::format($order->codDueCents())), true];
+        }
+        $cash = $this->money(Pricing::format($order->codDueCents()));
 
         return [
             'customer_first_name' => $order->shipping_address['first_name'] ?? __('there'),
@@ -65,9 +77,15 @@ class OrderPlacedMail extends Mailable
                     'gift_card' => 'Gift card', 'reward_points' => 'Reward points', default => $order->payment_method, // phase 11: reward points
                 })),
             'shipping_method' => __((string) $order->shipping_label),
-            'delivery_estimate' => Locale::digits(__((string) $order->shipping_eta)), // phase 13: "3–5 কর্মদিবস" with the digits setting
+            // Phase 13: "3–5 কর্মদিবস" with the digits setting. Phase 14: the delivery zone and its delivery time.
+            'delivery_estimate' => $order->deliveryText() ?? Locale::digits(__((string) $order->shipping_eta)),
             'next_steps' => match (true) {
-                $order->payment_method === 'cod' => __('We are preparing your order now. Please pay the courier in cash when it arrives.'),
+                // Phase 14: the advance delivery charge first, then the cash to keep ready.
+                $order->hasAdvance() && (float) $order->advance_paid <= 0 => __('Pay the delivery charge of :advance online (bKash, Nagad or card, “Pay now” on your order page) to confirm your order. Then please keep :amount ready for the courier.',
+                    ['advance' => $this->money($order->advance_amount), 'amount' => $cash]),
+                $order->usesBangladeshCod() => ($order->confirmation_status === 'pending' ? __('We’ll call you to confirm your order.').' ' : '')
+                    .__('Please keep :amount ready to pay the courier in cash.', ['amount' => $cash]),
+                $order->payment_method === 'cod' => ($order->confirmation_status === 'pending' ? __('We’ll call you to confirm your order.').' ' : '').__('We are preparing your order now. Please pay the courier in cash when it arrives.'),
                 // Phase 10 (part B): paid in full with a gift card; PayPal orders are approved on PayPal's site.
                 $order->payment_method === 'gift_card' => __('Your gift card paid for the whole order, so we are preparing it now.'),
                 $order->payment_method === 'reward_points' => __('Your reward points paid for the whole order, so we are preparing it now.'), // phase 11

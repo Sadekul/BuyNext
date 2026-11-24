@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\BdAddresses;
+
 /**
  * Phase 7: the prebuilt HTML pieces ("block" variables) email templates can
  * use: an items table, an address, a button, a tracking box, a staff note.
@@ -41,9 +43,15 @@ final class EmailBlocks
         if (! $address) {
             return '';
         }
-        $line1 = $address['line1'].(filled($address['line2'] ?? null) ? ', '.$address['line2'] : '');
-        $city = $address['city'].(filled($address['state'] ?? null) ? ', '.$address['state'] : '').' '.$address['postal_code'];
-        $lines = [trim($address['first_name'].' '.$address['last_name']), $line1, $city, $address['country']];
+        // Phase 14: a structured Bangladesh address: house/road, area and district, division and postcode (place names in the email's language).
+        $bangladesh = BdAddresses::lines($address, Locale::current());
+        if ($bangladesh !== null) {
+            $lines = [trim(($address['first_name'] ?? '').' '.($address['last_name'] ?? '')), ...$bangladesh];
+        } else {
+            $line1 = $address['line1'].(filled($address['line2'] ?? null) ? ', '.$address['line2'] : '');
+            $city = $address['city'].(filled($address['state'] ?? null) ? ', '.$address['state'] : '').' '.$address['postal_code'];
+            $lines = [trim($address['first_name'].' '.$address['last_name']), $line1, $city, $address['country']];
+        }
 
         return '<p style="margin:0 0 16px;font-size:14px;line-height:1.5">'.implode('<br>', array_map(fn ($line) => e($line), $lines)).'</p>';
     }

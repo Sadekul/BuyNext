@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\BackupController;
 use App\Http\Controllers\Api\Admin\CatalogRuleController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CouponController;
+use App\Http\Controllers\Api\Admin\CourierController;
 use App\Http\Controllers\Api\Admin\CreditMemoController;
 use App\Http\Controllers\Api\Admin\CurrencyController;
 use App\Http\Controllers\Api\Admin\CustomerAddressController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController
 use App\Http\Controllers\Api\Admin\CustomerGroupController;
 use App\Http\Controllers\Api\Admin\CustomerLoyaltyController;
 use App\Http\Controllers\Api\Admin\CustomerNoteController;
+use App\Http\Controllers\Api\Admin\DeliveryZoneController;
 use App\Http\Controllers\Api\Admin\DocumentPdfController;
 use App\Http\Controllers\Api\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\Admin\GiftCardController as AdminGiftCardController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\Api\Admin\NewsletterCampaignController;
 use App\Http\Controllers\Api\Admin\NewsletterSubscriberController;
 use App\Http\Controllers\Api\Admin\NotificationController;
 use App\Http\Controllers\Api\Admin\OrderBulkController;
+use App\Http\Controllers\Api\Admin\OrderConfirmationController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\OrderCreateController;
 use App\Http\Controllers\Api\Admin\OverviewController;
@@ -58,6 +61,7 @@ use App\Http\Controllers\Api\V1\MyAccountController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PayPalWebhookController;
+use App\Http\Controllers\Api\V1\PlaceController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReturnController;
 use App\Http\Controllers\Api\V1\ReviewController;
@@ -152,6 +156,10 @@ Route::prefix('v1')->group(function () {
         Route::get('home', [ContentController::class, 'home']);
         Route::get('pages/{slug}', [ContentController::class, 'page'])->where('slug', '[a-z0-9-]+');
         Route::get('store', [ContentController::class, 'store']);
+        // Phase 14: Bangladesh places for the address form (division → district → area).
+        Route::get('places/bd/divisions', [PlaceController::class, 'divisions']);
+        Route::get('places/bd/districts', [PlaceController::class, 'districts']);
+        Route::get('places/bd/areas', [PlaceController::class, 'areas']);
     });
     // Cart pricing: public, but a customer token (optional) identifies the shopper for per-customer coupon limits.
     Route::post('cart/validate', [CartController::class, 'validateCart'])->middleware(['customer.optional', 'throttle:api']);
@@ -289,6 +297,12 @@ Route::prefix('admin/v1')->group(function () {
         Route::post('orders/bulk', OrderBulkController::class)->middleware('can.admin:orders.view');
         Route::post('orders', [OrderCreateController::class, 'store'])->middleware('can.admin:orders.create');
         Route::get('orders/{number}/packing-slip', [AdminOrderController::class, 'packingSlip'])->middleware('can.admin:orders.view');
+        // Phase 14: Bangladesh delivery: phone confirmation of COD orders, packing slip PDFs, the courier CSV.
+        Route::get('orders/to-confirm', [OrderConfirmationController::class, 'index'])->middleware('can.admin:orders.edit');
+        Route::post('orders/{number}/confirmation', [OrderConfirmationController::class, 'store'])->middleware('can.admin:orders.edit');
+        Route::get('orders/{number}/packing-slip.pdf', [CourierController::class, 'packingSlip'])->middleware('can.admin:orders.view');
+        Route::post('orders/packing-slips', [CourierController::class, 'packingSlips'])->middleware('can.admin:orders.view');
+        Route::get('orders/export/courier.csv', [CourierController::class, 'courierCsv'])->middleware('can.admin:orders.view');
         Route::get('orders/{number}', [AdminOrderController::class, 'show'])->middleware('can.admin:orders.view');
         // Phase 8: a (new) Stripe payment link for an unpaid card order, to copy and send.
         Route::post('orders/{number}/payment-link', [AdminOrderController::class, 'paymentLink'])->middleware('can.admin:orders.edit');
@@ -421,6 +435,14 @@ Route::prefix('admin/v1')->group(function () {
 
         // Phase 10 (part B): shipping table rates (Settings → Shipping) and gift cards (Marketing).
         Route::get('shipping-rates', [ShippingRateController::class, 'index'])->middleware('can.admin:settings.view');
+        // Phase 14: delivery zones (Bangladesh).
+        Route::get('delivery-zones', [DeliveryZoneController::class, 'index'])->middleware('can.admin:settings.view');
+        Route::get('delivery-zones/match', [DeliveryZoneController::class, 'match'])->middleware('can.admin:settings.view');
+        Route::middleware('can.admin:settings.edit')->controller(DeliveryZoneController::class)->group(function () {
+            Route::post('delivery-zones', 'store');
+            Route::patch('delivery-zones/{id}', 'update')->whereNumber('id');
+            Route::delete('delivery-zones/{id}', 'destroy')->whereNumber('id');
+        });
         Route::get('shipping-rates/export.csv', [ShippingRateController::class, 'export'])->middleware('can.admin:settings.view');
         Route::post('shipping-rates/check', [ShippingRateController::class, 'check'])->middleware('can.admin:settings.view');
         Route::middleware('can.admin:settings.edit')->controller(ShippingRateController::class)->group(function () {

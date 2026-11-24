@@ -13,6 +13,8 @@ import { isEmail } from '../utils/customers'
 import { formatMoney, fullName } from '../utils/format'
 import { ADMIN_ONLY_PAYMENT_METHODS, PAYMENT_METHODS } from '../utils/orders'
 import { actionErrorMessage } from '../utils/permissions'
+// Phase 14 §3 and §4: the address's delivery zone, delivery times, cash on delivery.
+import { etaText } from '../utils/bangladesh'
 
 const SHIPPING_FALLBACK = [
   { id: 'standard', label: 'Standard' },
@@ -71,6 +73,14 @@ function CreateOrderPage() {
   const customer = useQuery({ queryKey: adminKeys.customer(customerId), queryFn: ({ signal }) => getCustomer(customerId, { signal }), enabled: mode === 'customer' && customerId !== null })
   const settings = useQuery({ queryKey: adminKeys.settings, queryFn: ({ signal }) => getSettings({ signal }), enabled: can('settings.view'), staleTime: 60_000 })
   const countries = settings.data?.checkout?.allowedCountries
+  // Phase 14 §2: a new address starts in the store's default country (Bangladesh: division, district, area).
+  const defaultCountry = settings.data?.checkout?.defaultCountry
+  const [countryFilled, setCountryFilled] = useState(false)
+  if (defaultCountry && !countryFilled) {
+    setCountryFilled(true)
+    if (!shipping.country) setShipping((current) => ({ ...current, country: current.country || defaultCountry }))
+    if (!billing.country) setBilling((current) => ({ ...current, country: current.country || defaultCountry }))
+  }
 
   // A chosen customer: their name and default addresses fill the form (once per customer, while rendering).
   const [filledFor, setFilledFor] = useState(null)
@@ -315,12 +325,14 @@ function CreateOrderPage() {
             </h2>
             <fieldset className="form__fieldset">
               <legend>Shipping method</legend>
+              {/* Phase 14 §3: the zone the Bangladesh address falls in prices the delivery. */}
+              {quote.data?.deliveryZone && <p className="field__hint">Delivery zone: {quote.data.deliveryZone.name ?? quote.data.deliveryZone.code}</p>}
               {shippingOptions.map((option) => (
                 <label key={option.id} className="checkbox">
                   <input type="radio" name="co-shipping-method" value={option.id} checked={shippingMethod === option.id} onChange={() => setShippingMethod(option.id)} />
                   {option.label}
                   {option.price !== undefined && <span className="muted"> · {option.price === 0 ? 'Free' : formatMoney(option.price)}</span>}
-                  {option.eta && <span className="muted"> · {option.eta}</span>}
+                  {(etaText(option.etaDaysMin, option.etaDaysMax) || option.eta) && <span className="muted"> · {etaText(option.etaDaysMin, option.etaDaysMax) || option.eta}</span>}
                 </label>
               ))}
               {err(errors, 'shippingMethod') && <span className="field__error">{err(errors, 'shippingMethod')}</span>}
@@ -338,6 +350,16 @@ function CreateOrderPage() {
                 </select>
               )}
             </Field>
+            {/* Phase 14 §4: cash on delivery's limit and zones, and its fee, for this order. */}
+            {paymentMethod === 'cod' && quote.data?.cod && (
+              <p className={quote.data.cod.available ? 'field__hint' : 'field__error'} role={quote.data.cod.available ? undefined : 'alert'}>
+                {quote.data.cod.available
+                  ? quote.data.cod.fee > 0
+                    ? `A cash on delivery fee of ${formatMoney(quote.data.cod.fee)} is added.`
+                    : 'Paid in cash on delivery.'
+                  : (quote.data.cod.message ?? "Cash on delivery isn't offered for this order.")}
+              </p>
+            )}
             <div className="coupon-row">
               <Field label="Coupon code (optional)" error={err(errors, 'couponCode') ?? (couponCode && quote.data?.couponError) ?? undefined}>
                 {(a11y) => (

@@ -22,7 +22,7 @@ class OnlinePayments
         return match (true) {
             $order->payment_method === 'paypal' || $order->payment_provider === 'paypal' => $this->paypal,
             // Phase 12.
-            $order->payment_method === 'sslcommerz' || $order->payment_provider === 'sslcommerz' => $this->sslcommerz,
+            $order->payment_method === 'sslcommerz' || $order->payment_provider === 'sslcommerz' || $order->hasAdvance() => $this->sslcommerz, // phase 14: COD advance
             default => $this->stripe,
         };
     }
@@ -33,6 +33,7 @@ class OnlinePayments
         $uses = match ($order->payment_method) {
             'paypal' => $this->paypal->usesPayPal($order),
             'sslcommerz' => $this->sslcommerz->usesSslCommerz($order),
+            'cod' => $order->hasAdvance() && $this->sslcommerz->usesSslCommerz($order), // phase 14: the advance delivery charge
             default => $this->stripe->usesStripe($order),
         };
 

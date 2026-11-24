@@ -1,15 +1,17 @@
 import { useId, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import AddressFields from '../checkout/AddressFields'
 import FormField, { CheckboxField } from '../forms/FormField'
 import Button from '../ui/Button'
 import { createSavedAddressSchema } from '../../schemas/checkoutSchema'
 import { applyServerFieldErrors } from '../../utils/serverErrors'
+import { usesBangladeshForm } from '../../utils/bangladesh'
 import './AddressForm.css'
 import { useTranslation } from 'react-i18next'
 
-const FIELDS = ['firstName', 'lastName', 'phone', 'company', 'line1', 'line2', 'city', 'state', 'postalCode', 'country', 'isDefaultShipping', 'isDefaultBilling']
+// Phase 14: a Bangladesh address's division, district and area too.
+const FIELDS = ['firstName', 'lastName', 'phone', 'company', 'line1', 'line2', 'city', 'state', 'postalCode', 'country', 'isDefaultShipping', 'isDefaultBilling', 'divisionId', 'districtId', 'areaId']
 // The shop service already turns the API's snake_case into these names.
 const SERVER_FIELD_MAP = Object.fromEntries(FIELDS.map((field) => [field, field]))
 
@@ -35,11 +37,13 @@ const EMPTY_SAVED_ADDRESS = {
  * an address saved before its country was removed keeps showing it, and the
  * schema asks for a new one.
  */
-function AddressForm({ title, initialValues, countries, onSave, onCancel, submitLabel }) {
+function AddressForm({ title, initialValues, countries, onSave, onCancel, submitLabel, bangladesh = false, defaultCountry = null }) {
   const { t } = useTranslation('account')
   const titleId = useId()
-  const [schema] = useState(() => createSavedAddressSchema(countries))
-  const defaults = { ...EMPTY_SAVED_ADDRESS, country: countries[0] ?? '', ...initialValues }
+  // Phase 14: `bangladesh` (the store's API knows Bangladesh's places): an address in Bangladesh has its own fields.
+  const [schema] = useState(() => createSavedAddressSchema(countries, { bangladesh }))
+  const startCountry = defaultCountry && countries.includes(defaultCountry) ? defaultCountry : (countries[0] ?? '')
+  const defaults = { ...EMPTY_SAVED_ADDRESS, country: startCountry, ...initialValues }
   const options = defaults.country && !countries.includes(defaults.country) ? [...countries, defaults.country] : countries
 
   const {
@@ -47,8 +51,12 @@ function AddressForm({ title, initialValues, countries, onSave, onCancel, submit
     handleSubmit,
     setError,
     clearErrors,
+    control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema), defaultValues: defaults, mode: 'onSubmit', reValidateMode: 'onChange' })
+  const country = useWatch({ control, name: 'country' })
+  const bangladeshAddress = usesBangladeshForm(country, { bangladeshAddresses: bangladesh })
 
   async function submit(values) {
     clearErrors('root.server')
@@ -65,9 +73,16 @@ function AddressForm({ title, initialValues, countries, onSave, onCancel, submit
       <h3 id={titleId} className="address-form__title">
         {title}
       </h3>
-      <AddressFields prefix="" register={register} errors={errors} autoCompleteSection="shipping" countries={options} />
+      <AddressFields prefix="" register={register} errors={errors} autoCompleteSection="shipping" countries={options} form={{ control, setValue }} bangladesh={bangladesh} />
       <div className="address-form__extra">
-        <FormField label={t('addressForm.phone')} type="tel" autoComplete="tel" hint={t('addressForm.phoneHint')} {...register('phone')} error={errors.phone?.message} />
+        <FormField
+          label={t('addressForm.phone')}
+          type="tel"
+          autoComplete="tel"
+          hint={bangladeshAddress ? t('common:bdAddress.mobileHint') : t('addressForm.phoneHint')}
+          {...register('phone')}
+          error={errors.phone?.message}
+        />
         <FormField label={t('addressForm.company')} autoComplete="organization" {...register('company')} error={errors.company?.message} />
       </div>
       <div className="address-form__defaults">

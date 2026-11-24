@@ -54,7 +54,7 @@ class CustomerAddressController extends Controller
         if (! $entry) {
             return $this->notFound('Address not found.');
         }
-        $data = $this->book->validate($request, partial: true);
+        $data = $this->book->validate($request, partial: true, existing: $entry);
         DB::transaction(function () use ($entry, $data) {
             $before = Audit::fieldsOf($entry, self::FIELDS);
             $this->book->update($entry, $data);

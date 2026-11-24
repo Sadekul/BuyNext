@@ -26,7 +26,8 @@ use Throwable;
 class Checkout
 {
     public function __construct(private Pricing $pricing, private AddressBook $addressBook, private Audit $audit,
-        private OrderDocuments $documents, private GiftCards $giftCards, private RewardPoints $rewardPoints) {}
+        private OrderDocuments $documents, private GiftCards $giftCards, private RewardPoints $rewardPoints,
+        private DeliveryZones $zones, private CashOnDelivery $cod) {}
 
     /**
      * Prices an order without placing it (no locks, no stock change): the
@@ -37,7 +38,9 @@ class Checkout
         return $this->pricing->quote($data['items'], $data['coupon_code'] ?? null, $data['shipping_method'] ?? null,
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null),
             country: $data['shipping_address']['country'] ?? null, group: $customer?->priceGroup(),
-            giftCardCode: $data['gift_card_code'] ?? null); // phase 10 (part B)
+            giftCardCode: $data['gift_card_code'] ?? null, // phase 10 (part B)
+            // Phase 14: the address's delivery zone, and the COD fee when paying cash on delivery.
+            deliveryZone: $this->zones->forAddress($data['shipping_address'] ?? null)?->code, paymentMethod: $data['payment_method'] ?? null);
     }
 
     /**
@@ -60,7 +63,9 @@ class Checkout
                 lock: true, customerId: $customer?->id, email: $data['email'], country: $data['shipping_address']['country'] ?? null,
                 group: $customer?->priceGroup(), giftCardCode: $data['gift_card_code'] ?? null,
                 // Phase 11: reward points (storefront checkout only; the customer row is locked).
-                rewardsCustomer: $admin ? null : $customer, rewardPoints: $admin ? null : ($data['reward_points'] ?? null));
+                rewardsCustomer: $admin ? null : $customer, rewardPoints: $admin ? null : ($data['reward_points'] ?? null),
+                // Phase 14: the delivery zone's rates, and the COD fee.
+                deliveryZone: $this->zones->forAddress($data['shipping_address'] ?? null)?->code, paymentMethod: $data['payment_method']);
 
             if ($quote->hasProblems()) {
                 throw new HttpResponseException(response()->json([
@@ -96,6 +101,10 @@ class Checkout
                     : __('Enter your gift card code, or choose another payment method.')]);
             } elseif ($data['payment_method'] === 'reward_points') {
                 throw ValidationException::withMessages(['payment_method' => __('Your reward points don\'t cover the whole total. Choose how to pay the rest.')]);
+            }
+            // Phase 14: cash on delivery only where it is offered and up to its limit.
+            if ($data['payment_method'] === 'cod' && ! ($quote->cod['available'] ?? true)) {
+                throw ValidationException::withMessages(['payment_method' => $quote->cod['message']]);
             }
             // The shopper saw a total; never charge a different one without asking.
             if (isset($data['expected_total']) && Pricing::toCents($data['expected_total']) !== $quote->totalCents) {
@@ -133,6 +142,13 @@ class Checkout
     {
         // Cash on delivery (and cash) can be prepared now; card/PayPal/bank transfer wait for the payment.
         $status = in_array($data['payment_method'], Order::PAY_LATER_METHODS, true) ? 'processing' : 'pending_payment';
+        // Phase 14: a COD order may first pay the delivery charge (+ fee) online (SSLCommerz): it waits for that payment.
+        $isCod = $data['payment_method'] === 'cod';
+        $advance = $isCod ? $quote->advanceCents() : 0;
+        if ($advance > 0) {
+            $status = 'pending_payment';
+        }
+        $method = $quote->shippingMethod ?? [];
 
         $order = Order::create([
             'customer_id' => $customer?->id,
@@ -166,6 +182,14 @@ class Checkout
             'shipping_address' => $data['shipping_address'],
             'billing_address' => $data['billing_address'] ?? $data['shipping_address'],
             'placed_at' => now(),
+            // Phase 14: delivery zone and its delivery time, cash on delivery (fee, advance, cash to collect), phone confirmation.
+            'delivery_zone_code' => $quote->deliveryZone?->code,
+            'delivery_eta_min' => $method['eta_days_min'] ?? null,
+            'delivery_eta_max' => $method['eta_days_max'] ?? null,
+            'cod_fee' => Pricing::format($quote->codFeeCents),
+            'advance_amount' => Pricing::format($advance),
+            'cod_due' => $isCod ? Pricing::format(max(0, $quote->amountDueCents() - $advance)) : null,
+            'confirmation_status' => $isCod && $this->cod->requiresConfirmation() ? 'pending' : null,
         ]);
         // The number comes from the id, which exists only after the insert.
         $order->forceFill(['number' => Order::numberFor($order->id)])->save();

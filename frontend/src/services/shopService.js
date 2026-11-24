@@ -50,7 +50,7 @@ export function submitReview(productId, { rating, title, comment }) {
  * signed-in customer is recognised by the session cookie. The shipping
  * `country` (sent only when the store charges tax) lets the server work out the tax.
  */
-export async function validateCart({ items, couponCode, shippingMethod, email, country, giftCardCode, rewardPoints }, { signal } = {}) {
+export async function validateCart({ items, couponCode, shippingMethod, email, country, giftCardCode, rewardPoints, place, paymentMethod }, { signal } = {}) {
   const body = {
     items: cartLines(items),
     couponCode: couponCode || null,
@@ -61,6 +61,10 @@ export async function validateCart({ items, couponCode, shippingMethod, email, c
     ...(giftCardCode && { giftCardCode }),
     // Phase 11: reward points to spend (signed-in customers; the server checks every limit).
     ...(rewardPoints > 0 && { rewardPoints }),
+    // Phase 14: a Bangladesh address's place (its delivery zone prices delivery), and the payment
+    // method when cash on delivery has rules (fee, limit, zones); left out otherwise.
+    ...(place?.areaId && { place: { divisionId: place.divisionId, districtId: place.districtId, areaId: place.areaId } }),
+    ...(paymentMethod && { paymentMethod }),
   }
   const cart = await apiClient.post('/api/shop/cart/validate', body, { ...SHOP, signal })
   // Phase 11: "Customers also bought" arrive as the API's product cards (like the catalog's).

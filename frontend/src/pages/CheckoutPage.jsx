@@ -40,12 +40,14 @@ import GiftCardRedeem from '../components/checkout/GiftCardRedeem'
 import RewardPointsRedeem from '../components/checkout/RewardPointsRedeem'
 import ChargedInBaseNote from '../components/cart/ChargedInBaseNote'
 import { trackBeginCheckout } from '../utils/analytics'
+import { codRefused, codUnavailableText, usesBangladeshForm, zoneDeliveryText, zoneName } from '../utils/bangladesh'
 import './CheckoutPage.css'
 import { Trans, useTranslation } from 'react-i18next'
 
 // API field names → checkout form fields. The shop service (server/shop/laravel.js)
 // already turns the API's snake_case into these camelCase paths.
-const ADDRESS_FIELDS = ['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'postalCode', 'country']
+// Phase 14: a Bangladesh address's division, district and area too.
+const ADDRESS_FIELDS = ['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'postalCode', 'country', 'divisionId', 'districtId', 'areaId']
 // Phase 10: gift cards only: the one address on the form is the billing address (sent as both).
 const GIFT_CARD_ONLY_FIELD_MAP = {
   shippingAddress: 'billing.line1',
@@ -164,7 +166,9 @@ function CheckoutPage() {
   const profile = profileRequest.data ?? user
   const address = profile?.address
   const { countries, paymentMethods } = settings
-  const emptyAddress = { ...EMPTY_ADDRESS, country: countries.includes(EMPTY_ADDRESS.country) ? EMPTY_ADDRESS.country : countries[0] }
+  // Phase 14: new addresses start in the store's default country (a Bangladeshi store: Bangladesh).
+  const startCountry = settings.defaultCountry && countries.includes(settings.defaultCountry) ? settings.defaultCountry : countries.includes(EMPTY_ADDRESS.country) ? EMPTY_ADDRESS.country : countries[0]
+  const emptyAddress = { ...EMPTY_ADDRESS, country: startCountry }
   // Saved addresses whose country the store no longer ships to can't be used.
   const savedAddresses = REAL_SHOP && user ? (addressRequest.data ?? []).filter((saved) => countries.includes(saved.country)) : []
   const savedShipping = defaultAddress(savedAddresses, 'shipping')
@@ -239,6 +243,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           // "gift_card": set on submit when a gift card pays everything (phase 10).
           paymentMethodIds: [...settings.paymentMethods.map((method) => method.id), 'gift_card'],
           requiresShipping,
+          // Phase 14: Bangladesh addresses (Division → District → Area) and mobile numbers.
+          bangladesh: settings.bangladeshAddresses === true,
         })
       : checkoutSchema,
   )
@@ -284,12 +290,21 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     control,
     name: ['shippingMethod', 'billingSameAsShipping', 'paymentMethod', 'email', 'shipping.country', 'shipping', 'billing'],
   })
+  // Phase 14: a Bangladesh address (the store's API knows its places): its area prices delivery (zone rates).
+  const bangladeshStore = REAL_SHOP && settings.bangladeshAddresses === true
+  const bdShipping = requiresShipping && usesBangladeshForm(shippingCountry, settings)
+  const bdContact = usesBangladeshForm(requiresShipping ? shippingCountry : billingAddress?.country, settings)
+  const shippingAreaId = bdShipping && shippingAddress?.areaId ? String(shippingAddress.areaId) : null
+  const place = shippingAreaId ? { divisionId: String(shippingAddress.divisionId ?? ''), districtId: String(shippingAddress.districtId ?? ''), areaId: shippingAreaId } : undefined
 
   // Phase 12: the phone's message depends on the payment method (SSLCommerz says why it needs one):
   // after a first submit, check it again when the method changes.
   useEffect(() => {
     if (isSubmitted) trigger('phone')
   }, [paymentMethod, isSubmitted, trigger])
+
+  // Phase 14: what the address fields need for Bangladesh's cascading places.
+  const addressForm = { control, setValue }
 
   // Signed-in customers (REAL_SHOP): which saved address the fields match (if any), and the address-book option.
   const canUseAddressBook = REAL_SHOP && isAuthenticated
@@ -319,6 +334,10 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     country: REAL_SHOP && requiresShipping ? shippingCountry : undefined,
     giftCardCode: REAL_SHOP ? (giftCardCode ?? undefined) : undefined,
     rewardPoints: REAL_SHOP && isAuthenticated && rewardPoints > 0 ? rewardPoints : undefined,
+    // Phase 14: the Bangladesh area (its delivery zone), and the payment method when the store has cash on
+    // delivery rules (its fee and limits change the total). Left out otherwise: the request stays as before.
+    place: REAL_SHOP ? place : undefined,
+    paymentMethod: REAL_SHOP && settings.cod && paymentMethod ? paymentMethod : undefined,
   }
   const pricing = useQuery({ ...cartPricingQuery(pricingInput), enabled: REAL_SHOP })
   const serverCart = REAL_SHOP ? pricing.data : null
@@ -338,7 +357,9 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
     const known = settings.shippingMethods.find((method) => method.id === option.id)
     const price = option.price ?? 0
     const text = shippingMethodText({ id: option.id, label: option.label ?? known?.label, eta: option.eta ?? known?.eta })
-    return { id: option.id, label: text.label || option.id, description: text.eta, aside: price === 0 ? t('page.free') : formatBasePrice(price) }
+    // Phase 14: a zone rate says its zone and delivery time ("Inside Dhaka · Delivery in 1–2 days").
+    const zoneText = bdShipping || option.zone || Number.isInteger(option.etaDaysMin) || Number.isInteger(option.etaDaysMax) ? zoneDeliveryText(option, serverCart?.deliveryZone) : null
+    return { id: option.id, label: text.label || option.id, description: zoneText ?? text.eta, aside: price === 0 ? t('page.free') : formatBasePrice(price) }
   })
   const shippingLabel = shippingOptions.find((option) => option.id === shippingMethod)?.label ?? shippingMethodText(localTotals.shippingMethod).label
   // The chosen method isn't offered for this cart (any more): switch to the first that is.
@@ -360,7 +381,22 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   const prepaid = giftCardPays + pointsPay
   const amountDue = serverCart?.totals.amountDue ?? Math.max(0, Math.round((totals.total - prepaid) * 100) / 100)
   const fullyCovered = REAL_SHOP && prepaid > 0 && amountDue === 0
-  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0 || noDelivery || !chosenIsOffered || Boolean(giftCardError) || Boolean(rewardPointsError))
+  const cannotPlace = REAL_SHOP && (!serverCart || problems.length > 0 || noDelivery || !chosenIsOffered || Boolean(giftCardError) || Boolean(rewardPointsError) || (paymentMethod === 'cod' && codRefused(serverCart?.cod)))
+  // Phase 14: cash on delivery for this cart: whether it can be chosen (zone, limit), its fee, and the advance.
+  const cod = serverCart?.cod ?? null
+  // Refused (zone, limit): shown but not choosable. Waiting for the area (zones set): said, still choosable.
+  const codUnavailable = REAL_SHOP && codRefused(cod)
+  const codReason = REAL_SHOP && cod?.available === false ? codUnavailableText(cod, { format: formatBasePrice, zone: serverCart?.deliveryZone }) : null
+  const otherMethod = settings.paymentMethods.find((method) => method.id !== 'cod')?.id ?? null
+  // Cash on delivery stopped being offered (the area or the total changed): switch to another method.
+  useEffect(() => {
+    if (codUnavailable && paymentMethod === 'cod' && otherMethod) setValue('paymentMethod', otherMethod, { shouldValidate: isSubmitted })
+  }, [codUnavailable, paymentMethod, otherMethod, setValue, isSubmitted])
+  const codFee = paymentMethod === 'cod' ? (totals.codFee ?? 0) : 0
+  const advanceAmount = cod?.advanceAmount ?? Math.round(((totals.shipping ?? 0) + codFee) * 100) / 100
+  const payAdvance = REAL_SHOP && !fullyCovered && paymentMethod === 'cod' && !codUnavailable && cod?.advance === 'delivery_charge' && advanceAmount > 0
+  const dueOnDelivery = payAdvance ? (cod?.dueOnDelivery ?? Math.max(0, Math.round((amountDue - advanceAmount) * 100) / 100)) : null
+
   // Phase 8: a card order is paid on Stripe's page right after it is created.
   const payByStripe = REAL_SHOP && !fullyCovered && settings.cardPayments === 'stripe' && paymentMethod === 'card'
   // Phase 10: a PayPal order is approved on PayPal's site right after it is created.
@@ -451,6 +487,8 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
         setError('root.server', { message: error.data?.code === 'guest_checkout_disabled' ? t('page.guestOff') : error.message })
         return
       }
+      // Phase 14: cash on delivery was refused (zone, limit): re-price, so the payment choices say why.
+      if (error.fieldErrors?.paymentMethod) pricing.refetch()
       if (applyServerFieldErrors(error, setError, requiresShipping ? SERVER_FIELD_MAP : { ...SERVER_FIELD_MAP, ...GIFT_CARD_ONLY_FIELD_MAP })) return
       // The code stopped applying (phase 7 messages say why: "Spend $20.00 more
       // to use this code", "This code applies to Shoes only"): re-price, so the
@@ -486,7 +524,9 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
 
   const placeLabel = isBusy
     ? t('page.checkingPrices')
-    : payByStripe
+    : payAdvance
+      ? t('cod.payAdvance', { amount: formatBasePrice(advanceAmount) })
+      : payByStripe
       ? t('page.continueSecure')
       : payByPaypal
         ? t('page.continuePaypal')
@@ -497,6 +537,15 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
   if (REAL_SHOP) {
     const noteKey = paymentMethod === 'cod' ? 'cod' : payByStripe ? 'stripe' : payByPaypal ? 'paypal' : payBySslcommerz ? 'sslcommerz' : 'online'
     paymentNote = t(`page.notes.${noteKey}`)
+    // Phase 14: cash on delivery's fee, the delivery charge paid first, and the store's phone call.
+    if (paymentMethod === 'cod') {
+      if (codReason) paymentNote = codReason
+      if (payAdvance) paymentNote = t('cod.advanceNote', { advance: formatBasePrice(advanceAmount), due: formatBasePrice(dueOnDelivery) })
+      if (codFee > 0) paymentNote = `${paymentNote} ${t('cod.fee', { fee: formatBasePrice(codFee) })}`
+      if (settings.cod?.requireConfirmation || cod?.requiresConfirmation) paymentNote = `${paymentNote} ${t('cod.callToConfirm')}`
+    } else if (codReason) {
+      paymentNote = `${codReason} ${paymentNote}`
+    }
     if (giftCardPays > 0) paymentNote = t('page.giftCardPays', { paid: formatBasePrice(giftCardPays), due: formatBasePrice(amountDue), note: paymentNote })
     else if (pointsPay > 0) paymentNote = t('page.pointsPay', { paid: formatBasePrice(pointsPay), due: formatBasePrice(amountDue), note: paymentNote })
   }
@@ -538,7 +587,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
                 label={t('page.phone')}
                 type="tel"
                 autoComplete="tel"
-                hint={t(paymentMethod === 'sslcommerz' && !fullyCovered ? 'page.phoneHintSslcommerz' : 'page.phoneHint')}
+                hint={bdContact ? t('common:bdAddress.mobileHint') : t(paymentMethod === 'sslcommerz' && !fullyCovered ? 'page.phoneHintSslcommerz' : 'page.phoneHint')}
                 {...register('phone')}
                 error={errors.phone?.message}
               />
@@ -551,7 +600,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             {canUseAddressBook && savedAddresses.length > 0 && (
               <SavedAddressPicker label={t('page.savedShipping')} addresses={savedAddresses} current={shippingAddress} onChoose={(saved) => fillFromSaved('shipping', saved)} />
             )}
-            <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} />
+            <AddressFields prefix="shipping" register={register} errors={errors.shipping} autoCompleteSection="shipping" countries={settings.countries} form={addressForm} bangladesh={bangladeshStore} />
             {offerToSave && <CheckboxField label={t('page.saveAddress')} {...register('saveAddress')} />}
           </section>
           ) : (
@@ -562,7 +611,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
               {canUseAddressBook && savedAddresses.length > 0 && (
                 <SavedAddressPicker label={t('page.savedAddresses')} addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
               )}
-              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
+              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} form={addressForm} bangladesh={bangladeshStore} />
             </section>
           )}
 
@@ -574,7 +623,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
               <SavedAddressPicker label={t('page.savedBilling')} addresses={savedAddresses} current={billingAddress} onChoose={(saved) => fillFromSaved('billing', saved)} />
             )}
             {!billingSameAsShipping && (
-              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} />
+              <AddressFields prefix="billing" register={register} errors={errors.billing} autoCompleteSection="billing" countries={settings.countries} form={addressForm} bangladesh={bangladeshStore} />
             )}
           </section>
 
@@ -589,6 +638,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
                 selectedId={shippingMethod}
                 error={errors.shippingMethod?.message}
               />
+              {/* Phase 14: the delivery charge follows the Bangladesh area (its delivery zone). */}
+              {bdShipping && (
+                <p className="checkout__note" aria-live="polite">
+                  {shippingAreaId ? (serverCart?.deliveryZone && zoneName(serverCart.deliveryZone) ? t('delivery.zone', { zone: zoneName(serverCart.deliveryZone) }) : null) : t('delivery.chooseArea')}
+                </p>
+              )}
               {noDelivery && (
                 <p className="checkout__error" role="alert">
                   {t('page.chooseCountry', { reason: serverCart?.shippingError ?? t('page.cantDeliver', { country: t(`common:countries.${shippingCountry}`, { defaultValue: shippingCountry }) }), email: settings.supportEmail ?? SITE.supportEmail })}
@@ -608,7 +663,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
             ) : (
               <ChoiceCards
                 legend={t('page.payment')}
-                options={settings.paymentMethods.map(localizedPaymentMethod)}
+                options={settings.paymentMethods.map(localizedPaymentMethod).map((method) => (method.id === 'cod' && codUnavailable ? { ...method, disabled: true, description: codReason } : method))}
                 registration={register('paymentMethod')}
                 selectedId={paymentMethod}
                 error={errors.paymentMethod?.message}
@@ -633,7 +688,11 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           <OrderItems items={serverCart ? withVariantLabels(serverCart.lines.filter((line) => line.available), cart.items) : cart.items} />
           {REAL_SHOP && <GroupDiscountNote group={serverCart?.customerGroup ?? group} amount={serverCart?.totals.groupDiscount} format={formatBasePrice} />}
           <OrderTotals
-            totals={prepaid > 0 ? { ...totals, giftCard: giftCardPays, rewardPoints: pointsPay, amountDue } : totals}
+            totals={{
+              ...(prepaid > 0 ? { ...totals, giftCard: giftCardPays, rewardPoints: pointsPay, amountDue } : totals),
+              // Phase 14: the delivery charge paid online first, the rest in cash.
+              ...(payAdvance && { advanceDue: advanceAmount, codDue: dueOnDelivery }),
+            }}
             rewardPointsSpent={pointsSpent}
             couponCode={cart.couponCode}
             appliedRules={serverCart?.appliedRules}
@@ -713,6 +772,7 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
           </Button>
           {/* Phase 11: prices shown in another currency elsewhere; the order is charged in the store currency. */}
           <ChargedInBaseNote amount={prepaid > 0 ? amountDue : totals.total} />
+          {bdShipping && !shippingAreaId && <p className="cart-summary__note">{t('delivery.areaNote')}</p>}
           <p className="cart-summary__note">
             {t(REAL_SHOP ? 'page.serverNote' : 'page.demoNote')}
           </p>

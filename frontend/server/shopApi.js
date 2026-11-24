@@ -99,6 +99,16 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  * ({ points, amount } applied, or null), `rewardPointsError`, and `totals.rewardPoints`; orders carry
  * `rewardPointsSpent`, `rewardPointsAmount`, `rewardPointsEarned` and `totals.rewardPoints`.
  *
+ * Phase 14 (docs/backend/PHASE14_CONTRACT.md; shop/bangladesh.js): a Bangladesh address (country
+ * "Bangladesh") also carries divisionId, districtId, areaId (orders, the address book; the API fills city
+ * and state and answers the places' names as division/district/area { id, name, nameEn, nameBn }).
+ * cart/validate also takes `place: { divisionId, districtId, areaId }` (its delivery zone prices delivery)
+ * and `paymentMethod` (cash on delivery's fee and limits). Priced carts carry `deliveryZone: { code, name }`,
+ * `cod: { available, reason, message, fee, advance, advanceAmount, … }`, `totals.codFee`, and per delivery
+ * method `zone`, `etaDaysMin`, `etaDaysMax`. Orders carry `deliveryZone`, `advancePaid`, `codDue`, `codFee`,
+ * `confirmationStatus` (pending | confirmed | unreachable | cancelled) and payment status "partially_paid".
+ * The places themselves are public: GET /api/catalog/places/bd/* (catalogApi.js).
+ *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */

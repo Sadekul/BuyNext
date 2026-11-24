@@ -4,6 +4,8 @@ import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from
 import { REWARD_SETTING_RULES } from './adminPhase11Api.js'
 // Phase 13: the Bangla texts of pages and home blocks; Settings → General's language settings.
 import { LANGUAGE_SETTING_RULES, checkBangla } from './adminPhase13Api.js'
+// Phase 14: the default country, Settings → Cash on delivery.
+import { COD_SETTING_RULES, defaultCountryRule } from './adminPhase14Api.js'
 
 /*
  * Phase 4 admin routes (docs/backend/PHASE4_CONTRACT.md), Laravel only:
@@ -244,6 +246,8 @@ const SETTING_RULES = {
     allowedCountries: (value) => (Array.isArray(value) && value.length > 0 && value.length <= 250 && value.every((country) => isText(country, { min: 1, max: 60 })) ? null : 'Keep at least one country.'),
     guestCheckout: isBoolean('Choose whether guests can check out.'),
     enabledPaymentMethods: someOf(PAYMENT_METHODS, 'Keep at least one payment method.'),
+    // Phase 14 §2 (the API checks it is one of the allowed countries).
+    defaultCountry: defaultCountryRule,
   },
   inventory: {
     lowStockThreshold: (value) => (Number.isInteger(value) && value >= 0 && value <= 100_000 ? null : 'Enter a whole number from 0 to 100,000.'),
@@ -274,6 +278,8 @@ const SETTING_RULES = {
   },
   // Phase 11 §4.
   rewards: REWARD_SETTING_RULES,
+  // Phase 14 §4.
+  cod: COD_SETTING_RULES,
 }
 
 /** PATCH /settings: { group: { key: value } }, known groups and keys only; errors as "group.key". */
@@ -290,6 +296,8 @@ export function validateSettings(body) {
   if (values.returns?.returnReasons) values.returns.returnReasons = values.returns.returnReasons.map((reason) => reason.trim())
   // Phase 10: an empty measurement id turns statistics off.
   if (values.analytics?.ga4MeasurementId === '') values.analytics.ga4MeasurementId = null
+  if (values.checkout?.defaultCountry === '') values.checkout.defaultCountry = null
+  if (values.cod?.zones) values.cod.zones = [...new Set(values.cod.zones)]
   if (values.checkout?.allowedCountries) values.checkout.allowedCountries = [...new Set(values.checkout.allowedCountries.map((country) => country.trim()))]
   if (Object.keys(errors).length === 0 && Object.keys(values).length === 0) errors.settings = ['Change at least one setting.']
   return Object.keys(errors).length > 0 ? { errors } : { values }

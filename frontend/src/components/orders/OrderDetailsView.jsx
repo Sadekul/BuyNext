@@ -1,5 +1,6 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router'
-import { LuExternalLink, LuFileText, LuUndo2 } from 'react-icons/lu'
+import { LuExternalLink, LuFileText, LuPhoneCall, LuUndo2 } from 'react-icons/lu'
 import OrderHistory from './OrderHistory'
 import OrderItems from './OrderItems'
 import OrderStatus from './OrderStatus'
@@ -15,8 +16,12 @@ import './OrderDetailsView.css'
 import { useTranslation } from 'react-i18next'
 import { translate } from '../../i18n'
 import { paymentMethodLabel, shippingMethodText } from '../../utils/payment'
+import { addressPlaceLines, etaText, zoneName } from '../../utils/bangladesh'
+import { useAddressPlaces } from '../../hooks/useAddressPlaces'
 
 function AddressBlock({ address }) {
+  // Phase 14: a Bangladesh address's places in the reader's language.
+  const withPlaces = useAddressPlaces([address])
   return (
     <address className="order-view__address">
       {address.firstName} {address.lastName}
@@ -28,8 +33,13 @@ function AddressBlock({ address }) {
           {address.line2}
         </>
       )}
-      <br />
-      {address.city}, {address.state} {address.postalCode}
+      {/* Phase 14: a Bangladesh address shows its area, district and division in the reader's language. */}
+      {addressPlaceLines(withPlaces(address)).map((line) => (
+        <Fragment key={line}>
+          <br />
+          {line}
+        </Fragment>
+      ))}
       <br />
       {translate(`common:countries.${address.country}`, { defaultValue: address.country })}
     </address>
@@ -136,6 +146,33 @@ const OTHER_PAYMENT_LABELS = { gift_card: 'Gift card', reward_points: 'Reward po
 // Phase 13: a payment method's name in the shopper's language (utils/payment.js).
 const paymentName = (method) => (ALL_PAYMENT_METHODS.some((known) => known.id === method) || OTHER_PAYMENT_LABELS[method] ? paymentMethodLabel(method) : method)
 
+/**
+ * Phase 14: "We'll call you to confirm" / "Confirmed": the store's phone call
+ * before a cash on delivery order is sent (when the store asks for one).
+ */
+export function PhoneConfirmation({ order }) {
+  const { t } = useTranslation('orders')
+  const status = order?.confirmationStatus
+  if (!status || status === 'cancelled' || order.status === 'cancelled') return null
+  const key = status === 'confirmed' ? 'confirmed' : status === 'unreachable' ? 'unreachable' : 'pending'
+  return (
+    <div className={`order-view__confirmation order-view__confirmation--${key}`}>
+      <p className="order-view__row">
+        <strong>
+          <LuPhoneCall aria-hidden="true" /> {t(`phoneConfirmation.${key}`)}
+        </strong>
+      </p>
+      <p className="order-view__muted">{t(`phoneConfirmation.${key}Line`, { phone: order.phone || order.contact?.phone || '' })}</p>
+    </div>
+  )
+}
+
+/** Phase 14: the method's name and delivery time ("Delivery in 1–2 days" from a zone rate, else the method's own). */
+function deliveryText(method) {
+  const text = shippingMethodText(method)
+  return { label: text.label, eta: etaText(method) ?? text.eta }
+}
+
 function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = null }) {
   const { t } = useTranslation('orders')
   const payment = ALL_PAYMENT_METHODS.find((method) => method.id === order.paymentMethod) ?? (OTHER_PAYMENT_LABELS[order.paymentMethod] && { label: OTHER_PAYMENT_LABELS[order.paymentMethod] })
@@ -171,9 +208,11 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
           {order.shippingAddress && order.requiresShipping !== false ? <AddressBlock address={order.shippingAddress} /> : <p>{t('view.byEmail')}</p>}
           {order.shippingMethod && (
             <p>
-              <strong>{shippingMethodText(order.shippingMethod).label}</strong> — {shippingMethodText(order.shippingMethod).eta}
+              <strong>{deliveryText(order.shippingMethod).label}</strong> — {deliveryText(order.shippingMethod).eta}
             </p>
           )}
+          {/* Phase 14: the delivery zone the address fell in (Inside Dhaka, Outside Dhaka…). */}
+          {order.deliveryZone && zoneName(order.deliveryZone) && <p className="order-view__muted">{t('view.zone', { zone: zoneName(order.deliveryZone) })}</p>}
           <p className="order-view__muted">
             {contact.email} · {contact.phone}
           </p>
@@ -202,6 +241,7 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
               )}
               {order.rewardPointsEarned > 0 && <p className="order-view__muted">{t('view.pointsEarned', { points: formatPoints(order.rewardPointsEarned) })}</p>}
               {payAction && <div className="order-view__pay">{payAction}</div>}
+              <PhoneConfirmation order={order} />
             </>
           ) : (
             <p>
@@ -222,7 +262,7 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
         </h2>
         <OrderItems items={order.items} currency={order.currency} />
         <OrderTotals
-          totals={order.totals}
+          totals={withCodTotals(order)}
           couponCode={order.couponCode ?? order.totals.couponCode}
           appliedRules={order.appliedRules}
           shippingLabel={order.shippingMethod ? shippingMethodText(order.shippingMethod).label : undefined}
@@ -238,6 +278,15 @@ function OrderDetailsView({ order, invoiceLink, invoicePdf = null, payAction = n
       </section>
     </div>
   )
+}
+
+/** Phase 14: an order's COD fee, advance paid and cash due, wherever the API put them (totals or the order). */
+function withCodTotals(order) {
+  const extra = {}
+  for (const key of ['codFee', 'advancePaid', 'codDue']) {
+    if (order.totals?.[key] === undefined && order[key] !== undefined) extra[key] = order[key]
+  }
+  return Object.keys(extra).length > 0 ? { ...order.totals, ...extra } : order.totals
 }
 
 export default OrderDetailsView

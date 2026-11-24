@@ -45,7 +45,7 @@ function PayNowButton({ order, email, size = 'md', variant = 'primary' }) {
   return (
     <div className="pay-now">
       <Button variant={variant} size={size} onClick={() => pay.mutate()} disabled={busy} aria-describedby={error ? errorId : undefined}>
-        <LuLock aria-hidden="true" /> {t(busy ? 'payNow.opening' : 'payNow.pay')}
+        <LuLock aria-hidden="true" /> {t(busy ? 'payNow.opening' : order.paymentMethod === 'cod' ? 'payNow.payAdvance' : 'payNow.pay')}
       </Button>
       {error && (
         <p id={errorId} className="pay-now__error" role="alert">

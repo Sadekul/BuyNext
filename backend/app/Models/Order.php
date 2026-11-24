@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Pricing;
+use App\Services\ShippingRates;
 use App\Support\Currency;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -24,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'reward_points_spent', 'reward_points_amount', 'reward_points_earned', // phase 11
     'currency', // phase 12
     'locale', // phase 13: the language the order was placed in (en|bn)
+    // Phase 14: delivery zone, cash on delivery, phone confirmation.
+    'delivery_zone_code', 'delivery_eta_min', 'delivery_eta_max', 'cod_fee', 'advance_amount', 'cod_due', 'confirmation_status',
 ])]
 class Order extends Model
 {
@@ -34,7 +37,12 @@ class Order extends Model
     public const STATUSES = ['pending_payment', 'processing', 'shipped', 'delivered', 'cancelled', 'closed'];
 
     /** Phase 12: review = an online payment was taken but flagged as risky (SSLCommerz risk level 1): staff approve it (invoice) or cancel. */
-    public const PAYMENT_STATUSES = ['unpaid', 'review', 'paid', 'partially_refunded', 'refunded'];
+    public const PAYMENT_STATUSES = ['unpaid', 'review', 'paid', 'partially_refunded', 'refunded',
+        'partially_paid', // phase 14: a COD order's advance (or part of the cash) is paid, the rest is still to collect
+    ];
+
+    /** Phase 14: phone confirmation of cash on delivery orders (cod.require_confirmation). */
+    public const CONFIRMATION_STATUSES = ['pending', 'confirmed', 'unreachable', 'cancelled'];
 
     /** Phase 6: storefront checkout, or staff creating the order in the admin. */
     public const SOURCES = ['storefront', 'admin'];
@@ -80,6 +88,17 @@ class Order extends Model
             'reward_points_amount' => 'decimal:2',
             'reward_points_earned' => 'integer',
             'payment_details' => 'array', // phase 12: SSLCommerz's transaction details
+            // Phase 14.
+            'delivery_eta_min' => 'integer',
+            'delivery_eta_max' => 'integer',
+            'cod_fee' => 'decimal:2',
+            'advance_amount' => 'decimal:2',
+            'advance_paid' => 'decimal:2',
+            'advance_refunded' => 'decimal:2',
+            'cod_due' => 'decimal:2',
+            'cod_collected' => 'decimal:2',
+            'confirmation_attempts' => 'integer',
+            'confirmed_at' => 'datetime',
         ];
     }
 
@@ -126,6 +145,74 @@ class Order extends Model
             - Pricing::toCents($this->reward_points_amount ?? 0));
     }
 
+    /** Phase 14: the phone confirmation attempts (and staff overrides), oldest first. */
+    public function confirmationLogs(): HasMany
+    {
+        return $this->hasMany(OrderConfirmationLog::class)->orderBy('id');
+    }
+
+    public function deliveryZone(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryZone::class, 'delivery_zone_code', 'code');
+    }
+
+    public function isCod(): bool
+    {
+        return $this->payment_method === 'cod';
+    }
+
+    /** Phase 14: a COD order that pays the delivery charge (+ fee) online first. */
+    public function hasAdvance(): bool
+    {
+        return $this->isCod() && Pricing::toCents($this->advance_amount ?? 0) > 0;
+    }
+
+    /** Phase 14: what an online payment of this order charges: the advance of a COD order, else the amount due. */
+    public function onlineDueCents(): int
+    {
+        return $this->hasAdvance() ? Pricing::toCents($this->advance_amount) : $this->dueCents();
+    }
+
+    /**
+     * Phase 14: the cash still to collect on delivery (COD orders; 0 for others).
+     * Orders from before phase 14 have no cod_due: everything due, until invoiced.
+     */
+    public function codDueCents(): int
+    {
+        if (! $this->isCod()) {
+            return 0;
+        }
+        if ($this->cod_due !== null) {
+            return Pricing::toCents($this->cod_due);
+        }
+
+        return in_array($this->payment_status, ['unpaid', 'review'], true) ? $this->dueCents() : 0;
+    }
+
+    /**
+     * Phase 14: "Inside Dhaka · Delivery in 1–2 days" in the current language
+     * (the zone and/or the zone rate's delivery time); null when the order has neither.
+     */
+    public function deliveryText(): ?string
+    {
+        $zone = $this->delivery_zone_code ? ($this->deliveryZone?->localName() ?? $this->delivery_zone_code) : null;
+        $eta = ShippingRates::etaText($this->delivery_eta_min, $this->delivery_eta_max);
+
+        return $zone || $eta ? implode(' · ', array_filter([$zone, $eta])) : null;
+    }
+
+    /** Phase 14: does this COD order use any of the Bangladesh COD extras (zone, fee, advance)? Then emails say more. */
+    public function usesBangladeshCod(): bool
+    {
+        return $this->isCod() && ($this->delivery_zone_code !== null || Pricing::toCents($this->cod_fee ?? 0) > 0 || $this->hasAdvance());
+    }
+
+    /** Phase 14: may this COD order not ship yet (waiting for, or not reached by, the phone confirmation)? */
+    public function awaitsConfirmation(): bool
+    {
+        return $this->isCod() && in_array($this->confirmation_status, ['pending', 'unreachable'], true);
+    }
+
     /** Phase 12: the order's currency code (USD for orders placed before phase 12). */
     public function currencyCode(): string
     {
@@ -150,7 +237,7 @@ class Order extends Model
     }
 
     /** What resources need to show an order with its documents (eager load, no N+1). */
-    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem', 'giftCard']; // phase 10 (part B): giftCard
+    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem', 'giftCard', 'deliveryZone']; // phase 10 (part B): giftCard
 
     /** Money recorded by invoices, in cents. */
     public function paidCents(): int

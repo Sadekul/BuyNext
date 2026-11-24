@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ShippingRate;
 use App\Services\Audit;
+use App\Services\DeliveryZones;
 use App\Services\Pricing;
 use App\Services\Settings;
 use App\Services\ShippingRates;
@@ -25,7 +26,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ShippingRateController extends Controller
 {
-    private const CSV_COLUMNS = ['method', 'country', 'min_weight_grams', 'max_weight_grams', 'min_subtotal', 'max_subtotal', 'price', 'position'];
+    private const CSV_COLUMNS = ['method', 'country', 'min_weight_grams', 'max_weight_grams', 'min_subtotal', 'max_subtotal', 'price', 'position',
+        'zone_code', 'eta_days_min', 'eta_days_max', // phase 14 (optional in imports)
+    ];
 
     private const MAX_ROWS = 2000;
 
@@ -75,7 +78,8 @@ class ShippingRateController extends Controller
         if (! $rate) {
             return $this->notFound();
         }
-        $data = $this->validRow([...$rate->only(['method', 'country', 'min_weight_grams', 'max_weight_grams', 'min_subtotal', 'max_subtotal', 'price']),
+        $data = $this->validRow([...$rate->only(['method', 'country', 'min_weight_grams', 'max_weight_grams', 'min_subtotal', 'max_subtotal', 'price',
+            'zone_code', 'eta_days_min', 'eta_days_max']),
             ...$request->all()], creating: false);
         DB::transaction(function () use ($rate, $data) {
             $before = $rate->toApi();
@@ -134,7 +138,7 @@ class ShippingRateController extends Controller
     {
         $rows = ShippingRate::orderBy('method')->orderBy('position')->orderBy('id')->get()->map(fn (ShippingRate $rate) => [
             $rate->method, $rate->country, $rate->min_weight_grams, $rate->max_weight_grams, $rate->min_subtotal, $rate->max_subtotal,
-            $rate->price, $rate->position,
+            $rate->price, $rate->position, $rate->zone_code, $rate->eta_days_min, $rate->eta_days_max,
         ]);
 
         return Csv::download('shipping-rates-'.now()->toDateString().'.csv', self::CSV_COLUMNS, $rows);
@@ -220,12 +224,14 @@ class ShippingRateController extends Controller
     {
         $data = $request->validate([
             'country' => ['nullable', 'string', 'max:60'],
+            'zone_code' => ['nullable', 'string', 'max:40'], // phase 14: price for an address in this delivery zone
             'weight_grams' => ['required', 'integer', 'min:0', 'max:100000000'],
             'subtotal' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:10000000'],
         ]);
         $country = filled($data['country'] ?? null) ? ShippingRates::normalizeCountry($data['country'], $this->settings->get('allowed_countries', [])) : null;
         $methods = $this->settings->shippingMethods();
-        $options = $this->rates->options($methods, $country === '*' ? null : $country, (int) $data['weight_grams'], Pricing::toCents((string) $data['subtotal']));
+        $options = $this->rates->options($methods, $country === '*' ? null : $country, (int) $data['weight_grams'], Pricing::toCents((string) $data['subtotal']),
+            $data['zone_code'] ?? null);
 
         return response()->json(['data' => array_values(array_map(fn (array $method) => [
             'method' => $method['id'],
@@ -234,6 +240,10 @@ class ShippingRateController extends Controller
             'price' => isset($options[$method['id']]) ? Pricing::format($options[$method['id']]['price_cents']) : null,
             'source' => $options[$method['id']]['source'] ?? ($this->rates->hasRows($method['id']) ? 'table' : 'flat'),
             'rate_id' => $options[$method['id']]['rate_id'] ?? null,
+            // Phase 14.
+            'zone_code' => $options[$method['id']]['zone_code'] ?? null,
+            'eta_days_min' => $options[$method['id']]['eta_days_min'] ?? null,
+            'eta_days_max' => $options[$method['id']]['eta_days_max'] ?? null,
         ], $methods))]);
     }
 
@@ -250,6 +260,10 @@ class ShippingRateController extends Controller
             'max_subtotal' => ['nullable', ...$money],
             'price' => ['required', ...$money],
             'position' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            // Phase 14: a delivery zone (its rows match only addresses in it) and the delivery time in days.
+            'zone_code' => ['nullable', 'string', 'max:40'],
+            'eta_days_min' => ['nullable', 'integer', 'min:0', 'max:60'],
+            'eta_days_max' => ['nullable', 'integer', 'min:0', 'max:60'],
         ], [
             'method.in' => 'The method must be standard, express, or nextDay.',
             'price.required' => 'Enter a price.',
@@ -268,6 +282,13 @@ class ShippingRateController extends Controller
         if (isset($data['max_subtotal']) && Pricing::toCents((string) $data['max_subtotal']) <= $minSubtotal) {
             $errors['max_subtotal'] = 'The maximum subtotal must be more than the minimum.';
         }
+        $zone = filled($data['zone_code'] ?? null) ? trim($data['zone_code']) : null;
+        if ($zone !== null && ! in_array($zone, app(DeliveryZones::class)->codes(), true)) {
+            $errors['zone_code'] = 'There is no delivery zone with this code.';
+        }
+        if (isset($data['eta_days_min'], $data['eta_days_max']) && $data['eta_days_max'] < $data['eta_days_min']) {
+            $errors['eta_days_max'] = 'The longest delivery time must be at least the shortest.';
+        }
         if ($errors) {
             throw ValidationException::withMessages($errors);
         }
@@ -280,6 +301,9 @@ class ShippingRateController extends Controller
             'min_subtotal' => Pricing::format($minSubtotal),
             'max_subtotal' => isset($data['max_subtotal']) ? Pricing::format(Pricing::toCents((string) $data['max_subtotal'])) : null,
             'price' => Pricing::format(Pricing::toCents((string) $data['price'])),
+            'zone_code' => $zone,
+            'eta_days_min' => isset($data['eta_days_min']) ? (int) $data['eta_days_min'] : null,
+            'eta_days_max' => isset($data['eta_days_max']) ? (int) $data['eta_days_max'] : null,
         ];
         if (array_key_exists('position', $data) && $data['position'] !== null) {
             $row['position'] = (int) $data['position'];

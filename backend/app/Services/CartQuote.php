@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CustomerGroup;
+use App\Models\DeliveryZone;
 use App\Models\GiftCard;
 
 /**
@@ -46,7 +47,17 @@ final readonly class CartQuote
         public int $rewardPoints = 0,
         public int $rewardPointsCents = 0,
         public ?string $rewardPointsError = null,
+        // Phase 14: the COD fee in the total (payment method cod), the address's delivery zone, and whether COD may be used.
+        public int $codFeeCents = 0,
+        public ?DeliveryZone $deliveryZone = null,
+        public ?array $cod = null,
     ) {}
+
+    /** Phase 14: the advance a COD order pays online first (delivery charge + fee), in cents. */
+    public function advanceCents(): int
+    {
+        return Pricing::toCents($this->cod['advance_amount'] ?? '0');
+    }
 
     /** Phase 10 (part B): what is left to pay after the gift card. Phase 11: and the reward points. */
     public function amountDueCents(): int
@@ -106,9 +117,14 @@ final readonly class CartQuote
                 'id' => $option['id'],
                 // Phase 13: translated on the way out (stored and computed in English).
                 'label' => filled($option['label']) ? __($option['label']) : $option['label'],
-                'eta' => filled($option['eta']) ? __($option['eta']) : $option['eta'],
+                'eta' => isset($option['eta_days_min']) ? ShippingRates::etaText($option['eta_days_min'], $option['eta_days_max'] ?? null)
+                    : (filled($option['eta']) ? __($option['eta']) : $option['eta']),
                 'price' => $money($option['price_cents']),
                 'source' => $option['source'] ?? 'flat', // phase 10 (part B): "table" (a table rate) or "flat"
+                // Phase 14: the matched zone rate's delivery time ("Delivery in 1–2 days" in the eta above).
+                'zone_code' => $option['zone_code'] ?? null,
+                'eta_days_min' => $option['eta_days_min'] ?? null,
+                'eta_days_max' => $option['eta_days_max'] ?? null,
             ], $this->shippingOptions),
             // Phase 10 (part B): shipping table rates and gift cards.
             'shipping_method' => $this->shippingRequired ? ($this->shippingMethod['id'] ?? null) : null,
@@ -129,6 +145,9 @@ final readonly class CartQuote
             'totals' => $this->totals(),
             'tax_estimated' => $this->taxEstimated,
             'customer_group' => $this->group?->summary(),
+            // Phase 14.
+            'delivery_zone' => $this->deliveryZone?->summary(),
+            'cod' => $this->cod,
         ];
     }
 
@@ -147,6 +166,7 @@ final readonly class CartQuote
             'gift_card' => Pricing::format($this->giftCardCents),
             'reward_points' => Pricing::format($this->rewardPointsCents), // phase 11: paid with reward points
             'amount_due' => Pricing::format($this->amountDueCents()),
+            'cod_fee' => Pricing::format($this->codFeeCents), // phase 14: in the total (payment method cod)
         ];
     }
 }

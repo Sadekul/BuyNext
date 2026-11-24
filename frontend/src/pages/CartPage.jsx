@@ -18,6 +18,7 @@ import { defaultShippingMethodId, useStoreSettings } from '../hooks/useStoreSett
 import { withServerPricing } from '../utils/cartTotals'
 import { cartLineKey } from '../reducers/cartReducer'
 import './CartPage.css'
+import { isBangladesh } from '../utils/bangladesh'
 import { useTranslation } from 'react-i18next'
 
 function CartPage() {
@@ -105,6 +106,8 @@ function CartPage() {
           onRemoveCoupon={cart.removeCoupon}
           isCheckingCoupon={REAL_SHOP && pricing.isFetching}
           showTax={!REAL_SHOP || settings.taxEnabled}
+          // Phase 14: a Bangladeshi store prices delivery by the shopper's area, chosen at checkout.
+          areaNote={REAL_SHOP && settings.bangladeshAddresses === true && isBangladesh(settings.defaultCountry)}
         >
           {REAL_SHOP && <GroupDiscountNote group={pricing.data?.customerGroup ?? user?.group} amount={pricing.data?.totals.groupDiscount} />}
           {problems.length > 0 && (

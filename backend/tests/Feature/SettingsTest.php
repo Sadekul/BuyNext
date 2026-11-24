@@ -72,6 +72,7 @@ class SettingsTest extends TestCase
             ],
             'free_shipping_threshold' => '50.00',
             'allowed_countries' => ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'Bangladesh', 'India'],
+            'default_country' => null, // phase 14
             'payment_methods' => ['card', 'paypal', 'cod'],
             'guest_checkout' => true,
             'tax_enabled' => false,
@@ -86,6 +87,8 @@ class SettingsTest extends TestCase
             // Phase 11.
             'rewards' => ['enabled' => false, 'earn_rate' => '1.00', 'point_value' => '0.0100', 'min_redeem' => 100],
             'currencies' => ['base' => 'USD', 'display' => []],
+            // Phase 14.
+            'cod' => ['fee' => '0.00', 'max_order_total' => null, 'advance' => 'none', 'zones' => [], 'require_confirmation' => false],
         ]]);
     }
 

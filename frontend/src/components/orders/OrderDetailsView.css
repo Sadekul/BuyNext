@@ -108,3 +108,19 @@
 .order-view__pay {
   margin-top: var(--space-3);
 }
+
+/* Phase 14: the store's phone call before a cash on delivery order is sent. */
+.order-view__confirmation {
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+}
+
+.order-view__confirmation svg {
+  vertical-align: -0.125em;
+}
+
+.order-view__confirmation--confirmed {
+  background: var(--color-primary-soft);
+}

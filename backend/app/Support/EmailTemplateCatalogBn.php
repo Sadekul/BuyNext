@@ -201,6 +201,17 @@ final class EmailTemplateCatalogBn
                     .'<blockquote>অর্ডার <strong>{{ order_number }}</strong></blockquote>'
                     .'<p>নিরাপত্তার জন্য কোডটি শুধু প্রাপকের ইমেইলেই আছে। ইমেইলটি না পৌঁছালে তাঁকে স্প্যাম ফোল্ডার দেখতে বলুন, অথবা এই ইমেইলের উত্তর দিন।</p>',
             ],
+            // Phase 14.
+            'cod_confirmed' => [
+                'subject' => 'আপনার অর্ডার {{ order_number }} নিশ্চিত করা হয়েছে',
+                'body' => '<h2>আমরা আপনার অর্ডার নিশ্চিত করেছি</h2>'
+                    .'<p>প্রিয় {{ customer_first_name }},</p>'
+                    .'<p>ফোনে অর্ডার <strong>{{ order_number }}</strong> নিশ্চিত করার জন্য ধন্যবাদ। আমরা এখন এটি প্রস্তুত করছি।</p>'
+                    .'<blockquote>ডেলিভারির সময় কুরিয়ারকে নগদে দেওয়ার জন্য <strong>${{ cod_amount }}</strong> প্রস্তুত রাখুন।</blockquote>'
+                    .'<p><strong>ডেলিভারি</strong><br />{{ delivery_estimate }}</p>'
+                    .'<p><strong>ডেলিভারির ঠিকানা</strong></p>{{ address }}'
+                    .self::QUESTIONS,
+            ],
         ];
     }
 }

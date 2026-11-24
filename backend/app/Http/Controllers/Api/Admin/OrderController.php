@@ -127,6 +127,10 @@ class OrderController extends Controller
             'payment_status' => ['nullable', 'in:paid'],
             'note' => ['nullable', 'string', 'max:1000'],
             'notify_customer' => ['nullable', 'boolean'],
+            // Phase 14: cash collected on delivery (COD), and shipping an unconfirmed COD order anyway.
+            'collected_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:100000000'],
+            'collection_note' => ['nullable', 'string', 'max:1000'],
+            'confirmation_override' => ['nullable', 'string', 'min:3', 'max:500'],
         ], [
             'status.in' => 'Choose a valid order status.',
             'payment_status.in' => 'An order can only be marked paid.',
@@ -155,7 +159,8 @@ class OrderController extends Controller
             if ($to === 'cancelled' && $from !== 'cancelled' && $order->invoices()->exists()) {
                 throw ValidationException::withMessages(['status' => 'This order has been invoiced (paid), so it can\'t be cancelled. Create a refund (credit memo) instead.']);
             }
-            if ($to === $from && ! $markPaid && blank($note)) {
+            $collect = isset($data['collected_amount']);
+            if ($to === $from && ! $markPaid && blank($note) && ! $collect) {
                 throw ValidationException::withMessages(['status' => 'Choose a new status, mark the order paid, or add a note.']);
             }
 
@@ -175,9 +180,21 @@ class OrderController extends Controller
             // The customer hears about shipping, delivery, and cancellation (OrderStatusMail).
             $emailed = $notify && $to !== $from && in_array($to, OrderStatusMail::STATUSES, true);
 
+            // Phase 14: the cash collected on delivery (with "delivered", or on a shipped/delivered COD order).
+            if ($collect) {
+                if (! in_array($to, ['shipped', 'delivered'], true) || ! in_array($from, ['shipped', 'delivered'], true)) {
+                    throw ValidationException::withMessages(['collected_amount' => 'Record the cash collected when the order is delivered.']);
+                }
+                $documents->collect($order, $admin, Pricing::toCents((string) $data['collected_amount']), $data['collection_note'] ?? null);
+                if ($to === $from && blank($note)) {
+                    return [$order, false];
+                }
+            }
+
             // Shortcut: "shipped" = a shipment without tracking (same rules as the shipment endpoint).
             if ($to === 'shipped' && $from !== 'shipped') {
-                $documents->ship($order, $admin, 'other', null, $note, $emailed, historyNote: $note, errorKey: 'status');
+                $documents->ship($order, $admin, 'other', null, $note, $emailed, historyNote: $note, errorKey: 'status',
+                    confirmationOverride: $data['confirmation_override'] ?? null);
 
                 return [$order, $emailed];
             }
@@ -272,6 +289,10 @@ class OrderController extends Controller
             'payment_status' => ['nullable', Rule::in(Order::PAYMENT_STATUSES)],
             'source' => ['nullable', Rule::in(Order::SOURCES)],
             'customer_id' => ['nullable', 'integer'],
+            // Phase 14.
+            'delivery_zone' => ['nullable', 'string', 'max:40'],
+            'cod' => ['nullable', 'boolean'],
+            'confirmation_status' => ['nullable', Rule::in(Order::CONFIRMATION_STATUSES)],
         ]);
     }
 
@@ -289,13 +310,18 @@ class OrderController extends Controller
             ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($data['payment_status'] ?? null, fn ($query, $status) => $query->where('payment_status', $status))
             ->when($data['source'] ?? null, fn ($query, $source) => $query->where('source', $source))
-            ->when($data['customer_id'] ?? null, fn ($query, $id) => $query->where('customer_id', $id));
+            ->when($data['customer_id'] ?? null, fn ($query, $id) => $query->where('customer_id', $id))
+            // Phase 14: delivery zone, cash on delivery or not, phone confirmation.
+            ->when($data['delivery_zone'] ?? null, fn ($query, $zone) => $query->where('delivery_zone_code', $zone))
+            ->when(isset($data['cod']) && $data['cod'] !== null, fn ($query) => filter_var($data['cod'], FILTER_VALIDATE_BOOLEAN)
+                ? $query->where('payment_method', 'cod') : $query->where('payment_method', '!=', 'cod'))
+            ->when($data['confirmation_status'] ?? null, fn ($query, $status) => $query->where('confirmation_status', $status));
     }
 
     private function find(string $number): ?Order
     {
         return Order::where('number', strtoupper($number))
-            ->with(['items', 'customer', 'createdBy', 'history.admin', 'returns.items', ...Order::DOCUMENTS])->first();
+            ->with(['items', 'customer', 'createdBy', 'history.admin', 'returns.items', 'confirmationLogs.admin', ...Order::DOCUMENTS])->first();
     }
 
     private function notFound(): JsonResponse

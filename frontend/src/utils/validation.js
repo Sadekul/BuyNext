@@ -16,7 +16,8 @@ const CODE_PATTERN = /^\d{6}$/
 
 /** "+1 (555) 010-0100" → "+15550100100"; "00880…" → "+880…" (the server tidies the same way). */
 export function normalizePhone(phone) {
-  const compact = phone.trim().replace(/[\s().-]/g, '')
+  // Phase 14: digits typed on a Bangla keyboard ("০১৭১২…") count as digits.
+  const compact = phone.trim().replace(/[০-৯]/g, (digit) => String('০১২৩৪৫৬৭৮৯'.indexOf(digit))).replace(/[\s().-]/g, '')
   return compact.startsWith('00') ? `+${compact.slice(2)}` : compact
 }
 

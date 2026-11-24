@@ -23,7 +23,8 @@ use Illuminate\Support\Collection;
 class Pricing
 {
     public function __construct(private Settings $settings, private CatalogRules $catalogRules, private CartRules $cartRules,
-        private ShippingRates $shippingRates, private GiftCards $giftCards, private RewardPoints $rewardPoints) {}
+        private ShippingRates $shippingRates, private GiftCards $giftCards, private RewardPoints $rewardPoints,
+        private CashOnDelivery $cod, private DeliveryZones $zones) {}
 
     /** "9.99" → 999. Decimal strings from the database have 2 places, so this is exact. */
     public static function toCents(string|int|float $amount): int
@@ -85,10 +86,13 @@ class Pricing
      * discount and before coupons.
      * Phase 11: $rewardsCustomer (the signed-in shopper) may pay with
      * $rewardPoints, after tax and before a gift card.
+     * Phase 14: $deliveryZone (the address's zone code) picks the zone's
+     * table rates; $paymentMethod "cod" adds the COD fee to the total. The
+     * quote's `cod` says whether cash on delivery may be used and why not.
      */
     public function quote(array $items, ?string $couponCode, ?string $shippingMethod, bool $lock = false, ?int $customerId = null,
         ?string $email = null, ?string $country = null, ?CustomerGroup $group = null, ?string $giftCardCode = null,
-        ?Customer $rewardsCustomer = null, ?int $rewardPoints = null): CartQuote
+        ?Customer $rewardsCustomer = null, ?int $rewardPoints = null, ?string $deliveryZone = null, ?string $paymentMethod = null): CartQuote
     {
         $group ??= CustomerGroup::general();
         $groupBasisPoints = $group?->discountBasisPoints() ?? 0;
@@ -148,7 +152,7 @@ class Pricing
         $shippingRequired = $itemCount === 0 || $shippable !== [];
 
         // Phase 10 (part B): table rates decide which methods are offered and their price (flat price without rows).
-        $methods = $shippingRequired ? $this->shippingRates->options($this->settings->shippingMethods(), $country, $weight, $merchandise) : [];
+        $methods = $shippingRequired ? $this->shippingRates->options($this->settings->shippingMethods(), $country, $weight, $merchandise, $deliveryZone) : [];
         $default = $this->settings->defaultShippingMethod();
         $chosenId = match (true) {
             $shippingMethod !== null && isset($methods[$shippingMethod]) => $shippingMethod,
@@ -184,6 +188,10 @@ class Pricing
                 'eta' => $method['eta'],
                 'price_cents' => $freeEverything || ($method['free_over_threshold'] && $freeStandard) ? 0 : $method['price_cents'],
                 'source' => $method['source'],
+                // Phase 14: the delivery zone of the matched table rate row, and its delivery time in days.
+                'zone_code' => $method['zone_code'] ?? null,
+                'eta_days_min' => $method['eta_days_min'] ?? null,
+                'eta_days_max' => $method['eta_days_max'] ?? null,
             ];
         }
         $method = match (true) {
@@ -194,6 +202,10 @@ class Pricing
         [$tax, $taxIncluded] = $itemCount > 0 ? $this->tax($merchandise - $discount + $shipping, $country) : [0, false];
         // Prices that already include tax: the tax is shown, but not added again.
         $total = $afterDiscount + $shipping + ($taxIncluded ? 0 : $tax);
+        // Phase 14: the cash on delivery fee (no tax on it), when paying cash on delivery.
+        $feeCents = $itemCount > 0 ? $this->cod->feeCents() : 0;
+        $codFee = $paymentMethod === 'cod' ? $feeCents : 0;
+        $total += $codFee;
 
         // Phase 11: reward points pay first (up to max_percent of the total, never for gift card lines), with the customer row locked at checkout.
         [$rewards, $points, $pointsCents, $pointsError] = $itemCount > 0
@@ -202,6 +214,20 @@ class Pricing
 
         // Phase 10 (part B): a gift card pays up to the total, but never for other gift cards. Phase 11: what points left.
         [$giftCard, $giftCardCents, $giftCardError] = $this->giftCard($giftCardCode, $lock, $total - $pointsCents, $giftLines);
+
+        // Phase 14: may this cart be paid cash on delivery (zone, limit with the fee), and the advance it would pay online first.
+        $zone = $this->zones->find($deliveryZone);
+        $codTotal = $total - $codFee + $feeCents;
+        // The zones are Bangladesh's: another country (none known yet: the cart page) isn't held to them.
+        $codProblem = $this->cod->problem($zone?->code, $codTotal, $country === null || $country === '' || BdAddresses::isBangladesh($country));
+        $codDue = max(0, $codTotal - $pointsCents - $giftCardCents);
+        $cod = [
+            'available' => $codProblem === null,
+            'reason' => $codProblem[0] ?? null,
+            'message' => $codProblem[1] ?? null,
+            ...array_diff_key($this->cod->publicSettings(), ['zones' => true, 'require_confirmation' => true]),
+            'advance_amount' => self::format($this->cod->advanceCents($shipping, $feeCents, $codDue)),
+        ];
 
         return new CartQuote(
             lines: $lines,
@@ -232,6 +258,9 @@ class Pricing
             rewardPoints: $points,
             rewardPointsCents: $pointsCents,
             rewardPointsError: $pointsError,
+            codFeeCents: $codFee,
+            deliveryZone: $zone,
+            cod: $cod,
         );
     }
 

@@ -32,6 +32,9 @@ import {
   // Phase 10.
   LuGift,
   LuTable2,
+  // Phase 14.
+  LuMapPinned,
+  LuPhoneCall,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -113,6 +116,8 @@ const LIVE_NAV = [
     heading: 'Sales',
     items: [
       { to: '/orders', label: 'Orders', icon: LuReceipt, permission: 'orders.view' },
+      // Phase 14 §4: cash on delivery orders waiting for a phone call.
+      { to: '/to-confirm', label: 'To confirm', icon: LuPhoneCall, permission: 'orders.edit' },
       { to: '/shipments', label: 'Shipments', icon: LuTruck, permission: 'orders.view' },
       { to: '/returns', label: 'Returns', icon: LuPackageOpen, permission: 'returns.view' },
       { to: '/invoices', label: 'Invoices', icon: LuFileText, permission: 'orders.view' },
@@ -154,6 +159,8 @@ const LIVE_NAV = [
   // `end`: Settings → Shipping → Table rates (phase 10) has its own entry.
   { to: '/settings', label: 'Settings', icon: LuSettings, end: true, permission: 'settings.view' },
   { to: '/settings/shipping-rates', label: 'Shipping table rates', icon: LuTable2, permission: 'settings.edit' },
+  // Phase 14 §3.
+  { to: '/settings/delivery-zones', label: 'Delivery zones', icon: LuMapPinned, permission: 'settings.edit' },
   {
     heading: 'System',
     items: [

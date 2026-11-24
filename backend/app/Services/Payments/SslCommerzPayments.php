@@ -81,7 +81,8 @@ class SslCommerzPayments
 
     public function usesSslCommerz(Order $order): bool
     {
-        return $order->payment_method === 'sslcommerz' && $this->enabled();
+        // Phase 14: a cash on delivery order's advance (delivery charge + fee) is paid through SSLCommerz too.
+        return ($order->payment_method === 'sslcommerz' || $order->hasAdvance()) && $this->enabled();
     }
 
     public function canPay(Order $order): bool
@@ -94,14 +95,14 @@ class SslCommerzPayments
     {
         return match (true) {
             ! $this->enabled() => __('Online payments through SSLCommerz aren\'t available right now. We\'ll contact you about the payment.'),
-            $order->payment_method !== 'sslcommerz' => __('This order isn\'t paid through SSLCommerz.'),
+            $order->payment_method !== 'sslcommerz' && ! $order->hasAdvance() => __('This order isn\'t paid through SSLCommerz.'),
             $order->payment_status === 'review' => __('This order\'s payment was received and is being checked.'),
             $order->payment_status !== 'unpaid' => __('This order has already been paid.'),
             $order->status === 'cancelled' => __('This order was cancelled, so it can\'t be paid.'),
             $order->status !== 'pending_payment' => __('This order isn\'t waiting for a payment.'),
             ! Currency::sslcommerzAccepts($order->currencyCode()) => __('This order is in :currency; SSLCommerz charges in BDT only.', ['currency' => $order->currencyCode()]),
             blank($order->phone) => 'SSLCommerz needs a phone number for this order. Contact us to add one.',
-            $order->dueCents() <= 0 => __('There is nothing left to pay on this order.'),
+            $order->onlineDueCents() <= 0 => __('There is nothing left to pay on this order.'),
             default => null,
         };
     }
@@ -129,7 +130,7 @@ class SslCommerzPayments
 
             try {
                 $session = $this->gateway->createSession(array_filter([
-                    'total_amount' => Pricing::format($order->dueCents()),
+                    'total_amount' => Pricing::format($order->onlineDueCents()), // phase 14: a COD order's advance only
                     'currency' => $order->currencyCode(),
                     'tran_id' => $tranId,
                     // The shopper's browser comes back with a form POST to the store's sign-in service (BFF), which forwards it here.
@@ -331,7 +332,7 @@ class SslCommerzPayments
             return [$order->number, 'invalid'];
         }
         // A repeat of a return trip already recorded: no need to ask SSLCommerz again.
-        if (in_array($order->payment_status, ['paid', 'review', 'partially_refunded', 'refunded'], true)
+        if (in_array($order->payment_status, ['paid', 'review', 'partially_refunded', 'refunded', 'partially_paid'], true)
             && ($order->payment_details['val_id'] ?? null) === $valId) {
             return [$order->number, $order->payment_status === 'review' ? 'review' : 'already_paid'];
         }
@@ -467,7 +468,8 @@ class SslCommerzPayments
      */
     public function expireStale(): array
     {
-        $ids = Order::where('payment_method', 'sslcommerz')->where('payment_provider', 'sslcommerz')
+        // Phase 14: also COD orders whose advance (delivery charge) wasn't paid.
+        $ids = Order::whereIn('payment_method', ['sslcommerz', 'cod'])->where('payment_provider', 'sslcommerz')
             ->where('payment_status', 'unpaid')->where('status', 'pending_payment')
             ->whereNotNull('payment_expires_at')->where('payment_expires_at', '<', now())
             ->orderBy('id')->limit(500)->pluck('id');
@@ -515,7 +517,7 @@ class SslCommerzPayments
             $order = Order::whereKey($id)->lockForUpdate()->first();
             // Checked again under the lock: paid, cancelled, or given a new page meanwhile → nothing to do.
             if (! $order || $order->payment_status !== 'unpaid' || $order->status !== 'pending_payment'
-                || $order->payment_method !== 'sslcommerz' || ! $order->payment_expires_at?->isPast()) {
+                || ($order->payment_method !== 'sslcommerz' && ! $order->hasAdvance()) || ! $order->payment_expires_at?->isPast()) {
                 return 'skipped';
             }
             $order->forceFill(['payment_url' => null])->save();
@@ -613,13 +615,13 @@ class SslCommerzPayments
 
             return 'cancelled_order';
         }
-        if ($amount !== $order->dueCents() || $currency !== $order->currencyCode()) {
+        if ($amount !== $order->onlineDueCents() || $currency !== $order->currencyCode()) {
             Log::warning('SSLCommerz payment does not match the order.', [
                 'order' => $order->number, 'tran_id' => $tranId, 'amount' => $amount, 'currency' => $currency,
-                'expected_amount' => $order->dueCents(), 'expected_currency' => $order->currencyCode(),
+                'expected_amount' => $order->onlineDueCents(), 'expected_currency' => $order->currencyCode(),
             ]);
             $this->problem($order, "Payment amount mismatch on order {$order->number}",
-                "SSLCommerz reported {$paidText} (tran_id {$tranId}) but the amount due is ".$order->money(Pricing::format($order->dueCents())).' '.$order->currencyCode()
+                "SSLCommerz reported {$paidText} (tran_id {$tranId}) but the amount due is ".$order->money(Pricing::format($order->onlineDueCents())).' '.$order->currencyCode()
                 .'. The order was left unpaid: check the payment in the SSLCommerz panel.');
             $order->history()->create([
                 'status' => $order->status,
@@ -667,7 +669,11 @@ class SslCommerzPayments
         }
 
         $order->forceFill(['paid_at' => now()])->save();
-        $invoice = $this->documents->invoice($order, null, $method === 'SSLCommerz' ? 'Paid through SSLCommerz.' : "Paid with {$method} through SSLCommerz.", true);
+        $invoice = $order->hasAdvance()
+            // Phase 14: the advance delivery charge of a cash on delivery order; the rest is collected on delivery.
+            ? $this->documents->recordAdvance($order, $amount, ($method === 'SSLCommerz' ? 'Advance delivery charge paid through SSLCommerz.'
+                : "Advance delivery charge paid with {$method} through SSLCommerz.").' The rest is collected on delivery.')
+            : $this->documents->invoice($order, null, $method === 'SSLCommerz' ? 'Paid through SSLCommerz.' : "Paid with {$method} through SSLCommerz.", true);
         $invoice->load(['order']);
         $mail = [$order->email, new InvoiceMail($invoice)];
 

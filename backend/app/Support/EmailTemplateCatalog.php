@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Services\ShippingRates;
+
 /**
  * Phase 7: every email the store sends, with its default subject and body,
  * the variables it may use, and the ones it must use (Magento's Marketing →
@@ -35,7 +37,7 @@ final class EmailTemplateCatalog
      * with the email's currency symbol ("৳1,250.00" for an order in taka);
      * written "{{ name }}" they are the plain number ("1250.00").
      */
-    public const MONEY_VARIABLES = ['order_total', 'invoice_amount', 'refund_total', 'amount', 'cart_subtotal'];
+    public const MONEY_VARIABLES = ['order_total', 'invoice_amount', 'refund_total', 'amount', 'cart_subtotal', 'cod_amount']; // phase 14: cod_amount
 
     private const CODE_VARIABLES = [
         'customer_first_name' => ['Customer first name', 'text'],
@@ -435,6 +437,28 @@ final class EmailTemplateCatalog
                     .'<p>For security, the code is only in the recipient’s email. If it doesn’t arrive, ask them to check their spam folder, or reply to this email.</p>',
             ],
             // End of phase 10 part B templates.
+            // Phase 14: staff confirmed a cash on delivery order by phone.
+            'cod_confirmed' => [
+                'name' => 'Cash on delivery order confirmed',
+                'description' => 'Sent when staff confirm a cash on delivery order by phone (Sales → To confirm).',
+                'variables' => [
+                    'customer_first_name' => ['Customer first name', 'text'],
+                    'order_number' => ['Order number', 'text'],
+                    'order_total' => ['Order total (write $ before it to show the currency symbol)', 'text'],
+                    'cod_amount' => ['Cash to pay on delivery (write $ before it to show the currency symbol)', 'text'],
+                    'delivery_estimate' => ['Delivery zone and estimate', 'text'],
+                    'address' => ['Shipping address', 'block'],
+                ],
+                'required' => [['order_number']],
+                'subject' => 'We’ve confirmed your order {{ order_number }}',
+                'body' => '<h2>We’ve confirmed your order</h2>'
+                    .'<p>Hi {{ customer_first_name }},</p>'
+                    .'<p>Thanks for confirming order <strong>{{ order_number }}</strong> on the phone. We are preparing it now.</p>'
+                    .'<blockquote>Please keep <strong>${{ cod_amount }}</strong> ready to pay the courier in cash.</blockquote>'
+                    .'<p><strong>Delivery</strong><br />{{ delivery_estimate }}</p>'
+                    .'<p><strong>Shipping to</strong></p>{{ address }}'
+                    .self::QUESTIONS,
+            ],
         ];
     }
 
@@ -534,6 +558,12 @@ final class EmailTemplateCatalog
             'gift_card_purchased' => [
                 'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'recipient_name' => 'Sam', 'recipient_email' => 'sam@example.com',
                 'amount' => '50.00', 'last4' => 'PQRS',
+            ],
+            // Phase 14.
+            'cod_confirmed' => [
+                'customer_first_name' => 'Ava', 'order_number' => 'BN-100001', 'order_total' => '124.96', 'cod_amount' => '124.96',
+                'delivery_estimate' => __('Inside Dhaka').' · '.ShippingRates::etaText(1, 2),
+                'address' => EmailBlocks::address($address),
             ],
         };
 

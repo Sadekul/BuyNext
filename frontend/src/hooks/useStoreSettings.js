@@ -37,6 +37,10 @@ export const DEFAULT_STORE_SETTINGS = {
   locales: ['en', 'bn'],
   defaultLocale: 'en',
   banglaDigits: true,
+  // Phase 14: no Bangladesh address form, store default country or cash on delivery rules in the demo.
+  defaultCountry: null,
+  bangladeshAddresses: false,
+  cod: null,
 }
 
 /**

@@ -8,6 +8,7 @@ use App\Http\Resources\PageResource;
 use App\Http\Resources\ProductResource;
 use App\Models\CurrencyRate;
 use App\Models\Page;
+use App\Services\CashOnDelivery;
 use App\Services\HomeContent;
 use App\Services\Payments\PayPalPayments;
 use App\Services\Payments\SslCommerzPayments;
@@ -62,6 +63,7 @@ class ContentController extends Controller
             ], $settings->shippingMethods())),
             'free_shipping_threshold' => Pricing::format($settings->cents('free_shipping_threshold')),
             'allowed_countries' => $settings->get('allowed_countries'),
+            'default_country' => $settings->get('default_country'), // phase 14: the country address forms start with (null: none)
             'payment_methods' => $settings->paymentMethods(),
             'guest_checkout' => (bool) $settings->get('guest_checkout'),
             'tax_enabled' => (bool) $settings->get('tax_enabled'),
@@ -87,6 +89,8 @@ class ContentController extends Controller
                 'point_value' => $rewards->pointValueString(),
                 'min_redeem' => $rewards->minRedeem(),
             ],
+            // Phase 14: cash on delivery rules (fee, limit, advance delivery charge, zones, phone confirmation).
+            'cod' => app(CashOnDelivery::class)->publicSettings(),
             'currencies' => [
                 'base' => CurrencyController::base(),
                 'display' => CurrencyRate::where('enabled', true)->where('rate', '>', 0)->orderBy('position')->orderBy('id')->get()

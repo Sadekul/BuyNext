@@ -63,7 +63,8 @@ class Refunds
         }
 
         // Nothing can be refunded before a payment was recorded.
-        $isPaid = in_array($order->payment_status, ['paid', 'partially_refunded'], true);
+        // Phase 14: partially_paid = a COD order's advance (or part of the cash) was paid.
+        $isPaid = in_array($order->payment_status, ['paid', 'partially_refunded', 'partially_paid'], true);
 
         return [
             'items' => $items,
@@ -119,7 +120,7 @@ class Refunds
      */
     public function refund(Order $order, Admin $admin, array $data, bool $notify): CreditMemo
     {
-        if (! in_array($order->payment_status, ['paid', 'partially_refunded'], true)) {
+        if (! in_array($order->payment_status, ['paid', 'partially_refunded', 'partially_paid'], true)) {
             throw ValidationException::withMessages(['order' => $order->payment_status === 'refunded'
                 ? 'This order has already been fully refunded.'
                 : 'This order hasn\'t been paid yet, so there is nothing to refund. Invoice it first.']);
@@ -180,7 +181,13 @@ class Refunds
         $otherRefund = $total - $pointsRefund - $giftCardRefund;
         // Phase 8: an order paid through Stripe (phase 10: or PayPal) gets the money back BEFORE the memo is
         // saved: the provider refusing throws a 422 and the transaction keeps nothing. Others: refunded by hand.
-        $refundReference = $otherRefund > 0 ? $this->payments->refund($order, $otherRefund, $order->creditMemos->count() + 1) : null;
+        // Phase 14: a COD order's advance went through SSLCommerz: up to what is left of it goes back there first, the rest by hand (cash).
+        $onlineRefund = $order->isCod() ? min($otherRefund, max(0, Pricing::toCents($order->advance_paid ?? 0) - Pricing::toCents($order->advance_refunded ?? 0)))
+            : $otherRefund;
+        $refundReference = $onlineRefund > 0 ? $this->payments->refund($order, $onlineRefund, $order->creditMemos->count() + 1) : null;
+        if ($order->isCod() && $refundReference) {
+            $order->forceFill(['advance_refunded' => Pricing::format(Pricing::toCents($order->advance_refunded ?? 0) + $onlineRefund)])->save();
+        }
         $memo = $order->creditMemos()->create([
             'return_id' => $data['return_id'] ?? null, // phase 6: the return this refund settles
             'subtotal' => Pricing::format($subtotal),
@@ -224,6 +231,8 @@ class Refunds
                 .($giftCardRefund > 0 ? ' ('.$order->money(Pricing::format($giftCardRefund)).' to the gift card)' : '')
                 .match (true) {
                     $refundReference && $order->payment_provider === 'paypal' => ' through PayPal.',
+                    $refundReference && $order->isCod() && $onlineRefund < $otherRefund => ' ('.$order->money(Pricing::format($onlineRefund))
+                        .' of it through SSLCommerz, the rest by hand).', // phase 14: the COD advance
                     $refundReference && $order->payment_provider === 'sslcommerz' => ' through SSLCommerz.', // phase 12
                     (bool) $refundReference => ' to the card through Stripe.',
                     default => '.',
@@ -262,7 +271,8 @@ class Refunds
             ? $order->items->mapWithKeys(fn (OrderItem $item) => [$item->id => Pricing::toCents($item->discount_amount)])->all()
             : $this->share(Pricing::toCents($order->discount_total), $lineCents);
         $paid = array_map(fn ($id) => $lineCents[$id] - $discountShares[$id], array_combine(array_keys($lineCents), array_keys($lineCents)));
-        $shipping = Pricing::toCents($order->shipping_total);
+        // Phase 14: the cash on delivery fee is refunded with the shipping.
+        $shipping = Pricing::toCents($order->shipping_total) + Pricing::toCents($order->cod_fee ?? 0);
 
         // The tax on top = what the order costs beyond merchandise and shipping (0 when tax was off or included in the prices).
         $taxOnTop = Pricing::toCents($order->grand_total) - (array_sum($paid) + $shipping);

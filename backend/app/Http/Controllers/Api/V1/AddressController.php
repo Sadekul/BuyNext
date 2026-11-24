@@ -35,7 +35,7 @@ class AddressController extends Controller
         if (! $address) {
             return $this->notFound();
         }
-        $address = $this->book->update($address, $this->book->validate($request, partial: true));
+        $address = $this->book->update($address, $this->book->validate($request, partial: true, existing: $address));
 
         return response()->json(['data' => $address->refresh()->toApiArray()]);
     }

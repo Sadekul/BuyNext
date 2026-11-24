@@ -1,4 +1,4 @@
-import { formatDate } from '../utils/formatters'
+import { formatDate, moneyFormatter } from '../utils/formatters'
 import { sslcommerzMethodName } from '../utils/payment'
 import { translate } from '../i18n'
 import { LuBan, LuCircleCheck, LuCircleX, LuClock, LuLock, LuPackage, LuPackageCheck, LuPackageOpen, LuUndo2, LuTruck } from 'react-icons/lu'
@@ -25,6 +25,8 @@ export const PAYMENT_STATUSES = {
   refunded: { label: 'Refunded', icon: LuUndo2 },
   // Phase 12: SSLCommerz flagged the payment (risk level 1): the store checks it before confirming.
   review: { label: 'Being checked', icon: LuClock },
+  // Phase 14: cash on delivery with the delivery charge paid in advance; the rest is collected on delivery.
+  partially_paid: { label: 'Partly paid', icon: LuClock },
 }
 
 /*
@@ -85,8 +87,16 @@ export function paymentNote(order, { stripe = false, paypal = false, sslcommerz 
   }
   // Phase 12: held for a check (SSLCommerz flagged the payment as risky): nothing to do for the shopper.
   if (order.paymentStatus === 'review') return n('review')
+  // Phase 14: cash on delivery with the delivery charge paid online first; the rest in cash.
+  const money = moneyFormatter(order.currency)
+  if (order.paymentStatus === 'partially_paid') {
+    const due = order.codDue ?? Math.max(0, (order.totals?.total ?? 0) - (order.advancePaid ?? 0))
+    return order.advancePaid > 0 ? n('codPartlyPaid', { advance: money(order.advancePaid), due: money(due) }) : n('codDue', { due: money(due) })
+  }
   if (order.paymentStatus === 'paid') return n('paid')
   if (order.status === 'cancelled') return n('cancelled')
+  if (order.paymentMethod === 'cod' && order.status === 'pending_payment' && order.paymentProvider === 'sslcommerz') return n('codAdvanceDue')
+  if (order.paymentMethod === 'cod' && order.codDue > 0) return n('codDue', { due: money(order.codDue) })
   if (order.paymentMethod === 'cod') return n('cod')
   if (byPaypal) return n('awaitPaypal')
   if (bySslcommerz) return n('awaitSslcommerz')

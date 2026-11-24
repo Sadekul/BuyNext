@@ -111,4 +111,42 @@ export function csvRowProblems(fieldErrors) {
 const ROW_OFFSET = 0
 
 /** "Standard rate for US" / "Express rate for any country", for messages. */
-export const rateName = (rate) => `${methodLabel(rate.method)} rate for ${rate.country === '*' ? 'any country' : rate.country}`
+// Phase 14: "Standard rate for Inside Dhaka" when the row is for a delivery zone.
+export const rateName = (rate, zoneName) =>
+  `${methodLabel(rate.method)} rate for ${rate.zoneCode ? (zoneName ?? rate.zoneCode) : rate.country === '*' ? 'any country' : rate.country}`
+
+/*
+ * Phase 14 §3: a rate row can be for one delivery zone of Bangladesh
+ * (zoneCode; empty = any address of its country) and say how long delivery
+ * takes (etaDaysMin–etaDaysMax days). Only used when the store has zones.
+ */
+
+/** The zone fields' text values. */
+export const zoneRateFormValues = (rate) => ({ zoneCode: rate.zoneCode ?? '', etaDaysMin: text(rate.etaDaysMin), etaDaysMax: text(rate.etaDaysMax) })
+
+/** Their problems by field. */
+export function zoneRateErrors(values) {
+  const errors = {}
+  const days = (key) => {
+    const raw = values[key].trim()
+    if (raw === '') return null
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < 0 || value > 60) {
+      errors[key] = ['Enter a whole number of days from 0 to 60, or leave it empty.']
+      return undefined
+    }
+    return value
+  }
+  const min = days('etaDaysMin')
+  const max = days('etaDaysMax')
+  if (Number.isInteger(min) && Number.isInteger(max) && max < min) errors.etaDaysMax = ['The longest time can’t be shorter than the shortest.']
+  if (values.zoneCode && values.country.trim() !== '*' && !/^(bd|bangladesh)$/i.test(values.country.trim())) errors.country = ['A zone rate is for Bangladesh: enter Bangladesh, or * for any country.']
+  return errors
+}
+
+/** → { zoneCode (null = any zone), etaDaysMin, etaDaysMax } (null = not said). */
+export const toZoneRateValues = (values) => ({
+  zoneCode: values.zoneCode || null,
+  etaDaysMin: values.etaDaysMin.trim() === '' ? null : Number(values.etaDaysMin),
+  etaDaysMax: values.etaDaysMax.trim() === '' ? null : Number(values.etaDaysMax),
+})

@@ -28,6 +28,7 @@ class ShipmentController extends Controller
             'tracking_number' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9 -]+$/'],
             'note' => ['nullable', 'string', 'max:1000'],
             'notify_customer' => ['nullable', 'boolean'],
+            'confirmation_override' => ['nullable', 'string', 'min:3', 'max:500'], // phase 14: ship an unconfirmed COD order anyway (reason)
         ], [
             'carrier.required' => 'Choose a carrier.',
             'carrier.in' => 'Choose a carrier: DHL, FedEx, UPS, USPS, or other.',
@@ -42,7 +43,8 @@ class ShipmentController extends Controller
         $shipment = DB::transaction(function () use ($number, $data, $tracking, $notify, $request, $documents) {
             $order = Order::where('number', strtoupper($number))->lockForUpdate()->firstOrFail();
 
-            return $documents->ship($order, $request->user(), $data['carrier'], $tracking, $data['note'] ?? null, $notify);
+            return $documents->ship($order, $request->user(), $data['carrier'], $tracking, $data['note'] ?? null, $notify,
+                confirmationOverride: $data['confirmation_override'] ?? null);
         });
 
         $shipment->load(['order', 'admin']);

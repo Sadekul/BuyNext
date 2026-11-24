@@ -46,6 +46,9 @@ import BackupsPage from './pages/BackupsPage'
 // Phase 10: shipping table rates and gift cards.
 import ShippingRatesPage from './pages/ShippingRatesPage'
 import { GiftCardDetailPage, GiftCardsPage } from './pages/GiftCardsPages'
+// Phase 14: Settings → Delivery zones, Sales → To confirm.
+import DeliveryZonesPage from './pages/DeliveryZonesPage'
+import ToConfirmPage from './pages/ToConfirmPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -128,6 +131,9 @@ export function AdminRoutes() {
             <Route path="settings/shipping-rates" element={guarded('settings.edit', <ShippingRatesPage />)} />
             <Route path="gift-cards" element={guarded('gift_cards.view', <GiftCardsPage />)} />
             <Route path="gift-cards/:giftCardId" element={guarded('gift_cards.view', <GiftCardDetailPage />)} />
+            {/* Phase 14: Bangladesh delivery zones (changed with settings.edit), cash on delivery orders to confirm by phone. */}
+            <Route path="settings/delivery-zones" element={guarded('settings.view', <DeliveryZonesPage />)} />
+            <Route path="to-confirm" element={guarded('orders.edit', <ToConfirmPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

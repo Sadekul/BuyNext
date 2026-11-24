@@ -89,3 +89,18 @@
 .choice-cards--invalid .choice-card {
   border-color: var(--color-sale);
 }
+
+/* Phase 14: an option shown but not offered for this order (its description says why). */
+.choice-card--disabled {
+  cursor: not-allowed;
+  background: var(--color-bg-muted);
+  border-style: dashed;
+}
+
+.choice-card--disabled:hover {
+  border-color: var(--color-border-strong);
+}
+
+.choice-card--disabled .choice-card__label {
+  color: var(--color-text-muted);
+}

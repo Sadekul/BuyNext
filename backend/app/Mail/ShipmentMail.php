@@ -3,7 +3,9 @@
 namespace App\Mail;
 
 use App\Mail\Concerns\RendersEmailTemplate;
+use App\Models\Order;
 use App\Models\Shipment;
+use App\Services\Pricing;
 use App\Support\EmailBlocks;
 use App\Support\Locale;
 use Illuminate\Mail\Mailable;
@@ -42,7 +44,19 @@ class ShipmentMail extends Mailable
             'tracking_url' => (string) $trackingUrl,
             'tracking' => EmailBlocks::tracking(__($this->shipment->carrierLabel()), $this->shipment->tracking_number),
             'button' => EmailBlocks::button($trackingUrl, __('Track your parcel')),
-            'note' => EmailBlocks::note($this->shipment->note, self::storeName()),
+            // Phase 14: the delivery zone and time, and the cash to keep ready for a cash on delivery order.
+            'note' => EmailBlocks::note($this->shipment->note, self::storeName()).$this->delivery($order),
         ];
+    }
+
+    private function delivery(Order $order): string
+    {
+        $lines = array_filter([
+            $order->deliveryText(),
+            $order->isCod() && $order->codDueCents() > 0 ? __('Please keep :amount ready to pay the courier in cash.', ['amount' => $this->money(Pricing::format($order->codDueCents()))]) : null,
+            $order->hasAdvance() && (float) $order->advance_paid > 0 ? __('Advance paid online: :amount.', ['amount' => $this->money($order->advance_paid)]) : null,
+        ]);
+
+        return $lines && ($order->delivery_zone_code !== null || $order->usesBangladeshCod()) ? EmailBlocks::paragraph(implode(' ', $lines)) : '';
     }
 }

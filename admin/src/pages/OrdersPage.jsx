@@ -15,6 +15,9 @@ import { ORDER_SOURCES, ORDER_STATUSES, PAYMENT_STATUSES, orderSource, orderStat
 // Phase 7: column chooser, rows per page, saved filters.
 import GridPreferences from '../components/GridPreferences'
 import { useGridPreferences } from '../utils/useGridPreferences'
+// Phase 14: delivery zone, cash on delivery, and phone confirmation filters and columns.
+import { getDeliveryZones, phase14Keys } from '../api/phase14'
+import { CONFIRMATION_STATUSES, SEEDED_ZONES, confirmationStatus } from '../utils/bangladesh'
 
 const LIMIT = 20
 const COLUMNS = [
@@ -25,6 +28,9 @@ const COLUMNS = [
   { id: 'status', label: 'Status' },
   { id: 'payment', label: 'Payment' },
   { id: 'total', label: 'Total' },
+  // Phase 14: hidden until chosen in the column chooser.
+  { id: 'zone', label: 'Delivery zone', optional: true },
+  { id: 'confirmation', label: 'Confirmation', optional: true },
 ]
 
 /**
@@ -106,11 +112,18 @@ function LiveOrdersPage() {
   const status = params.get('status') ?? ''
   const payment = params.get('paymentStatus') ?? ''
   const source = params.get('source') ?? ''
+  // Phase 14: ?zone=<code>&cod=1&confirmation=pending|confirmed|unreachable|cancelled.
+  const zone = params.get('zone') ?? ''
+  const cod = params.get('cod') === '1' ? '1' : ''
+  const confirmation = Object.hasOwn(CONFIRMATION_STATUSES, params.get('confirmation') ?? '') ? params.get('confirmation') : ''
   const skip = Number(params.get('skip')) || 0
   const grid = useGridPreferences('orders_grid', COLUMNS)
   const limit = grid.pageSize
   const [draft, setDraft] = useState(q)
-  const query = { q, status, paymentStatus: payment, source, skip, limit }
+  const query = { q, status, paymentStatus: payment, source, ...(zone && { zone }), ...(cod && { cod }), ...(confirmation && { confirmation }), skip, limit }
+  // The zones for the filter (settings.view); without the permission, the three seeded ones.
+  const zones = useQuery({ queryKey: phase14Keys.zones, queryFn: ({ signal }) => getDeliveryZones({ signal }), enabled: can('settings.view'), retry: false, staleTime: 60_000 })
+  const zoneOptions = zones.data?.zones?.length ? zones.data.zones : SEEDED_ZONES
   const orders = useQuery({
     queryKey: adminKeys.orders(query),
     queryFn: ({ signal }) => getOrders(query, { signal }),
@@ -142,7 +155,7 @@ function LiveOrdersPage() {
     setParams(next)
   }
 
-  const filtered = Boolean(q || status || payment || source)
+  const filtered = Boolean(q || status || payment || source || zone || cod || confirmation)
   const pageOrders = orders.data?.orders ?? []
   const allSelected = pageOrders.length > 0 && pageOrders.every((order) => selected.includes(order.number))
   const toggleOne = (number, checked) => select(checked ? [...selected, number] : selected.filter((item) => item !== number))
@@ -154,7 +167,7 @@ function LiveOrdersPage() {
         description={orders.data ? `${formatCount(orders.data.total)} ${filtered ? 'matching orders' : 'orders'}` : undefined}
         actions={
           <>
-            <a href={ordersCsvUrl({ q, status, paymentStatus: payment, source })} className="btn btn--outline" download>
+            <a href={ordersCsvUrl({ q, status, paymentStatus: payment, source, zone, cod, confirmation })} className="btn btn--outline" download>
               <LuDownload aria-hidden="true" /> Export CSV
             </a>
             {can('orders.create') && (
@@ -174,7 +187,8 @@ function LiveOrdersPage() {
         {summary && (
           <div ref={summaryRef} tabIndex={-1} className="notice notice--success bulk-summary">
             <p>
-              {summary.done.length === 1 ? '1 order' : `${formatCount(summary.done.length)} orders`} {summary.verb}.
+              {/* Phase 14 §5: a downloaded file says what it was. */}
+              {summary.text ?? `${summary.done.length === 1 ? '1 order' : `${formatCount(summary.done.length)} orders`} ${summary.verb}.`}
               {summary.skipped.length > 0 && ` ${formatCount(summary.skipped.length)} skipped:`}
             </p>
             {summary.skipped.length > 0 && (
@@ -240,18 +254,48 @@ function LiveOrdersPage() {
             ))}
           </select>
         </label>
+        {/* Phase 14 §5: Bangladesh delivery and cash on delivery. */}
+        <label className="toolbar__select">
+          <span>Delivery zone</span>
+          <select value={zone} onChange={(event) => update({ zone: event.target.value, skip: 0 })}>
+            <option value="">All zones</option>
+            {zoneOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="toolbar__select">
+          <span>Cash on delivery</span>
+          <select value={cod} onChange={(event) => update({ cod: event.target.value, skip: 0 })}>
+            <option value="">All payment methods</option>
+            <option value="1">Cash on delivery only</option>
+          </select>
+        </label>
+        <label className="toolbar__select">
+          <span>Confirmation</span>
+          <select value={confirmation} onChange={(event) => update({ confirmation: event.target.value, skip: 0 })}>
+            <option value="">Any</option>
+            {Object.entries(CONFIRMATION_STATUSES).map(([value, { label }]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <GridPreferences
         prefs={grid}
         noun="orders"
         onPageSize={() => update({ skip: 0 })}
-        current={{ q, status, paymentStatus: payment, source }}
+        current={{ q, status, paymentStatus: payment, source, ...(zone && { zone }), ...(cod && { cod }), ...(confirmation && { confirmation }) }}
         onApply={(saved) => {
           setDraft(saved.q ?? '')
           setParams(new URLSearchParams(Object.entries(saved).filter(([, value]) => value !== '' && value !== null)))
         }}
       />
-      {selected.length > 0 && <OrderBulkActions selected={selected} onDone={bulkDone} onClear={() => select([])} />}
+      {selected.length > 0 && <OrderBulkActions selected={selected} onDone={bulkDone} onClear={() => select([])} onDownloaded={(text) => setSummary({ text, done: [], skipped: [] })} />}
 
       {orders.isPending && <Loading label="Loading orders…" />}
       {orders.error && <ErrorState error={orders.error} onRetry={orders.refetch} />}
@@ -283,6 +327,8 @@ function LiveOrdersPage() {
                     Total
                   </th>
                 )}
+                {grid.isVisible('zone') && <th scope="col">Delivery zone</th>}
+                {grid.isVisible('confirmation') && <th scope="col">Confirmation</th>}
               </tr>
             </thead>
             <tbody>
@@ -317,6 +363,8 @@ function LiveOrdersPage() {
                     </td>
                   )}
                   {grid.isVisible('total') && <td className="num">{formatMoney(order.total, order.currency)}</td>}
+                  {grid.isVisible('zone') && <td>{order.deliveryZone ? (order.deliveryZone.name ?? order.deliveryZone.code) : <span className="muted">—</span>}</td>}
+                  {grid.isVisible('confirmation') && <td>{order.confirmationStatus ? <StatusBadge {...confirmationStatus(order.confirmationStatus)} /> : <span className="muted">—</span>}</td>}
                 </tr>
               ))}
             </tbody>

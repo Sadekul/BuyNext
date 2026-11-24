@@ -11,6 +11,8 @@ import { useStoreSettings } from '../hooks/useStoreSettings'
 import { addressesQuery, customerKeys } from '../queries/customerQueries'
 import { createAddress, deleteAddress, updateAddress } from '../services/customerService'
 import { MAX_SAVED_ADDRESSES } from '../utils/addresses'
+import { addressPlaceLines } from '../utils/bangladesh'
+import { useAddressPlaces } from '../hooks/useAddressPlaces'
 import { SITE } from '../constants/site'
 import './AddressBookPage.css'
 import { useTranslation } from 'react-i18next'
@@ -19,15 +21,18 @@ import { translate } from '../i18n'
 const fullName = (address) => [address.firstName, address.lastName].filter(Boolean).join(' ')
 
 function AddressBlock({ address }) {
+  // Phase 14: a Bangladesh address's places in the reader's language.
+  const withPlaces = useAddressPlaces([address])
   return (
     <address className="address-book__address">
       <strong>{fullName(address)}</strong>
       {address.company && <span>{address.company}</span>}
       <span>{address.line1}</span>
       {address.line2 && <span>{address.line2}</span>}
-      <span>
-        {address.city}, {address.state} {address.postalCode}
-      </span>
+      {/* Phase 14: a Bangladesh address shows its area, district and division in the reader's language. */}
+      {addressPlaceLines(withPlaces(address)).map((line) => (
+        <span key={line}>{line}</span>
+      ))}
       <span>{translate(`common:countries.${address.country}`, { defaultValue: address.country })}</span>
       {address.phone && <span>{address.phone}</span>}
     </address>
@@ -100,6 +105,8 @@ function AddressBookPage() {
       title={t(id ? 'addresses.edit' : 'addresses.addTitle')}
       initialValues={initialValues}
       countries={settings.countries}
+      bangladesh={settings.bangladeshAddresses === true}
+      defaultCountry={settings.defaultCountry ?? null}
       submitLabel={t(id ? 'addresses.saveChanges' : 'addresses.addButton')}
       onSave={(values) => save.mutateAsync({ id, values })}
       onCancel={() => setEditing(null)}

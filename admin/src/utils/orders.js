@@ -21,6 +21,8 @@ export const PAYMENT_STATUSES = {
   refunded: { label: 'Refunded', tone: 'neutral', icon: LuUndo2 },
   // Phase 12 §3: SSLCommerz flagged the payment as risky (risk level 1): on hold until staff check it.
   review: { label: 'On hold (risk check)', tone: 'warning', icon: LuShieldAlert },
+  // Phase 14 §4: cash on delivery with the delivery charge paid in advance, or a short collection: the rest is still due.
+  partially_paid: { label: 'Partly paid', tone: 'warning', icon: LuCalendarClock },
 }
 
 export const PRODUCT_STATUSES = {
@@ -48,7 +50,8 @@ export function orderActions(order) {
     // From processing only: a card/PayPal order is invoiced first; cash on delivery starts processing unpaid.
     ship: order.status === 'processing' && !shipped,
     deliver: order.status === 'shipped',
-    refund: ['paid', 'partially_refunded'].includes(order.paymentStatus),
+    // Phase 14: + partly paid (an advance or part of the cash was taken).
+    refund: ['paid', 'partially_refunded', 'partially_paid'].includes(order.paymentStatus),
     // Once paid, money has to go back with a refund instead.
     cancel: ['pending_payment', 'processing'].includes(order.status) && !invoiced,
     // Phase 6: returns are for shipped or delivered orders with something left to return; staff may override the window.

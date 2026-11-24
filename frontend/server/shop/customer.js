@@ -1,5 +1,6 @@
 import { laravel } from '../http.js'
 import { currencyCode, failed } from './laravel.js'
+import { fromBangladeshAddress, isBangladesh, toPlaceIds } from './bangladesh.js'
 
 /*
  * A signed-in customer's address book and returns, with BuyNest's Laravel API
@@ -35,6 +36,8 @@ export const fromSavedAddress = (raw = {}) => ({
   country: raw.country ?? '',
   isDefaultShipping: raw.is_default_shipping === true,
   isDefaultBilling: raw.is_default_billing === true,
+  // Phase 14: a Bangladesh address's place ids and names (both languages).
+  ...fromBangladeshAddress(raw),
 })
 
 /**
@@ -56,6 +59,9 @@ function toSavedAddress(body, { partial = false } = {}) {
     is_default_shipping: typeof body.isDefaultShipping === 'boolean' ? body.isDefaultShipping : undefined,
     is_default_billing: typeof body.isDefaultBilling === 'boolean' ? body.isDefaultBilling : undefined,
   }
+  // Phase 14: a Bangladesh address names its division, district and area (the API fills city and state).
+  // Sent with the country it belongs to (a PATCH changing only the default flags sends neither).
+  if (isBangladesh(body.country)) Object.assign(fields, toPlaceIds(body))
   // Empty optional text is "none" (null) so the API clears it. (Caps above are
   // generous: they only stop huge bodies; the API checks the real lengths.)
   for (const key of ['company', 'line2']) if (fields[key] === '') fields[key] = null

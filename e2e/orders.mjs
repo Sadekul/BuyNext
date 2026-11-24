@@ -147,8 +147,24 @@ await page.goto(`${BASE}/account/orders/${customerOrder}`, { waitUntil: 'network
 log(await visible(page.getByText('Shipped').first()), 'the customer sees "Shipped" on their order')
 await admin.getByRole('button', { name: 'Mark as delivered' }).click()
 await admin.getByRole('dialog').getByRole('button', { name: 'Mark as delivered' }).click()
-await admin.getByRole('button', { name: 'Invoice', exact: true }).click()
-await admin.getByRole('dialog').getByRole('button', { name: 'Create invoice' }).click()
+await admin.getByRole('dialog').waitFor({ state: 'hidden', timeout: 30000 })
+// Phase 14 §4: delivering a cash on delivery order records the cash and invoices it, so the
+// Invoice button goes away; other payment methods still invoice by hand. Ask the server (the
+// page may still show the old button for a moment), then reload so the page matches it.
+let afterDelivery = null
+for (let waited = 0; waited <= 15000; waited += 500) {
+  afterDelivery = (await api(`/api/admin/v1/orders/${customerOrder}`, { token: adminToken })).body.data
+  if (afterDelivery?.status === 'delivered') break
+  await admin.waitForTimeout(500)
+}
+await admin.reload({ waitUntil: 'networkidle' })
+const invoiceButton = admin.getByRole('button', { name: 'Invoice', exact: true })
+if (afterDelivery?.payment_status !== 'paid') {
+  await invoiceButton.click()
+  await admin.getByRole('dialog').getByRole('button', { name: 'Create invoice' }).click()
+} else {
+  log(await visible(admin.getByText(/INV-\d+/).first()), 'cash on delivery: marking it delivered invoiced the order')
+}
 // Creating the invoice also renders its PDF and sends the email: under a full run that can take more
 // than a second, so wait for the order to say so (up to 15 s) instead of a fixed pause.
 let delivered = null

@@ -229,7 +229,15 @@
     "awaiting": "Your order <strong>{{number}}</strong> is saved and awaiting payment. We've emailed a confirmation to <strong>{{email}}</strong>.",
     "confirmed": "Your order <strong>{{number}}</strong> is confirmed. We've emailed a confirmation to <strong>{{email}}</strong>.",
     "keepNumber": "Keep your order number: with your email, it lets you track this order.",
-    "nothingHappening": "Nothing happening? <pay>Continue to secure payment</pay>"
+    "nothingHappening": "Nothing happening? <pay>Continue to secure payment</pay>",
+    "toAdvance": {
+      "title": "Taking you to pay the delivery charge…",
+      "line": "Order {{number}} is saved. Pay the delivery charge on SSLCommerz's secure page; the rest is paid in cash on delivery."
+    },
+    "advancePaid": {
+      "title": "Delivery charge paid",
+      "line": "We've received {{advance}} for order {{number}}. Please keep {{due}} ready to pay in cash on delivery."
+    }
   },
   "balance": {
     "expired": "This gift card has expired.",
@@ -246,5 +254,32 @@
     "checking": "Checking…",
     "check": "Check balance",
     "startShopping": "Start shopping"
+  },
+  "delivery": {
+    "etaDays_one": "Delivery in {{count, number}} day",
+    "etaDays_other": "Delivery in {{count, number}} days",
+    "etaRange": "Delivery in {{min, number}}–{{max, number}} days",
+    "zone": "Delivery zone: {{zone}}",
+    "areaNote": "Delivery charge is calculated from your area.",
+    "chooseArea": "Choose your area to see the delivery charge for it.",
+    "zones": {
+      "inside_dhaka": "Inside Dhaka",
+      "dhaka_suburbs": "Dhaka suburbs",
+      "outside_dhaka": "Outside Dhaka"
+    }
+  },
+  "cod": {
+    "notInArea": "Cash on delivery isn't available in your area. Please choose another way to pay.",
+    "notInZone": "Cash on delivery isn't available for {{zone}}. Please choose another way to pay.",
+    "overLimit": "Cash on delivery is available for orders up to {{amount}}. Please choose another way to pay.",
+    "unavailable": "Cash on delivery isn't available for this order.",
+    "switched": "Cash on delivery isn't available for this order, so {{method}} is chosen instead.",
+    "fee": "A cash on delivery fee of {{fee}} is added.",
+    "advanceNote": "Pay the delivery charge ({{advance}}) now with bKash, Nagad or card. Pay the rest ({{due}}) in cash when your order arrives.",
+    "payAdvance": "Pay delivery charge · {{amount}}",
+    "callToConfirm": "We'll call you to confirm your order before we send it.",
+    "payNowRow": "Pay now (delivery charge)",
+    "dueRow": "Pay in cash on delivery",
+    "areaRequired": "Choose your area to see whether cash on delivery is available there."
   }
 }

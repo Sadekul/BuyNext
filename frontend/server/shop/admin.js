@@ -11,6 +11,8 @@ import { creditMemoPoints, orderRewardPoints, productPhase11, refundablePoints }
 import { paymentPhase12, withCurrency } from './adminPhase12.js'
 // Phase 13: Bangla texts and the grid's Bangla status on products; the order's language.
 import { BANGLA_FILTERS, orderLocale, productPhase13, toBanglaBody, toSpecificationRows } from './adminPhase13.js'
+// Phase 14: delivery zone and time, cash on delivery amounts, phone confirmation; the order address's area name.
+import { addressArea, orderPhase14 } from './adminPhase14.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -48,7 +50,8 @@ const PRODUCT_FIELDS = {
   links: 'links',
 }
 const FORM_FIELD = Object.fromEntries(Object.entries(PRODUCT_FIELDS).map(([form, api]) => [api, form]))
-const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber' }
+// Phase 14: + the cash collected on delivery and the shipping override's reason.
+const ORDER_FIELDS = { payment_status: 'paymentStatus', notify_customer: 'notifyCustomer', return_number: 'returnNumber', collected_amount: 'collectedAmount', confirmation_override: 'confirmationOverride' }
 // The admin's sort names → the API's.
 const PRODUCT_SORT = { title: 'name', price: 'price', stock: 'stock', rating: 'rating', newest: 'newest' }
 
@@ -150,6 +153,8 @@ function adminOrderRow(raw) {
     ...withCurrency(raw),
     // Phase 13: the language it was placed in.
     ...orderLocale(raw),
+    // Phase 14: deliveryZone, codDue, confirmationStatus (only what the API sent).
+    ...orderPhase14(raw),
   }
 }
 
@@ -210,6 +215,9 @@ export function adminOrderDetail(raw) {
     rewardPoints: orderRewardPoints(raw),
     // Phase 13: the language the order was placed in (en | bn; its emails and PDFs for guests).
     ...orderLocale(raw),
+    // Phase 14: delivery zone and time, COD fee, advance, cash to collect, the phone confirmation and its log.
+    ...orderPhase14(raw),
+    shippingAddress: addressArea(order.shippingAddress, raw.shipping_address),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,
       paymentStatus: entry.payment_status ?? null,
@@ -523,13 +531,15 @@ export const laravelAdminData = {
     return answer(result, [200, 204], () => ({ id: Number(id), deleted: true, live: true }))
   },
 
-  async listOrders(token, { q, status, paymentStatus, source, limit, skip }, request) {
+  async listOrders(token, { q, status, paymentStatus, source, extra = {}, limit, skip }, request) {
     const { page, perPage } = pageOf({ limit, skip })
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
     if (q) params.set('search', q)
     if (status) params.set('status', status)
     if (paymentStatus) params.set('payment_status', paymentStatus)
     if (source) params.set('source', source)
+    // Phase 14: delivery_zone, cod, confirmation_status.
+    for (const [key, value] of Object.entries(extra)) params.set(key, value)
     const result = await laravel(`/api/admin/v1/orders?${params}`, { token, request })
     return answer(result, [200], (data) => ({ orders: data.data.map(adminOrderRow), total: data.meta?.total ?? data.data.length, limit, skip, live: true }))
   },
@@ -545,8 +555,15 @@ export const laravelAdminData = {
   },
 
   /** { carrier, trackingNumber?, note?, notifyCustomer } → 201 { shipment }. */
-  async createShipment(token, number, { carrier, trackingNumber, note, notifyCustomer }, request) {
-    const body = { carrier, ...(trackingNumber && { tracking_number: trackingNumber }), ...(note && { note }), notify_customer: notifyCustomer }
+  async createShipment(token, number, { carrier, trackingNumber, note, notifyCustomer, confirmationOverride }, request) {
+    const body = {
+      carrier,
+      ...(trackingNumber && { tracking_number: trackingNumber }),
+      ...(note && { note }),
+      notify_customer: notifyCustomer,
+      // Phase 14 §4: ships a cash on delivery order not confirmed by phone (the reason is logged and audited).
+      ...(confirmationOverride && { confirmation_override: confirmationOverride }),
+    }
     const result = await laravel(`/api/admin/v1/orders/${number}/shipments`, { method: 'POST', token, request, body })
     return answer(result, [200, 201], (data) => ({ shipment: adminShipment(data.data), live: true }), ORDER_FIELDS)
   },
@@ -631,6 +648,10 @@ export const laravelAdminData = {
       ...(changes.paymentStatus && { payment_status: changes.paymentStatus }),
       ...(changes.note && { note: changes.note }),
       notify_customer: changes.notifyCustomer !== false,
+      // Phase 14 §4: the cash collected on delivery (the note when short), the shipping override.
+      ...(changes.collectedAmount !== undefined && { collected_amount: changes.collectedAmount.toFixed(2) }),
+      ...(changes.collectionNote && { collection_note: changes.collectionNote }),
+      ...(changes.confirmationOverride && { confirmation_override: changes.confirmationOverride }),
     }
     const result = await laravel(`/api/admin/v1/orders/${number}`, { method: 'PATCH', token, request, body })
     return answer(result, [200], (data) => adminOrderDetail(data.data), ORDER_FIELDS)

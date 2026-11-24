@@ -144,7 +144,38 @@ export function normalizeStoreSettings(raw) {
     locales: Array.isArray(data.locales) && data.locales.length > 0 ? data.locales.filter((code) => code === 'en' || code === 'bn') : ['en', 'bn'],
     defaultLocale: data.default_locale === 'bn' ? 'bn' : 'en',
     banglaDigits: data.bangla_digits !== false,
+    // Phase 14: the country new addresses start with, Bangladesh's Division → District → Area
+    // address form, and the store's cash on delivery rules (null: none sent).
+    ...normalizeBangladeshSettings(data, countriesOf(data)),
   }
+}
+
+const countriesOf = (data) => (data.allowed_countries ?? []).map((country) => (typeof country === 'string' ? country : country?.name)).filter(Boolean)
+
+const moneyOrNull = (value) => (value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value))
+
+/**
+ * Phase 14: GET /store `default_country` ("Bangladesh", "BD", another
+ * country name, or null) → the store's name for it, when the store ships
+ * there; the Bangladesh address form (Division → District → Area), on when
+ * the store's default country is Bangladesh, exactly when the API applies its
+ * Bangladesh address rules (`bd_addresses` can say so explicitly); and `cod`.
+ */
+export function normalizeBangladeshSettings(data, countries) {
+  const raw = typeof data.default_country === 'string' ? data.default_country.trim() : ''
+  const name = /^bd$/i.test(raw) ? 'Bangladesh' : raw
+  const defaultCountry = countries.find((country) => country.toLowerCase() === name.toLowerCase()) ?? null
+  const bangladeshAddresses = typeof data.bd_addresses === 'boolean' ? data.bd_addresses : defaultCountry !== null && /^(bangladesh|bd)$/i.test(defaultCountry)
+  const cod = data.cod && typeof data.cod === 'object'
+    ? {
+        maxOrderTotal: moneyOrNull(data.cod.max_order_total),
+        fee: moneyOrNull(data.cod.fee) ?? 0,
+        advance: data.cod.advance === 'delivery_charge' ? 'delivery_charge' : 'none',
+        zones: Array.isArray(data.cod.zones) ? data.cod.zones.filter((zone) => typeof zone === 'string') : [],
+        requireConfirmation: data.cod.require_confirmation === true,
+      }
+    : null
+  return { defaultCountry, bangladeshAddresses, cod }
 }
 
 /** Phase 12: GET /store `currency: { code, symbol, decimals }` (or phase 11's `currencies.base` alone) → the store currency. */

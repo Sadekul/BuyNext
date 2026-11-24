@@ -29,6 +29,8 @@ import { cleanSpecifications, linksProblem, matchPhase11Route, specificationsPro
 import { matchPhase12Route } from './adminPhase12Api.js'
 // Phase 13: Bangla texts on products (and their options and specifications), email templates per language (adminPhase13Api.js).
 import { banglaFilter, checkProductBangla, cleanSpecificationsBangla, matchPhase13Route, specificationsBanglaProblem } from './adminPhase13Api.js'
+// Phase 14: places, delivery zones, phone confirmation, courier files (adminPhase14Api.js); grid filters, collection, shipping override.
+import { checkCollection, checkConfirmationOverride, matchPhase14Route, orderPhase14Filters } from './adminPhase14Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -245,8 +247,11 @@ export function validateShipment(body) {
   if (body.trackingNumber !== undefined && body.trackingNumber !== null && typeof body.trackingNumber !== 'string') errors.trackingNumber = ['Enter the tracking number as text.']
   else if (tracking && !/^[A-Za-z0-9][A-Za-z0-9 -]{0,63}$/.test(tracking)) errors.trackingNumber = ['Use up to 64 letters, digits, spaces, or dashes.']
   const note = optionalNote(body, errors)
+  // Phase 14 §4: shipping an unconfirmed cash on delivery order needs a reason.
+  const phase14 = {}
+  checkConfirmationOverride(body, phase14, errors)
   if (Object.keys(errors).length > 0) return { errors }
-  return { values: { carrier: body.carrier, trackingNumber: tracking || undefined, note, notifyCustomer: body.notifyCustomer !== false } }
+  return { values: { carrier: body.carrier, trackingNumber: tracking || undefined, note, notifyCustomer: body.notifyCustomer !== false, ...phase14 } }
 }
 
 /**
@@ -451,6 +456,8 @@ const ROUTES = {
         status: oneOf(searchParams.get('status'), ORDER_STATUSES),
         paymentStatus: oneOf(searchParams.get('paymentStatus'), ['paid', 'unpaid']),
         source: oneOf(searchParams.get('source'), ['storefront', 'admin']),
+        // Phase 14: delivery zone, cash on delivery, phone confirmation.
+        extra: orderPhase14Filters(ctx.url),
         limit,
         skip,
       }
@@ -506,9 +513,12 @@ const ROUTES = {
     if (body.status !== undefined && !ORDER_STATUSES.includes(body.status)) errors.status = ['Choose a valid status.']
     if (body.paymentStatus !== undefined && body.paymentStatus !== 'paid') errors.paymentStatus = ['Payment can only be marked as paid.']
     if (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 1000)) errors.note = ['Keep the note under 1000 characters.']
-    if (body.status === undefined && body.paymentStatus === undefined) errors.status = ['Choose a new status or mark the order as paid.']
+    // Phase 14 §4: the cash collected on delivery (with a note when short), the shipping override's reason.
+    const phase14 = {}
+    checkCollection(body, phase14, errors)
+    if (body.status === undefined && body.paymentStatus === undefined && phase14.collectedAmount === undefined) errors.status = ['Choose a new status or mark the order as paid.']
     if (Object.keys(errors).length > 0) return invalid(errors)
-    const changes = { status: body.status, paymentStatus: body.paymentStatus, note: body.note?.trim() || undefined, notifyCustomer: body.notifyCustomer !== false }
+    const changes = { status: body.status, paymentStatus: body.paymentStatus, note: body.note?.trim() || undefined, notifyCustomer: body.notifyCustomer !== false, ...phase14 }
     return fromLaravel(await laravelAdminData.updateOrder(ctx.token, ctx.id, changes, ctx.request))
   },
 
@@ -638,6 +648,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 14: places/bd/…, delivery-zones[/…], orders/to-confirm, orders/:number/confirmation|packing-slip.pdf, orders/packing-slips, orders/export/courier.csv.
+  const phase14 = matchPhase14Route(method, segments)
+  if (phase14 !== undefined) return phase14
   // Phase 13: email-templates[/:key[/preview|test|reset]] with ?locale=en|bn (without one, the phase 7 routes).
   const phase13 = matchPhase13Route(method, segments)
   if (phase13 !== undefined) return phase13

@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Services\BdAddresses;
 use App\Services\Settings;
 use App\Support\Currency;
 use Illuminate\Foundation\Http\FormRequest;
@@ -43,11 +44,26 @@ class PlaceOrderRequest extends FormRequest
         $customer = $this->customer();
         $email = trim((string) $this->input('email')) ?: $customer?->email;
         $phone = trim((string) $this->input('phone')) ?: $customer?->phone;
+        // Phase 14: "BD" is stored as the store's spelling; a Bangladesh address takes local mobile formats (01712…).
+        $bd = app(BdAddresses::class);
+        foreach (['shipping_address', 'billing_address'] as $key) {
+            $address = $this->input($key);
+            if (is_array($address) && array_key_exists('country', $address)) {
+                $this->merge([$key => [...$address, 'country' => $bd->normalizeCountry($address['country'])]]);
+            }
+        }
+        $bangladeshi = BdAddresses::isBangladesh($this->input('shipping_address.country'));
 
         $this->merge([
             'email' => $email === null ? null : mb_strtolower($email),
-            'phone' => $phone === null ? null : PhoneNumber::normalize($phone),
+            'phone' => $phone === null ? null : ($bangladeshi ? BdAddresses::normalizePhone($phone) : PhoneNumber::normalize($phone)),
         ]);
+    }
+
+    /** Phase 14: is the address under $key a structured Bangladesh address (division → district → area)? */
+    public function structured(string $key): bool
+    {
+        return app(BdAddresses::class)->structured($this->input($key));
     }
 
     public function rules(): array
@@ -64,6 +80,10 @@ class PlaceOrderRequest extends FormRequest
             "{$prefix}.country" => [$required, 'string', Rule::in($settings->get('allowed_countries'))],
         ];
 
+        // Phase 14: structured Bangladesh addresses (ids, optional 4-digit postcode, city/state filled) and mobiles.
+        $structured = fn (string $prefix, string $required) => $this->structured($prefix)
+            ? BdAddresses::rules("{$prefix}.", $required === 'required') : [];
+
         return [
             ...CartController::rules(),
             'items' => ['required', 'array', 'min:1', 'max:50'],
@@ -75,11 +95,13 @@ class PlaceOrderRequest extends FormRequest
             'payment_method' => ['required', 'string', Rule::in([...$settings->paymentMethods(), 'gift_card', 'reward_points'])],
             'gift_card_code' => ['nullable', 'string', 'max:40'],
             'email' => ['required', 'string', 'email', 'max:190'],
-            'phone' => ['required', 'string', PhoneNumber::RULE],
+            'phone' => ['required', 'string', $this->structured('shipping_address') ? BdAddresses::MOBILE_RULE : PhoneNumber::RULE],
             'shipping_address' => ['required', 'array'],
             ...$address('shipping_address', 'required'),
+            ...$structured('shipping_address', 'required'),
             'billing_address' => ['nullable', 'array'],
             ...$address('billing_address', 'required_with:billing_address'),
+            ...$structured('billing_address', 'required_with:billing_address'),
             'expected_total' => ['nullable', 'numeric', 'min:0'],
             // Phase 6: signed-in customers may add the shipping address to their address book (ignored for guests).
             'save_address' => ['sometimes', 'boolean'],
@@ -93,8 +115,10 @@ class PlaceOrderRequest extends FormRequest
             'items.required' => __('Your cart is empty.'),
             'items.min' => __('Your cart is empty.'),
             'payment_method.in' => self::paymentMethodMessage($this->input('payment_method')),
-            'phone.regex' => __('Enter the phone number with its country code, for example +1 555 010 0100.'),
-            '*.postal_code.regex' => __('The postal code is invalid.'),
+            'phone.regex' => $this->structured('shipping_address') ? BdAddresses::mobileMessage()
+                : __('Enter the phone number with its country code, for example +1 555 010 0100.'),
+            ...BdAddresses::messages(),
+            ...($this->structured('shipping_address') || $this->structured('billing_address') ? [] : ['*.postal_code.regex' => __('The postal code is invalid.')]),
             '*.country.in' => __('We don\'t deliver to that country yet.'),
         ];
     }
@@ -104,7 +128,8 @@ class PlaceOrderRequest extends FormRequest
         $attributes = [];
         foreach (['shipping_address', 'billing_address'] as $prefix) {
             foreach (['first_name' => 'first name', 'last_name' => 'last name', 'line1' => 'address', 'line2' => 'address line 2',
-                'city' => 'city', 'state' => 'state', 'postal_code' => 'postal code', 'country' => 'country'] as $key => $label) {
+                'city' => 'city', 'state' => 'state', 'postal_code' => 'postal code', 'country' => 'country',
+                'division_id' => 'division', 'district_id' => 'district', 'area_id' => 'area'] as $key => $label) {
                 $attributes["{$prefix}.{$key}"] = __($label);
             }
         }
@@ -136,7 +161,28 @@ class PlaceOrderRequest extends FormRequest
         return Product::withTrashed()->whereIn('id', $ids)->where('type', 'gift_card')->count() === $ids->count();
     }
 
-    /** The address as stored: only the known fields, in a fixed order. */
+    /** Phase 14: the ids of a structured Bangladesh address must exist and belong together. */
+    public function after(): array
+    {
+        return [function ($validator) {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+            foreach (['shipping_address', 'billing_address'] as $key) {
+                if ($this->structured($key)) {
+                    foreach (app(BdAddresses::class)->problems((array) $this->input($key), "{$key}.") as $field => $message) {
+                        $validator->errors()->add($field, $message);
+                    }
+                }
+            }
+        }];
+    }
+
+    /**
+     * The address as stored: only the known fields, in a fixed order. Phase 14:
+     * a structured Bangladesh address adds division_id, district_id, area_id
+     * and area, with city and state filled from the district and division.
+     */
     public function address(string $key): ?array
     {
         $address = $this->validated($key);
@@ -144,8 +190,16 @@ class PlaceOrderRequest extends FormRequest
             return null;
         }
 
-        return collect(['first_name', 'last_name', 'line1', 'line2', 'city', 'state', 'postal_code', 'country'])
+        return self::storedAddress($address, $this->structured($key));
+    }
+
+    /** The stored form of a validated address (also used by admin-created orders). */
+    public static function storedAddress(array $address, bool $structured): array
+    {
+        $stored = collect(['first_name', 'last_name', 'line1', 'line2', 'city', 'state', 'postal_code', 'country'])
             ->mapWithKeys(fn ($field) => [$field => isset($address[$field]) ? trim($address[$field]) : null])
             ->all();
+
+        return $structured ? app(BdAddresses::class)->fill([...$stored, ...array_intersect_key($address, array_flip(BdAddresses::ID_FIELDS))]) : $stored;
     }
 }

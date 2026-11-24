@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LuArrowDown, LuArrowLeft, LuArrowUp, LuDownload, LuPencil, LuPlus, LuTrash2, LuUpload } from 'react-icons/lu'
+import { LuArrowDown, LuArrowLeft, LuArrowUp, LuDownload, LuMapPinned, LuPencil, LuPlus, LuTrash2, LuUpload } from 'react-icons/lu'
 import {
   checkShippingRates,
   createShippingRate,
@@ -21,6 +21,10 @@ import PageHeader from '../components/PageHeader'
 import { ErrorState, Loading } from '../components/States'
 import { formatCount, formatMoney, storeCode } from '../utils/format'
 import { SHIPPING_METHODS, csvRowProblems, describeRange, methodLabel, rateErrors, rateFormValues, rateName, toRateValues } from '../utils/shippingRates'
+// Phase 14 §3: rows for a delivery zone of Bangladesh, with the delivery time.
+import { getDeliveryZones, phase14Keys } from '../api/phase14'
+import { toZoneRateValues, zoneRateErrors, zoneRateFormValues } from '../utils/shippingRates'
+import { etaText, zoneName } from '../utils/bangladesh'
 
 /*
  * Settings → Shipping → Table rates (docs/backend/PHASE10_CONTRACT.md §4),
@@ -34,6 +38,11 @@ function ShippingRatesPage() {
   const rates = useQuery({ queryKey: phase10Keys.shippingRates, queryFn: ({ signal }) => getShippingRates({ signal }) })
   // Only for the country suggestions: the page works without it.
   const settings = useQuery({ queryKey: adminKeys.settings, queryFn: ({ signal }) => getSettings({ signal }), retry: false })
+  // Phase 14 §3: the delivery zones (none: the page is as before).
+  const zoneList = useQuery({ queryKey: phase14Keys.zones, queryFn: ({ signal }) => getDeliveryZones({ signal }), retry: false })
+  const zones = zoneList.data?.zones ?? []
+  const withZones = zones.length > 0 || Boolean(rates.data?.rates.some((rate) => rate.zoneCode))
+  const nameOf = (rate) => rateName(rate, rate.zoneCode ? zoneName(rate.zoneCode, zones) : undefined)
   const [notice, setNotice] = useState(null) // { tone, text }
   const noticeRef = useRef(null)
   const [editing, setEditing] = useState(null) // { rate } | { method } (new)
@@ -50,7 +59,7 @@ function ShippingRatesPage() {
     onSuccess: (_, rate) => {
       setToDelete(null)
       queryClient.invalidateQueries({ queryKey: phase10Keys.shippingRates })
-      setNotice({ tone: 'success', text: `${rateName(rate)} deleted.` })
+      setNotice({ tone: 'success', text: `${nameOf(rate)} deleted.` })
     },
     onError: (error) => {
       setToDelete(null)
@@ -78,9 +87,15 @@ function ShippingRatesPage() {
         title="Shipping table rates"
         description="Prices by country, cart weight, and order value. A method with rows takes its price from the first row that matches; without rows it keeps its flat price from Settings → Shipping."
         actions={
-          <a href={shippingRatesCsvUrl()} className="btn btn--outline" download>
-            <LuDownload aria-hidden="true" /> Export CSV
-          </a>
+          <>
+            {/* Phase 14 §3. */}
+            <Link to="/settings/delivery-zones" className="btn btn--outline">
+              <LuMapPinned aria-hidden="true" /> Delivery zones
+            </Link>
+            <a href={shippingRatesCsvUrl()} className="btn btn--outline" download>
+              <LuDownload aria-hidden="true" /> Export CSV
+            </a>
+          </>
         }
       />
       <div role={notice?.tone === 'error' ? 'alert' : 'status'}>
@@ -101,6 +116,7 @@ function ShippingRatesPage() {
               method={id}
               rates={rates.data.rates.filter((rate) => rate.method === id).sort((a, b) => a.position - b.position || a.id - b.id)}
               flatPrice={rates.data.methods?.find((method) => method.id === id)?.flatPrice ?? null}
+              zones={withZones ? zones : null}
               onAdd={(event) => openEditor({ method: id }, event)}
               onEdit={(rate, event) => openEditor({ rate }, event)}
               onDelete={(rate) => setToDelete(rate)}
@@ -123,6 +139,7 @@ function ShippingRatesPage() {
         <RateDialog
           rate={editing.rate}
           method={editing.method}
+          zones={withZones ? zones : null}
           onDone={(message) => {
             setEditing(null)
             queryClient.invalidateQueries({ queryKey: phase10Keys.shippingRates })
@@ -133,7 +150,7 @@ function ShippingRatesPage() {
       )}
       <ConfirmDialog
         isOpen={toDelete !== null}
-        title={`Delete ${toDelete ? rateName(toDelete) : 'this rate'}?`}
+        title={`Delete ${toDelete ? nameOf(toDelete) : 'this rate'}?`}
         message="Carts it matched take the next matching row. If no row of this method is left, the method goes back to its flat price."
         confirmLabel="Delete"
         busy={remove.isPending}
@@ -148,7 +165,7 @@ function ShippingRatesPage() {
 const article = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
 /** One method's rows, in the order they are tried. */
-function MethodRates({ method, rates, flatPrice, onAdd, onEdit, onDelete, onNotice }) {
+function MethodRates({ method, rates, flatPrice, zones, onAdd, onEdit, onDelete, onNotice }) {
   const queryClient = useQueryClient()
   const [order, setOrder] = useState(null) // ids while a move is being saved
   // Moves are announced here, politely, without taking focus from the button that moved the row.
@@ -211,8 +228,10 @@ function MethodRates({ method, rates, flatPrice, onAdd, onEdit, onDelete, onNoti
               <tr>
                 <th scope="col">#</th>
                 <th scope="col">Country</th>
+                {zones && <th scope="col">Zone</th>}
                 <th scope="col">Weight</th>
                 <th scope="col">Order value</th>
+                {zones && <th scope="col">Delivery</th>}
                 <th scope="col" className="num">
                   Price
                 </th>
@@ -226,8 +245,10 @@ function MethodRates({ method, rates, flatPrice, onAdd, onEdit, onDelete, onNoti
                 <tr key={rate.id}>
                   <td>{index + 1}</td>
                   <td>{rate.country === '*' ? 'Any country' : rate.country}</td>
+                  {zones && <td>{rate.zoneCode ? zoneName(rate.zoneCode, zones) : <span className="muted">Any zone</span>}</td>}
                   <td>{describeRange(rate.minWeightGrams, rate.maxWeightGrams, (grams) => `${formatCount(grams)} g`)}</td>
                   <td>{describeRange(rate.minSubtotal, rate.maxSubtotal, formatMoney)}</td>
+                  {zones && <td>{etaText(rate.etaDaysMin, rate.etaDaysMax).replace(/^Delivery /, '') || <span className="muted">Not said</span>}</td>}
                   <td className="num">{rate.price === 0 ? 'Free' : formatMoney(rate.price)}</td>
                   <td className="table__actions">
                     <div className="rates__tools">
@@ -270,33 +291,35 @@ function MethodRates({ method, rates, flatPrice, onAdd, onEdit, onDelete, onNoti
 }
 
 /** Add (`method`) or edit (`rate`) one row. */
-function RateDialog({ rate, method, onDone, onCancel }) {
-  const [values, setValues] = useState(() => rateFormValues(rate ?? { method }))
+function RateDialog({ rate, method, zones, onDone, onCancel }) {
+  // Phase 14 §3: with delivery zones, a row can be for one zone and say the delivery time.
+  const [values, setValues] = useState(() => ({ ...rateFormValues(rate ?? { method }), ...(zones && zoneRateFormValues(rate ?? {})) }))
+  const nameOf = (saved) => rateName(saved, saved.zoneCode ? zoneName(saved.zoneCode, zones ?? []) : undefined)
   const [errors, setErrors] = useState({})
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.value })
   const save = useMutation({
     mutationFn: (sent) => (rate ? updateShippingRate(rate.id, sent) : createShippingRate(sent)),
     onSuccess: (data) => {
       const saved = data?.rate ?? { ...values, method: values.method }
-      onDone(rate ? `${rateName(saved)} saved.` : `${rateName(saved)} added at the end of the ${methodLabel(saved.method).toLowerCase()} rates.`)
+      onDone(rate ? `${nameOf(saved)} saved.` : `${nameOf(saved)} added at the end of the ${methodLabel(saved.method).toLowerCase()} rates.`)
     },
     onError: (error) => setErrors(error.fieldErrors ?? {}),
   })
 
   function submit() {
-    const found = rateErrors(values)
+    const found = { ...rateErrors(values), ...(zones && zoneRateErrors(values)) }
     setErrors(found)
-    if (Object.keys(found).length === 0) save.mutate(toRateValues(values))
+    if (Object.keys(found).length === 0) save.mutate({ ...toRateValues(values), ...(zones && toZoneRateValues(values)) })
   }
   const error = (key) => errors[key]?.[0]
-  const shown = ['method', 'country', 'minWeightGrams', 'maxWeightGrams', 'minSubtotal', 'maxSubtotal', 'price']
+  const shown = ['method', 'country', 'minWeightGrams', 'maxWeightGrams', 'minSubtotal', 'maxSubtotal', 'price', 'zoneCode', 'etaDaysMin', 'etaDaysMax']
   const other = save.error && (save.error.fieldErrors ? Object.entries(save.error.fieldErrors).find(([field]) => !shown.includes(field))?.[1]?.[0] : save.error.message)
 
   return (
     <FormDialog
       isOpen
       wide
-      title={rate ? `Edit ${rateName(rate)}` : `Add ${article(methodLabel(method))} ${methodLabel(method).toLowerCase()} rate`}
+      title={rate ? `Edit ${nameOf(rate)}` : `Add ${article(methodLabel(method))} ${methodLabel(method).toLowerCase()} rate`}
       description={`A row matches from its minimum up to (not including) its maximum; an empty maximum means no limit. Weights in grams, amounts in ${storeCode()}; the order value is before cart discounts.`}
       submitLabel={rate ? 'Save rate' : 'Add rate'}
       busy={save.isPending}
@@ -319,6 +342,21 @@ function RateDialog({ rate, method, onDone, onCancel }) {
         <Field label="Country" error={error('country')} hint="As in Settings → Checkout (the shopper's address), or * for any country.">
           {(a11y) => <input {...a11y} value={values.country} maxLength={60} list="rate-countries" autoComplete="off" onChange={set('country')} />}
         </Field>
+        {zones && (
+          <Field label="Delivery zone" error={error('zoneCode')} hint="For Bangladesh addresses in this zone; their zone's rows are tried before the others.">
+            {(a11y) => (
+              <select {...a11y} value={values.zoneCode} onChange={set('zoneCode')}>
+                <option value="">Any zone (or not Bangladesh)</option>
+                {[...zones, ...(values.zoneCode && !zones.some((zone) => zone.code === values.zoneCode) ? [{ code: values.zoneCode, name: values.zoneCode }] : [])].map((zone) => (
+                  <option key={zone.code} value={zone.code}>
+                    {zone.name}
+                    {zone.isActive === false ? ' (off)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        )}
         <Field label="Weight from (g)" error={error('minWeightGrams')}>
           {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" step="1" value={values.minWeightGrams} onChange={set('minWeightGrams')} />}
         </Field>
@@ -334,6 +372,16 @@ function RateDialog({ rate, method, onDone, onCancel }) {
         <Field label={`Price (${storeCode()})`} error={error('price')} hint="0 = free with this row.">
           {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.price} onChange={set('price')} />}
         </Field>
+        {zones && (
+          <>
+            <Field label="Delivery from (days)" error={error('etaDaysMin')} hint="Shown at checkout: “Delivery in 1–2 days”. Empty: not said.">
+              {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" max="60" step="1" value={values.etaDaysMin} onChange={set('etaDaysMin')} />}
+            </Field>
+            <Field label="Delivery up to (days)" error={error('etaDaysMax')}>
+              {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="0" max="60" step="1" value={values.etaDaysMax} onChange={set('etaDaysMax')} />}
+            </Field>
+          </>
+        )}
       </div>
     </FormDialog>
   )

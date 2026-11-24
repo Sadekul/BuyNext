@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Services\CustomerCarts;
+use App\Services\DeliveryZones;
 use App\Services\Pricing;
 use App\Services\ProductLinks;
 use App\Services\Settings;
@@ -26,7 +27,13 @@ class CartController extends Controller
             ...self::rules(),
             'email' => ['nullable', 'string', 'email', 'max:190'],
             'country' => ['nullable', 'string', 'max:60'],
+            // Phase 14: a Bangladesh area (and district) picks the delivery zone's rates; payment_method "cod" adds the COD fee.
+            'area_id' => ['nullable', 'integer', 'min:1'],
+            'district_id' => ['nullable', 'integer', 'min:1'],
+            'payment_method' => ['nullable', 'string', 'max:30'],
         ], self::messages());
+        $zone = app(DeliveryZones::class)->forAddress(['country' => $data['country'] ?? null, 'area_id' => $data['area_id'] ?? null,
+            'district_id' => $data['district_id'] ?? null]);
 
         // Who is asking, for per-customer coupon limits: the signed-in customer
         // (optional Bearer token), else the guest's email if the cart sent one.
@@ -38,7 +45,8 @@ class CartController extends Controller
             customerId: $customer?->id, email: $customer ? null : ($data['email'] ?? null), country: $data['country'] ?? null,
             group: $customer?->priceGroup(), // phase 6: the customer's group price (guests: General)
             giftCardCode: $data['gift_card_code'] ?? null,
-            rewardsCustomer: $customer, rewardPoints: $data['reward_points'] ?? null); // phase 11
+            rewardsCustomer: $customer, rewardPoints: $data['reward_points'] ?? null, // phase 11
+            deliveryZone: $zone?->code, paymentMethod: $data['payment_method'] ?? null); // phase 14
 
         // Phase 7: a signed-in customer's cart is saved (restore on another device, abandoned carts report).
         if ($customer) {

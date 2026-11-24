@@ -1,6 +1,7 @@
 import { laravel, laravelPdf, pick } from '../http.js'
 import { serverMessage } from '../i18n.js'
 import { productCards } from './productCard.js'
+import { fromBangladeshAddress, fromCod, fromCodTotals, fromMethodDelivery, fromOrderDelivery, fromOrderEta, fromZone, isBangladesh, toBangladeshAddress, toPlaceIds } from './bangladesh.js'
 
 /*
  * Shopping with BuyNest's Laravel API (docs/backend/PHASE2_CONTRACT.md):
@@ -74,6 +75,8 @@ const toAddress = (address) =>
         state: str(address.state),
         postal_code: str(address.postalCode),
         country: str(address.country),
+        // Phase 14: a Bangladesh address names its division, district and area (the API fills city and state).
+        ...toBangladeshAddress(address),
       }
     : null
 
@@ -89,6 +92,8 @@ export const fromAddress = (raw) =>
     state: raw.state ?? '',
     postalCode: raw.postal_code ?? '',
     country: raw.country ?? '',
+    // Phase 14: a Bangladesh address's place ids and names (both languages).
+    ...fromBangladeshAddress(raw),
   }
 
 export const fromTotals = (raw = {}) => ({
@@ -108,6 +113,8 @@ export const fromTotals = (raw = {}) => ({
   ...(raw.amount_due !== undefined && raw.amount_due !== null && { amountDue: money(raw.amount_due) ?? 0 }),
   // Phase 11: what reward points pay of the total (after tax, before a gift card).
   ...(raw.reward_points !== undefined && raw.reward_points !== null && { rewardPoints: money(raw.reward_points) ?? 0 }),
+  // Phase 14: the cash on delivery fee, the advance paid online, and the cash collected on delivery.
+  ...fromCodTotals(raw),
 })
 
 const wholePoints = (value) => (Number.isInteger(value) ? value : Number.parseInt(value, 10) || 0)
@@ -232,7 +239,8 @@ export function fromCart(raw = {}) {
     // Phase 7: every cart rule that applied, automatic ones first (each with its label and saving).
     appliedRules: fromAppliedRules(raw.applied_rules),
     // Phase 10: only the methods offered for this cart (table rates by country, weight, and subtotal), each with its price.
-    shippingOptions: (raw.shipping_options ?? []).filter((option) => option && option.available !== false).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price) })),
+    // Phase 14: each with its delivery zone and delivery time in days (zone rates), when the API names them.
+    shippingOptions: (raw.shipping_options ?? []).filter((option) => option && option.available !== false).map((option) => ({ id: option.id, label: option.label, eta: option.eta, price: money(option.price), ...fromMethodDelivery(option) })),
     // Phase 10: a cart of gift cards only needs no delivery.
     requiresShipping: raw.shipping_required !== false,
     // Why no delivery method is offered (e.g. no table rate for that country or weight), or null.
@@ -249,6 +257,9 @@ export function fromCart(raw = {}) {
     rewards: fromCartRewards(raw.rewards),
     rewardPoints: rewardPointsApplied(raw.rewards),
     rewardPointsError: str(raw.reward_points_error) ?? null,
+    // Phase 14: the address's delivery zone, and cash on delivery for this cart (only when the API sends them).
+    ...(fromZone(raw.delivery_zone, raw.delivery_zone_code) && { deliveryZone: fromZone(raw.delivery_zone, raw.delivery_zone_code) }),
+    ...(fromCod(raw.cod) && { cod: fromCod(raw.cod) }),
   }
 }
 
@@ -364,7 +375,7 @@ export function fromOrder(raw) {
     status: raw.status,
     paymentStatus: raw.payment_status,
     paymentMethod: raw.payment_method,
-    shippingMethod: raw.shipping_method && typeof raw.shipping_method === 'object' && raw.shipping_method.id !== 'none' ? pick(raw.shipping_method, ['id', 'label', 'eta']) : null,
+    shippingMethod: raw.shipping_method && typeof raw.shipping_method === 'object' && raw.shipping_method.id !== 'none' ? { ...pick(raw.shipping_method, ['id', 'label', 'eta']), ...fromMethodDelivery(raw.shipping_method), ...fromOrderEta(raw) } : null,
     email: raw.email,
     phone: raw.phone,
     shippingAddress: fromAddress(raw.shipping_address),
@@ -395,6 +406,8 @@ export function fromOrder(raw) {
     ...((raw.shipping_required === false || raw.shipping_method?.id === 'none') && { requiresShipping: false }),
     // Phase 11: reward points spent on it (and what they paid), and earned once it was paid.
     ...fromOrderRewards(raw.reward_points),
+    // Phase 14: delivery zone, advance paid, cash due on delivery, COD fee, phone confirmation.
+    ...fromOrderDelivery(raw),
   }
 }
 
@@ -430,6 +443,12 @@ export const fromReview = (raw = {}) => ({
   status: ['pending', 'approved', 'rejected'].includes(raw.status) ? raw.status : 'pending',
 })
 
+/** Phase 14: the area (and its district) that prices a Bangladesh cart's delivery. */
+function cartPlace(place) {
+  const { area_id: areaId, district_id: districtId } = toPlaceIds(place)
+  return areaId ? { area_id: areaId, ...(districtId && { district_id: districtId }) } : {}
+}
+
 const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) ? { ok: true, status: result.status, data: map(result.data) } : failed(result))
 
 export const laravelShop = {
@@ -444,6 +463,7 @@ export const laravelShop = {
     const country = str(body.country)?.trim().slice(0, 60)
     const giftCardCode = toGiftCardCode(body.giftCardCode)
     const rewardPoints = token ? toRewardPoints(body.rewardPoints) : undefined
+    const paymentMethod = /^[a-z_]{2,30}$/.test(str(body.paymentMethod) ?? '') ? body.paymentMethod : undefined
     const payload = {
       items: toItems(body.items),
       coupon_code: str(body.couponCode) || null,
@@ -454,6 +474,10 @@ export const laravelShop = {
       ...(giftCardCode && { gift_card_code: giftCardCode }),
       // Phase 11: reward points to spend (signed in only: a guest has none).
       ...(rewardPoints && { reward_points: rewardPoints }),
+      // Phase 14: a Bangladesh address's place (its zone prices delivery), and the payment method
+      // (cash on delivery's fee and limits), only when the storefront sends them.
+      ...(country && isBangladesh(country) && cartPlace(body.place)),
+      ...(paymentMethod && { payment_method: paymentMethod }),
     }
     let result = await laravel('/api/v1/cart/validate', { method: 'POST', token, request, body: payload })
     // An expired session shouldn't stop the cart from being priced: ask again as a guest (without points).

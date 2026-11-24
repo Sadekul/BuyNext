@@ -9,6 +9,7 @@ use App\Http\Requests\PlaceOrderRequest;
 use App\Http\Resources\AdminOrderResource;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Services\BdAddresses;
 use App\Services\Checkout;
 use App\Services\OneTimeCodes;
 use App\Services\Payments\OnlinePayments;
@@ -54,6 +55,7 @@ class OrderCreateController extends Controller
             'email' => $customer?->email ?? ($data['guest']['email'] ?? null),
             'shipping_address' => $data['shipping_address'] ?? null,
             'gift_card_code' => $data['gift_card_code'] ?? null,
+            'payment_method' => $data['payment_method'] ?? null, // phase 14: "cod" adds the COD fee
         ], $customer);
 
         return response()->json(['data' => [
@@ -67,7 +69,7 @@ class OrderCreateController extends Controller
     {
         $data = $this->validated($request, quote: false);
         $customer = $this->customer($data);
-        $shipping = $this->address($data['shipping_address']);
+        $shipping = $this->address($data['shipping_address'], $data['_structured']['shipping_address']);
         $sameAsShipping = filter_var($data['same_as_shipping'] ?? false, FILTER_VALIDATE_BOOLEAN) || empty($data['billing_address']);
 
         $order = $checkout->place([
@@ -79,7 +81,7 @@ class OrderCreateController extends Controller
             'email' => $customer ? $customer->email : $data['guest']['email'],
             'phone' => $customer ? $customer->phone : $data['guest']['phone'],
             'shipping_address' => $shipping,
-            'billing_address' => $sameAsShipping ? $shipping : $this->address($data['billing_address']),
+            'billing_address' => $sameAsShipping ? $shipping : $this->address($data['billing_address'], $data['_structured']['billing_address']),
             'expected_total' => $data['expected_total'] ?? null,
             'note' => $data['note'] ?? null,
         ], $customer, $request->user(), notify: (bool) ($data['notify_customer'] ?? true));
@@ -95,20 +97,41 @@ class OrderCreateController extends Controller
 
     private function validated(Request $request, bool $quote): array
     {
+        // Phase 14: "BD" → the store's spelling; Bangladesh addresses take local mobile formats and the structured rules.
+        $bd = app(BdAddresses::class);
+        foreach (['shipping_address', 'billing_address'] as $key) {
+            $address = $request->input($key);
+            if (is_array($address) && array_key_exists('country', $address)) {
+                $request->merge([$key => [...$address, 'country' => $bd->normalizeCountry($address['country'])]]);
+            }
+        }
+        $bangladeshi = BdAddresses::isBangladesh($request->input('shipping_address.country'));
+        $structured = fn (string $key) => $bd->structured($request->input($key));
         $guest = $request->input('guest');
         if (is_array($guest)) {
             $request->merge(['guest' => [
                 ...$guest,
                 'email' => is_string($guest['email'] ?? null) ? OneTimeCodes::normalize($guest['email']) : ($guest['email'] ?? null),
-                'phone' => is_string($guest['phone'] ?? null) ? PhoneNumber::normalize($guest['phone']) : ($guest['phone'] ?? null),
+                'phone' => is_string($guest['phone'] ?? null)
+                    ? ($bangladeshi ? BdAddresses::normalizePhone($guest['phone']) : PhoneNumber::normalize($guest['phone'])) : ($guest['phone'] ?? null),
             ]]);
         }
         $countries = $this->settings->get('allowed_countries');
         $need = $quote ? 'nullable' : 'required';
         // Required only for the shipping address when placing the order; the
         // billing address (when sent and not "same as shipping") is checked below.
-        $address = function (string $prefix, bool $required) use ($quote, $countries) {
+        $address = function (string $prefix, bool $required) use ($quote, $countries, $structured) {
             $need = $required && ! $quote ? 'required' : 'nullable';
+            if ($structured($prefix)) {
+                return [
+                    $prefix => [$need, 'array'],
+                    "{$prefix}.first_name" => [$need, 'string', 'max:60'],
+                    "{$prefix}.last_name" => [$need, 'string', 'max:60'],
+                    "{$prefix}.line2" => ['nullable', 'string', 'max:120'],
+                    "{$prefix}.country" => [$need, 'string', Rule::in($countries)],
+                    ...BdAddresses::rules("{$prefix}.", $need === 'required'),
+                ];
+            }
 
             return [
                 $prefix => [$need, 'array'],
@@ -129,7 +152,7 @@ class OrderCreateController extends Controller
             'customer_id' => ['nullable', 'integer', ...($quote ? [] : ['required_without:guest']), 'prohibits:guest'],
             'guest' => ['nullable', 'array', ...($quote ? [] : ['required_without:customer_id'])],
             'guest.email' => [$quote ? 'nullable' : 'required_with:guest', 'string', 'email', 'max:190'],
-            'guest.phone' => [$quote ? 'nullable' : 'required_with:guest', 'string', PhoneNumber::RULE],
+            'guest.phone' => [$quote ? 'nullable' : 'required_with:guest', 'string', $structured('shipping_address') ? BdAddresses::MOBILE_RULE : PhoneNumber::RULE],
             'guest.first_name' => [$quote ? 'nullable' : 'required_with:guest', 'string', 'max:60'],
             'guest.last_name' => [$quote ? 'nullable' : 'required_with:guest', 'string', 'max:60'],
             ...$address('shipping_address', true),
@@ -152,14 +175,26 @@ class OrderCreateController extends Controller
             'guest.required_without' => 'Choose a customer, or enter the guest\'s details.',
             'customer_id.prohibits' => 'Choose a customer or enter a guest, not both.',
             'payment_method.in' => PlaceOrderRequest::paymentMethodMessage($request->input('payment_method')),
-            'guest.phone.regex' => 'Enter the phone number with its country code, for example +1 555 010 0100.',
-            '*.postal_code.regex' => 'The postal code is invalid.',
+            'guest.phone.regex' => $structured('shipping_address') ? 'Enter a Bangladeshi mobile number, for example 01712 345678.'
+                : 'Enter the phone number with its country code, for example +1 555 010 0100.',
+            '*.postal_code.regex' => $structured('shipping_address') || $structured('billing_address') ? 'Enter a 4-digit postcode.' : 'The postal code is invalid.',
             '*.country.in' => 'We don\'t deliver to that country yet.',
         ]);
 
+        // Phase 14: the places of a structured Bangladesh address must belong together.
+        foreach (['shipping_address', 'billing_address'] as $key) {
+            if ($structured($key) && ! empty($data[$key]) && (! $quote || ! empty($data[$key]['area_id']))) {
+                if ($problems = $bd->problems($data[$key], "{$key}.")) {
+                    throw ValidationException::withMessages($problems);
+                }
+            }
+        }
+        $data['_structured'] = ['shipping_address' => $structured('shipping_address'), 'billing_address' => $structured('billing_address')];
+
         if (! $quote && ! filter_var($data['same_as_shipping'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! empty($data['billing_address'])) {
             // A billing address that's sent must be complete (required_with only checks the keys exist).
-            $missing = array_filter(['first_name', 'last_name', 'line1', 'city', 'postal_code', 'country'],
+            $missing = array_filter($data['_structured']['billing_address'] ? ['first_name', 'last_name', 'line1', 'country', 'division_id', 'district_id', 'area_id']
+                : ['first_name', 'last_name', 'line1', 'city', 'postal_code', 'country'],
                 fn ($field) => blank($data['billing_address'][$field] ?? null));
             if ($missing) {
                 throw ValidationException::withMessages(array_combine(
@@ -189,10 +224,13 @@ class OrderCreateController extends Controller
         return $customer;
     }
 
-    private function address(array $address): array
+    /** Phase 14: a structured Bangladesh address keeps its place ids, with city/state filled (PlaceOrderRequest::storedAddress). */
+    private function address(array $address, bool $structured = false): array
     {
-        return collect(self::ADDRESS_FIELDS)
+        $stored = collect(self::ADDRESS_FIELDS)
             ->mapWithKeys(fn ($field) => [$field => isset($address[$field]) && trim((string) $address[$field]) !== '' ? trim($address[$field]) : null])
             ->all();
+
+        return $structured ? app(BdAddresses::class)->fill([...$stored, ...array_intersect_key($address, array_flip(BdAddresses::ID_FIELDS))]) : $stored;
     }
 }

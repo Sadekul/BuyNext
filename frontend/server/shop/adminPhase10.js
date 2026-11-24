@@ -41,6 +41,10 @@ export function shippingRate(raw) {
     maxSubtotal: money(raw.max_subtotal),
     price: money(raw.price) ?? 0,
     position: int(raw.position) ?? 0,
+    // Phase 14 §3: the delivery zone (null = any) and the delivery time in days, when the API has them.
+    ...(raw.zone_code !== undefined && { zoneCode: str(raw.zone_code) || null }),
+    ...(raw.eta_days_min !== undefined && { etaDaysMin: int(raw.eta_days_min) }),
+    ...(raw.eta_days_max !== undefined && { etaDaysMax: int(raw.eta_days_max) }),
   }
 }
 
@@ -54,6 +58,10 @@ export function toRateBody(values) {
   if (values.minSubtotal !== undefined) body.min_subtotal = cents(values.minSubtotal)
   if (values.maxSubtotal !== undefined) body.max_subtotal = cents(values.maxSubtotal)
   if (values.price !== undefined) body.price = cents(values.price)
+  // Phase 14 §3.
+  if (values.zoneCode !== undefined) body.zone_code = values.zoneCode
+  if (values.etaDaysMin !== undefined) body.eta_days_min = values.etaDaysMin
+  if (values.etaDaysMax !== undefined) body.eta_days_max = values.etaDaysMax
   return body
 }
 

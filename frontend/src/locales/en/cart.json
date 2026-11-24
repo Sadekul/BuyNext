@@ -55,7 +55,8 @@
     "taxes": "Taxes",
     "taxesLater": "Calculated at checkout",
     "estimatedTotal": "Estimated total",
-    "note": "Prices, stock, discounts, and shipping are confirmed by our servers at checkout."
+    "note": "Prices, stock, discounts, and shipping are confirmed by our servers at checkout.",
+    "areaNote": "Delivery charge is calculated from your area at checkout."
   },
   "currencyNote": {
     "approximate": "Prices in {{code}} are approximate.",

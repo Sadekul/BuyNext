@@ -47,5 +47,17 @@
     "lastName": "Enter your last name.",
     "username": "Use 3–30 letters, numbers, dots, dashes, or underscores.",
     "terms": "Please accept the terms to continue."
+  },
+  "bd": {
+    "division": "Choose your division.",
+    "district": "Choose your district.",
+    "area": "Choose your area (upazila or thana).",
+    "line1": "Enter your house, road or village.",
+    "postcode": "A postcode has 4 digits, like 1209. Or leave it empty.",
+    "mobile": {
+      "required": "Enter your mobile number so the courier can call you.",
+      "format": "Enter a Bangladeshi mobile number: 11 digits starting with 01, like 01712-345678.",
+      "operator": "Mobile numbers start with 013 to 019. Check the third digit."
+    }
   }
 }

@@ -10,7 +10,8 @@ import { useTranslation } from 'react-i18next'
  * Order summary. Every number comes from calculateCartTotals();
  * this component only displays them. `children` holds the action buttons.
  */
-function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isCheckingCoupon = false, showTax = true, children }) {
+/** `areaNote` (phase 14): the delivery charge follows the shopper's area, chosen at checkout (Bangladesh). */
+function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isCheckingCoupon = false, showTax = true, areaNote = false, children }) {
   const { t } = useTranslation('cart')
   return (
     <section className="cart-summary" aria-labelledby="cart-summary-title">
@@ -49,6 +50,7 @@ function CartSummary({ totals, couponCode, onApplyCoupon, onRemoveCoupon, isChec
           <dd>{formatPrice(totals.total)}</dd>
         </div>
       </dl>
+      {areaNote && totals.requiresShipping !== false && <p className="cart-summary__note">{t('summary.areaNote')}</p>}
       {/* Phase 11: prices shown in another currency are approximate; the order is charged in the store currency. */}
       <ChargedInBaseNote amount={totals.total} />
 

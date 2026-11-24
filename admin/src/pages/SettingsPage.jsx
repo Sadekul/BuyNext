@@ -14,6 +14,10 @@ import { rewardSettingsValues } from '../utils/rewards'
 import { formatMoney, getStoreCurrency, storeCode } from '../utils/format'
 import { paymentProviderNote } from '../utils/payments'
 import StatusBadge from '../components/StatusBadge'
+// Phase 14 §3 and §4: delivery zones, the default country, cash on delivery.
+import { LuMapPinned } from 'react-icons/lu'
+import { getDeliveryZones, phase14Keys } from '../api/phase14'
+import { COD_ADVANCE, advanceAvailability } from '../utils/bangladesh'
 
 const SHIPPING_METHODS = [
   { id: 'standard', label: 'Standard' },
@@ -57,6 +61,8 @@ function SettingsPage() {
           <ShippingForm saved={settings.data.shipping} />
           <TaxForm saved={settings.data.tax} />
           <CheckoutForm saved={settings.data.checkout} providers={settings.data.store?.paymentProviders} />
+          {/* Phase 14 §4: Payment methods → Cash on delivery (only when the API has the settings). */}
+          {settings.data.cod?.advance !== undefined && <CodForm saved={settings.data.cod} settings={settings.data} />}
           <InventoryForm saved={settings.data.inventory} />
           <CatalogForm saved={settings.data.catalog ?? {}} />
           {settings.data.returns && <ReturnsForm saved={settings.data.returns} />}
@@ -293,6 +299,11 @@ function ShippingForm({ saved }) {
           <Link to="/settings/shipping-rates">
             <LuTable2 aria-hidden="true" /> Table rates
           </Link>
+          {/* Phase 14 §3: Bangladesh delivery zones (rates per zone). */}
+          {' · '}
+          <Link to="/settings/delivery-zones">
+            <LuMapPinned aria-hidden="true" /> Delivery zones
+          </Link>
         </p>
       )}
     </SettingsGroup>
@@ -449,6 +460,9 @@ function CheckoutForm({ saved, providers }) {
   const [newCountry, setNewCountry] = useState('')
   const [guest, setGuest] = useState(saved.guestCheckout !== false)
   const [payments, setPayments] = useState(saved.enabledPaymentMethods ?? [])
+  // Phase 14 §2: the country new addresses start with ('' = none; only when the API has the setting).
+  const hasDefaultCountry = saved.defaultCountry !== undefined
+  const [defaultCountry, setDefaultCountry] = useState(saved.defaultCountry ?? '')
   const [errors, setErrors] = useState({})
 
   function addCountry() {
@@ -462,7 +476,9 @@ function CheckoutForm({ saved, providers }) {
     const found = {}
     if (countries.length === 0) found.allowedCountries = ['Keep at least one country.']
     if (payments.length === 0) found.enabledPaymentMethods = ['Keep at least one payment method.']
-    return Object.keys(found).length > 0 ? { errors: found } : { values: { allowedCountries: countries, guestCheckout: guest, enabledPaymentMethods: payments } }
+    if (hasDefaultCountry && defaultCountry && !countries.includes(defaultCountry)) found.defaultCountry = ['Choose one of the countries the store ships to.']
+    if (Object.keys(found).length > 0) return { errors: found }
+    return { values: { allowedCountries: countries, guestCheckout: guest, enabledPaymentMethods: payments, ...(hasDefaultCountry && { defaultCountry: defaultCountry || null }) } }
   }
   return (
     <SettingsGroup group="checkout" title="Checkout" toValues={toValues} errors={errors} setErrors={setErrors}>
@@ -491,6 +507,26 @@ function CheckoutForm({ saved, providers }) {
           <LuPlus aria-hidden="true" /> Add
         </button>
       </div>
+      {hasDefaultCountry && (
+        <div className="form__grid">
+          <Field
+            label="Default country"
+            error={err(errors, 'defaultCountry')}
+            hint="New addresses start with it, at checkout and in the admin. A Bangladeshi store chooses Bangladesh: the address form then asks for the division, district, and area."
+          >
+            {(a11y) => (
+              <select {...a11y} value={defaultCountry} onChange={(event) => setDefaultCountry(event.target.value)}>
+                <option value="">None (the shopper chooses)</option>
+                {[...new Set([...countries, ...(defaultCountry ? [defaultCountry] : [])])].map((country) => (
+                  <option key={country} value={country}>
+                    {country}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        </div>
+      )}
       <label className="checkbox">
         <input type="checkbox" checked={guest} onChange={(event) => setGuest(event.target.checked)} />
         Guests can check out without an account
@@ -802,3 +838,111 @@ function ReturnsForm({ saved }) {
 }
 
 export default SettingsPage
+
+/**
+ * Phase 14 §4: Payment methods → Cash on delivery, the Bangladeshi way: an
+ * order limit, a COD fee, the delivery charge paid online first (needs
+ * SSLCommerz), the zones where it is offered, and a phone call to confirm
+ * each order before it ships (Sales → To confirm).
+ */
+function CodForm({ saved, settings }) {
+  const zones = useQuery({ queryKey: phase14Keys.zones, queryFn: ({ signal }) => getDeliveryZones({ signal }), retry: false, staleTime: 60_000 })
+  const [values, setValues] = useState(() => ({
+    maxOrderTotal: toText(saved.maxOrderTotal),
+    fee: toText(saved.fee ?? 0),
+    advance: saved.advance === 'delivery_charge' ? 'delivery_charge' : 'none',
+    zones: saved.zones ?? [],
+    requireConfirmation: saved.requireConfirmation === true,
+  }))
+  const [errors, setErrors] = useState({})
+  const set = (key) => (event) => setValues({ ...values, [key]: event.target.value })
+  const advance = advanceAvailability(settings)
+  const codOffered = (settings.checkout?.enabledPaymentMethods ?? []).includes('cod')
+  const zoneOptions = [
+    ...(zones.data?.zones ?? []).map((zone) => ({ id: zone.code, label: `${zone.name}${zone.isActive === false ? ' (off)' : ''}` })),
+    ...values.zones.filter((code) => !(zones.data?.zones ?? []).some((zone) => zone.code === code)).map((code) => ({ id: code, label: code })),
+  ]
+
+  function toValues() {
+    const found = {}
+    if (values.maxOrderTotal.trim() !== '' && !isMoneyText(values.maxOrderTotal)) found.maxOrderTotal = ['Enter an amount of 0 or more with at most 2 decimals, or leave it empty for no limit.']
+    if (!isMoneyText(values.fee)) found.fee = ['Enter a fee of 0 or more, with at most 2 decimals.']
+    if (values.advance === 'delivery_charge' && !advance.ok && saved.advance !== 'delivery_charge') found.advance = [advance.reason]
+    if (Object.keys(found).length > 0) return { errors: found }
+    return {
+      values: {
+        maxOrderTotal: values.maxOrderTotal.trim() === '' ? null : Number(values.maxOrderTotal),
+        fee: Number(values.fee),
+        advance: values.advance,
+        zones: values.zones,
+        requireConfirmation: values.requireConfirmation,
+      },
+    }
+  }
+
+  return (
+    <SettingsGroup
+      group="cod"
+      title="Cash on delivery"
+      description={`How cash on delivery works when it is offered (Checkout → Payment methods). Amounts in ${storeCode()}.`}
+      toValues={toValues}
+      errors={errors}
+      setErrors={setErrors}
+    >
+      {!codOffered && <p className="notice">Cash on delivery isn't ticked under Checkout → Payment methods, so shoppers don't see it now.</p>}
+      <div className="form__grid">
+        <Field label="Largest order total for cash on delivery" error={err(errors, 'maxOrderTotal')} hint="Empty: no limit. Bigger orders must pay online; the checkout explains why.">
+          {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.maxOrderTotal} onChange={set('maxOrderTotal')} />}
+        </Field>
+        <Field label="Cash on delivery fee" error={err(errors, 'fee')} hint={`Added to every cash on delivery order. 0: no fee.${Number(values.fee) > 0 ? ` Shoppers see “Cash on delivery fee ${formatMoney(Number(values.fee))}”.` : ''}`}>
+          {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={values.fee} onChange={set('fee')} />}
+        </Field>
+      </div>
+      <fieldset className="form__fieldset choices" aria-describedby={!advance.ok ? 'cod-advance-why' : undefined}>
+        <legend>Paid in advance</legend>
+        {Object.entries(COD_ADVANCE).map(([id, label]) => {
+          const blocked = id === 'delivery_charge' && !advance.ok && values.advance !== 'delivery_charge'
+          return (
+            <label key={id} className="checkbox">
+              <input type="radio" name="cod-advance" value={id} checked={values.advance === id} disabled={blocked} onChange={() => setValues({ ...values, advance: id })} />
+              {label}
+            </label>
+          )
+        })}
+        {advance.ok ? (
+          <p className="field__hint">
+            With the advance, the shopper pays the delivery charge (and the fee) through SSLCommerz when placing the order; the order waits until it is paid, and unpaid ones
+            are cancelled like other SSLCommerz payments. The rest is collected on delivery.
+          </p>
+        ) : (
+          <p id="cod-advance-why" className="field__hint">
+            {advance.reason}
+          </p>
+        )}
+        {err(errors, 'advance') && <p className="field__error">{err(errors, 'advance')}</p>}
+      </fieldset>
+      <Choices
+        legend="Delivery zones where it is offered"
+        hint={zoneOptions.length === 0 ? 'No delivery zones yet: cash on delivery is offered everywhere.' : 'None ticked: everywhere. Zones are for Bangladesh addresses; other countries follow the payment methods above.'}
+        options={zoneOptions}
+        chosen={values.zones}
+        onChange={(chosen) => setValues({ ...values, zones: chosen })}
+        error={err(errors, 'zones')}
+      />
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={values.requireConfirmation}
+          aria-describedby="cod-confirm-hint"
+          onChange={(event) => setValues({ ...values, requireConfirmation: event.target.checked })}
+        />
+        Confirm each order by phone before shipping
+      </label>
+      <p id="cod-confirm-hint" className="field__hint">
+        New cash on delivery orders wait in <Link to="/to-confirm">Sales → To confirm</Link> until staff call the customer. Unconfirmed orders can't be shipped unless staff give a
+        reason.
+      </p>
+      {err(errors, 'requireConfirmation') && <p className="field__error">{err(errors, 'requireConfirmation')}</p>}
+    </SettingsGroup>
+  )
+}

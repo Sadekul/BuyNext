@@ -31,7 +31,8 @@ class Settings
         // Phase 10 (part B): default_weight_grams (products without a weight, for table rates).
         'shipping' => ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'enabled_methods', 'default_weight_grams'],
         'tax' => ['tax_enabled', 'tax_rates', 'prices_include_tax'],
-        'checkout' => ['allowed_countries', 'guest_checkout', 'enabled_payment_methods'],
+        // Phase 14: default_country (null = none; a Bangladeshi store sets Bangladesh).
+        'checkout' => ['allowed_countries', 'guest_checkout', 'enabled_payment_methods', 'default_country'],
         'inventory' => ['low_stock_threshold'],
         // Phase 5: Settings → Catalog. The contract calls it reviews.require_approval.
         'catalog' => ['reviews_require_approval'],
@@ -44,6 +45,8 @@ class Settings
         'analytics' => ['ga4_measurement_id'],
         // Phase 11: Settings → Reward points. The API names (enabled, ...) are stored as rewards_enabled, ... (STORAGE_KEYS).
         'rewards' => ['enabled', 'earn_rate', 'point_value', 'min_redeem', 'max_percent', 'signup_bonus', 'review_bonus'],
+        // Phase 14: Settings → Payment methods → Cash on delivery. Stored as cod_max_order_total, ... (STORAGE_KEYS).
+        'cod' => ['max_order_total', 'fee', 'advance', 'zones', 'require_confirmation'],
     ];
 
     /** Phase 11: group key → stored key, for groups whose API names would clash with other keys. */
@@ -56,6 +59,13 @@ class Settings
             'max_percent' => 'rewards_max_percent',
             'signup_bonus' => 'rewards_signup_bonus',
             'review_bonus' => 'rewards_review_bonus',
+        ],
+        'cod' => [
+            'max_order_total' => 'cod_max_order_total',
+            'fee' => 'cod_fee',
+            'advance' => 'cod_advance',
+            'zones' => 'cod_zones',
+            'require_confirmation' => 'cod_require_confirmation',
         ],
     ];
 
@@ -104,9 +114,16 @@ class Settings
         'rewards_max_percent' => 50,
         'rewards_signup_bonus' => 0,
         'rewards_review_bonus' => 0,
+        // Phase 14: the country address forms start with (null: none), and cash on delivery (the defaults change nothing).
+        'default_country' => null,
+        'cod_max_order_total' => null, // null = no limit
+        'cod_fee' => '0.00',
+        'cod_advance' => 'none', // none | delivery_charge (paid online through SSLCommerz first)
+        'cod_zones' => [], // delivery zone codes; [] = everywhere
+        'cod_require_confirmation' => false,
     ];
 
-    private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price'];
+    private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'cod_fee'];
 
     /** Values for this request, so the cache is read once (null = not loaded yet). */
     private ?array $values = null;
@@ -279,6 +296,14 @@ class Settings
             'rewards.max_percent' => ['integer', 'min:1', 'max:100'],
             'rewards.signup_bonus' => ['integer', 'min:0', 'max:1000000'],
             'rewards.review_bonus' => ['integer', 'min:0', 'max:1000000'],
+            // Phase 14 (default_country is also checked against allowed_countries by SettingsController).
+            'checkout.default_country' => ['nullable', 'string', 'min:2', 'max:60'],
+            'cod.max_order_total' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:100000000'],
+            'cod.fee' => $money,
+            'cod.advance' => ['string', Rule::in(CashOnDelivery::ADVANCE_MODES)],
+            'cod.zones' => ['array', 'max:100'],
+            'cod.zones.*' => ['string', 'distinct', 'max:40'],
+            'cod.require_confirmation' => ['boolean'],
         ];
     }
 
@@ -294,6 +319,10 @@ class Settings
             $key === 'rewards_point_value' => number_format(round((float) $value, 4), 4, '.', ''),
             in_array($key, ['rewards_min_redeem', 'rewards_max_percent', 'rewards_signup_bonus', 'rewards_review_bonus'], true) => (int) $value,
             in_array($key, self::MONEY_KEYS, true) => Pricing::format(Pricing::toCents((string) $value)),
+            // Phase 14.
+            $key === 'cod_max_order_total' => $value === null || $value === '' ? null : Pricing::format(Pricing::toCents((string) $value)),
+            $key === 'cod_require_confirmation' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            $key === 'cod_zones' => array_values(array_map('trim', $value)),
             in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval', 'returns_enabled',
                 'require_admin_two_factor'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 9 (part A): the last one
             in_array($key, ['low_stock_threshold', 'return_window_days', 'default_weight_grams'], true) => (int) $value, // phase 10 (part B): the last one

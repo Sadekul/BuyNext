@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Services\Payments\OnlinePayments;
 use App\Services\Pricing;
 use App\Services\Returns;
+use App\Services\ShippingRates;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -59,6 +60,10 @@ class OrderResource extends JsonResource
             'payment' => $this->payment(),
             // Phase 9 (part A): show "Cancel order" (POST /orders/{number}/cancel).
             'can_cancel' => $this->resource->customerCanCancel(),
+            // Phase 14: delivery zone and time, cash on delivery amounts, phone confirmation ("We'll call you to confirm").
+            'delivery' => self::deliveryOf($this->resource),
+            'cod' => $this->codSummary(),
+            'confirmation_status' => $this->confirmation_status,
             'history' => $this->whenLoaded('history', fn () => $this->history->map(fn ($entry) => $this->historyEntry($entry))->values()),
             // Phase 3 documents (Order::DOCUMENTS eager-loads them).
             ...$this->documents($request),
@@ -148,8 +153,39 @@ class OrderResource extends JsonResource
             'gift_card' => Pricing::format(Pricing::toCents($order->gift_card_amount ?? 0)),
             'reward_points' => Pricing::format(Pricing::toCents($order->reward_points_amount ?? 0)), // phase 11: paid with reward points
             'amount_due' => Pricing::format($order->dueCents()),
+            'cod_fee' => Pricing::format(Pricing::toCents($order->cod_fee ?? 0)), // phase 14: in the total
             'paid' => Pricing::format($order->paidCents()),
             'refunded' => Pricing::format($order->refundedCents()),
+        ];
+    }
+
+    /** Phase 14: { zone_code, zone_name, eta_days_min, eta_days_max, eta } (all null for orders without a zone or delivery time). */
+    public static function deliveryOf(Order $order): array
+    {
+        $zone = $order->delivery_zone_code ? $order->deliveryZone : null;
+
+        return [
+            'zone_code' => $order->delivery_zone_code,
+            'zone_name' => $zone?->localName() ?? $order->delivery_zone_code,
+            'eta_days_min' => $order->delivery_eta_min,
+            'eta_days_max' => $order->delivery_eta_max,
+            'eta' => ShippingRates::etaText($order->delivery_eta_min, $order->delivery_eta_max),
+        ];
+    }
+
+    /** Phase 14: { fee, advance_amount, advance_paid, cod_due } for cash on delivery orders (staff also see collected), else null. */
+    protected function codSummary(): ?array
+    {
+        if (! $this->resource->isCod()) {
+            return null;
+        }
+
+        return [
+            'fee' => Pricing::format(Pricing::toCents($this->cod_fee ?? 0)),
+            'advance_amount' => Pricing::format(Pricing::toCents($this->advance_amount ?? 0)),
+            'advance_paid' => Pricing::format(Pricing::toCents($this->advance_paid ?? 0)),
+            'cod_due' => Pricing::format($this->resource->codDueCents()),
+            ...($this->forCustomer() ? [] : ['collected' => Pricing::format(Pricing::toCents($this->cod_collected ?? 0))]),
         ];
     }
 

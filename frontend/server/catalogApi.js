@@ -15,6 +15,10 @@ import { serverMessage } from './i18n.js'
  *   GET /api/catalog/redirects?path=/old → GET /api/v1/redirects?path=/old ({ data: { from_path, to_path, status_code } }, or 404)
  *                                        the admin's URL redirects, checked by the storefront's "not found" page (phase 7)
  *   GET /api/catalog/products/compare?ids=1,2,3 → GET /api/v1/products/compare?ids=1,2,3 (phase 11: 2–4 products side by side)
+ *   GET /api/catalog/places/bd/divisions            → GET /api/v1/places/bd/divisions (phase 14: Bangladesh's 8 divisions)
+ *   GET /api/catalog/places/bd/districts?division=3 → GET /api/v1/places/bd/districts?division=3 (its districts; all 64 without it)
+ *   GET /api/catalog/places/bd/areas?district=47    → GET /api/v1/places/bd/areas?district=47 (its upazilas and thanas)
+ *                                        each { id, name (in the request language), name_en, name_bn, kind?, postcodes? }
  * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
  * Phase 10: a search the API corrected ("ihpone" → "iphone") says so in `meta.corrected_query`.
  *
@@ -27,6 +31,8 @@ import { serverMessage } from './i18n.js'
 const QUERY_KEYS = ['search', 'correct', 'suggest', 'category', 'brand[]', 'min_price', 'max_price', 'min_rating', 'available', 'sort', 'direction', 'page', 'per_page']
 const MAX_VALUE_LENGTH = 100
 const CACHE = 'public, max-age=60'
+// Phase 14: Bangladesh's places hardly ever change.
+const PLACES_CACHE = 'public, max-age=3600'
 
 const isId = (value) => /^\d{1,9}$/.test(value ?? '')
 const isSlug = (value) => /^[a-z0-9-]{1,80}$/.test(value ?? '')
@@ -54,8 +60,26 @@ function compareLookup(url) {
   return `/api/v1/products/compare?${new URLSearchParams({ ids: ids.join(',') })}`
 }
 
+/**
+ * Phase 14: Bangladesh places. Only the three lists, and only a numeric
+ * parent id (`division` for districts, `district` for areas) goes through.
+ */
+const PLACE_PARENTS = { divisions: null, districts: 'division', areas: 'district' }
+function placesLookup(segments, url) {
+  const [country, list, ...rest] = segments
+  if (country !== 'bd' || rest.length > 0 || !Object.hasOwn(PLACE_PARENTS, list ?? '')) return null
+  const parent = PLACE_PARENTS[list]
+  if (!parent) return '/api/v1/places/bd/divisions'
+  const id = url.searchParams.get(parent)
+  // Every district at once (no division) is allowed: the address book names them in Bangla with it.
+  if (list === 'districts' && (id === null || id === '')) return '/api/v1/places/bd/districts'
+  if (!isId(id)) return null
+  return `/api/v1/places/bd/${list}?${new URLSearchParams({ [parent]: id })}`
+}
+
 /** /api/catalog/<segments> → the Laravel path, or null. */
 function upstreamPath(segments, url) {
+  if (segments[0] === 'places') return placesLookup(segments.slice(1), url)
   const [resource, id, ...rest] = segments
   if (rest.length > 0) return null
   if (resource === 'products' && id === 'compare') return compareLookup(url)
@@ -67,6 +91,10 @@ function upstreamPath(segments, url) {
   if (resource === 'redirects' && id === undefined) return redirectLookup(url)
   return null
 }
+
+// Phase 14: only the documented keys of each place.
+const PLACE_KEYS = ['id', 'name', 'name_en', 'name_bn', 'kind', 'postcodes', 'division_id', 'district_id', 'city_corporation']
+const places = (list) => (Array.isArray(list) ? list.slice(0, 1000).filter((place) => place && typeof place === 'object').map((place) => pick(place, PLACE_KEYS)) : [])
 
 export async function handleCatalogRequest(request, segments) {
   const path = upstreamPath(segments, new URL(request.url))
@@ -83,8 +111,8 @@ export async function handleCatalogRequest(request, segments) {
   const { status, data } = await laravel(path, { request, language })
   if (status !== 200) return json({ message: data?.message ?? serverMessage(request, 'catalogFailed') }, status)
   // Only the documented keys: Laravel's `links`, `meta.links`, and `meta.path` hold the API's internal address.
-  const body = { data: data?.data ?? null, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query']) }) }
+  const body = { data: segments[0] === 'places' ? places(data?.data) : (data?.data ?? null), ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query']) }) }
   const response = json(body)
-  response.headers.set('Cache-Control', CACHE)
+  response.headers.set('Cache-Control', segments[0] === 'places' ? PLACES_CACHE : CACHE)
   return response
 }

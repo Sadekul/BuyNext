@@ -9,6 +9,8 @@ import { formatMoney, storeCode } from '../utils/format'
 import { CARRIERS, paidThroughProvider } from '../utils/orders'
 // Phase 11 §4: refunds settle reward points first, then the gift card, then the payment method.
 import { formatPoints, refundSplit } from '../utils/rewards'
+// Phase 14 §4: unconfirmed cash on delivery orders ship only with a reason; the cash collected on delivery.
+import { amountToCollect, awaitsConfirmation, confirmationOf, confirmationStatus } from '../utils/bangladesh'
 
 /*
  * The actions on a real order, each in its own dialog with its own note and
@@ -85,8 +87,19 @@ export function ShipDialog({ order, onDone, onCancel }) {
   const [note, setNote] = useState('')
   const [notify, setNotify] = useState(true)
   const [errors, setErrors] = useState({})
+  // Phase 14 §4: not confirmed by phone yet: shipping anyway needs a reason (audited).
+  const unconfirmed = awaitsConfirmation(order)
+  const [override, setOverride] = useState(false)
+  const [overrideReason, setOverrideReason] = useState('')
   const create = useMutation({
-    mutationFn: () => createShipment(order.number, { carrier, trackingNumber: tracking.trim() || undefined, note: note.trim() || undefined, notifyCustomer: notify }),
+    mutationFn: () =>
+      createShipment(order.number, {
+        carrier,
+        trackingNumber: tracking.trim() || undefined,
+        note: note.trim() || undefined,
+        notifyCustomer: notify,
+        ...(unconfirmed && override && { confirmationOverride: overrideReason.trim() }),
+      }),
     onSuccess: ({ shipment }) => {
       const tracked = shipment.trackingNumber ? ` with ${shipment.carrierLabel} tracking number ${shipment.trackingNumber}` : ` with ${shipment.carrierLabel}`
       onDone(`Shipment ${shipment.number} created${tracked}. The order is now shipped.${notify ? ' The customer was emailed.' : ''}`)
@@ -98,6 +111,8 @@ export function ShipDialog({ order, onDone, onCancel }) {
     const found = {}
     if (!carrier) found.carrier = ['Choose a carrier.']
     if (tracking.trim() && !/^[A-Za-z0-9][A-Za-z0-9 -]{0,63}$/.test(tracking.trim())) found.trackingNumber = ['Use up to 64 letters, digits, spaces, or dashes.']
+    if (unconfirmed && !override) found.overrideConfirmation = ['Confirm the order by phone first, or tick “Ship without confirmation” and give the reason.']
+    if (unconfirmed && override && overrideReason.trim().length < 3) found.confirmationOverride = ['Give the reason for shipping without confirmation (at least 3 characters).']
     setErrors(found)
     if (Object.keys(found).length === 0) create.mutate()
   }
@@ -109,10 +124,39 @@ export function ShipDialog({ order, onDone, onCancel }) {
       description="Ships every item in one parcel."
       submitLabel="Create shipment"
       busy={create.isPending}
-      error={formError(create.error, ['carrier', 'trackingNumber', 'note'])}
+      error={formError(create.error, ['carrier', 'trackingNumber', 'note', ...(unconfirmed ? ['confirmationOverride', 'overrideConfirmation'] : [])])}
       onSubmit={submit}
       onCancel={onCancel}
     >
+      {unconfirmed && (
+        <fieldset className="form__fieldset ship-override">
+          <legend>Not confirmed by phone</legend>
+          <p className="field__hint">
+            This cash on delivery order is “{confirmationStatus(confirmationOf(order)).label.toLowerCase()}”. Orders are shipped once the customer confirms; to ship it anyway,
+            say why (it is kept in the audit log).
+          </p>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={override}
+              aria-invalid={errors.overrideConfirmation ? true : undefined}
+              aria-describedby={errors.overrideConfirmation ? 'ship-override-error' : undefined}
+              onChange={(event) => setOverride(event.target.checked)}
+            />
+            Ship without confirmation
+          </label>
+          {errors.overrideConfirmation && (
+            <span id="ship-override-error" className="field__error">
+              {errors.overrideConfirmation[0]}
+            </span>
+          )}
+          {override && (
+            <Field label="Reason" error={errors.confirmationOverride?.[0]}>
+              {(a11y) => <input {...a11y} value={overrideReason} maxLength={500} onChange={(event) => setOverrideReason(event.target.value)} />}
+            </Field>
+          )}
+        </fieldset>
+      )}
       <Field label="Carrier" error={errors.carrier?.[0]}>
         {(a11y) => (
           <select {...a11y} value={carrier} onChange={(event) => setCarrier(event.target.value)}>
@@ -156,6 +200,72 @@ export function StatusDialog({ order, status, onDone, onCancel }) {
       onCancel={onCancel}
     >
       <NoteAndEmail note={note} setNote={setNote} notify={notify} setNotify={setNotify} error={firstError(change.error, 'note')} />
+    </FormDialog>
+  )
+}
+
+/**
+ * Phase 14 §4: "Mark as delivered" for a cash on delivery order: staff
+ * confirm the cash the courier collected. The full amount pays the order
+ * (it is invoiced with the cash line and any advance); less is a short
+ * collection, kept with a note: the rest stays due and admins are notified.
+ */
+export function CodCollectionDialog({ order, onDone, onCancel }) {
+  const due = amountToCollect(order)
+  const [collected, setCollected] = useState(String(due))
+  const [shortNote, setShortNote] = useState('')
+  const [note, setNote] = useState('')
+  const [notify, setNotify] = useState(true)
+  const [errors, setErrors] = useState({})
+  const value = collected.trim() === '' ? NaN : Number(collected)
+  const isShort = Number.isFinite(value) && toCents(value) < toCents(due)
+  const change = useMutation({
+    mutationFn: () =>
+      updateOrder(order.number, {
+        status: 'delivered',
+        collectedAmount: value,
+        ...(isShort && { collectionNote: shortNote.trim() }),
+        note: note.trim() || undefined,
+        notifyCustomer: notify,
+      }),
+    onSuccess: () =>
+      onDone(
+        isShort
+          ? `Marked as delivered with ${formatMoney(value, order.currency)} collected; ${formatMoney((toCents(due) - toCents(value)) / 100, order.currency)} is still due.${notify ? ' The customer was emailed.' : ''}`
+          : `Marked as delivered; ${formatMoney(value, order.currency)} collected and the order is paid.${notify ? ' The customer was emailed.' : ''}`,
+      ),
+    onError: (error) => setErrors(error.fieldErrors ?? {}),
+  })
+
+  function submit() {
+    const found = {}
+    if (!Number.isFinite(value) || value < 0 || !hasCents(value)) found.collectedAmount = ['Enter the amount collected, with at most 2 decimals.']
+    else if (toCents(value) > toCents(due)) found.collectedAmount = [`That is more than the ${formatMoney(due, order.currency)} due.`]
+    if (isShort && !shortNote.trim()) found.collectionNote = ['Say why less was collected.']
+    setErrors(found)
+    if (Object.keys(found).length === 0) change.mutate()
+  }
+
+  return (
+    <FormDialog
+      isOpen
+      title={`Mark order ${order.number} as delivered?`}
+      description={`Cash on delivery: ${formatMoney(due, order.currency)} to collect. Confirm what the courier collected.`}
+      submitLabel="Mark as delivered"
+      busy={change.isPending}
+      error={formError(change.error, ['collectedAmount', 'collectionNote', 'note', 'status'])}
+      onSubmit={submit}
+      onCancel={onCancel}
+    >
+      <Field label={`Amount collected (${order.currency ?? storeCode()})`} error={errors.collectedAmount?.[0] ?? firstError(change.error, 'status')} hint="The full amount pays the order and invoices it.">
+        {(a11y) => <input {...a11y} type="number" inputMode="decimal" min="0" step="0.01" value={collected} onChange={(event) => setCollected(event.target.value)} />}
+      </Field>
+      {isShort && (
+        <Field label="Why less was collected" error={errors.collectionNote?.[0]} hint={`${formatMoney((toCents(due) - Math.max(toCents(value), 0)) / 100, order.currency)} stays due; admins are notified.`}>
+          {(a11y) => <textarea {...a11y} rows={2} maxLength={500} value={shortNote} onChange={(event) => setShortNote(event.target.value)} />}
+        </Field>
+      )}
+      <NoteAndEmail note={note} setNote={setNote} notify={notify} setNotify={setNotify} error={errors.note?.[0]} />
     </FormDialog>
   )
 }

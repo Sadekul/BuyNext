@@ -26,6 +26,13 @@ class AdminOrderResource extends OrderResource
                 ? ['id' => $this->createdBy->id, 'name' => $this->createdBy->name] : null,
             // Phase 10 (part B): gift cards bought with this order (made when it was paid).
             'gift_cards_issued' => $this->giftCardsIssued(),
+            // Phase 14: the phone confirmation (logs on the detail answer).
+            'confirmation' => [
+                'status' => $this->confirmation_status,
+                'attempts' => (int) $this->confirmation_attempts,
+                'confirmed_at' => $this->confirmed_at?->toIso8601ZuluString(),
+                ...($this->relationLoaded('confirmationLogs') ? ['logs' => $this->confirmationLogs->map->toApi()->values()] : []),
+            ],
         ];
     }
 

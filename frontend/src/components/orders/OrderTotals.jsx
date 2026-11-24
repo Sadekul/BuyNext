@@ -8,6 +8,11 @@ import { useTranslation } from 'react-i18next'
 /** Phase 10: `totals.giftCard` (what a gift card pays) and `totals.amountDue` (what is left to pay); `requiresShipping: false` for gift cards only. */
 /** Phase 11: `totals.rewardPoints` (what points pay, paid before a gift card) and `rewardPointsSpent` (how many points). */
 /** Phase 12: `currency`: the order's own currency code (its money is written in it); the store currency otherwise. */
+/**
+ * Phase 14, cash on delivery: `totals.codFee` (a row after delivery), and at the end what is paid
+ * online first and what in cash: `totals.advanceDue` (checkout: the delivery charge to pay now) or
+ * `totals.advancePaid` (an order), then `totals.codDue` (cash on delivery).
+ */
 function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax = true, requiresShipping = true, rewardPointsSpent = null, currency = null }) {
   const { t } = useTranslation('orders')
   const formatBasePrice = moneyFormatter(currency)
@@ -30,6 +35,12 @@ function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax 
         <div>
           <dt>{t('totals.shipping')}</dt>
           <dd>{t('totals.noShipping')}</dd>
+        </div>
+      )}
+      {totals.codFee > 0 && (
+        <div>
+          <dt>{t('totals.codFee')}</dt>
+          <dd>{formatBasePrice(totals.codFee)}</dd>
         </div>
       )}
       {/* Server-priced totals include the tax; the demo can't know it. Checkout hides the line when the store charges no tax. */}
@@ -66,6 +77,24 @@ function OrderTotals({ totals, couponCode, appliedRules, shippingLabel, showTax 
             <dd>{formatBasePrice(amountDue)}</dd>
           </div>
         </>
+      )}
+      {totals.advanceDue > 0 && (
+        <div>
+          <dt>{t('totals.advanceDue')}</dt>
+          <dd>{formatBasePrice(totals.advanceDue)}</dd>
+        </div>
+      )}
+      {totals.advancePaid > 0 && (
+        <div className="cart-summary__saving">
+          <dt>{t('totals.advancePaid')}</dt>
+          <dd>−{formatBasePrice(totals.advancePaid)}</dd>
+        </div>
+      )}
+      {(totals.advanceDue > 0 || totals.advancePaid > 0) && totals.codDue !== undefined && totals.codDue !== null && (
+        <div className="cart-summary__total">
+          <dt>{t('totals.codDue')}</dt>
+          <dd>{formatBasePrice(totals.codDue)}</dd>
+        </div>
       )}
       {/* Orders with refunds (credit memos) show what came back. */}
       {totals.refunded > 0 && (

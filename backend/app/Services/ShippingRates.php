@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ShippingRate;
+use App\Support\Locale;
 use Illuminate\Support\Collection;
 
 /**
@@ -46,36 +47,72 @@ class ShippingRates
         return $this->rows()->has($method);
     }
 
-    /** The first row of $method matching the cart (exact country first, then "*"), or null. */
-    public function match(string $method, ?string $country, int $weightGrams, int $subtotalCents): ?ShippingRate
+    /**
+     * The first row of $method matching the cart (exact country first, then "*"), or null.
+     * Phase 14: rows of the address's delivery zone ($zone) come before both.
+     */
+    public function match(string $method, ?string $country, int $weightGrams, int $subtotalCents, ?string $zone = null): ?ShippingRate
     {
         $rows = $this->rows()->get($method, collect());
-        $matching = $rows->filter(fn (ShippingRate $rate) => $rate->matches($country, $weightGrams, $subtotalCents));
+        $matching = $rows->filter(fn (ShippingRate $rate) => $rate->matches($country, $weightGrams, $subtotalCents, $zone));
 
-        return $matching->first(fn (ShippingRate $rate) => $rate->country !== '*') ?? $matching->first();
+        return $matching->first(fn (ShippingRate $rate) => $rate->zone_code !== null)
+            ?? $matching->first(fn (ShippingRate $rate) => $rate->country !== '*')
+            ?? $matching->first();
     }
 
     /**
      * Prices for the enabled methods (Settings::shippingMethods()):
-     * id => [id, label, eta, price_cents, free_over_threshold, source, rate_id],
+     * id => [id, label, eta, price_cents, free_over_threshold, source, rate_id, zone_code, eta_days_min, eta_days_max],
      * leaving out methods whose table has no matching row.
+     * Phase 14: $zone is the address's delivery zone code; a matched row's
+     * eta days replace the method's ETA text (etaText()).
      */
-    public function options(array $methods, ?string $country, int $weightGrams, int $subtotalCents): array
+    public function options(array $methods, ?string $country, int $weightGrams, int $subtotalCents, ?string $zone = null): array
     {
         $options = [];
+        // Phase 14: zone rows only describe Bangladesh. For any other country a method whose rows are
+        // all zone rows still has its flat price (a zone price must never take Standard away abroad).
+        $abroad = $country !== null && ! in_array(mb_strtolower($country), ['bangladesh', 'bd'], true);
         foreach ($methods as $id => $method) {
-            if (! $this->hasRows($id)) {
-                $options[$id] = [...$method, 'source' => 'flat', 'rate_id' => null];
+            $ownRows = $this->rows()->get($id, collect());
+            if (! $this->hasRows($id) || ($abroad && $ownRows->every(fn (ShippingRate $rate) => $rate->zone_code !== null))) {
+                $options[$id] = [...$method, 'source' => 'flat', 'rate_id' => null, 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null];
 
                 continue;
             }
-            $rate = $this->match($id, $country, $weightGrams, $subtotalCents);
+            $rate = $this->match($id, $country, $weightGrams, $subtotalCents, $zone);
             if ($rate) {
-                $options[$id] = [...$method, 'price_cents' => Pricing::toCents($rate->price), 'source' => 'table', 'rate_id' => $rate->id];
+                $days = $rate->eta_days_min !== null || $rate->eta_days_max !== null;
+                $options[$id] = [...$method, 'price_cents' => Pricing::toCents($rate->price), 'source' => 'table', 'rate_id' => $rate->id,
+                    'zone_code' => $rate->zone_code, 'eta_days_min' => $rate->eta_days_min ?? $rate->eta_days_max,
+                    'eta_days_max' => $rate->eta_days_max ?? $rate->eta_days_min,
+                    'eta' => $days ? self::etaText($rate->eta_days_min ?? $rate->eta_days_max, $rate->eta_days_max ?? $rate->eta_days_min, 'en') : $method['eta']];
             }
         }
 
         return $options;
+    }
+
+    /**
+     * Phase 14: "Delivery in 1–2 days" / "Delivery in 1 day" (in $locale, the
+     * request's by default: "১–২ দিনে ডেলিভারি" with the digits setting).
+     */
+    public static function etaText(?int $min, ?int $max, ?string $locale = null): ?string
+    {
+        if ($min === null && $max === null) {
+            return null;
+        }
+        $min ??= $max;
+        $max ??= $min;
+        $replace = ['min' => Locale::digits($min, $locale), 'max' => Locale::digits($max, $locale),
+            'days' => Locale::digits($max, $locale)];
+
+        return match (true) {
+            $min === $max && $max === 1 => __('Delivery in :days day', $replace, $locale),
+            $min === $max => __('Delivery in :days days', $replace, $locale),
+            default => __('Delivery in :min–:max days', $replace, $locale),
+        };
     }
 
     /** "*", a store country name, or an ISO code → what is stored ("*" or the name); null when unknown. */

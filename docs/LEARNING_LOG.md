@@ -281,3 +281,14 @@
 - Formatting by locale with `Intl`, and when not to use it: Bangla digits, and keeping money in the same layout as emails and PDFs
 - Emails and PDFs in the recipient's language, and the limits of PDF engines with complex scripts (Bangla conjuncts in dompdf)
 - Never hard-code a number that belongs to a setting (the free-shipping "$50"): read it from the store and format it in the shopper's language
+
+## Phase 14 (backend): Bangladesh delivery and cash on delivery
+
+- Using open data responsibly: checking a dataset's licence, keeping its LICENSE and source next to it, and filling its gaps with your own clearly marked file
+- Reference data in the database: idempotent seeders run from migrations, stable ids, and caches that must be versioned when the data changes
+- Cascading selects (Division → District → Area) that stay accessible: disabled until the step before is chosen, loading and retry states, keyboard friendly
+- Country-specific rules behind a switch: strict Bangladesh addresses and mobile numbers only when the store says so, so every other address keeps working
+- Zones on top of an existing rules table (shipping rates) instead of a second pricing system
+- Cash on delivery as a payment state machine: advance paid online, partly paid, cash collected (in full or short), invoiced at the end
+- Operational workflows for staff: a phone-confirmation queue with a log, and a guarded override with a reason
+- Files for other systems: PDFs for printing and CSV for couriers (UTF-8 BOM for Excel, formula-injection guard, local phone format)

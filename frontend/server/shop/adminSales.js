@@ -92,6 +92,10 @@ const ADDRESS_FIELDS = {
   country: 'country',
   isDefaultShipping: 'is_default_shipping',
   isDefaultBilling: 'is_default_billing',
+  // Phase 14 §2: a Bangladesh address's places (the API fills city and state from them).
+  divisionId: 'division_id',
+  districtId: 'district_id',
+  areaId: 'area_id',
 }
 const toAddressBody = (values) => Object.fromEntries(Object.entries(values).filter(([field]) => ADDRESS_FIELDS[field]).map(([field, value]) => [ADDRESS_FIELDS[field], value]))
 
@@ -154,9 +158,16 @@ const toCustomerBody = (values) => Object.fromEntries(Object.entries(values).fil
 
 function toAddress(address) {
   if (!address) return undefined
-  // A quote's address: only the country, for tax.
-  if (address.firstName === undefined) return { country: address.country }
+  // Phase 14 §3: a Bangladesh address's place ids (its zone prices the delivery), when it has them.
+  const places = {
+    ...(address.divisionId && { division_id: address.divisionId }),
+    ...(address.districtId && { district_id: address.districtId }),
+    ...(address.areaId && { area_id: address.areaId }),
+  }
+  // A quote's address: only the country, for tax (and the places).
+  if (address.firstName === undefined) return { country: address.country, ...places }
   return {
+    ...places,
     first_name: address.firstName,
     last_name: address.lastName,
     line1: address.line1,

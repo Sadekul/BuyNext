@@ -233,10 +233,20 @@ export async function laravelDownload(path, { token, request, maxBytes = 20 * 10
  * { status, stream, contentType, contentLength, disposition }. Anything that
  * isn't a PDF attachment (an error, which is JSON) → { status, data } like laravel().
  */
-export async function laravelPdf(path, { token, request, headers = {} } = {}) {
+export async function laravelPdf(path, { token, request, headers = {}, method = 'GET', body } = {}) {
   try {
     const response = await fetch(`${laravelBase()}${path}`, {
-      headers: { Accept: 'application/pdf, application/json', ...headers, ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
+      // Phase 14: a POST with a JSON body too (several orders' packing slips in one PDF).
+      method,
+      headers: {
+        Accept: 'application/pdf, application/json',
+        ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...headers,
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...languageHeaders(request, path),
+        ...bffHeaders(request),
+      },
+      ...(body !== undefined && { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(60_000),
     })
     const contentType = response.headers.get('content-type') ?? ''

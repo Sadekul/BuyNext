@@ -316,6 +316,9 @@ async function runChecks() {
     const header = await shop.locator('.site-header').innerText()
     log(header.includes('সব পণ্য') && !/Shop all|Sign in\b/.test(header), 'the header in Bangla ("সব পণ্য", no "Shop all")')
     // Product prices only: the home hero is the store's own (English) content, not translated here.
+    // Switching language fetches the products again in Bangla (language-aware cache): wait for them.
+    await shop.locator('main .product-card__price').first().waitFor({ timeout: 20000 }).catch(() => {})
+    await shop.waitForLoadState('networkidle')
     const homePrices = await shop.locator('main .product-card__price').allInnerTexts()
     log(homePrices.length > 0 && homePrices.every((price) => /\$[০-৯]/.test(price) && !/\d/.test(price)), `home: ${homePrices.length} product prices with Bangla digits (${homePrices[0]?.replace(/\s+/g, ' ')}), none with Latin digits`)
     log(!/Add to cart/.test(await mainText(shop)), 'home: no "Add to cart" left in English')
@@ -446,8 +449,9 @@ async function runChecks() {
     const address = { firstName: 'Rina', lastName: 'Akter', line1: 'House 12, Road 5', city: 'Dhaka', state: 'Dhaka', postalCode: '1207' }
     for (const [field, value] of Object.entries(address)) await page.locator(`[name="shipping.${field}"]`).fill(value)
     await page.locator('[name="shipping.country"]').selectOption('Bangladesh').catch(() => {})
-    // A phone number without the country code passes the form but not the API.
-    await page.locator('[name="phone"]').fill('01712 345678')
+    // A phone number without the country code passes the form but not the API. (Phase 14: a local
+    // Bangladesh mobile such as 01712 345678 is now accepted for a Bangladesh address, so use one that isn't.)
+    await page.locator('[name="phone"]').fill('555 010 0100')
     const cod = page.getByRole('radio', { name: /ক্যাশ অন ডেলিভারি/ })
     if (await visible(cod, 3000)) await cod.check()
     await settled(page)
@@ -455,7 +459,8 @@ async function runChecks() {
     const apiMessage = 'দেশের কোডসহ ফোন নম্বর দিন, যেমন +880 1712 345678।'
     log(await visible(page.getByText(apiMessage).first(), 20000), `a phone number without the country code: "${apiMessage}" (from the API)`)
     log(new URL(page.url()).pathname === '/checkout', 'no order was placed')
-    await page.locator('[name="phone"]').fill('+880 1712 345678')
+    // Phase 14: the local form of a Bangladesh mobile is accepted and saved with +880.
+    await page.locator('[name="phone"]').fill('01712 345678')
     const mailBefore = await lastMailId(rina.email)
     await settled(page)
     await place.click()
@@ -469,6 +474,8 @@ async function runChecks() {
     await phone(page, 'the confirmation in Bangla')
     const order = await orderOf(number)
     log(order?.locale === 'bn', `orders.locale = ${order?.locale}`)
+    const savedPhone = order?.phone ?? order?.shipping_address?.phone ?? null
+    log(typeof savedPhone === 'string' && savedPhone.replace(/\s/g, '') === '+8801712345678', `the local mobile 01712 345678 is saved as ${savedPhone}`)
     log(order?.items?.[0]?.name === names.lamp, `the order item keeps the English name for staff ("${order?.items?.[0]?.name}")`)
 
     const mail = await waitForMail(rina.email, new RegExp(number), { after: mailBefore })

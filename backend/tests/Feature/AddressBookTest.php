@@ -57,6 +57,7 @@ class AddressBookTest extends TestCase
             ->assertJsonPath('data.is_default_shipping', true)
             ->assertJsonPath('data.is_default_billing', true);
         $this->assertSame(['id', 'first_name', 'last_name', 'company', 'phone', 'line1', 'line2', 'city', 'state', 'postal_code', 'country',
+            'division_id', 'district_id', 'area_id', // phase 14
             'is_default_shipping', 'is_default_billing', 'created_at', 'updated_at'], array_keys($first->json('data')));
 
         // A second address that is the new default shipping clears the flag on the first only for shipping.

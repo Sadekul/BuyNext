@@ -12,9 +12,13 @@ use Illuminate\Http\Response;
  */
 final class Csv
 {
-    public static function download(string $filename, array $header, iterable $rows): Response
+    /** Phase 14: $bom puts a UTF-8 byte order mark first, so Excel reads Bangla (and other non-Latin) text. */
+    public static function download(string $filename, array $header, iterable $rows, bool $bom = false): Response
     {
         $stream = fopen('php://temp', 'r+');
+        if ($bom) {
+            fwrite($stream, "\xEF\xBB\xBF");
+        }
         fputcsv($stream, $header, escape: '');
         foreach ($rows as $row) {
             fputcsv($stream, array_map(self::safeCell(...), $row), escape: '');

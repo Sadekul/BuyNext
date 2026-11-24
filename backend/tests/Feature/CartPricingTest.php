@@ -45,7 +45,7 @@ class CartPricingTest extends TestCase
     {
         $this->assertSame(
             ['item_count' => $count, 'subtotal' => $subtotal, 'discount' => $discount, 'group_discount' => '0.00', 'shipping' => $shipping, 'tax' => '0.00', 'total' => $total,
-                'gift_card' => '0.00', 'reward_points' => '0.00', 'amount_due' => $total], // phase 10 (part B); phase 11: reward_points
+                'gift_card' => '0.00', 'reward_points' => '0.00', 'amount_due' => $total, 'cod_fee' => '0.00'], // phase 10 (part B); phase 11: reward_points; phase 14: cod_fee
             $response->json('data.totals'),
         );
     }
@@ -64,10 +64,10 @@ class CartPricingTest extends TestCase
             ->assertJsonPath('data.coupon_error', null)
             ->assertJsonPath('data.problems', []);
         $this->assertSame([
-            // Phase 10 (part B): source "flat" (no table rates).
-            ['id' => 'standard', 'label' => 'Standard', 'eta' => '3–5 business days', 'price' => '4.99', 'source' => 'flat'],
-            ['id' => 'express', 'label' => 'Express', 'eta' => '1–2 business days', 'price' => '12.99', 'source' => 'flat'],
-            ['id' => 'nextDay', 'label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price' => '24.99', 'source' => 'flat'],
+            // Phase 10 (part B): source "flat" (no table rates). Phase 14: zone_code and eta days (table zone rates only).
+            ['id' => 'standard', 'label' => 'Standard', 'eta' => '3–5 business days', 'price' => '4.99', 'source' => 'flat', 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null],
+            ['id' => 'express', 'label' => 'Express', 'eta' => '1–2 business days', 'price' => '12.99', 'source' => 'flat', 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null],
+            ['id' => 'nextDay', 'label' => 'Next day', 'eta' => 'Next business day (order by 2 pm)', 'price' => '24.99', 'source' => 'flat', 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null],
         ], $response->json('data.shipping_options'));
     }
 

@@ -196,8 +196,8 @@ class ShippingRateTest extends TestCase
 
         // The check tool: Germany matches its own row (exact before "*"); express has no rows (flat).
         $this->admin('POST', '/api/admin/v1/shipping-rates/check', ['country' => 'Germany', 'weight_grams' => 3000, 'subtotal' => '80.00'])->assertOk()
-            ->assertJsonPath('data.0', ['method' => 'standard', 'label' => 'Standard', 'available' => true, 'price' => '4.00', 'source' => 'table', 'rate_id' => $id])
-            ->assertJsonPath('data.1', ['method' => 'express', 'label' => 'Express', 'available' => true, 'price' => '12.99', 'source' => 'flat', 'rate_id' => null]);
+            ->assertJsonPath('data.0', ['method' => 'standard', 'label' => 'Standard', 'available' => true, 'price' => '4.00', 'source' => 'table', 'rate_id' => $id, 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null]) // phase 14: the last three
+            ->assertJsonPath('data.1', ['method' => 'express', 'label' => 'Express', 'available' => true, 'price' => '12.99', 'source' => 'flat', 'rate_id' => null, 'zone_code' => null, 'eta_days_min' => null, 'eta_days_max' => null]);
 
         $this->admin('DELETE', "/api/admin/v1/shipping-rates/{$id}")->assertNoContent();
         $this->admin('DELETE', "/api/admin/v1/shipping-rates/{$id}")->assertNotFound();

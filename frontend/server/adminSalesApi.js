@@ -3,6 +3,8 @@ import { failed } from './shop/adminSystem.js'
 import { laravelSalesData } from './shop/adminSales.js'
 // Phase 13: the customer's language.
 import { localeRule } from './adminPhase13Api.js'
+// Phase 14: Bangladesh addresses (division, district, area; mobile numbers), the grid's zone/COD/confirmation filters.
+import { BD_MOBILE_MESSAGE, bdAddressPlaces, bdMobile, bdPostcode, isBangladesh, orderPhase14Filters } from './adminPhase14Api.js'
 
 /*
  * Phase 6 admin routes (docs/backend/PHASE6_CONTRACT.md), Laravel only:
@@ -146,8 +148,36 @@ const blankToNull = (values, fields) => {
   for (const field of fields) if (values[field] === '') values[field] = null
   return values
 }
+/**
+ * Phase 14 §2: a Bangladesh address with its place ids: city and state come
+ * from the server (not required), the postcode is optional (4 digits), and
+ * the number a Bangladeshi mobile (sent as +8801XXXXXXXXX).
+ */
+function structuredBangladesh(body, checked, prefix = '') {
+  const places = {}
+  const structured = bdAddressPlaces(body, places, checked.errors, prefix)
+  if (!structured) return false
+  for (const field of ['city', 'state', 'postalCode']) delete checked.errors[`${prefix}${field}`]
+  delete checked.values.city
+  delete checked.values.state
+  const postal = bdPostcode(body.postalCode, checked.errors, `${prefix}postalCode`)
+  if (postal !== undefined) checked.values.postalCode = postal
+  else delete checked.values.postalCode
+  if (typeof body.phone === 'string' && body.phone.trim() !== '') {
+    const mobile = bdMobile(body.phone)
+    if (mobile) {
+      checked.values.phone = mobile
+      delete checked.errors[`${prefix}phone`]
+    } else checked.errors[`${prefix}phone`] = [BD_MOBILE_MESSAGE]
+  }
+  Object.assign(checked.values, places)
+  return true
+}
+
 export function validateAddress(body, { partial }) {
-  const checked = check(body, ADDRESS_RULES, partial ? [] : BOOK_REQUIRED)
+  const bangladesh = isBangladesh(body?.country) && ['divisionId', 'districtId', 'areaId'].some((key) => body[key] !== undefined)
+  const checked = check(body, ADDRESS_RULES, partial ? [] : bangladesh ? BOOK_REQUIRED.filter((field) => !['city', 'postalCode'].includes(field)) : BOOK_REQUIRED)
+  structuredBangladesh(body, checked)
   if (!partial && checked.values.phone === '') checked.errors.phone = ['Enter a phone number.']
   blankToNull(checked.values, ['company', 'line2', 'state'])
   if (checked.values.phone === '') delete checked.values.phone
@@ -162,7 +192,10 @@ function orderAddress(prefix, address, errors) {
     return undefined
   }
   const rules = Object.fromEntries(['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'postalCode', 'country'].map((field) => [field, ADDRESS_RULES[field]]))
-  const checked = check(address, rules, ADDRESS_REQUIRED)
+  const bangladesh = isBangladesh(address.country) && ['divisionId', 'districtId', 'areaId'].some((key) => address[key] !== undefined)
+  const checked = check(address, rules, bangladesh ? ADDRESS_REQUIRED.filter((field) => !['city', 'postalCode'].includes(field)) : ADDRESS_REQUIRED)
+  // Phase 14 §2: a Bangladesh address names its division, district, and area (an order's number is the customer's or guest's).
+  structuredBangladesh({ ...address, phone: undefined }, checked)
   for (const [field, messages] of Object.entries(checked.errors)) errors[`${prefix}.${field}`] = messages
   return blankToNull(checked.values, ['line2', 'state'])
 }
@@ -203,7 +236,13 @@ export function validateAdminOrder(body, { quote }) {
   if (quote) {
     // A quote only needs the country (for tax); the rest of the address may still be half filled.
     const country = body.shippingAddress?.country
-    if (isText(country, { min: 1, max: 60 })) values.shippingAddress = { country: country.trim() }
+    if (isText(country, { min: 1, max: 60 })) {
+      values.shippingAddress = { country: country.trim() }
+      // Phase 14 §3: a Bangladesh address's area prices the delivery by its zone.
+      const places = {}
+      bdAddressPlaces(body.shippingAddress, places, {})
+      Object.assign(values.shippingAddress, places)
+    }
   } else values.shippingAddress = orderAddress('shippingAddress', body.shippingAddress, errors)
   if (body.sameAsShipping === true || (body.billingAddress === undefined && !quote)) values.sameAsShipping = true
   else if (body.billingAddress !== undefined && body.billingAddress !== null && !quote) values.billingAddress = orderAddress('billingAddress', body.billingAddress, errors)
@@ -337,6 +376,8 @@ function orderFilters(url) {
   if (ORDER_STATUSES.includes(status)) params.set('status', status)
   if (['paid', 'unpaid'].includes(payment)) params.set('payment_status', payment)
   if (['storefront', 'admin'].includes(source)) params.set('source', source)
+  // Phase 14: delivery zone, cash on delivery, phone confirmation.
+  for (const [key, value] of Object.entries(orderPhase14Filters(url))) params.set(key, value)
   return params
 }
 

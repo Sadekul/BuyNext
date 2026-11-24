@@ -16,6 +16,7 @@ import { trackPurchase } from '../utils/analytics'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { canPayOrder, guestPaymentEmail, isPaymentUrl, paymentPage } from '../utils/payment'
 import { paymentNote } from '../constants/orders'
+import { moneyFormatter } from '../utils/formatters'
 import { REAL_SHOP } from '../constants/shop'
 import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
@@ -95,7 +96,10 @@ function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startEr
   const name = PROVIDER_NAMES[provider] ?? tx('partner')
   const number = order.number
   const email = order.email
+  // Phase 14: cash on delivery with the delivery charge paid online first (SSLCommerz).
+  const advance = order.paymentMethod === 'cod'
   if (leaving) {
+    if (advance) return { tone: 'waiting', title: tx('toAdvance.title'), lines: [tx('toAdvance.line', { number })] }
     if (provider === 'paypal') return { tone: 'waiting', title: tx('toPaypal.title'), lines: [tx('toPaypal.line', { number })] }
     if (provider === 'sslcommerz') {
       return { tone: 'waiting', title: tx('toSslcommerz.title'), lines: [tx('toSslcommerz.line', { number })] }
@@ -110,6 +114,11 @@ function paymentMessage({ order, paymentReturn, leaving, gaveUp, canPay, startEr
     }
   }
   if (paymentReturn === 'success') {
+    if (advance && order.paymentStatus === 'partially_paid') {
+      const money = moneyFormatter(order.currency)
+      const due = order.codDue ?? order.totals?.codDue ?? 0
+      return { tone: 'done', title: tx('advancePaid.title'), lines: [tx('advancePaid.line', { number, advance: money(order.advancePaid ?? order.totals?.advancePaid ?? 0), due: money(due) })] }
+    }
     if (paid) return { tone: 'done', title: tx('paid.title'), lines: [tx('paid.line', { number, email })] }
     // Phase 12: SSLCommerz flagged the payment for a check (risk level 1): received, confirmed by staff.
     if (order.paymentStatus === 'review') {
@@ -215,7 +224,7 @@ function ServerOrderConfirmation() {
   const confirming = paymentReturn === 'success' && (paypalToken === null || capture.isSuccess)
   const pollEvery = user ? POLL_CUSTOMER_MS : POLL_GUEST_MS
   // Polling stops once the order is paid (or, phase 12, held for a check: staff decide from there).
-  const refetchInterval = (query) => (confirming && !gaveUp && !query.state.error && !['paid', 'review'].includes(query.state.data?.paymentStatus) ? pollEvery : false)
+  const refetchInterval = (query) => (confirming && !gaveUp && !query.state.error && !['paid', 'review', 'partially_paid'].includes(query.state.data?.paymentStatus) ? pollEvery : false)
   const customerRequest = useQuery({ ...orderQuery(user?.id, orderId, authorizedRequest), enabled: mustFetch && Boolean(user), refetchInterval })
   const guestRequest = useQuery({ ...guestOrderQuery(orderId, guestEmail), enabled: mustFetch && !user && Boolean(guestEmail), refetchInterval })
   const request = user ? customerRequest : guestRequest
@@ -327,6 +336,13 @@ function ServerOrderConfirmation() {
                 />
               </p>
               {awaitingPayment && <p>{paymentNote(order, { stripe: stripeOn, paypal: paypalOn, sslcommerz: sslcommerzOn })}</p>}
+              {/* Phase 14: cash on delivery: what to keep ready, and the store's phone call before sending it. */}
+              {!awaitingPayment && order.paymentMethod === 'cod' && order.status !== 'cancelled' && (order.codDue > 0 || order.paymentStatus === 'partially_paid') && (
+                <p>{paymentNote(order)}</p>
+              )}
+              {!awaitingPayment && ['pending', 'unreachable'].includes(order.confirmationStatus) && order.status !== 'cancelled' && (
+                <p>{t('orders:phoneConfirmation.pendingLine', { phone: order.phone ?? '' })}</p>
+              )}
             </>
           )}
           {!isAuthenticated && <p>{t('confirmation.keepNumber')}</p>}

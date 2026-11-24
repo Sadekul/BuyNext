@@ -142,10 +142,11 @@ describe('customers', () => {
     await user.type(within(dialog).getByLabelText('Address'), '9 Elm St')
     await user.type(within(dialog).getByLabelText('City'), 'Dhaka')
     await user.type(within(dialog).getByLabelText('Postal code'), '1207')
-    await user.type(within(dialog).getByLabelText('Country'), 'Bangladesh')
+    // Phase 14: a Bangladesh address asks for its division, district, and area instead (Phase14.test.jsx).
+    await user.type(within(dialog).getByLabelText('Country'), 'India')
     await user.click(within(dialog).getByRole('button', { name: 'Add address' }))
     expect(await screen.findByText('Address added.')).toBeInTheDocument()
-    expect(sentTo(fetchMock, 'POST', '/api/admin/customers/5/addresses')).toMatchObject({ line1: '9 Elm St', city: 'Dhaka', postalCode: '1207', country: 'Bangladesh', phone: '+15550100100', line2: null, isDefaultShipping: true, isDefaultBilling: true })
+    expect(sentTo(fetchMock, 'POST', '/api/admin/customers/5/addresses')).toMatchObject({ line1: '9 Elm St', city: 'Dhaka', postalCode: '1207', country: 'India', phone: '+15550100100', line2: null, isDefaultShipping: true, isDefaultBilling: true })
 
     await user.click(screen.getByRole('tab', { name: 'Notes' }))
     await user.type(screen.getByLabelText('New note'), 'Called about delivery.')

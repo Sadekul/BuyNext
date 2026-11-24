@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { LuArrowLeft, LuFileX, LuPrinter } from 'react-icons/lu'
@@ -13,9 +14,13 @@ import { SITE } from '../constants/site'
 import { formatDate, formatNumber, moneyFormatter } from '../utils/formatters'
 import { translate } from '../i18n'
 import './InvoicePage.css'
+import { addressPlaceLines } from '../utils/bangladesh'
+import { useAddressPlaces } from '../hooks/useAddressPlaces'
 import { useTranslation } from 'react-i18next'
 
 function Address({ address }) {
+  // Phase 14: a Bangladesh address's places in the reader's language.
+  const withPlaces = useAddressPlaces(address ? [address] : [])
   if (!address) return null
   return (
     <address className="invoice__address">
@@ -28,8 +33,13 @@ function Address({ address }) {
           {address.line2}
         </>
       )}
-      <br />
-      {address.city}, {address.state} {address.postalCode}
+      {/* Phase 14: a Bangladesh address shows its area, district and division in the reader's language. */}
+      {addressPlaceLines(withPlaces(address)).map((line) => (
+        <Fragment key={line}>
+          <br />
+          {line}
+        </Fragment>
+      ))}
       <br />
       {translate(`common:countries.${address.country}`, { defaultValue: address.country })}
     </address>

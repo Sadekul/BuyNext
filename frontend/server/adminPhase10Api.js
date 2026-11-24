@@ -1,6 +1,8 @@
 import { json, laravelPdf, multipartType, readBody, readLimitedBody } from './http.js'
 import { failed } from './shop/adminSystem.js'
 import { SHIPPING_METHODS, laravelPhase10Data } from './shop/adminPhase10.js'
+// Phase 14 §3: a row for one delivery zone, with the delivery time in days.
+import { checkZoneRate } from './adminPhase14Api.js'
 
 /*
  * Phase 10 admin routes (docs/backend/PHASE10_CONTRACT.md §2, §4, §5 and the
@@ -114,6 +116,7 @@ export function validateRate(body, { partial }) {
     if (isMoney(body.price)) values.price = body.price
     else errors.price = ['Enter a price of 0 or more, with at most 2 decimals.']
   }
+  checkZoneRate(body, values, errors)
   if (Number.isInteger(values.maxWeightGrams) && Number.isInteger(values.minWeightGrams) && values.maxWeightGrams <= values.minWeightGrams) errors.maxWeightGrams = ['The maximum weight must be more than the minimum.']
   if (typeof values.maxSubtotal === 'number' && typeof values.minSubtotal === 'number' && values.maxSubtotal <= values.minSubtotal) errors.maxSubtotal = ['The maximum order value must be more than the minimum.']
   if (partial && Object.keys(values).length === 0 && Object.keys(errors).length === 0) errors.price = ['Change at least one field.']

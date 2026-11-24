@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { addressSummary, isSameAddress } from '../../utils/addresses'
+import { useAddressPlaces } from '../../hooks/useAddressPlaces'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -12,6 +13,8 @@ function SavedAddressPicker({ label, addresses, current, onChoose }) {
   const { t } = useTranslation('checkout')
   const id = useId()
   const selected = addresses.find((saved) => isSameAddress(saved, current))
+  // Phase 14: Bangladesh addresses name their places in the shopper's language.
+  const withPlaces = useAddressPlaces(addresses)
 
   function handleChange(event) {
     const saved = addresses.find((address) => String(address.id) === event.target.value)
@@ -27,7 +30,7 @@ function SavedAddressPicker({ label, addresses, current, onChoose }) {
         <option value="">{t('savedAddress.new')}</option>
         {addresses.map((address) => (
           <option key={address.id} value={String(address.id)}>
-            {addressSummary(address)}
+            {addressSummary(withPlaces(address))}
           </option>
         ))}
       </select>

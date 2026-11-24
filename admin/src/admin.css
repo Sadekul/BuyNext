@@ -2941,3 +2941,191 @@ code.path {
   margin: var(--space-4) 0 var(--space-2);
   font-size: 1rem;
 }
+
+/* ---------- Phase 14: Bangladesh delivery, zones, cash on delivery ---------- */
+.zones,
+.confirm-queue {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zone__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-right: var(--space-5);
+}
+
+.zone__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-5);
+}
+
+.zone__tools {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.zone__places,
+.zone__count {
+  margin: var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+/* At least 24 × 24 px to tap. */
+.chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip__remove:hover {
+  color: var(--color-sale);
+}
+
+.zone-places {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  min-width: 0;
+}
+
+.zone-places > legend {
+  font-weight: 700;
+}
+
+.zone-places .btn {
+  justify-self: start;
+}
+
+.confirm-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.confirm-card__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.confirm-card__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+}
+
+.confirm-card__call {
+  overflow-wrap: anywhere;
+}
+
+.confirm-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+.confirm-card__log {
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.confirm-card__log summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.confirm-log p {
+  margin: 0;
+}
+
+.order-confirmation {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) var(--space-5);
+}
+
+.order-confirmation p {
+  margin: 0;
+}
+
+.order-confirmation .history {
+  margin: 0;
+}
+
+.ship-override {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.ship-override > legend {
+  padding: 0 var(--space-1);
+  font-weight: 700;
+}
+
+@media (min-width: 720px) {
+  .confirm-card__body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* 390 px phones: the action buttons take the full width, two per row. */
+@media (max-width: 600px) {
+  .confirm-card__actions .btn {
+    flex: 1 1 calc(50% - var(--space-2));
+    justify-content: center;
+  }
+
+  .zone__tools {
+    margin-left: 0;
+  }
+}

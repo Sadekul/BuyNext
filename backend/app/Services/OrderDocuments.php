@@ -21,6 +21,9 @@ use Illuminate\Validation\ValidationException;
  */
 class OrderDocuments
 {
+    /** Phase 14: shipping a COD order that hasn't been confirmed by phone. */
+    public const UNCONFIRMED = 'This cash on delivery order hasn\'t been confirmed by phone yet. Confirm it first, or ship it anyway with a reason.';
+
     public function __construct(private Audit $audit, private Inventory $inventory) {}
 
     /**
@@ -71,6 +74,8 @@ class OrderDocuments
     /**
      * Records the payment of the full grand total: paid, and pending_payment → processing.
      * Phase 8: $admin is null when Stripe reported the payment (webhook).
+     * Phase 14: an order already partly paid (a COD advance, or a short cash
+     * collection: partially_paid) is invoiced for the rest.
      */
     public function invoice(Order $order, ?Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): Invoice
     {
@@ -79,28 +84,111 @@ class OrderDocuments
         }
         // Also refuse when the payment is already recorded (e.g. a paid order without an invoice): never invoice twice.
         // Phase 12: "review" (an SSLCommerz payment held for a risk check) is approved by invoicing it.
-        if ($order->invoices()->exists() || ! in_array($order->payment_status, ['unpaid', 'review'], true)) {
+        $order->unsetRelation('invoices');
+        $rest = Pricing::toCents($order->grand_total) - $order->paidCents();
+        $partlyPaid = $order->payment_status === 'partially_paid';
+        if ((! $partlyPaid && $order->invoices()->exists()) || ! in_array($order->payment_status, ['unpaid', 'review', 'partially_paid'], true) || $rest <= 0) {
             throw ValidationException::withMessages([$errorKey => 'This order has already been invoiced.']);
         }
 
+        return $this->createInvoice($order, $admin, $rest, $note, $notify, null);
+    }
+
+    /**
+     * Phase 14: the advance of a COD order (delivery charge + fee) was paid
+     * online: an invoice for it, pending_payment → processing, and
+     * partially_paid (paid when nothing is left to collect).
+     */
+    public function recordAdvance(Order $order, int $cents, string $note): Invoice
+    {
+        $invoice = $this->createInvoice($order, null, $cents, $note, true, null);
+        $order->forceFill(['advance_paid' => Pricing::format($cents)])->save();
+
+        return $invoice;
+    }
+
+    /**
+     * Phase 14: staff collected $cents in cash for a COD order (on delivery).
+     * The whole amount due → an invoice for the rest of the order (paid).
+     * Less → an invoice for what was collected (when > 0), partially_paid, and
+     * the rest stays in cod_due (a $note is required, and staff are notified).
+     */
+    public function collect(Order $order, Admin $admin, int $cents, ?string $note, string $errorKey = 'collected_amount'): ?Invoice
+    {
+        $due = $order->codDueCents();
+        $problem = match (true) {
+            ! $order->isCod() => 'Only cash on delivery orders collect cash.',
+            in_array($order->status, ['cancelled', 'closed', 'pending_payment'], true) => 'A '.str_replace('_', ' ', $order->status).' order can\'t collect cash.',
+            $due <= 0 => 'Nothing is left to collect on this order.',
+            $cents > $due => 'That is more than the '.$order->money(Pricing::format($due)).' to collect.',
+            default => null,
+        };
+        if ($problem) {
+            throw ValidationException::withMessages([$errorKey => $problem]);
+        }
+        if ($cents < $due && blank($note)) {
+            throw ValidationException::withMessages(['collection_note' => 'Say why less than '.$order->money(Pricing::format($due)).' was collected.']);
+        }
+
+        $advance = Pricing::toCents($order->advance_paid ?? 0);
+        $collected = Pricing::toCents($order->cod_collected ?? 0) + $cents;
+        $lines = 'Cash collected on delivery: '.$order->money(Pricing::format($cents)).'.'
+            .($advance > 0 ? ' Advance paid online: '.$order->money(Pricing::format($advance)).'.' : '');
+        $invoice = null;
+        if ($cents === $due) {
+            $invoice = $this->createInvoice($order, $admin, Pricing::toCents($order->grand_total) - $order->paidCents(), trim($lines.' '.($note ?? '')), false, null);
+        } elseif ($cents > 0) {
+            $invoice = $this->createInvoice($order, $admin, $cents, trim($lines.' '.$note), false, 'partially_paid');
+        }
+        $order->forceFill(['cod_due' => Pricing::format($due - $cents), 'cod_collected' => Pricing::format($collected)])->save();
+
+        if ($cents < $due) {
+            $short = $order->money(Pricing::format($due - $cents));
+            $order->history()->create([
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'note' => "Short collection: {$order->money(Pricing::format($cents))} collected, {$short} still to collect. {$note}",
+                'admin_id' => $admin->id,
+                'customer_notified' => false,
+            ]);
+            app(AdminNotifications::class)->notify('cod_short_collection', "order:{$order->id}", "Short cash collection on order {$order->number}",
+                "{$admin->name} collected {$order->money(Pricing::format($cents))}; {$short} is still to collect. Note: {$note}", "/orders/{$order->number}");
+        }
+        $this->audit->record('order.cash_collected', "Cash collected for order {$order->number}: {$order->money(Pricing::format($cents))}"
+            .($cents < $due ? ' (short)' : '').'.', 'order', $order->id,
+            ['before' => ['cod_due' => Pricing::format($due)], 'after' => ['cod_due' => Pricing::format($due - $cents), 'collected' => Pricing::format($cents),
+                'payment_status' => $order->payment_status]], $admin);
+
+        return $invoice;
+    }
+
+    /**
+     * An invoice of $cents: the order becomes paid when the invoices reach the
+     * grand total (or $paymentStatus), and pending_payment → processing.
+     */
+    private function createInvoice(Order $order, ?Admin $admin, int $cents, ?string $note, bool $notify, ?string $paymentStatus): Invoice
+    {
         $paymentBefore = $order->payment_status;
         $invoice = $order->invoices()->create([
-            'amount' => $order->grand_total,
+            'amount' => Pricing::format($cents),
             'admin_id' => $admin?->id,
             'note' => $note,
             'customer_notified' => $notify,
         ]);
         $invoice->forceFill(['number' => Invoice::numberFor($invoice->id)])->save();
+        $order->unsetRelation('invoices');
+        $paid = $paymentStatus ?? ($order->paidCents() >= Pricing::toCents($order->grand_total) ? 'paid' : 'partially_paid');
 
         $order->forceFill([
-            'payment_status' => 'paid',
+            'payment_status' => $paid,
             // Paid card/PayPal orders are ready to be prepared.
             'status' => $order->status === 'pending_payment' ? 'processing' : $order->status,
+            ...($paid === 'paid' && $order->isCod() ? ['cod_due' => '0.00'] : []),
         ])->save();
 
         $order->history()->create([
             'status' => $order->status,
-            'payment_status' => 'paid',
+            'payment_status' => $paid,
             'note' => "Invoice {$invoice->number} created; payment of {$order->money($invoice->amount)} recorded."
                 // Phase 10 (part B): the payment's own note ("Paid by card through Stripe.", "Paid through PayPal.", "Paid with gift card ••••ABCD.").
                 .($admin ? '' : ' '.($note ?? 'Paid online.')),
@@ -108,12 +196,14 @@ class OrderDocuments
             'customer_notified' => $notify,
         ]);
         $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} ({$order->money($invoice->amount)}).",
-            'invoice', $invoice->id, ['before' => ['payment_status' => $paymentBefore], 'after' => ['payment_status' => 'paid', 'amount' => $invoice->amount]], $admin);
+            'invoice', $invoice->id, ['before' => ['payment_status' => $paymentBefore], 'after' => ['payment_status' => $paid, 'amount' => $invoice->amount]], $admin);
 
-        // Phase 10 (part B): gift cards bought with the order are made (and emailed after the commit) once it is paid.
-        app(GiftCards::class)->issueFor($order);
-        // Phase 11: a signed-in customer's paid order earns reward points (once).
-        app(RewardPoints::class)->earnFor($order);
+        if ($paid === 'paid') {
+            // Phase 10 (part B): gift cards bought with the order are made (and emailed after the commit) once it is paid.
+            app(GiftCards::class)->issueFor($order);
+            // Phase 11: a signed-in customer's paid order earns reward points (once).
+            app(RewardPoints::class)->earnFor($order);
+        }
 
         return $invoice;
     }
@@ -125,7 +215,7 @@ class OrderDocuments
      * keeps phase 2's behaviour: the staff note IS the history note).
      */
     public function ship(Order $order, Admin $admin, string $carrier, ?string $trackingNumber, ?string $note, bool $notify,
-        ?string $historyNote = null, string $errorKey = 'order'): Shipment
+        ?string $historyNote = null, string $errorKey = 'order', ?string $confirmationOverride = null): Shipment
     {
         $notPaidYet = 'Invoice this order before shipping it: it hasn\'t been paid yet.';
         $problem = match (true) {
@@ -133,10 +223,18 @@ class OrderDocuments
             $order->status === 'pending_payment' => $notPaidYet,
             $order->status !== 'processing' => 'A '.str_replace('_', ' ', $order->status).' order can\'t be shipped.',
             ! in_array($order->payment_method, Order::PAY_LATER_METHODS, true) && ! $order->invoices()->exists() => $notPaidYet,
+            // Phase 14: a COD order waiting for its phone confirmation ships only with a reason (audited).
+            $order->awaitsConfirmation() && blank($confirmationOverride) => self::UNCONFIRMED,
             default => null,
         };
         if ($problem) {
             throw ValidationException::withMessages([$errorKey => $problem]);
+        }
+        if ($order->awaitsConfirmation()) {
+            $reason = trim((string) $confirmationOverride);
+            $order->confirmationLogs()->create(['admin_id' => $admin->id, 'outcome' => 'override', 'note' => $reason]);
+            $this->audit->record('order.confirmation_overridden', "Order {$order->number} shipped without a phone confirmation: {$reason}", 'order', $order->id,
+                ['before' => ['confirmation_status' => $order->confirmation_status], 'after' => ['override_reason' => $reason]], $admin);
         }
 
         $shipment = $order->shipments()->create([

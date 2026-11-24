@@ -19,6 +19,13 @@ import { useAdminAuth } from '../auth/useAdminAuth'
 import { formatPoints } from '../utils/rewards'
 // Phase 13: the order's language.
 import { languageName } from '../utils/bangla'
+// Phase 14: Bangladesh address, delivery zone and time, cash on delivery, phone confirmation, packing slip PDF.
+import { Address as SharedAddress } from '../components/Address'
+import ConfirmationDialog from '../components/ConfirmationDialog'
+import ConfirmationLog from '../components/ConfirmationLog'
+import { CodCollectionDialog } from '../components/OrderActionDialogs'
+import { packingSlipPdfUrl } from '../api/phase14'
+import { amountToCollect, awaitsConfirmation, confirmationOf, confirmationStatus, etaText, formatBdMobile, isBangladesh, isCod, telHref } from '../utils/bangladesh'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -128,6 +135,8 @@ function DemoOrderDetailPage() {
 
 function Address({ address }) {
   if (!address) return null
+  // Phase 14 §2: the Bangladesh format (area, district, division, mobile).
+  if (isBangladesh(address.country)) return <SharedAddress address={address} />
   return (
     <address className="address">
       {address.firstName} {address.lastName}
@@ -290,7 +299,7 @@ function LiveOrderDetailPage() {
   const queryClient = useQueryClient()
   const location = useLocation()
   const order = useQuery({ queryKey: adminKeys.order(orderId), queryFn: ({ signal }) => getOrder(orderId, { signal }) })
-  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'return' | 'delivered' | 'cancelled'
+  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'return' | 'delivered' | 'cancelled' | 'confirm:<outcome>'
   // An order just created (Create order) arrives with what happened.
   const [notice, setNotice] = useState(location.state?.notice ?? null)
   const noticeRef = useRef(null)
@@ -338,6 +347,10 @@ function LiveOrderDetailPage() {
   }
 
   const Dialog = DIALOGS[dialog]
+  // Phase 14 §4: a cash on delivery order is delivered with the cash collected (the amount is confirmed).
+  const collects = dialog === 'delivered' && isCod(data) && amountToCollect(data) > 0
+  const confirmation = confirmationOf(data)
+  const canConfirm = can('orders.edit') && awaitsConfirmation(data) && ['pending_payment', 'processing'].includes(data.status)
   // Phase 11 §4: what reward points paid (money).
   const pointsPaid = data.rewardPoints?.spent > 0 ? data.rewardPoints.amount : 0
   return (
@@ -452,6 +465,33 @@ function LiveOrderDetailPage() {
                   <strong>{formatMoney(data.totals.total, data.currency)}</strong>
                 </td>
               </tr>
+              {/* Phase 14 §4: the COD fee (inside the total), what was paid online in advance, and the cash to collect. */}
+              {(data.codFee ?? data.totals.codFee) > 0 && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Including the cash on delivery fee
+                  </th>
+                  <td className="num">{formatMoney(data.codFee ?? data.totals.codFee, data.currency)}</td>
+                </tr>
+              )}
+              {(data.advancePaid ?? data.totals.advancePaid) > 0 && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    Paid in advance (delivery charge)
+                  </th>
+                  <td className="num">−{formatMoney(data.advancePaid ?? data.totals.advancePaid, data.currency)}</td>
+                </tr>
+              )}
+              {isCod(data) && typeof (data.codDue ?? data.totals.codDue) === 'number' && (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    To collect on delivery
+                  </th>
+                  <td className="num">
+                    <strong>{formatMoney(data.codDue ?? data.totals.codDue, data.currency)}</strong>
+                  </td>
+                </tr>
+              )}
               {/* Phase 11 §4: points paid first (after tax), then (phase 10 §5) a gift card; the rest by the order's payment method. */}
               {pointsPaid > 0 && (
                 <tr>
@@ -573,6 +613,10 @@ function LiveOrderDetailPage() {
                   ) : (
                     <p className="field__hint">No payment provider is connected yet: invoice the order once the money has arrived. It then moves to Processing and can be shipped.</p>
                   ))}
+                {/* Phase 14 §4. */}
+                {actions.ship && awaitsConfirmation(data) && (
+                  <p className="field__hint">This cash on delivery order isn't confirmed by phone yet. Confirm it below first, or ship it anyway with a reason.</p>
+                )}
                 {actions.refund && !actions.cancel && ['pending_payment', 'processing'].includes(data.status) && (
                   <p className="field__hint">This order is paid, so it can't be cancelled: refund it instead.</p>
                 )}
@@ -590,6 +634,8 @@ function LiveOrderDetailPage() {
             <Link to={`/print/packing-slips?orders=${data.number}`} className="btn btn--outline btn--sm">
               <LuPrinter aria-hidden="true" /> Packing slip
             </Link>
+            {/* Phase 14 §5: the courier's slip (mobile, full address, cash to collect in large type). */}
+            <PdfLink small href={packingSlipPdfUrl(data.number)} name={`packing slip ${data.number}`} />
             {data.invoices?.length > 0 && (
               <Link to={`/print/invoices?orders=${data.number}`} className="btn btn--outline btn--sm">
                 <LuPrinter aria-hidden="true" /> Print invoice
@@ -631,7 +677,8 @@ function LiveOrderDetailPage() {
             {data.phone && (
               <>
                 <dt>Phone</dt>
-                <dd>{data.phone}</dd>
+                {/* Phase 14 §4: a call link (staff confirm cash on delivery orders by phone). */}
+                <dd>{telHref(data.phone) ? <a href={telHref(data.phone)}>{isBangladesh(data.shippingAddress?.country) ? formatBdMobile(data.phone) : data.phone}</a> : data.phone}</dd>
               </>
             )}
             {/* Phase 13: the language the order was placed in. */}
@@ -657,10 +704,41 @@ function LiveOrderDetailPage() {
             </dd>
             <dt>Method</dt>
             <dd>
-              {data.shippingMethod?.label} <span className="muted">· {data.shippingMethod?.eta}</span>
+              {data.shippingMethod?.label}{' '}
+              <span className="muted">
+                · {etaText(data.etaDaysMin ?? data.shippingMethod?.etaDaysMin, data.etaDaysMax ?? data.shippingMethod?.etaDaysMax) || data.shippingMethod?.eta}
+              </span>
             </dd>
+            {/* Phase 14 §3: the delivery zone the address fell in when the order was placed. */}
+            {data.deliveryZone && (
+              <>
+                <dt>Delivery zone</dt>
+                <dd>{data.deliveryZone.name ?? data.deliveryZone.code}</dd>
+              </>
+            )}
             <dt>Payment</dt>
             <dd>{PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}</dd>
+            {/* Phase 14 §4: cash on delivery: paid in advance and still to collect. */}
+            {isCod(data) && (data.advancePaid ?? data.totals.advancePaid) > 0 && (
+              <>
+                <dt>Paid in advance</dt>
+                <dd>{formatMoney(data.advancePaid ?? data.totals.advancePaid, data.currency)} <span className="muted">· the delivery charge, online</span></dd>
+              </>
+            )}
+            {isCod(data) && (
+              <>
+                <dt>Cash to collect</dt>
+                <dd>
+                  <strong>{formatMoney(amountToCollect(data), data.currency)}</strong>
+                  {data.codCollection && (
+                    <span className="muted">
+                      {' '}
+                      · {formatMoney(data.codCollection.amount ?? 0, data.currency)} collected
+                    </span>
+                  )}
+                </dd>
+              </>
+            )}
             {/* Phase 12 §1: an order keeps the currency it was placed in (shown when the store's is different now). */}
             {data.currency && data.currency !== storeCode() && (
               <>
@@ -678,6 +756,36 @@ function LiveOrderDetailPage() {
             </dd>
           </dl>
         </section>
+
+        {/* Phase 14 §4: the phone confirmation of a cash on delivery order. */}
+        {confirmation && (
+          <section className="panel" aria-labelledby="confirmation-title">
+            <h2 id="confirmation-title" className="panel__title">
+              Phone confirmation
+            </h2>
+            <div className="order-confirmation">
+              <p>
+                <StatusBadge {...confirmationStatus(confirmation)} />
+                {Number.isInteger(data.confirmation?.attempts) && <span className="muted"> · {data.confirmation.attempts === 1 ? '1 call' : `${formatCount(data.confirmation.attempts)} calls`}</span>}
+              </p>
+              {data.confirmation?.confirmedAt && <p className="muted">Confirmed {formatDateTime(data.confirmation.confirmedAt)}</p>}
+              {canConfirm && (
+                <div className="order-actions__buttons">
+                  <button type="button" className="btn btn--primary btn--sm" onClick={(event) => open('confirm:confirmed', event)}>
+                    Confirmed
+                  </button>
+                  <button type="button" className="btn btn--outline btn--sm" onClick={(event) => open('confirm:unreachable', event)}>
+                    Couldn't reach
+                  </button>
+                  <button type="button" className="btn btn--danger btn--sm" onClick={(event) => open('confirm:cancelled', event)}>
+                    Cancel order
+                  </button>
+                </div>
+              )}
+              {data.confirmation?.log?.length > 0 ? <ConfirmationLog log={data.confirmation.log} /> : <p className="muted">No calls yet.</p>}
+            </div>
+          </section>
+        )}
 
         <section className="panel" aria-labelledby="history-title">
           <h2 id="history-title" className="panel__title">
@@ -703,7 +811,19 @@ function LiveOrderDetailPage() {
       </div>
 
       {Dialog && <Dialog order={data} onDone={done} onCancel={cancel} />}
-      {(dialog === 'delivered' || dialog === 'cancelled') && <StatusDialog order={data} status={dialog} onDone={done} onCancel={cancel} />}
+      {collects && <CodCollectionDialog order={data} onDone={done} onCancel={cancel} />}
+      {((dialog === 'delivered' && !collects) || dialog === 'cancelled') && <StatusDialog order={data} status={dialog} onDone={done} onCancel={cancel} />}
+      {dialog?.startsWith('confirm:') && (
+        <ConfirmationDialog
+          order={{ number: data.number, phone: data.phone, customerName: fullName(data.customer) }}
+          outcome={dialog.slice(8)}
+          onDone={(text) => {
+            queryClient.invalidateQueries({ queryKey: ['to-confirm'] })
+            done(text)
+          }}
+          onCancel={cancel}
+        />
+      )}
     </>
   )
 }

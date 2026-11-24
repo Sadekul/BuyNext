@@ -28,6 +28,8 @@ class AdminNotifications
         'payment_problem' => ['critical', 'orders.view'],
         // Phase 9 (part B): the daily (or a manual) database backup failed.
         'backup_failed' => ['critical', 'backups.view'],
+        // Phase 14: less cash than due was collected on a cash on delivery order.
+        'cod_short_collection' => ['warning', 'orders.view'],
     ];
 
     /** Returns the new notification, or null when an unread one for the same subject exists. */

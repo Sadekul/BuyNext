@@ -416,6 +416,13 @@ function AddressDialog({ customer, address, onDone, onCancel }) {
   // The store's countries make the country a list (settings.view); otherwise free text, checked by the API.
   const settings = useQuery({ queryKey: adminKeys.settings, queryFn: ({ signal }) => getSettings({ signal }), enabled: can('settings.view'), staleTime: 60_000 })
   const [value, setValue] = useState(() => ({ ...EMPTY_ADDRESS, ...(address ?? { firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone ?? '' }) }))
+  // Phase 14 §2: a new address starts in the store's default country (once the settings arrive).
+  const defaultCountry = settings.data?.checkout?.defaultCountry
+  const [countryFilled, setCountryFilled] = useState(false)
+  if (!address && defaultCountry && !countryFilled) {
+    setCountryFilled(true)
+    if (!value.country) setValue({ ...value, country: defaultCountry })
+  }
   const [defaults, setDefaults] = useState({ shipping: address?.isDefaultShipping ?? customer.addresses.length === 0, billing: address?.isDefaultBilling ?? customer.addresses.length === 0 })
   const [errors, setErrors] = useState({})
   const save = useMutation({
