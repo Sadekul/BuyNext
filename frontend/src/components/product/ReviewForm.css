@@ -52,7 +52,7 @@
 }
 
 .review-form__star-label--on {
-  color: #b45309;
+  color: var(--color-warning);
 }
 
 .review-form__star-label--on svg {

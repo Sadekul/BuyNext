@@ -1,10 +1,12 @@
 .main-nav {
   display: none;
+  background: var(--color-bg);
   border-top: 1px solid var(--color-border);
 }
 
 .main-nav__list {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   /* Pull links left by their own padding so the first label lines up with the logo. */
   padding-inline: calc(var(--container-gutter) - var(--space-4));
@@ -12,12 +14,24 @@
 
 .main-nav__link {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-secondary);
+  white-space: nowrap;
   transition: color var(--transition-fast);
+}
+
+/* Redesign: a small icon per category, tinted indigo; coral underline on the active item. */
+.main-nav__icon {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--color-primary);
+  transition: transform var(--transition-fast);
 }
 
 .main-nav__link::after {
@@ -26,8 +40,9 @@
   right: var(--space-4);
   bottom: 0;
   left: var(--space-4);
-  height: 2px;
-  background: var(--color-primary);
+  height: 3px;
+  background: var(--color-accent);
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
   transform: scaleX(0);
   transition: transform var(--transition-fast);
 }
@@ -37,13 +52,24 @@
   color: var(--color-primary);
 }
 
+.main-nav__link:hover .main-nav__icon {
+  transform: translateY(-1px) scale(1.1);
+}
+
 .main-nav__link:hover::after,
 .main-nav__link--active::after {
   transform: scaleX(1);
 }
 
-.main-nav__link--highlight {
-  color: var(--color-sale);
+/* "Deals": coral-strong text (4.5:1 on white) with a coral icon. */
+.main-nav__link--highlight,
+.main-nav__link--highlight:hover,
+.main-nav__link--highlight.main-nav__link--active {
+  color: var(--color-accent-strong);
+}
+
+.main-nav__link--highlight .main-nav__icon {
+  color: var(--color-accent);
 }
 
 /* Category with subcategories: the link, then a small toggle button for its menu. */
@@ -65,7 +91,7 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-secondary);
   background: none;
   border: 0;
   cursor: pointer;
@@ -80,12 +106,16 @@
   color: var(--color-primary);
 }
 
-.main-nav__toggle svg {
+.main-nav__toggle > svg:last-child {
   transition: transform var(--transition-fast);
 }
 
-.main-nav__toggle[aria-expanded='true'] svg {
+.main-nav__toggle[aria-expanded='true'] > svg:last-child {
   transform: rotate(180deg);
+}
+
+.main-nav__toggle.main-nav__link {
+  gap: var(--space-2);
 }
 
 .main-nav__menu {
@@ -101,6 +131,7 @@
   overflow-y: auto;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
 }
@@ -128,7 +159,7 @@
 .main-nav__menu-link:hover,
 .main-nav__menu-link--active {
   color: var(--color-primary);
-  background: var(--color-bg-muted);
+  background: var(--color-primary-soft);
 }
 
 @media (min-width: 1024px) {

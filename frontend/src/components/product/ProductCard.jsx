@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { Link } from 'react-router'
-import { LuEye, LuShoppingBag } from 'react-icons/lu'
+import { LuEye, LuPlus, LuShoppingBag } from 'react-icons/lu'
 import Button from '../ui/Button'
 import ProductBadge from './ProductBadge'
 import RatingStars from './RatingStars'
@@ -24,14 +24,24 @@ const AVAILABILITY_TONE = { 'In Stock': 'success', 'Low Stock': 'warning', 'Out 
 // Phase 16: colour dots shown on a card; the rest are counted ("+3").
 const MAX_SWATCHES = 5
 
+/** A second photo for the hover swap: the first gallery photo that isn't the thumbnail (demo data; list items from the API have none). */
+function secondPhoto(product) {
+  return (product.images ?? []).find((url) => typeof url === 'string' && url && url !== product.thumbnail) ?? null
+}
+
 /**
  * One product tile, in "grid" or "list" layout.
  * "Add to cart" and "Quick view" are optional function props — the card only
  * reports clicks and the parent decides what happens; each button renders
  * only when its handler is provided. The wishlist heart is self-contained
  * (WishlistButton reads the wishlist context), shown unless showWishlist={false}.
+ *
+ * 2026 redesign: on a mouse hover the card shows the product's second photo (when it
+ * has one), and in the grid a simple product gets a round quick-add button next to the
+ * price (same accessible name as before: "Add to cart"). `isNew` adds a "New" badge
+ * (e.g. on a "New arrivals" row); it defaults to the product's own `isNew` flag.
  */
-function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true, showCompare = true }) {
+function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true, showCompare = true, isNew = product.isNew === true }) {
   const { t } = useTranslation('catalog')
   // Phase 11: memo() skips re-renders from the parent, so the card follows the display currency itself.
   useDisplayCurrency()
@@ -42,14 +52,22 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
   const swatches = product.swatches ?? []
   // Phase 16: hovering a colour dot (pointer only) shows that colour's photo; same box, no layout shift.
   const [hoverImage, setHoverImage] = useState(null)
+  // Redesign: the second photo is only requested once a mouse first hovers the card (never on touch).
+  const alternatePhoto = secondPhoto(product)
+  const [wantsAlternate, setWantsAlternate] = useState(false)
   const isOutOfStock = stock === 0
   const { canBuy, min: minQuantity } = getPurchaseLimits(product)
   const productUrl = ROUTES.productDetails(id)
   const isGiftCard = isGiftCardProduct(product)
   const choosesOnPage = product.hasVariants || isGiftCard
 
+  const quickAdd = layout === 'grid'
+
   return (
-    <article className={cn('product-card', `product-card--${layout}`)}>
+    <article
+      className={cn('product-card', `product-card--${layout}`)}
+      onPointerEnter={alternatePhoto && !wantsAlternate ? (event) => event.pointerType === 'mouse' && setWantsAlternate(true) : undefined}
+    >
       {/* Decorative: the title link (stretched over the card) names the product. */}
       <div className="product-card__media">
         {/* Phase 9: the resized copies (srcset) when the API made them; the original otherwise. */}
@@ -65,13 +83,12 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             height="300"
           />
         )}
+        {/* A background image, not an <img>: purely decorative and outside the card's image queries. */}
+        {alternatePhoto && wantsAlternate && !hoverImage && (
+          <span className="product-card__alt-photo" style={{ backgroundImage: `url(${JSON.stringify(alternatePhoto)})` }} aria-hidden="true" />
+        )}
         {onQuickView && (
-          <button
-            type="button"
-            className="product-card__quick-view"
-            onClick={() => onQuickView(product)}
-            aria-label={t('card.quickViewLabel', { title })}
-          >
+          <button type="button" className="product-card__quick-view" onClick={() => onQuickView(product)} aria-label={t('card.quickViewLabel', { title })}>
             <LuEye aria-hidden="true" />
             {t('card.quickView')}
           </button>
@@ -83,6 +100,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
           <ProductBadge variant="sale">{t('card.salePercent', { percent: roundedDiscount })}</ProductBadge>
         )}
         {isOutOfStock && <ProductBadge variant="danger">{t('card.outOfStock')}</ProductBadge>}
+        {isNew && <ProductBadge variant="info">{t('card.new')}</ProductBadge>}
         {availabilityStatus === 'Low Stock' && <ProductBadge variant="warning">{t('card.lowStock')}</ProductBadge>}
       </div>
 
@@ -133,20 +151,38 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
           </p>
         )}
 
-        <p className="product-card__price">
-          <span className="visually-hidden">{t(hasDiscount ? 'card.salePrice' : 'card.price')}</span>
-          <span className="product-card__price-current">
-            {from !== null && <span className="product-card__price-from">{t('card.from')}</span>}
-            {formatPrice(salePrice)}
-          </span>
-          {hasDiscount && (
-            <>
-              <span className="visually-hidden">{t('card.originalPrice')}</span>
-              <s className="product-card__price-original">{formatPrice(originalPrice)}</s>
-              {layout === 'list' && <span className="product-card__saving">{t('card.save', { percent: roundedDiscount })}</span>}
-            </>
+        {/* A product with a minimum order adds that many at once: say so before the click. */}
+        {onAddToCart && !choosesOnPage && canBuy && minQuantity > 1 && <p className="product-card__note">{t('card.minimum', { count: minQuantity })}</p>}
+        <div className="product-card__buy">
+          <p className="product-card__price">
+            <span className="visually-hidden">{t(hasDiscount ? 'card.salePrice' : 'card.price')}</span>
+            <span className="product-card__price-current">
+              {from !== null && <span className="product-card__price-from">{t('card.from')}</span>}
+              {formatPrice(salePrice)}
+            </span>
+            {hasDiscount && (
+              <>
+                <span className="visually-hidden">{t('card.originalPrice')}</span>
+                <s className="product-card__price-original">{formatPrice(originalPrice)}</s>
+                {layout === 'list' && <span className="product-card__saving">{t('card.save', { percent: roundedDiscount })}</span>}
+              </>
+            )}
+          </p>
+          {/* Grid: a round quick-add button beside the price; the hidden text keeps its name ("Add to cart", "Sold out"). */}
+          {onAddToCart && !choosesOnPage && quickAdd && (
+            <Button
+              variant={canBuy ? 'primary' : 'outline'}
+              size="sm"
+              disabled={!canBuy}
+              onClick={() => onAddToCart(product)}
+              className="btn--icon product-card__quick-add"
+              title={t(isOutOfStock ? 'card.soldOut' : canBuy ? 'card.addToCart' : 'card.unavailable')}
+            >
+              {canBuy ? <LuPlus aria-hidden="true" /> : <LuShoppingBag aria-hidden="true" />}
+              <span className="visually-hidden">{t(isOutOfStock ? 'card.soldOut' : canBuy ? 'card.addToCart' : 'card.unavailable')}</span>
+            </Button>
           )}
-        </p>
+        </div>
 
         {/* A product with options (size, color) is bought on its page, where a variant is chosen;
             a gift card too (phase 10), where its amount and recipient are chosen. */}
@@ -162,11 +198,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             {t(isGiftCard ? 'card.chooseAmount' : 'card.chooseOptions')}
           </Button>
         )}
-        {/* A product with a minimum order adds that many at once: say so before the click. */}
-        {onAddToCart && !choosesOnPage && canBuy && minQuantity > 1 && (
-          <p className="product-card__note">{t('card.minimum', { count: minQuantity })}</p>
-        )}
-        {onAddToCart && !choosesOnPage && (
+        {onAddToCart && !choosesOnPage && !quickAdd && (
           <Button
             variant={canBuy ? 'primary' : 'outline'}
             size="sm"

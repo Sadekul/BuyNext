@@ -1,0 +1,106 @@
+/*
+ * Newsletter on --gradient-brand (indigo → violet → pink): white text
+ * (≥ 4.6:1 across the gradient), a coral icon disc and Subscribe button with
+ * ink text (5.7:1; never white on bright coral), the error on a white pill.
+ */
+.home-newsletter {
+  padding-block: var(--section-gap);
+}
+
+.home-newsletter .newsletter {
+  position: relative;
+  width: min(100% - 2 * var(--container-gutter), var(--container-width) - 2 * var(--container-gutter));
+  margin-inline: auto;
+  padding-block: var(--space-10);
+  overflow: hidden;
+  color: var(--color-text-inverse);
+  background: var(--gradient-brand);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glow);
+  isolation: isolate;
+}
+
+/* Decorative coral and white rings (shapes only). */
+.home-newsletter .newsletter::before,
+.home-newsletter .newsletter::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  content: '';
+}
+
+.home-newsletter .newsletter::before {
+  top: -5rem;
+  inset-inline-end: -3rem;
+  width: 16rem;
+  aspect-ratio: 1;
+  border: 2.5rem solid rgb(255 107 87 / 0.35);
+}
+
+.home-newsletter .newsletter::after {
+  bottom: -4rem;
+  inset-inline-start: -2rem;
+  width: 10rem;
+  aspect-ratio: 1;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.home-newsletter .newsletter__inner {
+  padding-inline: var(--space-6);
+}
+
+.home-newsletter .newsletter__icon {
+  color: var(--color-secondary);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0.5rem rgb(255 255 255 / 0.12);
+}
+
+.home-newsletter .newsletter__title {
+  font-size: var(--text-3xl);
+  color: inherit;
+}
+
+.home-newsletter .newsletter__text {
+  margin-top: var(--space-2);
+  color: inherit;
+  opacity: 0.95;
+}
+
+.home-newsletter .newsletter__input {
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+}
+
+.home-newsletter .newsletter__form .btn {
+  color: var(--color-secondary);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.home-newsletter .newsletter__form .btn:hover:not(:disabled) {
+  color: var(--color-text-inverse);
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+
+.home-newsletter .newsletter :focus-visible {
+  outline-color: var(--color-text-inverse);
+}
+
+.home-newsletter .newsletter__error {
+  display: inline-block;
+  padding: var(--space-1) var(--space-4);
+  color: var(--color-sale);
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+}
+
+@media (min-width: 768px) {
+  .home-newsletter .newsletter {
+    padding-block: var(--space-12);
+  }
+
+  .home-newsletter .newsletter__inner {
+    padding-inline: var(--space-10);
+  }
+}

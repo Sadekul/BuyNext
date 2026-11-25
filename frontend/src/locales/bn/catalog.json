@@ -98,7 +98,8 @@
     "from": "শুরু ",
     "colours_one": "{{count, number}}টি রং",
     "colours_other": "{{count, number}}টি রং",
-    "moreSwatches": "+{{count, number}}"
+    "moreSwatches": "+{{count, number}}",
+    "new": "নতুন"
   },
   "quickView": {
     "title": "এক নজরে দেখুন",

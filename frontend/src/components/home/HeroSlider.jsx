@@ -6,6 +6,7 @@ import { cn } from '../../utils/classNames'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import './HeroBanner.css'
 import './HeroSlider.css'
+import './tones.css'
 
 /*
  * Home page slider (docs/backend/HOME_SLIDER_CONTRACT.md, section 3), built on
@@ -34,7 +35,7 @@ function Slide({ slide, index, total, active }) {
       role="group"
       aria-roledescription={t('home.slider.roleSlide')}
       aria-label={t('home.slider.slideOf', { current: index + 1, total })}
-      className={cn('hero-slider__slide', `hero-slider__slide--${tone}`, active && 'hero-slider__slide--active')}
+      className={cn('hero-slider__slide', `tone--${tone}`, active && 'hero-slider__slide--active')}
       // Hidden slides: not focusable, not read (inert), and visibility: hidden in CSS.
       inert={!active}
       data-slide-id={slide.id}
@@ -62,6 +63,7 @@ function Slide({ slide, index, total, active }) {
 
         {image && (
           <div className="hero-slider__visual">
+            <span className="hero-slider__halo" aria-hidden="true" />
             <img
               src={image}
               alt={imageAlt}

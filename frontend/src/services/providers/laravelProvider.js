@@ -11,7 +11,8 @@ import {
 const MAX_PER_PAGE = 100
 
 // BuyNest sort fields → the API's `sort` names.
-const SORT_FIELDS = { price: 'price', rating: 'rating', discountPercentage: 'discount', title: 'name' }
+// `createdAt` (newest first) is used by the home page's New arrivals (2026-11 redesign).
+const SORT_FIELDS = { price: 'price', rating: 'rating', discountPercentage: 'discount', title: 'name', createdAt: 'newest' }
 
 // Phase 10: "Search instead for <what was typed>": the API searches the words as typed, without correcting typos.
 // (the API's `correct=0`; the storefront's own address says ?exact=1).

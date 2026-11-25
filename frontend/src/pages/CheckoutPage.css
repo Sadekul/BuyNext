@@ -89,3 +89,37 @@
     top: 10rem;
   }
 }
+
+/* ---- 2026 redesign: indigo + coral ---- */
+.checkout__section {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* An indigo bar on the left edge of each step (decorative). */
+.checkout__section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--gradient-brand);
+}
+
+.checkout__section:focus-within {
+  border-color: var(--color-primary-soft);
+  box-shadow: var(--shadow-md);
+}
+
+.checkout__section h2 {
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 479px) {
+  .checkout__section {
+    padding: var(--space-5) var(--space-4);
+  }
+}

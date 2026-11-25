@@ -26,7 +26,7 @@
 .toast__icon {
   flex-shrink: 0;
   font-size: var(--text-xl);
-  color: #6ee7b7;
+  color: var(--color-accent);
 }
 
 .toast__message {
@@ -45,7 +45,7 @@
 }
 
 .toast__close:hover {
-  background: rgb(255 255 255 / 0.1);
+  background: var(--color-on-dark-hover);
 }
 
 @keyframes toast-in {
@@ -62,5 +62,5 @@
 }
 
 .toast__icon--warning {
-  color: #fcd34d;
+  color: var(--color-star);
 }

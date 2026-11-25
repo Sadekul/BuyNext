@@ -1,6 +1,13 @@
 .site-footer {
-  color: #cbd5e1;
+  position: relative;
+  color: var(--color-on-dark-muted);
   background: var(--color-secondary);
+  /* Redesign: a brand-gradient edge on top, and a soft indigo/coral glow in the corners. */
+  background-image:
+    radial-gradient(circle at 0% 0%, var(--color-primary-glow), transparent 40%),
+    radial-gradient(circle at 100% 100%, var(--color-accent-glow), transparent 35%);
+  border-top: 4px solid transparent;
+  border-image: var(--gradient-brand) 1;
 }
 
 .site-footer__main {
@@ -27,9 +34,27 @@
 }
 
 .site-footer__heading {
-  margin-bottom: var(--space-4);
+  position: relative;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-2);
   font-size: var(--text-base);
   color: var(--color-text-inverse);
+}
+
+/* A short coral bar under each heading (decorative shape). */
+.site-footer__heading::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1.75rem;
+  height: 3px;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
+.site-footer__contact svg {
+  color: var(--color-accent);
 }
 
 .site-footer__links {
@@ -43,11 +68,22 @@
 }
 
 .site-footer a:hover {
-  color: #6ee7b7;
+  color: var(--color-text-inverse);
+}
+
+.site-footer__links a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.site-footer :focus-visible {
+  outline-color: var(--color-text-inverse);
 }
 
 .site-footer__bottom {
-  border-top: 1px solid rgb(255 255 255 / 0.1);
+  border-top: 1px solid var(--color-on-dark-line);
 }
 
 .site-footer__bottom-inner {
@@ -70,12 +106,22 @@
   place-items: center;
   width: 2.5rem;
   height: 2.5rem;
-  border: 1px solid rgb(255 255 255 / 0.15);
+  color: var(--color-on-dark);
+  background: var(--color-on-dark-hover);
+  border: 1px solid var(--color-on-dark-line);
   border-radius: 50%;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
+/* Coral shape, ink icon (never white on bright coral). */
 .site-footer__social a:hover {
-  border-color: #6ee7b7;
+  color: var(--color-secondary);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
 }
 
 @media (min-width: 640px) {

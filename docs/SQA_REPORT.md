@@ -324,6 +324,22 @@ Asked by the user ("many products have no variation; it should be sizes and colo
 
 Checks: browser checks 1,841 on the dev server (full run, with the system suite rerun alone after C6: 40). Not rerun on the production build: no storefront code changed since its last full run.
 
+## Storefront redesign: indigo + coral, bold and colourful — 2026-11-25
+
+Asked by the store owner ("eye-catching and modern, and update the theme colour"; chose Indigo + coral and a bold, colourful style). The lead set the theme tokens; two agents built the shell and components and the home page in parallel against [STOREFRONT_REDESIGN.md](STOREFRONT_REDESIGN.md) (stopped once at the owner's request and resumed the next day; every touched file was checked for half-finished edits). Checks: every colour pair that carries text measured (white on indigo 7.9:1, white on coral-strong 5.1:1, ink on bright coral 5.7:1; white on bright coral 2.8:1 is never used); no hard-coded colours outside print styles; screenshots at 1440px and 390px (no sideways scroll, no page errors); English and Bangla; reduced motion. Storefront only, plus the admin's colour labels.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| R1 | Medium | The newsletter block promised "Get 10% off your first order" (old template text); subscribing gives no coupon | Honest title: "Be first to hear about deals" / "অফারের খবর সবার আগে পান" |
+| R2 | Low | Today's deals said "Up to 19% off" while the cards showed "-20%": the band rounded down, the cards to the nearest | The band rounds like the cards (unit test) |
+| R3 | Low | The admin still named the banner/slide colours Navy / Emerald / Amber / Rose, which now show as ink, indigo, coral, violet | Labels Ink / Indigo / Coral / Violet; the stored keys are unchanged so old content keeps working |
+| R4 | Low | Carousel cards were squeezed into narrow columns at desktop width (found by builder B's screenshot) | Fixed card widths in the carousel |
+| R5 | Test | The motion suite clicked "Close", which now also matched the announcement bar's "Close announcement" | It clicks the cart dialog's own Close |
+
+No countdown in Today's deals: the API exposes no end date for price rules, and a countdown without one would be false urgency. Not done in this round: the list API sends no extra images, so the cards' second photo on hover shows only where product data includes images (demo mode); brand logos (the API has none, so brands are name chips).
+
+Checks: frontend 898 unit tests; admin 222; browser checks 1,841 on the dev server (full run, with the motion suite rerun alone after R5: 7) and 1,834 on the production build (full run, all passing).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

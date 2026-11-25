@@ -14,6 +14,7 @@ import WishlistSyncNotice from '../components/layout/WishlistSyncNotice'
 import LanguageHint from '../components/layout/LanguageHint'
 import Loader from '../components/ui/Loader'
 import { storeAnnouncements } from '../constants/site'
+import { ROUTES } from '../constants/routes'
 import { useNavLinks } from '../hooks/useNavLinks'
 import { usePageMetaDefaults } from '../hooks/usePageMetaDefaults'
 import { useStoreSettings } from '../hooks/useStoreSettings'
@@ -46,7 +47,8 @@ function MainLayout() {
       {/* Phase 10: asks before any statistics load (only when the store uses them); sends page views after. */}
       <CookieConsent />
       <OfflineBanner />
-      <AnnouncementBar messages={storeAnnouncements(settings.freeShippingThreshold, formatBasePrice)} />
+      {/* Redesign: one closable message; not in the checkout, where nothing should pull the shopper away. */}
+      {!pathname.startsWith(ROUTES.checkout) && <AnnouncementBar messages={storeAnnouncements(settings.freeShippingThreshold, formatBasePrice)} />}
       <Header navLinks={links} mobileNavLinks={mobileLinks} />
       <main id="main-content" tabIndex={-1}>
         <ErrorBoundary key={pathname}>

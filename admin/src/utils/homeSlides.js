@@ -9,11 +9,13 @@ export const HERO_MODES = [
   { value: 'banner', label: 'Single banner', hint: 'One large banner with a headline, buttons, and an image (the hero below).' },
   { value: 'slider', label: 'Slider', hint: 'Up to 8 slides that change by themselves or with the arrows.' },
 ]
+// The stored keys stay (old content keeps working); the labels name the colours the redesigned store shows
+// (frontend/src/components/home/tones.css): navy → ink, emerald → indigo, amber → coral, rose → violet.
 export const TONES = [
-  { value: 'navy', label: 'Navy' },
-  { value: 'emerald', label: 'Emerald' },
-  { value: 'amber', label: 'Amber' },
-  { value: 'rose', label: 'Rose' },
+  { value: 'navy', label: 'Ink' },
+  { value: 'emerald', label: 'Indigo' },
+  { value: 'amber', label: 'Coral' },
+  { value: 'rose', label: 'Violet' },
 ]
 export const MAX_SLIDES = 8
 export const SLIDER_SECONDS = { min: 3, max: 15, default: 6 }

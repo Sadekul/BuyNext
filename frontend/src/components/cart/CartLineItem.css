@@ -10,7 +10,7 @@
   height: 6rem;
   padding: var(--space-2);
   object-fit: contain;
-  background: var(--color-bg-muted);
+  background: var(--color-bg-tint);
   border-radius: var(--radius-md);
 }
 

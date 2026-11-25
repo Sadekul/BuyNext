@@ -2,10 +2,12 @@ import { useCallback } from 'react'
 import HeroBanner from '../components/home/HeroBanner'
 import HeroSlider from '../components/home/HeroSlider'
 import FeaturedCategories from '../components/home/FeaturedCategories'
-import ProductSection from '../components/home/ProductSection'
-import PromoBanner from '../components/home/PromoBanner'
+import DealsBand from '../components/home/DealsBand'
+import PromoGrid from '../components/home/PromoGrid'
+import ProductCarousel from '../components/home/ProductCarousel'
 import BenefitsSection from '../components/home/BenefitsSection'
-import Newsletter from '../components/forms/Newsletter'
+import BrandStrip from '../components/home/BrandStrip'
+import HomeNewsletter from '../components/home/HomeNewsletter'
 import RecentlyViewed from '../components/product/RecentlyViewed'
 import { useRecentlyViewed } from '../utils/recentlyViewed'
 import ErrorMessage from '../components/ui/ErrorMessage'
@@ -19,12 +21,15 @@ import { SITE, freeShippingAmount } from '../constants/site'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { formatBasePrice } from '../utils/formatters'
 import { featuredCategories, homeCollectionIds, localizedBenefits, localizedHeroContent, localizedPromoBanners } from '../data/homeContent'
-import { allProductsQuery } from '../queries/productQueries'
+import { allProductsQuery, newestProductsQuery } from '../queries/productQueries'
 import { homeContentQuery } from '../queries/contentQueries'
-import { buildHomeCollections } from '../utils/productCollections'
+import { CAN_SORT_BY_NEWEST } from '../services/productService'
+import { pickProductsByIds } from '../utils/productCollections'
+import { pickBrands, pickCategoryTiles, pickDeals } from '../utils/homeSections'
 import { useTranslation } from 'react-i18next'
+import '../components/home/home.css'
 
-const EMPTY_COLLECTIONS = { featured: [], newArrivals: [], bestSellers: [], specialOffers: [] }
+const NO_PRODUCTS = []
 
 /**
  * REAL_SHOP: the hero (single banner or slider) from the admin's CMS. While it loads (or if it can't
@@ -56,63 +61,51 @@ function CmsHero({ request, storeName }) {
 }
 
 /**
- * One request for every product (card fields only, ~53 KB), then the
- * collections are picked client-side. DummyJSON can't fetch a list of
- * specific IDs, and 24 single-product requests would be far slower.
- * `select` derives the collections from the cached list (module-level, so
- * it's a stable function and only re-runs when the data changes).
- */
-const selectHomeCollections = (items) => buildHomeCollections(items, homeCollectionIds)
-
-/**
- * The storefront homepage: composes section components and feeds them
- * live API data. Loading, error, and retry states come from custom hooks.
+ * The storefront homepage (docs/STOREFRONT_REDESIGN.md, "Home page"), in this order, each section
+ * only when it has real data:
+ *   1. hero banner / slider          (the admin's CMS; the demo's static hero)
+ *   2. Shop by category              (categories + a photo each)
+ *   3. Today's deals                 (biggest real discounts in stock; no countdown: no end dates in the API)
+ *   4. promo grid                    (the home banners as a bento grid)
+ *   5. New arrivals carousel         (BuyNest's API: newest first) / Featured products (the CMS's picks;
+ *                                     the demo's hand-picked ones)
+ *   6. benefits, 7. brands, recently viewed (phase 11), 8. newsletter
+ *
+ * One request loads every product (card fields only); deals, brands and the category photos are
+ * picked from it client-side. DummyJSON can't fetch a list of specific IDs.
  */
 function HomePage() {
   const { t } = useTranslation('marketing')
-  const collectionsRequest = useQuery({ ...allProductsQuery(), select: selectHomeCollections })
+  const productsRequest = useQuery(allProductsQuery())
   // REAL_SHOP: hero, promo banners, and featured products come from the admin's CMS.
   const homeRequest = useQuery({ ...homeContentQuery(), enabled: REAL_SHOP })
-  const cmsFeatured = homeRequest.data?.featuredProducts ?? []
-  const banners = REAL_SHOP ? (homeRequest.data?.banners ?? []) : localizedPromoBanners(t)
+  const newestRequest = useQuery({ ...newestProductsQuery(12), enabled: CAN_SORT_BY_NEWEST })
+  const banners = REAL_SHOP ? (homeRequest.data?.banners ?? NO_PRODUCTS) : localizedPromoBanners(t)
   const categoriesRequest = useCategories()
   const { addItem } = useCart()
   // The free-shipping line names the store's own threshold and currency ("৳৫,০০০"), never a fixed "$50".
   const { settings } = useStoreSettings()
   const freeShipping = freeShippingAmount(settings.freeShippingThreshold, formatBasePrice)
 
-  const collections = collectionsRequest.data ?? EMPTY_COLLECTIONS
-  const isLoadingProducts = collectionsRequest.isPending
+  const products = productsRequest.data ?? NO_PRODUCTS
+  const isLoadingProducts = productsRequest.isPending
 
-  // Merge configured images with live category names; only show categories the API confirms exist.
-  const categories = featuredCategories
-    .map((featured) => ({
-      ...featured,
-      name: categoriesRequest.data?.find((category) => category.slug === featured.slug)?.name,
-    }))
-    .filter((category) => category.name)
+  const categories = pickCategoryTiles({ categories: categoriesRequest.data, products, configured: featuredCategories })
+  const { deals, maxDiscount } = pickDeals(products)
+  const brands = pickBrands(products)
+  // Featured: the admin's picks (REAL_SHOP), or the demo's hand-picked list.
+  const featured = REAL_SHOP ? (homeRequest.data?.featuredProducts ?? NO_PRODUCTS) : pickProductsByIds(products, homeCollectionIds.featured)
+  const featuredLoading = REAL_SHOP ? homeRequest.isPending : isLoadingProducts
 
   // Passed down as a function prop: ProductCard reports the click, the cart
   // handles it. useCallback keeps the same function between renders, so the
   // memoized ProductCards don't re-render just because HomePage did.
   const handleAddToCart = useCallback((product) => addItem(product), [addItem])
 
-  const productsUnavailable = collectionsRequest.error && (
-    <section className="section section--muted" aria-label={t('home.products')}>
-      <div className="container">
-        <ErrorMessage
-          title={t('home.productsFailed')}
-          message={collectionsRequest.error.message}
-          onRetry={collectionsRequest.refetch}
-        />
-      </div>
-    </section>
-  )
-
   return (
     <>
       {REAL_SHOP ? <CmsHero request={homeRequest} storeName={settings.storeName} /> : <HeroBanner content={localizedHeroContent(t, freeShipping)} />}
-      <BenefitsSection benefits={localizedBenefits(t, freeShipping)} />
+
       <FeaturedCategories
         categories={categories}
         isLoading={categoriesRequest.isPending}
@@ -120,77 +113,50 @@ function HomePage() {
         onRetry={categoriesRequest.refetch}
       />
 
-      {REAL_SHOP && (homeRequest.isPending || cmsFeatured.length > 0) && (
-        <ProductSection
-          eyebrow={t('home.handpicked')}
-          title={t('home.featured')}
-          products={cmsFeatured}
-          isLoading={homeRequest.isPending}
-          viewAllTo={ROUTES.products}
-          onAddToCart={handleAddToCart}
-          muted
-        />
-      )}
-
-      {productsUnavailable || (!REAL_SHOP && (
-        <ProductSection
-          eyebrow={t('home.handpicked')}
-          title={t('home.featured')}
-          products={collections.featured}
-          isLoading={isLoadingProducts}
-          viewAllTo={ROUTES.products}
-          onAddToCart={handleAddToCart}
-          muted
-        />
-      ))}
-
-      {banners.length > 0 && (
-        <section className="section" aria-label={t('home.promotions')}>
-          <div className="container promo-section">
-            {banners.map((banner) => (
-              <PromoBanner key={banner.id} banner={banner} />
-            ))}
+      {productsRequest.error ? (
+        <section className="section" aria-label={t('home.products')}>
+          <div className="container">
+            <ErrorMessage title={t('home.productsFailed')} message={productsRequest.error.message} onRetry={productsRequest.refetch} />
           </div>
         </section>
+      ) : (
+        <DealsBand deals={deals} maxDiscount={maxDiscount} isLoading={isLoadingProducts} onAddToCart={handleAddToCart} />
       )}
 
-      {/* If products failed, the single error panel above covers every product section. */}
-      {!collectionsRequest.error && (
-        <>
-          <ProductSection
-            eyebrow={t('home.justLanded')}
-            title={t('home.newArrivals')}
-            products={collections.newArrivals}
-            isLoading={isLoadingProducts}
-            viewAllTo={ROUTES.products}
-            onAddToCart={handleAddToCart}
-          />
-          <ProductSection
-            eyebrow={t('home.limited')}
-            title={t('home.offers')}
-            description={t('home.offersDescription')}
-            products={collections.specialOffers}
-            isLoading={isLoadingProducts}
-            skeletonCount={4}
-            viewAllTo={ROUTES.deals}
-            onAddToCart={handleAddToCart}
-            muted
-          />
-          <ProductSection
-            eyebrow={t('home.favorites')}
-            title={t('home.bestSellers')}
-            products={collections.bestSellers}
-            isLoading={isLoadingProducts}
-            viewAllTo={ROUTES.products}
-            onAddToCart={handleAddToCart}
-          />
-        </>
+      <PromoGrid banners={banners} />
+
+      {CAN_SORT_BY_NEWEST && !newestRequest.error && (
+        <ProductCarousel
+          eyebrow={t('home.justLanded')}
+          title={t('home.newArrivals')}
+          products={newestRequest.data ?? NO_PRODUCTS}
+          isLoading={newestRequest.isPending}
+          viewAllTo={ROUTES.products}
+          onAddToCart={handleAddToCart}
+          muted
+        />
       )}
+
+      {!(productsRequest.error && !REAL_SHOP) && (
+        <ProductCarousel
+          eyebrow={t('home.handpicked')}
+          title={t('home.featured')}
+          products={featured}
+          isLoading={featuredLoading}
+          viewAllTo={ROUTES.products}
+          onAddToCart={handleAddToCart}
+          muted={!CAN_SORT_BY_NEWEST}
+        />
+      )}
+
+      <BenefitsSection benefits={localizedBenefits(t, freeShipping)} />
+
+      <BrandStrip brands={brands} />
 
       {/* Phase 11: products this browser opened before (nothing when there are none). */}
       <RecentlyViewedSection onAddToCart={handleAddToCart} />
 
-      <Newsletter />
+      <HomeNewsletter />
     </>
   )
 }
@@ -198,7 +164,7 @@ function HomePage() {
 function RecentlyViewedSection({ onAddToCart }) {
   if (useRecentlyViewed().length === 0) return null
   return (
-    <div className="section">
+    <div className="section home-section">
       <div className="container">
         <RecentlyViewed onAddToCart={onAddToCart} />
       </div>

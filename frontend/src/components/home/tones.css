@@ -1,0 +1,42 @@
+/*
+ * Home page tones (2026-11-24 redesign: indigo + coral). Slides and promo
+ * banners store one of four tone keys from the admin: "navy", "emerald",
+ * "amber", "rose". The keys stay; they now mean the new palette:
+ *
+ *   navy    → ink      (ink → indigo-strong, a coral glow)
+ *   emerald → indigo   (the old primary tone is the new primary: indigo → violet)
+ *   amber   → coral    (coral-strong → deep rose; the warm tone)
+ *   rose    → violet   (violet → magenta)
+ *
+ * Every stop is dark enough for white text, small sizes included (WCAG AA,
+ * ≥ 5:1 at the lightest stop, #c2412d). Bright coral (#ff6b57) is only
+ * used for decorative shapes here, never behind text.
+ */
+:root {
+  --tone-violet: #6d28d9;
+  --tone-magenta: #be185d;
+  --tone-deep-rose: #9f1239;
+  --tone-ink: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-primary-strong) 100%);
+  --tone-indigo: linear-gradient(135deg, var(--color-primary) 0%, var(--tone-violet) 100%);
+  --tone-coral: linear-gradient(135deg, var(--color-accent-strong) 0%, var(--tone-deep-rose) 100%);
+  --tone-purple: linear-gradient(135deg, var(--tone-violet) 0%, var(--tone-magenta) 100%);
+  /* Decorative glows over the tones (shapes only). */
+  --tone-glow-coral: radial-gradient(circle at 88% 18%, rgb(255 107 87 / 0.45), transparent 42%);
+  --tone-glow-light: radial-gradient(circle at 88% 18%, rgb(255 255 255 / 0.18), transparent 45%);
+}
+
+.tone--navy {
+  background: var(--tone-glow-coral), var(--tone-ink);
+}
+
+.tone--emerald {
+  background: var(--tone-glow-coral), var(--tone-indigo);
+}
+
+.tone--amber {
+  background: var(--tone-glow-light), var(--tone-coral);
+}
+
+.tone--rose {
+  background: var(--tone-glow-light), var(--tone-purple);
+}

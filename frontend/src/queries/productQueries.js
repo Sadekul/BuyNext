@@ -25,6 +25,7 @@ export const productKeys = {
     return ['products', currentLanguage()]
   },
   list: () => [...productKeys.all, 'list', 'all'],
+  newest: (limit) => [...productKeys.all, 'list', 'newest', limit],
   catalog: (scope) => [...productKeys.all, 'catalog', scope],
   detail: (id) => [...productKeys.all, 'detail', String(id)],
   related: (categorySlug) => [...productKeys.all, 'related', categorySlug],
@@ -49,6 +50,14 @@ export const allProductsQuery = () =>
   queryOptions({
     queryKey: productKeys.list(),
     queryFn: async ({ signal }) => (await getProducts({ all: true, signal })).items,
+  })
+
+/** The newest products first (the home page's New arrivals; BuyNest's API only, see CAN_SORT_BY_NEWEST). */
+export const newestProductsQuery = (limit = 12) =>
+  queryOptions({
+    queryKey: productKeys.newest(limit),
+    queryFn: async ({ signal }) => (await getProducts({ sortBy: 'createdAt', order: 'desc', limit, signal })).items,
+    staleTime: 5 * 60_000,
   })
 
 /**

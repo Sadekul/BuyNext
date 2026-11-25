@@ -1,23 +1,34 @@
 import Button from '../ui/Button'
+import { cn } from '../../utils/classNames'
+import './tones.css'
 import './PromoBanner.css'
 
-/** Promotional tile. `tone` picks the color scheme: "navy", "emerald", "amber", or "rose". */
-function PromoBanner({ banner }) {
+/**
+ * Promotional tile. `tone` picks the colour scheme from the stored keys "navy", "emerald",
+ * "amber", or "rose" (tones.css maps them to ink, indigo, coral, and violet).
+ * `large`: the big tile of the promo grid (more room for the photo and the title).
+ */
+function PromoBanner({ banner, large = false }) {
   const { eyebrow, title, description, cta, image, imageAlt, tone } = banner
 
   return (
-    <article className={`promo-banner promo-banner--${tone}`}>
+    <article className={cn('promo-banner', `tone--${tone}`, large && 'promo-banner--large')}>
       <div className="promo-banner__copy">
-        <p className="promo-banner__eyebrow">{eyebrow}</p>
+        {eyebrow && <p className="promo-banner__eyebrow">{eyebrow}</p>}
         <h3 className="promo-banner__title">{title}</h3>
-        <p className="promo-banner__description">{description}</p>
+        {description && <p className="promo-banner__description">{description}</p>}
         {cta && (
-          <Button to={cta.to} variant="light" size="sm">
+          <Button to={cta.to} variant="light" size="sm" className="promo-banner__cta">
             {cta.label}
           </Button>
         )}
       </div>
-      {image && <img src={image} alt={imageAlt} className="promo-banner__image" loading="lazy" width="280" height="280" />}
+      {image && (
+        <div className="promo-banner__visual">
+          <span className="promo-banner__disc" aria-hidden="true" />
+          <img src={image} alt={imageAlt} className="promo-banner__image" loading="lazy" width="280" height="280" />
+        </div>
+      )}
     </article>
   )
 }

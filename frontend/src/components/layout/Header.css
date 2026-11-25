@@ -2,9 +2,10 @@
   position: sticky;
   top: 0;
   z-index: var(--header-z);
-  background: rgb(255 255 255 / 0.96);
-  backdrop-filter: blur(8px);
+  background: var(--color-glass);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .site-header__bar {
@@ -17,7 +18,7 @@
 .site-header__search {
   display: none;
   flex: 1;
-  max-width: 36rem;
+  max-width: 40rem;
   margin-inline: auto;
 }
 
@@ -56,11 +57,14 @@
   background: transparent;
   border: none;
   border-radius: var(--radius-full);
-  transition: background-color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .site-header__icon-button:hover {
-  background: var(--color-bg-muted);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 /* Hidden visually on small screens but still read as the link's name. */
@@ -85,9 +89,11 @@
   height: 1.25rem;
   padding-inline: 0.25rem;
   font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--color-text-inverse);
-  background: var(--color-primary);
+  font-weight: 800;
+  line-height: 1;
+  /* Coral shape, ink text (5.7:1): white is never used on bright coral. */
+  color: var(--color-secondary);
+  background: var(--color-accent);
   border: 2px solid var(--color-bg);
   border-radius: var(--radius-full);
 }
@@ -113,6 +119,7 @@
 
   .site-header__bar {
     gap: var(--space-6);
+    min-height: 5rem;
   }
 }
 
@@ -159,5 +166,18 @@
 
   .site-header__language + .site-header__actions {
     margin-left: auto;
+  }
+}
+
+/* Redesign: on desktop the account link is a soft pill (icon + "Sign in" / "Hi, Name"). */
+@media (min-width: 1024px) {
+  .site-header__account {
+    padding-inline: var(--space-2) var(--space-4);
+    font-size: 1.25rem;
+    border: 1px solid var(--color-border);
+  }
+
+  .site-header__account:hover {
+    border-color: var(--color-primary);
   }
 }

@@ -135,7 +135,7 @@
   min-width: 2.125rem;
   border-radius: var(--radius-full);
   /* A thin inner line keeps white and very light colours visible. */
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+  box-shadow: inset 0 0 0 1px var(--color-swatch-edge);
 }
 
 /* A value without a hex colour: a neutral pill with its name. */

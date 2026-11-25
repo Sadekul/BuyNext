@@ -1,11 +1,124 @@
-.featured-categories {
+/*
+ * "Shop by category" tiles. Phones: one row that scrolls sideways inside the
+ * section (scroll-snap; the page itself never scrolls sideways). From 640px:
+ * a grid of 4, from 1024px a single row of up to 8.
+ */
+.category-tiles {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-6) var(--space-4);
+  grid-auto-columns: minmax(8.5rem, 42%);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  margin-inline: calc(var(--container-gutter) * -1);
+  padding: var(--space-2) var(--container-gutter) var(--space-4);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: var(--container-gutter);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.category-tiles__item {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.category-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3);
+  color: var(--color-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.category-tile:hover {
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+/* Tinted photo wells in turn: indigo, coral, violet tint, warm. */
+.category-tile__media {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-primary-soft);
+  border-radius: calc(var(--radius-lg) - var(--space-1));
+}
+
+.category-tiles__item:nth-child(4n + 2) .category-tile__media {
+  background: var(--color-accent-soft);
+}
+
+.category-tiles__item:nth-child(4n + 3) .category-tile__media {
+  background: var(--color-bg-tint);
+}
+
+.category-tiles__item:nth-child(4n) .category-tile__media {
+  background: var(--color-warning-soft);
+}
+
+.category-tile__media img {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  transition: transform 400ms ease;
+}
+
+.category-tile:hover .category-tile__media img {
+  transform: scale(1.1);
+}
+
+.category-tile__name {
+  padding-inline: var(--space-1);
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.category-tile:hover .category-tile__name {
+  color: var(--color-primary);
+}
+
+@media (min-width: 640px) {
+  .category-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
+    gap: var(--space-4);
+    margin-inline: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
 }
 
 @media (min-width: 1024px) {
-  .featured-categories {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+  .category-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-tile,
+  .category-tile__media img {
+    transition: none;
+  }
+
+  .category-tile:hover,
+  .category-tile:hover .category-tile__media img {
+    transform: none;
   }
 }

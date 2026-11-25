@@ -1,46 +1,100 @@
-.benefits {
-  padding-block: var(--space-10);
-  border-block: 1px solid var(--color-border);
-}
-
+/*
+ * Benefits: four colourful tiles. Each tile is a light tint (dark text, AA)
+ * with a solid icon disc: indigo, coral (ink icon: never white on bright
+ * coral), violet, ink.
+ */
 .benefits__list {
   display: grid;
-  gap: var(--space-6);
-}
-
-.benefits__item {
-  display: flex;
-  align-items: center;
   gap: var(--space-4);
 }
 
-.benefits__icon {
-  flex-shrink: 0;
-  width: 3rem;
-  height: 3rem;
-  padding: var(--space-3);
-  color: var(--color-primary);
+.benefits__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  overflow: hidden;
   background: var(--color-primary-soft);
+  border-radius: var(--radius-lg);
+  isolation: isolate;
+}
+
+/* A soft ring in the corner (a shape only). */
+.benefits__item::after {
+  position: absolute;
+  z-index: -1;
+  top: -2.5rem;
+  inset-inline-end: -2.5rem;
+  width: 7rem;
+  aspect-ratio: 1;
+  border: 1.25rem solid rgb(255 255 255 / 0.7);
+  border-radius: 50%;
+  content: '';
+}
+
+.benefits__icon {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  font-size: 1.5rem;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  transform: rotate(-6deg);
+}
+
+.benefits__item--returns {
+  background: var(--color-accent-soft);
+}
+
+.benefits__item--returns .benefits__icon {
+  color: var(--color-secondary);
+  background: var(--color-accent);
+}
+
+.benefits__item--shield {
+  background: var(--color-bg-tint);
+}
+
+.benefits__item--shield .benefits__icon {
+  background: var(--tone-violet, var(--color-primary-strong));
+}
+
+.benefits__item--support {
+  background: var(--color-warning-soft);
+}
+
+.benefits__item--support .benefits__icon {
+  background: var(--color-secondary);
 }
 
 .benefits__title {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
+  color: var(--color-secondary);
 }
 
 .benefits__text {
+  margin-top: var(--space-1);
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 @media (min-width: 640px) {
   .benefits__list {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
   .benefits__list {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .benefits__item {
+    flex-direction: column;
   }
 }

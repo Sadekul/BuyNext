@@ -50,16 +50,16 @@
 }
 
 .modal::backdrop {
-  background-color: rgb(15 23 42 / 0);
+  background-color: transparent;
 }
 
 .modal[open]::backdrop {
-  background-color: rgb(15 23 42 / 0.55);
+  background-color: var(--color-overlay);
 }
 
 @starting-style {
   .modal[open]::backdrop {
-    background-color: rgb(15 23 42 / 0);
+    background-color: transparent;
   }
 }
 

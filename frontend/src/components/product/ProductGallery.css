@@ -7,9 +7,11 @@
 .gallery__main {
   aspect-ratio: 1;
   overflow: hidden;
-  background: var(--color-bg-muted);
+  /* Redesign: the photo on a soft indigo tint. */
+  background: radial-gradient(circle at 50% 40%, var(--color-bg) 0%, var(--color-bg-tint) 80%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
 }
 
 .gallery__main img {
@@ -29,7 +31,7 @@
   width: 4.5rem;
   height: 4.5rem;
   padding: var(--space-1);
-  background: var(--color-bg-muted);
+  background: var(--color-bg-tint);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: border-color var(--transition-fast);
@@ -41,6 +43,7 @@
 
 .gallery__thumb--active {
   border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
 }
 
 .gallery__thumb img {

@@ -308,3 +308,11 @@
 - Magento's product page rules: nothing pre-selected, "From" prices, a message per missing option with focus moved there, no cart call until the choice is complete
 - Accessible swatches: real radio inputs behind the colour circles, the value name as their accessible name, "sold out" in the name instead of colour alone
 - Listing performance: eager loading the relations every card needs, with a test that the query count doesn't grow with the number of products
+
+## Storefront redesign (2026-11-25)
+
+- Design tokens pay off: changing the theme in one file recoloured the whole store before any component was touched
+- Contrast is checked with numbers, not by eye: bright coral fails with white text (2.8:1), so it carries dark text or decoration only, and a deeper coral carries white text
+- Honest marketing: no countdown without a real end date, no "10% off" promise the store doesn't keep, badges rounded the same way everywhere
+- Renaming what staff see (Ink / Indigo / Coral / Violet) without changing stored keys keeps old content working
+- A new element with a common name ("Close announcement") can make older tests ambiguous: tests scope to the dialog they mean

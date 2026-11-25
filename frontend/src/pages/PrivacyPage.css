@@ -62,8 +62,8 @@
 }
 
 .btn.privacy__delete:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .goodbye {

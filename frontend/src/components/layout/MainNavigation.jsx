@@ -4,6 +4,7 @@ import { LuChevronDown } from 'react-icons/lu'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../utils/classNames'
 import { linkLabel } from './navLabel'
+import { NavIcon } from './categoryIcons'
 import './MainNavigation.css'
 
 /**
@@ -62,17 +63,15 @@ function MainNavigation({ links }) {
   )
 }
 
-
 function TopLink({ link }) {
   const { t } = useTranslation('common')
   return (
     <NavLink
       to={link.to}
       end
-      className={({ isActive }) =>
-        cn('main-nav__link', isActive && 'main-nav__link--active', link.highlight && 'main-nav__link--highlight')
-      }
+      className={({ isActive }) => cn('main-nav__link', isActive && 'main-nav__link--active', link.highlight && 'main-nav__link--highlight')}
     >
+      <NavIcon link={link} className="main-nav__icon" />
       {linkLabel(t, link)}
     </NavLink>
   )
@@ -106,7 +105,14 @@ function SubmenuItem({ link, isOpen, onToggle, onClose }) {
         aria-controls={menuId}
         onClick={onToggle}
       >
-        {link.to ? <span className="visually-hidden">{t('nav.subcategories', { label: linkLabel(t, link) })}</span> : linkLabel(t, link)}
+        {link.to ? (
+          <span className="visually-hidden">{t('nav.subcategories', { label: linkLabel(t, link) })}</span>
+        ) : (
+          <>
+            <NavIcon link={link} className="main-nav__icon" />
+            {linkLabel(t, link)}
+          </>
+        )}
         <LuChevronDown aria-hidden="true" />
       </button>
       <ul id={menuId} className="main-nav__menu" hidden={!isOpen}>

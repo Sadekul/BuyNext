@@ -38,6 +38,16 @@ export const promoBanners = [
     imageAlt: 'Chanel Coco Noir eau de parfum bottle',
     tone: 'emerald',
   },
+  {
+    id: 'smart-phones',
+    eyebrow: 'Smartphones',
+    title: 'Upgrade your phone',
+    description: 'The latest smartphones from Apple, Samsung and more.',
+    cta: { label: 'Shop smartphones', to: ROUTES.category('smartphones') },
+    image: 'https://cdn.dummyjson.com/product-images/smartphones/iphone-13-pro/1.webp',
+    imageAlt: 'iPhone 13 Pro smartphone',
+    tone: 'amber',
+  },
 ]
 
 // `icon` is a key the BenefitsSection component maps to an icon component.

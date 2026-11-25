@@ -33,17 +33,39 @@
 }
 
 .mobile-nav__link--highlight {
-  color: var(--color-sale);
+  color: var(--color-accent-strong);
+}
+
+/* Redesign: the category icon in a soft indigo tile (coral for Deals). */
+.mobile-nav__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.05rem;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-sm);
+}
+
+.mobile-nav__link--highlight .mobile-nav__icon {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.mobile-nav__list--secondary .mobile-nav__link svg {
+  color: var(--color-primary);
 }
 
 .mobile-nav__sublist {
   display: flex;
   flex-direction: column;
-  padding-left: var(--space-4);
 }
 
 .mobile-nav__link--child {
   padding-block: var(--space-2);
+  padding-left: calc(var(--space-2) + 2.75rem);
   font-weight: 400;
 }
 .mobile-nav__language { align-self: flex-start; margin-top: var(--space-4); }

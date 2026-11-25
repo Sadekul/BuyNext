@@ -8,6 +8,7 @@
 .logo__mark {
   width: 2.25rem;
   height: 2.25rem;
+  filter: drop-shadow(var(--shadow-primary));
 }
 
 .logo__mark rect {
@@ -40,6 +41,17 @@
   color: var(--color-primary);
 }
 
+/* Coral full stop after the wordmark: decorative shape, no text. */
+.logo__name::after {
+  content: '';
+  display: inline-block;
+  width: 0.32em;
+  height: 0.32em;
+  margin-left: 0.08em;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
 .logo__tagline {
   margin-top: var(--space-1);
   font-size: var(--text-xs);
@@ -51,9 +63,9 @@
 }
 
 .logo--light .logo__accent {
-  color: #6ee7b7;
+  color: var(--color-accent);
 }
 
 .logo--light .logo__tagline {
-  color: #cbd5e1;
+  color: var(--color-on-dark-muted);
 }

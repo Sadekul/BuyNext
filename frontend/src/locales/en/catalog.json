@@ -98,7 +98,8 @@
     "from": "From ",
     "colours_one": "{{count}} colour",
     "colours_other": "{{count}} colours",
-    "moreSwatches": "+{{count}}"
+    "moreSwatches": "+{{count}}",
+    "new": "New"
   },
   "quickView": {
     "title": "Quick view",

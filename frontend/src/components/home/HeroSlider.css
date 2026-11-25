@@ -37,29 +37,35 @@
     visibility 0s;
 }
 
-/* The same tones as the promo banners: dark enough for white text (WCAG AA). */
-.hero-slider__slide--navy {
-  background:
-    radial-gradient(circle at 85% 20%, rgb(52 211 153 / 0.16), transparent 45%),
-    linear-gradient(135deg, var(--color-secondary), #1e3a5f);
+/* Tones: tones.css (the stored keys navy / emerald / amber / rose mapped to the indigo + coral palette). */
+.hero-slider__slide {
+  position: relative;
+  overflow: hidden;
 }
 
-.hero-slider__slide--emerald {
-  background:
-    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.12), transparent 45%),
-    linear-gradient(135deg, var(--color-primary), #065f46);
+/* Decorative coral and white rings: shapes only, never behind the copy's text. */
+.hero-slider__slide::before,
+.hero-slider__slide::after {
+  position: absolute;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
 }
 
-.hero-slider__slide--amber {
-  background:
-    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.1), transparent 45%),
-    linear-gradient(135deg, #92400e, #b45309);
+.hero-slider__slide::before {
+  inset-inline-end: -6rem;
+  bottom: -8rem;
+  width: 22rem;
+  aspect-ratio: 1;
+  border: 2.5rem solid rgb(255 107 87 / 0.35);
 }
 
-.hero-slider__slide--rose {
-  background:
-    radial-gradient(circle at 85% 20%, rgb(255 255 255 / 0.1), transparent 45%),
-    linear-gradient(135deg, #9f1239, #be123c);
+.hero-slider__slide::after {
+  top: -3rem;
+  inset-inline-start: 42%;
+  width: 7rem;
+  aspect-ratio: 1;
+  background: rgb(255 255 255 / 0.08);
 }
 
 /* Room at the bottom for the controls, which sit over the slides. */
@@ -69,7 +75,15 @@
 }
 
 .hero-slider__copy {
+  position: relative;
+  z-index: 1;
   min-width: 0;
+}
+
+/* The eyebrow as an ink-on-coral pill (5.7:1), not white on bright coral. */
+.hero-slider__eyebrow {
+  color: var(--color-secondary);
+  background: var(--color-accent);
 }
 
 .hero-slider__title {
@@ -98,17 +112,33 @@
   background-color: rgb(255 255 255 / 0.1);
 }
 
-/* White focus ring: the site's green ring would vanish on the emerald slide. */
+/* White focus ring: the site's indigo ring would vanish on the indigo slide. */
 .hero-slider :focus-visible {
   outline-color: var(--color-text-inverse);
   box-shadow: 0 0 0 6px rgb(15 23 42 / 0.6);
 }
 
 .hero-slider__visual {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: min(100%, 16rem);
   margin-inline: auto;
+}
+
+/* A bright coral disc behind the product photo (a shape: no text sits on it). */
+.hero-slider__halo {
+  position: absolute;
+  inset: 8%;
+  background: var(--gradient-warm);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.25rem rgb(255 255 255 / 0.08);
+  opacity: 0.9;
+}
+
+.hero-slider__image {
+  position: relative;
 }
 
 .hero-slider__image {

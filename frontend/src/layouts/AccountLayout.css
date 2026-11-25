@@ -76,3 +76,61 @@
     border-radius: var(--radius-md);
   }
 }
+
+/* ---- 2026 redesign: indigo + coral ---- */
+/* The account header on a soft brand tint, with a coral kicker. */
+.account__header {
+  padding: var(--space-6) var(--space-6);
+  background:
+    radial-gradient(circle at 100% 0%, var(--color-accent-soft), transparent 45%),
+    var(--color-bg-tint);
+  border-radius: var(--radius-xl);
+}
+
+.account__eyebrow {
+  color: var(--color-accent-strong);
+}
+
+.account__link {
+  color: var(--color-secondary);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.account__link:hover {
+  color: var(--color-primary);
+}
+
+.account__link--active,
+.account__link--active:hover {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-primary);
+}
+
+.account__logout {
+  color: var(--color-accent-strong);
+}
+
+@media (min-width: 900px) {
+  .account__nav {
+    position: sticky;
+    top: 10rem;
+    padding: var(--space-3);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .account__nav .account__link {
+    border-color: transparent;
+  }
+
+  .account__nav .account__link--active {
+    border-color: var(--color-primary);
+  }
+}

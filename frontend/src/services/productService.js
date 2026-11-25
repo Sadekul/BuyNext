@@ -8,6 +8,12 @@ import { apiProvider } from './providers'
  */
 const { catalog, adapter } = apiProvider
 
+/**
+ * True when the catalog can list the newest products first (BuyNest's API:
+ * `sort=newest`). DummyJSON has no real dates, so the demo can't.
+ */
+export const CAN_SORT_BY_NEWEST = apiProvider.name === 'laravel'
+
 async function getProductPage({ path, params }, signal) {
   return adapter.productPage(await apiClient.get(path, { params, signal }))
 }

@@ -1,0 +1,29 @@
+/*
+ * Home page section headings (2026-11 redesign): a short coral kicker with a
+ * coral bar before it. Coral-strong (#c2412d) text on white is 5.1:1; the
+ * bright coral is only the bar. The deals band restyles its own kicker.
+ */
+.home-section .section-heading__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-strong);
+}
+
+.home-section:not(.deals-band) .section-heading__eyebrow::before {
+  width: 1.5rem;
+  height: 0.3rem;
+  background: var(--gradient-warm);
+  border-radius: var(--radius-full);
+  content: '';
+}
+
+.home-section .section-heading__title {
+  color: var(--color-secondary);
+  letter-spacing: -0.02em;
+}
+
+/* Sections sit closer together than the site's default: the page is long. */
+.home-section.section {
+  padding-block: calc(var(--section-gap) * 0.7);
+}

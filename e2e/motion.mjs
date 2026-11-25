@@ -51,7 +51,7 @@ const opening = await track(page, 'dialog.modal--drawer-right', () =>
 const openX = opening.map((sample) => sample.x)
 log(openX[0] > openX.at(-1) && oneWay(openX), `mini cart opens with one steady slide (${openX[0]} → ${openX.at(-1)}, ${openX.length} frames)`)
 log(openX.length >= 20, `mini cart animation runs smoothly (${openX.length} frames in 0.7s)`)
-const closing = await track(page, 'dialog.modal--drawer-right', () => page.getByRole('button', { name: 'Close' }).click())
+const closing = await track(page, 'dialog.modal--drawer-right', () => page.locator('dialog.modal--drawer-right').getByRole('button', { name: 'Close', exact: true }).click())
 const closeX = closing.map((sample) => sample.x)
 log(closeX.at(-1) > closeX[0] && oneWay(closeX), `mini cart slides out when closed (${closeX[0]} → ${closeX.at(-1)})`)
 log(!(await page.evaluate(() => document.querySelector('dialog.modal--drawer-right').open)), 'mini cart is closed afterwards')

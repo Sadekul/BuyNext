@@ -23,7 +23,7 @@
   "newsletter": {
     "thanks": "Thanks! If this address isn't subscribed yet, we've sent you a link to confirm.",
     "invalid": "Please enter a valid email address.",
-    "title": "Get 10% off your first order",
+    "title": "Be first to hear about deals",
     "text": "Join the BuyNest newsletter for new arrivals, exclusive deals, and style tips.",
     "email": "Email address",
     "subscribing": "Subscribing…",
@@ -61,6 +61,26 @@
       "play": "Play slides",
       "choose": "Choose a slide",
       "number": "{{value, number}}"
+    },
+    "deals": {
+      "eyebrow": "Today's deals",
+      "title": "Big savings, in stock now",
+      "description": "Our biggest discounts on products ready to ship.",
+      "all": "All deals",
+      "upTo": "Up to",
+      "percent": "{{value, number}}%",
+      "off": "off"
+    },
+    "carousel": {
+      "previous": "{{title}}: previous",
+      "next": "{{title}}: next"
+    },
+    "brands": {
+      "eyebrow": "Brands",
+      "title": "Shop by brand",
+      "link_one": "{{brand}}, {{count, number}} product",
+      "link_other": "{{brand}}, {{count, number}} products",
+      "count": "{{count, number}}"
     }
   },
   "categories": {
@@ -88,7 +108,8 @@
     "support": {
       "title": "Friendly support",
       "text": "Real people, seven days a week."
-    }
+    },
+    "eyebrow": "Our promise"
   },
   "demo": {
     "hero": {
@@ -117,6 +138,13 @@
         "description": "Iconic fragrances from Chanel, Dior, Gucci and more.",
         "cta": "Shop fragrances",
         "imageAlt": "Chanel Coco Noir eau de parfum bottle"
+      },
+      "smart-phones": {
+        "eyebrow": "Smartphones",
+        "title": "Upgrade your phone",
+        "description": "The latest smartphones from Apple, Samsung and more.",
+        "cta": "Shop smartphones",
+        "imageAlt": "iPhone 13 Pro smartphone"
       }
     }
   },

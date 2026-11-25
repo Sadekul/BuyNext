@@ -106,7 +106,7 @@ async function runChecks() {
   await admin.getByLabel(`Slide ${n}: Description`, { exact: true }).fill('Added by the browser check, removed at the end.')
   await admin.getByLabel(`Slide ${n}: Main button text (optional)`, { exact: true }).fill('Shop all')
   await admin.getByLabel(`Slide ${n}: Main button link`, { exact: true }).fill('/products')
-  await admin.getByLabel(`Slide ${n}: Color`, { exact: true }).selectOption({ label: 'Amber' })
+  await admin.getByLabel(`Slide ${n}: Color`, { exact: true }).selectOption({ label: 'Coral' })
   await admin.getByLabel(`Slide ${n}: title in Bangla`, { exact: true }).fill(TITLE_BN)
   await axe(admin, 'admin home page, slides editor')
   // Client check: an empty title is refused before saving.

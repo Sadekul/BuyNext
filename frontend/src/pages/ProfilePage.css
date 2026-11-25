@@ -9,7 +9,11 @@
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-6);
-  background: var(--color-bg-muted);
+  /* Redesign: soft indigo tint with a coral glow; the card also holds the name form, so its text stays ink. */
+  background:
+    radial-gradient(circle at 100% 0%, var(--color-accent-soft), transparent 50%),
+    var(--color-bg-tint);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
 }
 
@@ -19,7 +23,9 @@
   background: var(--color-bg);
   border: 3px solid var(--color-bg);
   border-radius: 50%;
-  box-shadow: var(--shadow-md);
+  box-shadow:
+    0 0 0 3px var(--color-primary),
+    var(--shadow-md);
 }
 
 .profile__name {

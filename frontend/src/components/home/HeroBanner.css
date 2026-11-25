@@ -1,8 +1,10 @@
 .hero {
+  position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 85% 20%, rgb(4 120 87 / 0.12), transparent 45%),
-    linear-gradient(180deg, var(--color-bg-muted), var(--color-bg));
+    radial-gradient(circle at 88% 12%, rgb(255 107 87 / 0.22), transparent 38%),
+    radial-gradient(circle at 8% 90%, rgb(109 40 217 / 0.14), transparent 40%),
+    linear-gradient(180deg, var(--color-bg-tint), var(--color-bg));
 }
 
 .hero__inner {
@@ -18,15 +20,29 @@
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
   font-weight: 700;
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+  border: 1px solid rgb(194 65 45 / 0.2);
   border-radius: var(--radius-full);
 }
 
 .hero__title {
   font-size: var(--text-hero);
   font-weight: 800;
+  line-height: 1.08;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+
+/* A coral underline under the single banner's headline (a shape, not text colour). */
+.hero .hero__title::after {
+  display: block;
+  width: 5rem;
+  height: 0.4rem;
+  margin-top: var(--space-4);
+  background: var(--gradient-warm);
+  border-radius: var(--radius-full);
+  content: '';
 }
 
 .hero__description {
@@ -46,7 +62,7 @@
 .hero__highlights {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3) var(--space-6);
+  gap: var(--space-3);
   margin-top: var(--space-8);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -56,10 +72,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
 }
 
 .hero__highlights svg {
-  color: var(--color-primary);
+  color: var(--color-accent-strong);
 }
 
 /* A square box sized independently of the column, so the blob can't overflow it. */
@@ -76,16 +97,28 @@
   position: absolute;
   width: 85%;
   aspect-ratio: 1;
-  background: linear-gradient(135deg, var(--color-primary), #34d399);
+  background: var(--gradient-brand);
   border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
-  opacity: 0.9;
+  box-shadow: var(--shadow-glow);
+}
+
+/* A coral disc peeking out behind the blob. */
+.hero__visual::before {
+  position: absolute;
+  top: 4%;
+  inset-inline-end: 2%;
+  width: 34%;
+  aspect-ratio: 1;
+  background: var(--gradient-warm);
+  border-radius: 50%;
+  content: '';
 }
 
 .hero__image {
   position: relative;
   width: 90%;
   height: auto;
-  filter: drop-shadow(0 24px 32px rgb(15 23 42 / 0.25));
+  filter: drop-shadow(0 24px 32px rgb(30 27 75 / 0.3));
 }
 
 @media (min-width: 1024px) {
