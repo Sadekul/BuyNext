@@ -20,10 +20,10 @@
 }
 
 .shipping-progress progress::-webkit-progress-value {
-  background: var(--gradient-brand);
+  background: var(--color-primary);
   border-radius: var(--radius-full);
 }
 
 .shipping-progress progress::-moz-progress-bar {
-  background: var(--gradient-brand);
+  background: var(--color-primary);
 }

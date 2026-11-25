@@ -104,7 +104,7 @@ if (isProductionBuild) {
   const paths = ['/', '/products', '/products/1', '/cart', '/wishlist', '/account', '/account/orders', '/checkout', '/admin/', '/admin/products', '/admin/products/1', '/admin/orders/1', '/admin/customers']
   for (const path of paths) await cspPage.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
   log(violations.length === 0, `CSP: no violations across ${paths.length} store and admin pages ${violations.length ? JSON.stringify(violations) : ''}`)
-  log(await cspPage.evaluate(async () => (await document.fonts.ready, document.fonts.check('16px Inter'))), 'CSP: web fonts still load')
+  log(await cspPage.evaluate(async () => (await document.fonts.ready, document.fonts.check('16px "Public Sans"'))), 'CSP: web fonts still load')
   const brokenImages = await cspPage.evaluate(() => [...document.images].filter((img) => img.complete && img.naturalWidth === 0).length)
   log(brokenImages === 0, `CSP: no blocked images (${brokenImages})`)
   const metaTags = await cspPage.evaluate(() => document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').length)

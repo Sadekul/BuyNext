@@ -99,7 +99,7 @@
 }
 
 .modal--center .modal__panel {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .modal__header {
@@ -123,7 +123,7 @@
   font-size: var(--text-xl);
   background: transparent;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
 }
 
 .modal__close:hover {

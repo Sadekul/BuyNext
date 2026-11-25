@@ -54,11 +54,24 @@ describe('HeroRow', () => {
 })
 
 describe('FeaturedCategories (category icon row)', () => {
-  it('shows the photo when there is one and the category icon otherwise, each tile one link', () => {
-    renderWithProviders(<FeaturedCategories categories={[{ slug: 'laptops', name: 'Laptops', image: 'l.webp' }, { slug: 'books', name: 'Books', image: null }]} />)
+  it("shows the category's line icon, its photo only when it has no icon of its own, each tile one link", () => {
+    renderWithProviders(
+      <FeaturedCategories
+        categories={[
+          { slug: 'laptops', name: 'Laptops', image: 'l.webp' },
+          { slug: 'gift-cards', name: 'Gift cards', image: 'g.webp' },
+          { slug: 'books', name: 'Books', image: null },
+        ]}
+      />,
+    )
     const section = screen.getByRole('region', { name: 'Shop by category' })
     const laptops = within(section).getByRole('link', { name: 'Laptops' })
-    expect(laptops.querySelector('img')).toHaveAttribute('alt', '')
+    expect(laptops).toHaveAttribute('href', '/categories/laptops')
+    expect(laptops.querySelector('img')).toBeNull()
+    expect(laptops.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    const giftCards = within(section).getByRole('link', { name: 'Gift cards' })
+    expect(giftCards.querySelector('img')).toHaveAttribute('alt', '') // no icon of its own: the photo, decorative
+    expect(giftCards.querySelector('svg')).toBeNull()
     const books = within(section).getByRole('link', { name: 'Books' })
     expect(books).toHaveAttribute('href', '/categories/books')
     expect(books.querySelector('img')).toBeNull()

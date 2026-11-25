@@ -1,90 +1,95 @@
 /*
- * Newsletter on --gradient-brand (indigo → violet → pink): white text
- * (≥ 4.6:1 across the gradient), a coral icon disc and Subscribe button with
- * ink text (5.7:1; never white on bright coral), the error on a white pill.
+ * Newsletter (2026-11-25 restyle): a flat dark slate block (#3d4654, 10px
+ * corners). White title (9.5:1), amber subtitle (#ffb321, 5.3:1), the email
+ * field in a white box with an envelope icon, the red Subscribe button
+ * attached to it (#d32f2f, white text 5:1), the error on a white pill.
+ * The form itself (components/forms/Newsletter) is unchanged.
  */
 .home-newsletter {
+  --newsletter-slate: #3d4654;
+
   padding-block: var(--section-gap);
 }
 
 .home-newsletter .newsletter {
-  position: relative;
   width: min(100% - 2 * var(--container-gutter), var(--container-width) - 2 * var(--container-gutter));
   margin-inline: auto;
-  padding-block: var(--space-10);
-  overflow: hidden;
+  padding-block: var(--space-8);
   color: var(--color-text-inverse);
-  background: var(--gradient-brand);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-glow);
-  isolation: isolate;
-}
-
-/* Decorative coral and white rings (shapes only). */
-.home-newsletter .newsletter::before,
-.home-newsletter .newsletter::after {
-  position: absolute;
-  z-index: -1;
-  border-radius: 50%;
-  content: '';
-}
-
-.home-newsletter .newsletter::before {
-  top: -5rem;
-  inset-inline-end: -3rem;
-  width: 16rem;
-  aspect-ratio: 1;
-  border: 2.5rem solid rgb(255 107 87 / 0.35);
-}
-
-.home-newsletter .newsletter::after {
-  bottom: -4rem;
-  inset-inline-start: -2rem;
-  width: 10rem;
-  aspect-ratio: 1;
-  background: rgb(255 255 255 / 0.08);
+  background: var(--newsletter-slate);
+  border-radius: var(--radius-lg);
 }
 
 .home-newsletter .newsletter__inner {
-  padding-inline: var(--space-6);
+  padding-inline: var(--space-5);
 }
 
 .home-newsletter .newsletter__icon {
-  color: var(--color-secondary);
-  background: var(--color-accent);
-  box-shadow: 0 0 0 0.5rem rgb(255 255 255 / 0.12);
+  color: var(--color-star);
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.25);
 }
 
 .home-newsletter .newsletter__title {
-  font-size: var(--text-3xl);
-  color: inherit;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-inverse);
 }
 
 .home-newsletter .newsletter__text {
-  margin-top: var(--space-2);
-  color: inherit;
-  opacity: 0.95;
+  margin-top: var(--space-1);
+  font-weight: 600;
+  color: var(--color-star);
+}
+
+/* The field and the button in one white box (wraps onto two rows on narrow phones). */
+.home-newsletter .newsletter__field {
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
 }
 
 .home-newsletter .newsletter__input {
-  border-color: transparent;
-  box-shadow: var(--shadow-md);
+  min-height: 2.75rem;
+  padding-inline: 2.75rem var(--space-3);
+  background: var(--color-bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='m3.5 6.5 8.5 6.5 8.5-6.5'/%3E%3C/svg%3E")
+    no-repeat 0.875rem center / 1.25rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.home-newsletter .newsletter__input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 2px var(--color-sale);
 }
 
 .home-newsletter .newsletter__form .btn {
-  color: var(--color-secondary);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  color: var(--color-text-inverse);
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
 }
 
 .home-newsletter .newsletter__form .btn:hover:not(:disabled) {
-  color: var(--color-text-inverse);
-  background: var(--color-secondary);
-  border-color: var(--color-secondary);
+  background: #b3261e;
+  border-color: #b3261e;
+  box-shadow: none;
+  transform: none;
 }
 
+/* White rings on the slate; the field's own ring sits inside the white box. */
 .home-newsletter .newsletter :focus-visible {
   outline-color: var(--color-text-inverse);
+}
+
+.home-newsletter .newsletter__input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .home-newsletter .newsletter__error {
@@ -92,12 +97,12 @@
   padding: var(--space-1) var(--space-4);
   color: var(--color-sale);
   background: var(--color-bg);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
 }
 
 @media (min-width: 768px) {
   .home-newsletter .newsletter {
-    padding-block: var(--space-12);
+    padding-block: var(--space-10);
   }
 
   .home-newsletter .newsletter__inner {

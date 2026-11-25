@@ -1,4 +1,4 @@
-/* Phase 17 "All categories": an indigo button at the start of the category row, a full-width panel below it. */
+/* "All categories": a steel-blue button (5px corners) at the start of the category row, a full-width panel below it. */
 .mega-menu {
   flex-shrink: 0;
 }
@@ -16,8 +16,7 @@
   color: var(--color-text-inverse);
   background: var(--color-primary);
   border: 0;
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
@@ -54,9 +53,9 @@
   overflow-y: auto;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-top: 3px solid var(--color-primary);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
 .mega-menu__panel[hidden] {
@@ -147,15 +146,15 @@
   color: var(--color-text-muted);
 }
 
-/* Featured promo: brand gradient, white text (4.6:1 or better across it). */
+/* Featured promo (restyle): a flat light-grey tile with dark text, like the reference banners. */
 .mega-menu__promo {
   display: none;
   align-content: start;
   gap: var(--space-2);
   padding: var(--space-5);
-  color: var(--color-text-inverse);
-  background: var(--gradient-brand);
-  border-radius: var(--radius-lg);
+  color: var(--color-secondary);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
 }
 
 @media (min-width: 1200px) {
@@ -169,9 +168,11 @@
   padding: 0.125rem var(--space-2);
   font-size: var(--text-xs);
   font-weight: 700;
-  color: var(--color-secondary);
-  background: var(--color-accent);
-  border-radius: var(--radius-full);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-inverse);
+  background: var(--color-accent-strong);
+  border-radius: 3px;
 }
 
 .mega-menu__promo-title {
@@ -190,6 +191,7 @@
 .mega-menu__promo-cta {
   font-size: var(--text-sm);
   font-weight: 700;
+  color: var(--color-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -199,8 +201,8 @@
   outline-offset: 2px;
 }
 
-.mega-menu__promo:focus-visible {
-  outline-color: var(--color-secondary);
+.mega-menu__promo:hover .mega-menu__promo-title {
+  color: var(--color-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

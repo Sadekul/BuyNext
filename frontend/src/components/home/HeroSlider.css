@@ -8,8 +8,8 @@
 .hero-slider {
   position: relative;
   overflow: hidden;
-  color: var(--color-text-inverse);
-  background: var(--color-secondary);
+  color: var(--color-secondary);
+  background: #f5f5f5;
 }
 
 .hero-slider__slides {
@@ -18,10 +18,12 @@
 }
 
 .hero-slider__slide {
+  position: relative;
   display: flex;
   grid-area: 1 / 1;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
   visibility: hidden;
   opacity: 0;
   transition:
@@ -37,36 +39,10 @@
     visibility 0s;
 }
 
-/* Tones: tones.css (the stored keys navy / emerald / amber / rose mapped to the indigo + coral palette). */
-.hero-slider__slide {
-  position: relative;
-  overflow: hidden;
-}
-
-/* Decorative coral and white rings: shapes only, never behind the copy's text. */
-.hero-slider__slide::before,
-.hero-slider__slide::after {
-  position: absolute;
-  border-radius: 50%;
-  content: '';
-  pointer-events: none;
-}
-
-.hero-slider__slide::before {
-  inset-inline-end: -6rem;
-  bottom: -8rem;
-  width: 22rem;
-  aspect-ratio: 1;
-  border: 2.5rem solid rgb(255 107 87 / 0.35);
-}
-
-.hero-slider__slide::after {
-  top: -3rem;
-  inset-inline-start: 42%;
-  width: 7rem;
-  aspect-ratio: 1;
-  background: rgb(255 255 255 / 0.08);
-}
+/*
+ * Tones: tones.css (the stored keys navy / emerald / amber / rose → light blue
+ * grey, grey, beige, pink). Flat: no rings, glows or gradients; dark text.
+ */
 
 /* Room at the bottom for the controls, which sit over the slides. */
 .hero-slider__inner {
@@ -80,42 +56,18 @@
   min-width: 0;
 }
 
-/* The eyebrow as an ink-on-coral pill (5.7:1), not white on bright coral. */
+/* Small red uppercase kicker: #b3261e is ≥ 5.6:1 on every tone. */
 .hero-slider__eyebrow {
-  color: var(--color-secondary);
-  background: var(--color-accent);
+  color: var(--tone-kicker);
 }
 
 .hero-slider__title {
-  color: inherit;
+  color: var(--color-secondary);
   overflow-wrap: anywhere;
 }
 
 .hero-slider__description {
-  color: inherit;
-  opacity: 0.9;
-}
-
-.hero-slider .btn {
-  max-width: 100%;
-  white-space: normal;
-  text-align: center;
-}
-
-.hero-slider__secondary {
-  color: var(--color-text-inverse);
-  border-color: rgb(255 255 255 / 0.7);
-}
-
-.hero-slider__secondary:hover:not(:disabled) {
-  border-color: var(--color-text-inverse);
-  background-color: rgb(255 255 255 / 0.1);
-}
-
-/* White focus ring: the site's indigo ring would vanish on the indigo slide. */
-.hero-slider :focus-visible {
-  outline-color: var(--color-text-inverse);
-  box-shadow: 0 0 0 6px rgb(15 23 42 / 0.6);
+  color: var(--color-text-muted);
 }
 
 .hero-slider__visual {
@@ -127,31 +79,26 @@
   margin-inline: auto;
 }
 
-/* A bright coral disc behind the product photo (a shape: no text sits on it). */
-.hero-slider__halo {
+/* A soft white disc behind the product photo (a shape: no text sits on it). */
+.hero-slider__disc {
   position: absolute;
-  inset: 8%;
-  background: var(--gradient-warm);
+  inset: 6%;
+  background: rgb(255 255 255 / 0.75);
   border-radius: 50%;
-  box-shadow: 0 0 0 1.25rem rgb(255 255 255 / 0.08);
-  opacity: 0.9;
 }
 
 .hero-slider__image {
   position: relative;
-}
-
-.hero-slider__image {
   width: 100%;
   height: auto;
   aspect-ratio: 1;
   object-fit: contain;
-  filter: drop-shadow(0 24px 32px rgb(0 0 0 / 0.35));
 }
 
 /*
  * Controls over the slides: a progress timeline with a counter on the left,
- * frosted-glass Pause / Previous / Next on the right. On phones the two
+ * flat white square-ish Pause / Previous / Next on the right (dark icons,
+ * readable on the light tones). On phones the two
  * groups wrap onto two rows (no sideways scroll, even with 8 slides).
  */
 .hero-slider__controls {
@@ -196,7 +143,7 @@
   width: 100%;
   height: 4px;
   overflow: hidden;
-  background: rgb(255 255 255 / 0.3);
+  background: var(--tone-control); /* ≥ 4.6:1 on every tone */
   border-radius: var(--radius-full);
   transition:
     height var(--transition-fast),
@@ -205,12 +152,15 @@
 
 .hero-slider__dot:hover .hero-slider__track {
   height: 6px;
-  background: rgb(255 255 255 / 0.5);
 }
 
-.hero-slider__dot--done .hero-slider__track,
+/* The passed slides and the shown one's fill: steel blue. */
+.hero-slider__dot--done .hero-slider__track {
+  background: var(--color-primary);
+}
+
 .hero-slider__fill {
-  background: var(--color-text-inverse);
+  background: var(--color-primary);
 }
 
 .hero-slider__fill {
@@ -246,14 +196,14 @@
   font-size: var(--text-sm);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: rgb(255 255 255 / 0.75);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
 .hero-slider__counter-current {
   font-size: var(--text-lg);
   font-weight: 700;
-  color: var(--color-text-inverse);
+  color: var(--color-secondary);
 }
 
 .hero-slider__counter-sep {
@@ -273,31 +223,27 @@
   width: 2.75rem;
   height: 2.75rem;
   font-size: 1.25rem;
-  color: var(--color-text-inverse);
-  background: rgb(255 255 255 / 0.14);
-  border: 1px solid rgb(255 255 255 / 0.35);
-  border-radius: var(--radius-full);
-  box-shadow: 0 8px 24px rgb(15 23 42 / 0.18);
-  backdrop-filter: blur(12px) saturate(140%);
+  color: var(--color-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
     border-color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+    transform var(--transition-fast);
 }
 
 .hero-slider__button svg {
   transition: transform var(--transition-fast);
 }
 
+/* Steel blue with a white icon (5.1:1). */
 .hero-slider__button:hover {
-  color: var(--color-secondary);
-  background: var(--color-text-inverse);
-  border-color: var(--color-text-inverse);
-  box-shadow: 0 12px 28px rgb(15 23 42 / 0.28);
-  transform: translateY(-2px);
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .hero-slider__button--prev:hover svg {
@@ -309,7 +255,7 @@
 }
 
 .hero-slider__button:active {
-  transform: translateY(0) scale(0.95);
+  transform: scale(0.95);
 }
 
 /* Pause / Play: a little smaller and quieter than the arrows. */
@@ -331,7 +277,7 @@
     transition: none;
   }
 
-  .hero-slider__button:hover,
+  .hero-slider__button:active,
   .hero-slider__button:hover svg {
     transform: none;
   }

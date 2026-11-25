@@ -72,7 +72,8 @@ function CmsHero({ request, storeName }) {
  * redesign in docs/STOREFRONT_REDESIGN.md), in this order, each section only when it has real data:
  *   1. hero row: the hero (single banner / slider, the admin's CMS; the demo's static hero) with the
  *      first two promo banners in a column beside it on desktop
- *   2. Shop by category              (a compact row of round tiles: photo, or the category's icon)
+ *   2. Shop by category              (light grey square tiles: the category's line icon, or its photo
+ *                                     when it has no icon of its own)
  *   3. Top products tabs             (Best selling / Trending / New arrivals / On sale, each sorted by
  *                                     the API; Best selling only with real sales; the demo has no sales
  *                                     or dates, so only Trending and On sale)
@@ -158,7 +159,6 @@ function HomePage() {
           isLoading={featuredLoading}
           viewAllTo={ROUTES.products}
           onAddToCart={handleAddToCart}
-          muted
         />
       )}
 

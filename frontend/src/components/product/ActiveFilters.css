@@ -21,7 +21,7 @@
   color: var(--color-primary);
   background: var(--color-primary-soft);
   border: 1px solid transparent;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
 }
 
 .active-filters__chip:hover {

@@ -9,7 +9,7 @@
   color: var(--color-primary);
   white-space: nowrap;
   background: var(--color-primary-soft);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
 }
 
 .order-badge svg {

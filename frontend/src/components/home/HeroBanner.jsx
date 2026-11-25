@@ -1,4 +1,4 @@
-import { LuCircleCheck } from 'react-icons/lu'
+import { LuArrowRight, LuCircleCheck } from 'react-icons/lu'
 import Button from '../ui/Button'
 import './HeroBanner.css'
 
@@ -22,12 +22,13 @@ function HeroBanner({ content }) {
           {(primaryCta || secondaryCta) && (
             <div className="hero__actions">
               {primaryCta && (
-                <Button to={primaryCta.to} size="lg">
+                <Button to={primaryCta.to} size="lg" className="hero__cta">
                   {primaryCta.label}
+                  <LuArrowRight aria-hidden="true" />
                 </Button>
               )}
               {secondaryCta && (
-                <Button to={secondaryCta.to} size="lg" variant="outline">
+                <Button to={secondaryCta.to} size="lg" variant="outline" className="hero__cta hero__cta--secondary">
                   {secondaryCta.label}
                 </Button>
               )}
@@ -47,7 +48,7 @@ function HeroBanner({ content }) {
 
         {image && (
           <div className="hero__visual">
-            <div className="hero__blob" aria-hidden="true" />
+            <div className="hero__disc" aria-hidden="true" />
             <img src={image} alt={imageAlt} className="hero__image" width="560" height="560" fetchPriority="high" />
           </div>
         )}

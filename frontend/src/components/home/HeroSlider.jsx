@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { LuChevronLeft, LuChevronRight, LuPause, LuPlay } from 'react-icons/lu'
+import { LuArrowRight, LuChevronLeft, LuChevronRight, LuPause, LuPlay } from 'react-icons/lu'
 import { useTranslation } from 'react-i18next'
 import Button from '../ui/Button'
 import { cn } from '../../utils/classNames'
@@ -48,12 +48,13 @@ function Slide({ slide, index, total, active }) {
           {(primaryCta || secondaryCta) && (
             <div className="hero__actions">
               {primaryCta && (
-                <Button to={primaryCta.to} size="lg" variant="light">
+                <Button to={primaryCta.to} size="lg" className="hero__cta">
                   {primaryCta.label}
+                  <LuArrowRight aria-hidden="true" />
                 </Button>
               )}
               {secondaryCta && (
-                <Button to={secondaryCta.to} size="lg" variant="outline" className="hero-slider__secondary">
+                <Button to={secondaryCta.to} size="lg" variant="outline" className="hero__cta hero__cta--secondary">
                   {secondaryCta.label}
                 </Button>
               )}
@@ -63,7 +64,7 @@ function Slide({ slide, index, total, active }) {
 
         {image && (
           <div className="hero-slider__visual">
-            <span className="hero-slider__halo" aria-hidden="true" />
+            <span className="hero-slider__disc" aria-hidden="true" />
             <img
               src={image}
               alt={imageAlt}

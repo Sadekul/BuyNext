@@ -4,57 +4,58 @@
  * brand change (or a future dark theme) happens in one place.
  */
 :root {
-  /* Brand: indigo + coral (2026-11-24 redesign, chosen by the store owner) */
-  --color-primary: #4338ca;
-  --color-primary-hover: #3730a3;
-  --color-primary-soft: #eef0ff;
-  --color-primary-strong: #312e81;
-  --color-secondary: #1e1b4b;
-  --color-secondary-hover: #2e2a6b;
-  /* Coral: bright for shapes and large type; "strong" wherever small text sits on it or is coral (4.5:1 on white) */
-  --color-accent: #ff6b57;
-  --color-accent-strong: #c2412d;
-  --color-accent-soft: #fff1ee;
-  --gradient-brand: linear-gradient(135deg, #4338ca 0%, #6d28d9 55%, #db2777 100%);
-  --gradient-warm: linear-gradient(135deg, #ff6b57 0%, #f59e0b 100%);
+  /* Brand: steel blue + coral-red, flat and light (2026-11-25, matching the store owner's reference design) */
+  --color-primary: #417394; /* white text 5.1:1 */
+  --color-primary-hover: #355f7a;
+  --color-primary-soft: #eef3f7;
+  --color-primary-strong: #2c5068;
+  --color-secondary: #222222; /* titles */
+  --color-secondary-hover: #3a3a3a;
+  /* Coral-red: bright for shapes and large type only; "strong" for buttons, sale prices and small text (white 5:1) */
+  --color-accent: #ff4f4f;
+  --color-accent-strong: #d32f2f;
+  --color-accent-soft: #fff1f1;
+  /* Flat look: the "gradients" are solid colours now (kept as tokens so older rules still resolve). */
+  --gradient-brand: linear-gradient(0deg, #417394, #417394);
+  --gradient-warm: linear-gradient(0deg, #ff4f4f, #ff4f4f);
 
   /* Surfaces and text */
   --color-bg: #ffffff;
-  --color-bg-muted: #f6f6fd;
-  --color-bg-tint: #f1efff;
-  --color-text: #1f1d3a;
-  --color-text-muted: #5f5f7a;
+  --color-bg-muted: #f8f8f8;
+  --color-bg-tint: #f8f8f8;
+  --color-text: #222222;
+  --color-text-muted: #4a5568; /* 7.1:1 on #f8f8f8 */
   --color-text-inverse: #ffffff;
-  --color-border: #e4e4f0;
-  --color-border-strong: #c9c9dc;
+  --color-border: #ececec;
+  --color-border-strong: #dddddd;
 
   /* Accents: sales, warnings, success, ratings */
-  --color-sale: #c2412d;
-  --color-sale-soft: #fff1ee;
+  --color-sale: #d32f2f;
+  --color-sale-soft: #fff1f1;
   --color-warning: #b45309;
   --color-warning-soft: #fffbeb;
   --color-success: #166534; /* 6.3:1 even on the lavender tint (#f1efff), 7.1:1 on white */
   --color-success-soft: #f0fdf4;
-  --color-star: #f59e0b;
+  --color-star: #ffb321;
   --color-danger: #b91c1c;
   --color-warning-border: #fde68a;
 
   /* On ink (footer, toasts, dark bars): body text, muted text, hairlines, overlays */
-  --color-on-dark: #e4e4fb;
-  --color-on-dark-muted: #b9b8e3;
+  --color-on-dark: #e8eaed;
+  --color-on-dark-muted: #b8bec7; /* 8.5:1 on the footer #1d2328 */
   --color-on-dark-line: rgb(255 255 255 / 0.14);
   --color-on-dark-hover: rgb(255 255 255 / 0.1);
-  --color-overlay: rgb(30 27 75 / 0.55);
-  --color-primary-glow: rgb(67 56 202 / 0.45);
-  --color-accent-glow: rgb(255 107 87 / 0.16);
+  --color-overlay: rgb(29 35 40 / 0.55);
+  --color-primary-glow: rgb(65 115 148 / 0.35);
+  --color-accent-glow: rgb(255 79 79 / 0.14);
   --color-glass: rgb(255 255 255 / 0.94);
-  --color-swatch-edge: rgb(30 27 75 / 0.2);
-  --ring-focus: 0 0 0 3px rgb(67 56 202 / 0.2);
-  --ring-error: 0 0 0 3px rgb(194 65 45 / 0.18);
+  --color-swatch-edge: rgb(0 0 0 / 0.18);
+  --ring-focus: 0 0 0 3px rgb(65 115 148 / 0.25);
+  --ring-error: 0 0 0 3px rgb(211 47 47 / 0.18);
 
   /* Typography */
-  --font-body: 'Inter', 'Noto Sans Bengali', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-heading: 'Plus Jakarta Sans', var(--font-body);
+  --font-body: 'Public Sans', 'Noto Sans Bengali', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Public Sans', var(--font-body);
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -79,16 +80,16 @@
   --section-gap: clamp(2.25rem, 1.5rem + 3vw, 3.75rem);
 
   /* Shape and depth */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.75rem;
+  --radius-sm: 0.3125rem; /* 5px: buttons, inputs */
+  --radius-md: 0.5rem; /* 8px: cards, tiles */
+  --radius-lg: 0.625rem; /* 10px: banners, panels */
+  --radius-xl: 0.75rem;
   --radius-full: 999px;
-  --shadow-sm: 0 1px 2px rgb(30 27 75 / 0.06);
-  --shadow-md: 0 6px 16px rgb(30 27 75 / 0.08);
-  --shadow-lg: 0 16px 40px rgb(30 27 75 / 0.14);
-  --shadow-glow: 0 12px 32px rgb(67 56 202 / 0.28);
-  --shadow-primary: 0 4px 14px rgb(67 56 202 / 0.22);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 24px rgb(0 0 0 / 0.08);
+  --shadow-glow: 0 6px 16px rgb(65 115 148 / 0.2);
+  --shadow-primary: 0 4px 12px rgb(65 115 148 / 0.2);
 
   /* Motion */
   --transition-fast: 150ms ease;
@@ -98,4 +99,9 @@
   --container-width: 1280px;
   --container-gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
   --header-z: 50;
+}
+
+/* The dark footer of the reference design (charcoal). */
+:root {
+  --color-footer: #1d2328;
 }

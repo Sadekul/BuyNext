@@ -1,6 +1,5 @@
 import { LuHeadphones, LuRotateCcw, LuShieldCheck, LuTruck } from 'react-icons/lu'
 import SectionHeading from '../common/SectionHeading'
-import './tones.css'
 import './BenefitsSection.css'
 import { useTranslation } from 'react-i18next'
 
@@ -11,7 +10,7 @@ const BENEFIT_ICONS = {
   support: LuHeadphones,
 }
 
-/** The store's promises as colourful tiles: each one a tint with a bold icon disc. */
+/** The store's promises as four flat, light grey tiles, each with a steel-blue line icon. */
 function BenefitsSection({ benefits }) {
   const { t } = useTranslation('marketing')
   return (

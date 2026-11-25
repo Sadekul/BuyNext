@@ -325,3 +325,10 @@
 - Checking layouts at many widths (390 → 1440), not just phone and desktop: the tablet header overflowed
 - Landmarks: a dialog opened from inside `<header>` must not contain its own `<header>`/`<footer>`
 - React's development mode runs effects twice; count network requests on the production build before calling something slow
+
+## Storefront restyle: follow the reference design (2026-11-25)
+
+- Matching a reference look means matching its tokens first (colour, font, radius, shadow): most of the restyle came from one file
+- A reference's colours aren't automatically accessible: its coral-red fails with white text, so a deeper red carries text and the bright one stays decorative
+- Never open a file for writing before reading it in the same script: `open(p, 'w')` empties it first
+- Compare screenshots side by side with the reference at the same widths, then list the intentional differences instead of leaving them implicit

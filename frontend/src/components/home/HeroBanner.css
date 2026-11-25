@@ -1,10 +1,14 @@
+/*
+ * Homepage hero (2026-11-25 restyle, flat and light): a light grey panel,
+ * a small red uppercase kicker (letter-spaced), a big bold dark title, grey
+ * text, and a rectangular steel-blue button with an arrow; the product photo
+ * on the right on a soft white disc. No gradients, glows or blobs.
+ * Contrast on #f5f5f5: kicker #b3261e 6:1, title #222 14.6:1, text #4a5568 6.9:1.
+ */
 .hero {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 88% 12%, rgb(255 107 87 / 0.22), transparent 38%),
-    radial-gradient(circle at 8% 90%, rgb(109 40 217 / 0.14), transparent 40%),
-    linear-gradient(180deg, var(--color-bg-tint), var(--color-bg));
+  background: #f5f5f5;
 }
 
 .hero__inner {
@@ -15,39 +19,26 @@
 }
 
 .hero__eyebrow {
-  display: inline-block;
-  margin-bottom: var(--space-4);
-  padding: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-3);
   font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--color-accent-strong);
-  background: var(--color-accent-soft);
-  border: 1px solid rgb(194 65 45 / 0.2);
-  border-radius: var(--radius-full);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tone-kicker, #b3261e);
 }
 
 .hero__title {
   font-size: var(--text-hero);
   font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--color-secondary);
   overflow-wrap: anywhere;
-}
-
-/* A coral underline under the single banner's headline (a shape, not text colour). */
-.hero .hero__title::after {
-  display: block;
-  width: 5rem;
-  height: 0.4rem;
-  margin-top: var(--space-4);
-  background: var(--gradient-warm);
-  border-radius: var(--radius-full);
-  content: '';
 }
 
 .hero__description {
   max-width: 34rem;
-  margin-top: var(--space-5);
+  margin-top: var(--space-4);
   font-size: var(--text-lg);
   color: var(--color-text-muted);
 }
@@ -59,31 +50,72 @@
   margin-top: var(--space-8);
 }
 
+/* Rectangular buttons (5px), flat: steel blue with white text (5.1:1), the second one outlined in ink. */
+.hero .hero__cta,
+.hero-slider .hero__cta {
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-base);
+  white-space: normal;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.hero .hero__cta:hover:not(:disabled),
+.hero-slider .hero__cta:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
+.hero .hero__cta svg,
+.hero-slider .hero__cta svg {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.hero .hero__cta:hover svg,
+.hero-slider .hero__cta:hover svg {
+  transform: translateX(3px);
+}
+
+.hero .hero__cta--secondary,
+.hero-slider .hero__cta--secondary {
+  color: var(--color-secondary);
+  background: transparent;
+  border-color: var(--color-secondary);
+}
+
+.hero .hero__cta--secondary:hover:not(:disabled),
+.hero-slider .hero__cta--secondary:hover:not(:disabled) {
+  color: var(--color-text-inverse);
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+
 .hero__highlights {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-5);
   margin-top: var(--space-8);
   font-size: var(--text-sm);
   font-weight: 500;
+  color: var(--color-text);
 }
 
 .hero__highlights li {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
 }
 
 .hero__highlights svg {
-  color: var(--color-accent-strong);
+  flex-shrink: 0;
+  color: var(--color-primary);
 }
 
-/* A square box sized independently of the column, so the blob can't overflow it. */
+/* A square box sized independently of the column, so the disc can't overflow it. */
 .hero__visual {
   position: relative;
   display: grid;
@@ -93,32 +125,32 @@
   margin-inline: auto;
 }
 
-.hero__blob {
+/* A soft white disc behind the product photo (a shape only). */
+.hero__disc {
   position: absolute;
-  width: 85%;
-  aspect-ratio: 1;
-  background: var(--gradient-brand);
-  border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
-  box-shadow: var(--shadow-glow);
-}
-
-/* A coral disc peeking out behind the blob. */
-.hero__visual::before {
-  position: absolute;
-  top: 4%;
-  inset-inline-end: 2%;
-  width: 34%;
-  aspect-ratio: 1;
-  background: var(--gradient-warm);
+  inset: 6%;
+  background: var(--color-bg);
   border-radius: 50%;
-  content: '';
 }
 
 .hero__image {
   position: relative;
-  width: 90%;
+  width: 86%;
   height: auto;
-  filter: drop-shadow(0 24px 32px rgb(30 27 75 / 0.3));
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero .hero__cta svg,
+  .hero-slider .hero__cta svg {
+    transition: none;
+  }
+
+  .hero .hero__cta:hover svg,
+  .hero-slider .hero__cta:hover svg {
+    transform: none;
+  }
 }
 
 @media (min-width: 1024px) {

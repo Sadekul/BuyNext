@@ -16,17 +16,19 @@
   display: block;
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  /* Restyle: flat light-grey chips; steel blue when chosen. */
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-bg-muted);
+  border-radius: var(--radius-sm);
   transition:
     border-color var(--transition-fast),
     background-color var(--transition-fast);
 }
 
 .category-nav__link:hover {
+  color: var(--color-primary);
   border-color: var(--color-primary);
 }
 

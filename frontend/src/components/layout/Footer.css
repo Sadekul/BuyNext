@@ -1,91 +1,60 @@
+/* Footer (2026-11 restyle): flat charcoal, white headings, light-grey links (8.5:1), no gradients or glows. */
 .site-footer {
   position: relative;
   color: var(--color-on-dark-muted);
-  background: var(--color-secondary);
-  /* Redesign: a brand-gradient edge on top, and a soft indigo/coral glow in the corners. */
-  background-image:
-    radial-gradient(circle at 0% 0%, var(--color-primary-glow), transparent 40%),
-    radial-gradient(circle at 100% 100%, var(--color-accent-glow), transparent 35%);
-  border-top: 4px solid transparent;
-  border-image: var(--gradient-brand) 1;
+  background: var(--color-footer);
 }
 
 .site-footer__main {
   display: grid;
   gap: var(--space-8);
-  /* Phase 17: denser (was 4rem / 3rem). */
-  padding-block: var(--space-12) var(--space-8);
+  padding-block: var(--space-12) var(--space-10);
 }
 
 .site-footer__about {
   max-width: 22rem;
-  margin-block: var(--space-5);
+  margin-block: var(--space-4) var(--space-5);
+  font-size: var(--text-sm);
+  line-height: 1.8;
 }
 
 .site-footer__contact {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .site-footer__contact li {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* Phase 17: a multi-line postal address keeps its icon at the first line. */
-.site-footer__contact li:has(.site-footer__address) {
   align-items: flex-start;
+  gap: var(--space-3);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
-.site-footer__contact li:has(.site-footer__address) svg {
+.site-footer__contact svg {
   flex-shrink: 0;
-  margin-top: 0.25em;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.2em;
+  color: var(--color-on-dark);
 }
 
 .site-footer__address {
   white-space: pre-line;
 }
 
-/* Phase 17: "We accept" and the payment badges, above the bottom row. */
-.site-footer__payments {
-  padding-block: var(--space-4);
-  border-top: 1px solid var(--color-on-dark-line);
-}
-
-.site-footer__payments:not(:has(.payment-badges)) {
-  display: none;
-}
-
 .site-footer__heading {
-  position: relative;
   margin-bottom: var(--space-5);
-  padding-bottom: var(--space-2);
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
+  font-weight: 600;
   color: var(--color-text-inverse);
-}
-
-/* A short coral bar under each heading (decorative shape). */
-.site-footer__heading::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 1.75rem;
-  height: 3px;
-  background: var(--color-accent);
-  border-radius: var(--radius-full);
-}
-
-.site-footer__contact svg {
-  color: var(--color-accent);
 }
 
 .site-footer__links {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .site-footer a {
@@ -98,8 +67,6 @@
 
 .site-footer__links a:hover {
   text-decoration: underline;
-  text-decoration-color: var(--color-accent);
-  text-decoration-thickness: 2px;
   text-underline-offset: 4px;
 }
 
@@ -107,22 +74,10 @@
   outline-color: var(--color-text-inverse);
 }
 
-.site-footer__bottom {
-  border-top: 1px solid var(--color-on-dark-line);
-}
-
-.site-footer__bottom-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-block: var(--space-4);
-  font-size: var(--text-sm);
-}
-
+/* Round social icons on a slightly lighter charcoal. */
 .site-footer__social {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
@@ -133,20 +88,38 @@
   height: 2.5rem;
   color: var(--color-on-dark);
   background: var(--color-on-dark-hover);
-  border: 1px solid var(--color-on-dark-line);
   border-radius: 50%;
   transition:
     background-color var(--transition-fast),
-    color var(--transition-fast),
-    transform var(--transition-fast);
+    color var(--transition-fast);
 }
 
-/* Coral shape, ink icon (never white on bright coral). */
 .site-footer__social a:hover {
-  color: var(--color-secondary);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  transform: translateY(-2px);
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+}
+
+/* Bottom row: copyright (with the language switch and cookie settings) left, payment badges right. */
+.site-footer__bottom-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-6);
+  padding-block: var(--space-6);
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--color-on-dark-line);
+}
+
+.site-footer__legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+
+.site-footer__payments:not(:has(.payment-badges)) {
+  display: none;
 }
 
 @media (min-width: 640px) {
@@ -157,7 +130,22 @@
 
 @media (min-width: 1024px) {
   .site-footer__main {
-    grid-template-columns: 2fr repeat(3, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Wide screens: one row of columns, however many link groups the store has; brand and store details wider. */
+@media (min-width: 1280px) {
+  .site-footer__main {
+    grid-template-columns: 1.5fr;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    gap: var(--space-6);
+  }
+
+  /* Room for a whole email address on one line (it only breaks when it can't fit at all). */
+  .site-footer__store {
+    min-width: 18rem;
   }
 }
 

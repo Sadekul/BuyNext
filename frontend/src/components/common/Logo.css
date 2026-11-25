@@ -8,11 +8,11 @@
 .logo__mark {
   width: 2.25rem;
   height: 2.25rem;
-  filter: drop-shadow(var(--shadow-primary));
 }
 
 .logo__mark rect {
   fill: var(--color-primary);
+  rx: 6px;
 }
 
 .logo__mark path {

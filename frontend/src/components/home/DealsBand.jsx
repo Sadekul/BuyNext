@@ -8,7 +8,7 @@ import './DealsBand.css'
 
 /**
  * "Today's deals": the biggest real discounts on products in stock
- * (utils/homeSections.js pickDeals), on a warm coral → amber band.
+ * (utils/homeSections.js pickDeals), on a flat white panel with a red top edge.
  *
  * No countdown: the API doesn't say when a discount ends (a product's
  * `price_rule` is only { id, name }), and the plan forbids fake urgency.

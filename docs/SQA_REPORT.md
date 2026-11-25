@@ -360,6 +360,26 @@ Not a bug, checked: the dev server makes each home page request twice (React's d
 
 Checks: backend 587 feature tests (Pint clean); frontend 971 unit tests; admin 228; browser checks 1,903 on the dev server (full run, with the loyalty suite rerun alone after M9: 130) and 1,896 on the production build (full run, with the marketplace and marketing suites rerun alone: 62, 187). Not automated in the browser: the sticky header's compact state on scroll, hovering a card for its second photo, and a real phone's clipboard permission prompt.
 
+## Storefront restyle: follow the reference design (flat, light, steel blue) — 2026-11-25
+
+Asked by the store owner ("update design and theme colors, follow my reference link": Fastkart demo 9, `theme-color-5`). The look was matched (steel blue `#417394`, coral-red accents, `#f8f8f8` tiles, charcoal footer, Public Sans, flat cards and buttons, small radii) with **our own code, CSS, icons, images and texts**; only colour values and the free Google Font were taken. The lead set the theme; two agents restyled the shell and pages and the home page in parallel against [STOREFRONT_FASTKART_STYLE.md](STOREFRONT_FASTKART_STYLE.md). Checks: every text colour pair measured, screenshots side by side with the reference at 1440px and 390px, no sideways scroll at 390/600/768/820/900/1024/1280/1440px, axe on the main pages, English and Bangla. All features from phases 1–17 kept.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| F1 | Medium | The reference's coral-red `#ff4f4f` with white text is 3.2:1 (fails WCAG AA) | `#ff4f4f` only for shapes, badges' backgrounds with large text and icons; sale prices and white-on-red buttons use `#d32f2f` (4.98:1) |
+| F2 | Low | Light banner tones with coloured text: the reference's pale blue and beige needed darker words | Tone text `#2c5068` on blue grey and `#b3261e` on pink (7.3:1 and 5.6:1); the admin's tone labels renamed Blue grey / Grey / Beige / Pink (stored keys unchanged) |
+| F3 | Low | The footer's store email broke in the middle of a word at 1280px | The store column has a minimum width and long addresses wrap at sensible points |
+| F4 | Low | A recolouring script emptied the favicon (opened for writing before reading) | Restored from git and recoloured; every touched file checked for 0 bytes |
+| F5 | Test | The slider suite picked the slide colour by its old label "Coral" | It picks "Beige" |
+| F6 | Test | The marketing suite's cart-rules page once took over 15 s to load in the full dev run | Passed 187/187 alone with no change |
+| F7 | Test | The security suite checked that the old web font (Inter) loads under the content security policy | It checks Public Sans |
+| F8 | Test | The slider suite's Bangla accessibility check sometimes ran during the 400 ms slide cross-fade, measuring half-transparent text as low contrast (production build, 1 run in 4) | It waits for the fade to finish; every slide checked in both languages has no contrast issue |
+| F9 | Test | Under the full production run, two pages took over 15–30 s to load (extras: cookie consent; marketplace: phone footer, once the admin's home page) | Passed alone with no change (extras 164/164, marketplace 62/62); the test data was checked clean afterwards |
+
+Intentional differences from the reference: search and "All categories" sit on a second header row (our search has a category picker and suggestions); no countdowns, "sold" bars or invented ratings (honest data); our own line icons and photos.
+
+Checks: frontend 971 unit tests; admin 228; browser checks 1,889 on the dev server (full run, with the marketing suite rerun alone after F6: 187) and 1,877 of 1,881 on the production build (full run; the four failures are F7–F9, and the security, slider, extras and marketplace suites then passed alone: 20, 41, 164, 62).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

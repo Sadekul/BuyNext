@@ -1,12 +1,15 @@
 /*
- * "Shop by category" (phase 17): compact round tiles. Phones: one row that
- * scrolls sideways inside the section (scroll-snap; the page itself never
- * scrolls sideways). From 640px: a grid that fills the row (up to 12 tiles,
- * one or two rows on desktop). The discs take turns in four tints.
+ * "Shop by category" (2026-11-25 restyle): equal light grey square tiles
+ * (8px corners, flat), a thin line icon centred above the name. Hover / focus:
+ * a steel-blue border and icon. Phones: one row of square tiles that scrolls
+ * sideways inside the section (scroll-snap; the page itself never scrolls
+ * sideways). From 640px: a grid of 4, then 6 per row (12 categories = two
+ * even rows), the tiles a little wider than tall like the reference.
+ * Name #222 on #f8f8f8: 15:1.
  */
 .category-icons {
   display: grid;
-  grid-auto-columns: 5.75rem;
+  grid-auto-columns: 6.5rem;
   grid-auto-flow: column;
   gap: var(--space-3);
   margin-inline: calc(var(--container-gutter) * -1);
@@ -27,105 +30,98 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: center;
+  gap: var(--space-3);
   height: 100%;
-  padding: var(--space-2) var(--space-1);
+  min-height: 6.5rem;
+  padding: var(--space-4) var(--space-2);
   color: var(--color-secondary);
-  border-radius: var(--radius-lg);
+  background: var(--color-bg-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
-.category-icon__disc {
+.category-icon__media {
   display: grid;
   place-items: center;
-  width: 4.5rem;
-  aspect-ratio: 1;
-  overflow: hidden;
-  background: var(--color-primary-soft);
-  border: 2px solid transparent;
-  border-radius: 50%;
-  box-shadow: var(--shadow-sm);
-  transition:
-    transform var(--transition-base),
-    border-color var(--transition-base),
-    box-shadow var(--transition-base);
+  width: 2.75rem;
+  height: 2.75rem;
 }
 
-.category-icons__item:nth-child(4n + 2) .category-icon__disc {
-  background: var(--color-accent-soft);
-}
-
-.category-icons__item:nth-child(4n + 3) .category-icon__disc {
-  background: var(--color-bg-tint);
-}
-
-.category-icons__item:nth-child(4n) .category-icon__disc {
-  background: var(--color-warning-soft);
-}
-
-.category-icon__disc img {
-  width: 78%;
-  height: 78%;
+.category-icon__media img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  mix-blend-mode: multiply;
 }
 
 .category-icon__glyph {
-  width: 45%;
-  height: 45%;
-  color: var(--color-primary);
-}
-
-.category-icon:hover .category-icon__disc {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-3px);
+  width: 2.25rem;
+  height: 2.25rem;
+  stroke-width: 1.5;
+  color: var(--color-secondary);
+  transition: color var(--transition-fast);
 }
 
 .category-icon__name {
-  font-size: var(--text-xs);
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: 500;
   line-height: 1.25;
   text-align: center;
   overflow-wrap: break-word;
   hyphens: auto;
 }
 
-.category-icon:hover .category-icon__name {
+.category-icon:hover {
+  color: var(--color-primary-strong);
+  border-color: var(--color-primary);
+}
+
+.category-icon:hover .category-icon__glyph {
   color: var(--color-primary);
 }
 
-/* Even rows for up to 12 categories: two rows of 6, then one row of 12 on wide screens (no lone leftovers). */
 @media (min-width: 640px) {
   .category-icons {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-auto-flow: row;
-    gap: var(--space-3);
     margin-inline: 0;
     padding: 0;
     overflow: visible;
   }
 
-  .category-icon__disc {
-    width: 5.25rem;
+  .category-icon {
+    min-height: 8rem;
   }
 
-  .category-icon__name {
-    font-size: var(--text-sm);
+  .category-icon__media {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .category-icon__glyph {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .category-icons {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  .category-icon {
+    min-height: 9rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .category-icon__disc {
+  .category-icon,
+  .category-icon__glyph {
     transition: none;
-  }
-
-  .category-icon:hover .category-icon__disc {
-    transform: none;
-  }
-}
-
-@media (min-width: 1200px) {
-  .category-icons {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: var(--space-2);
   }
 }

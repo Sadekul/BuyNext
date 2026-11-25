@@ -42,7 +42,7 @@
   color: var(--color-text);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
 }
 
 .account__link:hover {
@@ -77,14 +77,12 @@
   }
 }
 
-/* ---- 2026 redesign: indigo + coral ---- */
-/* The account header on a soft brand tint, with a coral kicker. */
+/* ---- 2026-11 restyle: flat, steel blue ---- */
+/* The account header on flat light grey, with a red kicker. */
 .account__header {
   padding: var(--space-6) var(--space-6);
-  background:
-    radial-gradient(circle at 100% 0%, var(--color-accent-soft), transparent 45%),
-    var(--color-bg-tint);
-  border-radius: var(--radius-xl);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
 }
 
 .account__eyebrow {
@@ -108,7 +106,6 @@
   color: var(--color-text-inverse);
   background: var(--color-primary);
   border-color: var(--color-primary);
-  box-shadow: var(--shadow-primary);
 }
 
 .account__logout {
@@ -122,7 +119,7 @@
     padding: var(--space-3);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
   }
 

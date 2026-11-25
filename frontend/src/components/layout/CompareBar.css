@@ -3,9 +3,9 @@
   /* Phase 17: above the phone tab bar when it's there. */
   bottom: var(--bottom-bar-offset, 0px);
   z-index: calc(var(--header-z) - 1);
-  background: var(--color-secondary);
+  /* Restyle: a flat charcoal bar (like the footer) with white text. */
+  background: var(--color-footer);
   color: var(--color-text-inverse);
-  box-shadow: var(--shadow-lg);
 }
 
 .compare-bar__inner {
@@ -25,7 +25,7 @@
   padding-inline: var(--space-4);
   font-size: var(--text-sm);
   font-weight: 700;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
 }
 
 .compare-bar__link {
@@ -46,7 +46,7 @@
 }
 
 .compare-bar__clear:hover {
-  background: var(--color-secondary-hover);
+  background: var(--color-on-dark-hover);
 }
 
 .compare-bar__notice {

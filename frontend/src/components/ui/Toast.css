@@ -17,9 +17,10 @@
   max-width: 28rem;
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   color: var(--color-text-inverse);
-  background: var(--color-secondary);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  /* Restyle: flat charcoal (the footer's colour), 5px corners. */
+  background: var(--color-footer);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
   pointer-events: auto;
   animation: toast-in var(--transition-base);
 }
@@ -42,7 +43,7 @@
   height: 2rem;
   background: transparent;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
 }
 
 .toast__close:hover {

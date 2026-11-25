@@ -1,5 +1,5 @@
 /*
- * Phase 17 hero row: the hero as a rounded panel inside the container, the
+ * Phase 17 hero row: the hero as a flat panel (10px corners, no shadow) inside the container, the
  * compact promo column beside it from 1024px (two columns below it on
  * tablets, stacked on phones). The hero's own markup and CSS are unchanged;
  * only its outer spacing and type scale are tightened here.
@@ -17,8 +17,7 @@
   display: grid;
   min-width: 0;
   overflow: hidden;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
 }
 
 /* The hero fills the row's height when the side column is taller (no empty strip under it). */

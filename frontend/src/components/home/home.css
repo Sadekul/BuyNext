@@ -1,26 +1,26 @@
 /*
- * Home page section headings (2026-11 redesign): a short coral kicker with a
- * coral bar before it. Coral-strong (#c2412d) text on white is 5.1:1; the
- * bright coral is only the bar. The deals band restyles its own kicker.
+ * Home page section headings (2026-11-25 restyle, flat): a bold dark title
+ * (~28px on desktop), left aligned, with a small red uppercase kicker above
+ * it (#d32f2f on white 5:1, no decoration) and "View all" in steel blue on
+ * the right. The deals band and the coupon band restyle their own headings.
  */
 .home-section .section-heading__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
   color: var(--color-accent-strong);
 }
 
-.home-section:not(.deals-band) .section-heading__eyebrow::before {
-  width: 1.5rem;
-  height: 0.3rem;
-  background: var(--gradient-warm);
-  border-radius: var(--radius-full);
-  content: '';
+.home-section .section-heading__title {
+  font-weight: 700;
+  color: var(--color-secondary);
+  letter-spacing: -0.01em;
 }
 
-.home-section .section-heading__title {
-  color: var(--color-secondary);
-  letter-spacing: -0.02em;
+.home-section .section-heading__link {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
 /* Sections sit closer together than the site's default: the page is long. */
@@ -30,8 +30,8 @@
 
 /*
  * Phase 17: a denser, marketplace-style page. Sections sit closer together
- * from tablets up, headings are a step smaller, and the kept sections
- * (benefits, brands, newsletter) use less padding. Touch targets are unchanged.
+ * from tablets up, and the kept sections (benefits, brands, newsletter) use
+ * less padding. Touch targets are unchanged.
  */
 @media (min-width: 768px) {
   .home-section.section {
@@ -39,22 +39,22 @@
   }
 
   .home-section .section-heading__title {
-    font-size: var(--text-2xl);
+    font-size: 1.75rem;
   }
 
   .home-section .section-heading {
     margin-bottom: var(--space-5);
   }
 
-  .home-section .benefits__item {
-    padding: var(--space-4) var(--space-5);
-  }
-
   .home-newsletter {
     padding-block: calc(var(--section-gap) * 0.5) var(--section-gap);
   }
+}
 
-  .home-newsletter .newsletter {
-    padding-block: var(--space-8);
-  }
+/* Bangla: no letter-spacing on the kickers (spacing pulls the script's joined letters apart). */
+:lang(bn) .hero__eyebrow,
+:lang(bn) .home-section .section-heading__eyebrow,
+:lang(bn) .coupon-band__eyebrow,
+:lang(bn) .deals-band__badge-label {
+  letter-spacing: 0;
 }

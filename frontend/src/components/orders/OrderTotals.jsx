@@ -2,6 +2,7 @@ import DiscountRows from '../cart/DiscountRows'
 import { moneyFormatter } from '../../utils/formatters'
 import { formatPoints } from '../../utils/rewards'
 import { useTranslation } from 'react-i18next'
+import '../cart/CartSummary.css' // its rows are styled there; imported here too so a checkout opened directly is styled
 
 /** Totals rows shared by checkout, confirmation, and order details. Reuses CartSummary's styles. */
 /** `appliedRules` (phase 7): the cart price rules the server applied, one row each. */

@@ -106,7 +106,7 @@ async function runChecks() {
   await admin.getByLabel(`Slide ${n}: Description`, { exact: true }).fill('Added by the browser check, removed at the end.')
   await admin.getByLabel(`Slide ${n}: Main button text (optional)`, { exact: true }).fill('Shop all')
   await admin.getByLabel(`Slide ${n}: Main button link`, { exact: true }).fill('/products')
-  await admin.getByLabel(`Slide ${n}: Color`, { exact: true }).selectOption({ label: 'Coral' })
+  await admin.getByLabel(`Slide ${n}: Color`, { exact: true }).selectOption({ label: 'Beige' })
   await admin.getByLabel(`Slide ${n}: title in Bangla`, { exact: true }).fill(TITLE_BN)
   await axe(admin, 'admin home page, slides editor')
   // Client check: an empty title is refused before saving.
@@ -187,6 +187,7 @@ async function runChecks() {
   await shop.getByRole('button', { name: `স্লাইড ${nBn} দেখান` }).click()
   log(await visible(shop.getByRole('heading', { name: TITLE_BN })), `Bangla: the new slide's Bangla title ("${TITLE_BN}")`)
   log(await visible(shop.getByRole('group', { name: `${nBn}টির মধ্যে ${nBn}` }).getByRole('link', { name: 'Shop all' })), 'Bangla: an untranslated button keeps its English text')
+  await shop.waitForTimeout(600) // the 400 ms cross-fade: axe mid-fade measures half-transparent text
   await axe(shop, 'store home with the slider in Bangla')
   await shop.context().close()
 

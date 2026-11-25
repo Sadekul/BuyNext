@@ -11,14 +11,10 @@
   width: min(100%, 28rem);
   padding: clamp(var(--space-6), 4vw, var(--space-10));
   background: var(--color-bg);
+  /* Restyle: a flat white card with a hairline and a steel-blue top edge. */
   border: 1px solid var(--color-border);
-  /* Redesign: a brand-gradient edge on top of the card. */
-  border-top: 5px solid transparent;
-  border-radius: var(--radius-xl);
-  background-image: linear-gradient(var(--color-bg), var(--color-bg)), var(--gradient-brand);
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow: var(--shadow-lg);
+  border-top: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
 }
 
 .auth-card--wide {

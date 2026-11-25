@@ -1,9 +1,11 @@
 /*
- * Compact product lists (phase 17). Phones: one row that swipes sideways
- * inside the section (each list 85% wide, scroll-snap; the page never
- * scrolls sideways). 640px: two per row. 1100px: all four side by side.
- * Each row: a tinted thumbnail well, the name (its link is stretched over the
- * row), stars, and the price (sale price coral-strong, original struck through).
+ * Compact product lists (phase 17; 2026-11-25 restyle, flat). Phones: one row
+ * that swipes sideways inside the section (each list 85% wide, scroll-snap;
+ * the page never scrolls sideways). 640px: two per row. 1100px: all four side
+ * by side. No card: each list is a title with a steel-blue underline segment
+ * over a grey hairline, then rows of a square light grey thumbnail, the name
+ * on one line (its link is stretched over the row), stars, and the price in
+ * steel blue (#417394 on white 5.1:1), the original struck through in grey.
  */
 .product-lists__row {
   display: grid;
@@ -21,26 +23,34 @@
 
 .compact-list {
   min-width: 0;
-  padding: var(--space-4);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
   scroll-snap-align: start;
 }
 
 .compact-list__head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
   padding-bottom: var(--space-3);
-  border-bottom: 2px solid var(--color-bg-tint);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+/* The steel-blue segment over the hairline (a shape). */
+.compact-list__head::after {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: -1px;
+  width: min(7.5rem, 45%);
+  height: 2px;
+  background: var(--color-primary);
+  content: '';
 }
 
 .compact-list__title {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
+  font-weight: 700;
   color: var(--color-secondary);
 }
 
@@ -51,7 +61,7 @@
   gap: var(--space-1);
   min-height: 1.5rem;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-primary);
 }
 
@@ -67,16 +77,10 @@
 .compact-product {
   position: relative;
   display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-columns: 5rem minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1);
+  gap: var(--space-4);
   border-radius: var(--radius-md);
-  transition: background-color var(--transition-base);
-}
-
-.compact-product:hover {
-  background: var(--color-bg-muted);
 }
 
 .compact-product__media {
@@ -84,7 +88,7 @@
   place-items: center;
   aspect-ratio: 1;
   overflow: hidden;
-  background: var(--color-primary-soft);
+  background: var(--color-bg-muted);
   border-radius: var(--radius-md);
 }
 
@@ -92,6 +96,12 @@
   width: 86%;
   height: 86%;
   object-fit: contain;
+  mix-blend-mode: multiply;
+  transition: transform var(--transition-base);
+}
+
+.compact-product:hover .compact-product__media img {
+  transform: scale(1.05);
 }
 
 .compact-product__body {
@@ -100,16 +110,15 @@
   min-width: 0;
 }
 
+/* One line, cut with an ellipsis (the full name is the link's name). */
 .compact-product__name {
-  display: -webkit-box;
   overflow: hidden;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--color-secondary);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* The whole row opens the product (one link, named by the product). */
@@ -146,8 +155,8 @@
 }
 
 .compact-product__price-current {
-  font-weight: 800;
-  color: var(--color-accent-strong);
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 .compact-product__price-original {
@@ -173,6 +182,7 @@
 @media (min-width: 640px) {
   .product-lists__row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6) var(--space-8);
     grid-auto-flow: row;
     margin-inline: 0;
     padding: 0;
@@ -191,8 +201,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .compact-product {
+  .compact-product__media img {
     transition: none;
+  }
+
+  .compact-product:hover .compact-product__media img {
+    transform: none;
   }
 }
 

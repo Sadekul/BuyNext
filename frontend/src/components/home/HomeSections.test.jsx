@@ -104,11 +104,11 @@ describe('DealsBand', () => {
 })
 
 describe('FeaturedCategories', () => {
-  it('shows a photo tile per category, each one link named by the category', () => {
+  it('shows a tile per category (its line icon, decorative), each one link named by the category', () => {
     renderWithProviders(<FeaturedCategories categories={[{ slug: 'laptops', name: 'Laptops', image: 'l.webp' }, { slug: 'beauty', name: 'Beauty', image: 'b.webp' }]} />)
     const section = screen.getByRole('region', { name: 'Shop by category' })
     expect(within(section).getByRole('link', { name: 'Laptops' })).toHaveAttribute('href', '/categories/laptops')
-    expect(within(section).getByRole('link', { name: 'Beauty' }).querySelector('img')).toHaveAttribute('alt', '')
+    expect(within(section).getByRole('link', { name: 'Beauty' }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(within(section).getByRole('link', { name: 'All products' })).toHaveAttribute('href', '/products')
   })
 
