@@ -25,7 +25,9 @@
     "priceDesc": "Price: high to low",
     "ratingDesc": "Top rated",
     "discountDesc": "Biggest discount",
-    "titleAsc": "Name: A to Z"
+    "titleAsc": "Name: A to Z",
+    "bestSelling": "Best selling",
+    "newest": "Newest"
   },
   "view": {
     "layout": "Product layout",
@@ -220,6 +222,7 @@
     "allProducts": "All products",
     "deals": "Deals",
     "resultsFor": "Results for \"{{query}}\"",
+    "resultsInCategory": "Results for \"{{query}}\" in {{category}}",
     "category": "Category",
     "shopCategory": "Shop {{name}} at BuyNest.",
     "showingFor": "Showing results for <strong>{{corrected}}</strong>.",

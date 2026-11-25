@@ -55,6 +55,7 @@ class ContentController extends Controller
             'bangla_digits' => Locale::banglaDigitsEnabled(),
             'support_email' => $settings->get('support_email'),
             'support_phone' => $settings->get('support_phone'),
+            'address' => $settings->get('address'), // phase 17: the footer's store address (Settings → General), null when unset
             'shipping_methods' => array_values(array_map(fn (array $method) => [
                 'id' => $method['id'],
                 'label' => __($method['label']), // phase 13: in the request language (ids stay)

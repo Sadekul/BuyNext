@@ -223,6 +223,33 @@ class Product extends Model
         $query->where('status', 'active')->whereIn('category_id', ($tree ?? CategoryTree::load())->visibleIds());
     }
 
+    /** Phase 17: how far back "best selling" counts sold units. */
+    public const BEST_SELLING_DAYS = 90;
+
+    /**
+     * Phase 17: Product::orderByBestSelling(): by units sold in orders that aren't cancelled
+     * (order_items.quantity, last BEST_SELLING_DAYS days; never sold = 0), then rating, then id.
+     * One grouped subquery joined once (no per-product queries); keeps every other filter working.
+     * Each row gets `units_sold` (int, 0 when never sold), which ProductResource shows on these lists only.
+     */
+    public function scopeOrderByBestSelling(Builder $query, string $direction = 'desc'): void
+    {
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+        $sold = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.status', '!=', 'cancelled')
+            ->where('orders.created_at', '>=', now()->subDays(self::BEST_SELLING_DAYS))
+            ->whereNotNull('order_items.product_id')
+            ->groupBy('order_items.product_id')
+            ->selectRaw('order_items.product_id AS sold_product_id, SUM(order_items.quantity) AS units_sold');
+
+        $query->leftJoinSub($sold, 'best_sellers', 'best_sellers.sold_product_id', '=', 'products.id')
+            ->select('products.*')
+            ->selectRaw('COALESCE(best_sellers.units_sold, 0) AS units_sold')
+            ->orderByRaw('COALESCE(best_sellers.units_sold, 0) '.$direction)
+            ->orderBy('products.rating_average', 'desc');
+    }
+
     public function isForSale(?CategoryTree $tree = null): bool
     {
         return ! $this->trashed() && $this->status === 'active' && ($tree ?? CategoryTree::load())->isVisible($this->category_id);

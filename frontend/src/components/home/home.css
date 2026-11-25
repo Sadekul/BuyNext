@@ -27,3 +27,34 @@
 .home-section.section {
   padding-block: calc(var(--section-gap) * 0.7);
 }
+
+/*
+ * Phase 17: a denser, marketplace-style page. Sections sit closer together
+ * from tablets up, headings are a step smaller, and the kept sections
+ * (benefits, brands, newsletter) use less padding. Touch targets are unchanged.
+ */
+@media (min-width: 768px) {
+  .home-section.section {
+    padding-block: calc(var(--section-gap) * 0.5);
+  }
+
+  .home-section .section-heading__title {
+    font-size: var(--text-2xl);
+  }
+
+  .home-section .section-heading {
+    margin-bottom: var(--space-5);
+  }
+
+  .home-section .benefits__item {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .home-newsletter {
+    padding-block: calc(var(--section-gap) * 0.5) var(--section-gap);
+  }
+
+  .home-newsletter .newsletter {
+    padding-block: var(--space-8);
+  }
+}

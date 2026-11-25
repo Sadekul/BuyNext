@@ -25,7 +25,9 @@
     "priceDesc": "দাম: বেশি থেকে কম",
     "ratingDesc": "সেরা রেটিং",
     "discountDesc": "সবচেয়ে বেশি ছাড়",
-    "titleAsc": "নাম: A থেকে Z"
+    "titleAsc": "নাম: A থেকে Z",
+    "bestSelling": "সর্বাধিক বিক্রিত",
+    "newest": "সবচেয়ে নতুন"
   },
   "view": {
     "layout": "পণ্যের বিন্যাস",
@@ -220,6 +222,7 @@
     "allProducts": "সব পণ্য",
     "deals": "অফার",
     "resultsFor": "\"{{query}}\"-এর ফলাফল",
+    "resultsInCategory": "{{category}}-এ \"{{query}}\"-এর ফলাফল",
     "category": "ক্যাটাগরি",
     "shopCategory": "BuyNest-এ {{name}} কিনুন।",
     "showingFor": "<strong>{{corrected}}</strong>-এর ফলাফল দেখানো হচ্ছে।",

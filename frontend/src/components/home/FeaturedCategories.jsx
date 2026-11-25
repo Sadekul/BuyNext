@@ -1,23 +1,28 @@
+import { createElement } from 'react'
 import { Link } from 'react-router'
 import SectionHeading from '../common/SectionHeading'
 import ErrorMessage from '../ui/ErrorMessage'
 import Loader from '../ui/Loader'
 import { ROUTES } from '../../constants/routes'
+import { categoryIcon } from '../layout/categoryIcons'
 import './FeaturedCategories.css'
 import { useTranslation } from 'react-i18next'
 
 /**
- * "Shop by category": photo tiles (utils/homeSections.js pickCategoryTiles:
- * the category's image or its first product's photo). A row that scrolls
- * sideways on phones, a grid from tablets up. Each tile is one link named
- * by the category; the photo is decorative (alt="").
+ * "Shop by category" (phase 17, PHASE17_CONTRACT.md §4.2): a compact row of
+ * round category tiles, replacing the larger photo tiles. Each circle shows
+ * the category's photo when one is known (utils/homeSections.js
+ * pickCategoryIcons) and its icon otherwise, so every top-level category gets
+ * a tile. The row scrolls sideways on phones (inside the section; the page
+ * never does) and wraps into a grid from tablets up. Each tile is one link
+ * named by the category; the photo and icon are decorative.
  */
 function FeaturedCategories({ categories, isLoading, error, onRetry }) {
   const { t } = useTranslation('marketing')
   if (!isLoading && !error && categories.length === 0) return null
 
   return (
-    <section className="section home-section" aria-labelledby="featured-categories-title">
+    <section className="section home-section category-row" aria-labelledby="featured-categories-title">
       <div className="container">
         <SectionHeading
           id="featured-categories-title"
@@ -29,14 +34,18 @@ function FeaturedCategories({ categories, isLoading, error, onRetry }) {
         {error && <ErrorMessage titleAs="h3" title={t('categories.unavailable')} message={error.message} onRetry={onRetry} />}
         {isLoading && <Loader label={t('categories.loading')} />}
         {!isLoading && !error && (
-          <ul className="category-tiles">
+          <ul className="category-icons">
             {categories.map((category) => (
-              <li key={category.slug} className="category-tiles__item">
-                <Link to={ROUTES.category(category.slug)} className="category-tile">
-                  <span className="category-tile__media">
-                    <img src={category.image} alt="" loading="lazy" width="240" height="240" />
+              <li key={category.slug} className="category-icons__item">
+                <Link to={ROUTES.category(category.slug)} className="category-icon">
+                  <span className="category-icon__disc">
+                    {category.image ? (
+                      <img src={category.image} alt="" loading="lazy" width="96" height="96" />
+                    ) : (
+                      createElement(categoryIcon(category.slug), { 'aria-hidden': true, className: 'category-icon__glyph' })
+                    )}
                   </span>
-                  <span className="category-tile__name">{category.name}</span>
+                  <span className="category-icon__name">{category.name}</span>
                 </Link>
               </li>
             ))}

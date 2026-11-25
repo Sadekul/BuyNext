@@ -554,7 +554,7 @@ async function runChecks() {
     const suggestTerm = `zq${run}`
     const ihponeBefore = (await terms('ihpone'))?.hits ?? 0
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
-    const search = page.getByRole('combobox').first()
+    const search = page.getByRole('combobox', { name: 'Search products' }).first()
     const suggestRequests = []
     page.on('request', (request) => {
       if (/suggest=1|suggest%3D1/.test(request.url())) suggestRequests.push(request.url())

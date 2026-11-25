@@ -135,3 +135,18 @@ export function shippingMethodText(method) {
   const eta = method.eta === undefined || method.eta === null || method.eta === known.eta ? translate(`checkout:methods.shipping.${method.id}.eta`) : method.eta
   return { label, eta }
 }
+
+/**
+ * Phase 17: the footer's payment badges for the store's payment methods (GET /store `payment_methods`,
+ * already without the ones the store currency rules out): SSLCommerz stands for
+ * bKash, Nagad and cards. Unknown ids are left out. Each badge once, in this order.
+ */
+export function paymentBadgeIds(paymentMethods = []) {
+  const ids = new Set(paymentMethods.map((method) => (typeof method === 'string' ? method : method?.id)))
+  const badges = []
+  if (ids.has('sslcommerz')) badges.push('bkash', 'nagad', 'card')
+  if (ids.has('card')) badges.push('card')
+  if (ids.has('paypal')) badges.push('paypal')
+  if (ids.has('cod')) badges.push('cod')
+  return [...new Set(badges)]
+}

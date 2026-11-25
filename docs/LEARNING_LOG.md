@@ -316,3 +316,12 @@
 - Honest marketing: no countdown without a real end date, no "10% off" promise the store doesn't keep, badges rounded the same way everywhere
 - Renaming what staff see (Ink / Indigo / Coral / Violet) without changing stored keys keeps old content working
 - A new element with a common name ("Close announcement") can make older tests ambiguous: tests scope to the dialog they mean
+
+## Phase 17: marketplace-style storefront (2026-11-25)
+
+- Borrowing a design's *style* from a commercial template (layout, kinds of sections) while writing every line, image and text ourselves: the template's files need a licence
+- Honest data as a rule: "Best selling" from real orders with `units_sold` / `has_sales` so a list never pretends; coupons only while active; no invented "sold recently" or countdowns
+- A proxy that whitelists fields can silently drop a new one (`has_sales`): test the whole path, not just each side
+- Checking layouts at many widths (390 → 1440), not just phone and desktop: the tablet header overflowed
+- Landmarks: a dialog opened from inside `<header>` must not contain its own `<header>`/`<footer>`
+- React's development mode runs effects twice; count network requests on the production build before calling something slow

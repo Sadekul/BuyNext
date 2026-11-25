@@ -62,6 +62,14 @@
       "terms": "Terms of service",
       "contact": "Contact us",
       "componentLab": "Component lab"
+    },
+    "payments": "We accept",
+    "paymentBadges": {
+      "card": "Cards",
+      "paypal": "PayPal",
+      "cod": "Cash on delivery",
+      "bkash": "bKash",
+      "nagad": "Nagad"
     }
   },
   "layout": {
@@ -76,6 +84,49 @@
   },
   "currency": {
     "showPricesIn": "Show prices in"
+  },
+  "topBar": {
+    "deliverTo": "Deliver to: {{place}}",
+    "deliverToEta": "Deliver to: {{place}} · {{eta}}",
+    "settings": "Language and currency",
+    "code": "Code",
+    "copy": "Copy",
+    "copyCode": "Copy code {{code}}",
+    "copied": "Code {{code}} copied.",
+    "copyFailed": "Couldn't copy. The code is {{code}}."
+  },
+  "deliverTo": {
+    "title": "Deliver to",
+    "chooseArea": "Choose your area",
+    "intro": "Choose your area to see delivery charges and days, and whether cash on delivery is available. We'll fill it in at checkout.",
+    "current": "Delivering to {{place}}",
+    "methods": "Delivery options",
+    "free": "Free",
+    "freeOver": "Free delivery on orders over {{amount}}",
+    "codYes": "Cash on delivery is available here.",
+    "codFee": "Cash on delivery is available here (fee {{fee}}).",
+    "codNo": "Cash on delivery isn't available here.",
+    "loading": "Checking delivery for this area…",
+    "failed": "We couldn't check delivery for this area.",
+    "save": "Deliver here",
+    "change": "Change",
+    "clear": "Clear",
+    "saved": "Delivery area saved: {{place}}.",
+    "cleared": "Delivery area cleared.",
+    "checkoutNote": "We'll fill this area in at checkout."
+  },
+  "megaMenu": {
+    "button": "All categories",
+    "shopAll": "Shop all {{name}}",
+    "allProducts": "Browse all products",
+    "featured": "Featured",
+    "loading": "Loading categories…",
+    "failed": "We couldn't load the categories."
+  },
+  "tabBar": {
+    "label": "Quick links",
+    "categories": "Categories",
+    "search": "Search"
   },
   "ui": {
     "somethingWrong": "Something went wrong",
@@ -109,7 +160,9 @@
     "availableFor_other": "{{count}} suggestions available for {{query}}",
     "none": "No suggestions",
     "label": "Search products",
-    "showingFor": "Showing suggestions for <strong>{{query}}</strong>"
+    "showingFor": "Showing suggestions for <strong>{{query}}</strong>",
+    "inCategory": "Search in",
+    "allCategories": "All categories"
   },
   "countries": {
     "United States": "United States",

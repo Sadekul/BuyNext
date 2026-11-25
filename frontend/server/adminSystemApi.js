@@ -34,10 +34,12 @@ import { COD_SETTING_RULES, defaultCountryRule } from './adminPhase14Api.js'
  *   GET    /api/admin/pages/:id
  *   PATCH  /api/admin/pages/:id                     → { page } (body comes back sanitized)
  *   DELETE /api/admin/pages/:id
- *   GET    /api/admin/home                          → { hero, banners, featuredProductIds, featuredProducts, heroMode, slides, slider }
- *   PUT    /api/admin/home                          { hero, banners, featuredProductIds, heroMode?, slides?, slider? } → { home }
+ *   GET    /api/admin/home                          → { hero, banners, featuredProductIds, featuredProducts, heroMode, slides, slider, topBar }
+ *   PUT    /api/admin/home                          { hero, banners, featuredProductIds, heroMode?, slides?, slider?, topBar? } → { home }
  *          (home slider, docs/backend/HOME_SLIDER_CONTRACT.md: heroMode "banner" | "slider"; slides[] up to 8,
  *           errors by path like "slides.0.title"; slider { autoplay, intervalSeconds 3–15 })
+ *          (Phase 17: topBar { enabled, message ≤120, messageBn ≤120 | null, couponCode | null }; the message is needed
+ *           when shown; the API answers 422 "topBar.couponCode" when the code isn't an active coupon)
  *   GET    /api/admin/reports/sales|products|customers|coupons|low-stock?from&to&groupBy&limit
  *   GET    /api/admin/reports/sales.csv|products.csv  → the CSV file, with the API's Content-Type and Content-Disposition
  *   GET    /api/admin/settings                      → { general, shipping, tax, checkout, inventory, catalog, returns, security (phase 9) }
@@ -146,6 +148,34 @@ export const MAX_SLIDES = 8
 export const SLIDER_SECONDS = { min: 3, max: 15, default: 6 }
 // A slide's image: an http(s) address (up to 2048 characters), or none.
 const isImageAddress = (value) => typeof value === 'string' && value.length <= 2048 && (value === '' || /^https?:\/\/\S+$/i.test(value))
+
+// Phase 17 §2 (docs/backend/PHASE17_CONTRACT.md): the top promo strip above the store's header.
+export const TOP_BAR_MESSAGE_MAX = 120
+// Coupon codes are stored upper case: 3–40 letters, digits, dashes, underscores (the coupon form's rule).
+const COUPON_CODE = /^[A-Z0-9_-]{3,40}$/
+
+/** topBar { enabled, message, messageBn, couponCode } → checked values, or errors by path ("topBar.message"). */
+export function checkTopBar(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { errors: { topBar: ['Send the promo strip as fields.'] } }
+  const errors = {}
+  const textOf = (value) => (typeof value === 'string' ? value.trim() : '')
+  if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') errors['topBar.enabled'] = ['Choose whether the promo strip is shown.']
+  const enabled = raw.enabled === true
+  const message = textOf(raw.message)
+  const messageBn = textOf(raw.messageBn)
+  const couponCode = textOf(raw.couponCode).toUpperCase()
+  for (const [field, value] of [['message', raw.message], ['messageBn', raw.messageBn], ['couponCode', raw.couponCode]]) {
+    if (value !== undefined && value !== null && typeof value !== 'string') errors[`topBar.${field}`] = ['Enter text.']
+  }
+  if (!errors['topBar.message']) {
+    if (message.length > TOP_BAR_MESSAGE_MAX) errors['topBar.message'] = [`Use up to ${TOP_BAR_MESSAGE_MAX} characters.`]
+    else if (enabled && !message) errors['topBar.message'] = ['Write the promo message, or turn the promo strip off.']
+  }
+  if (!errors['topBar.messageBn'] && messageBn.length > TOP_BAR_MESSAGE_MAX) errors['topBar.messageBn'] = [`Use up to ${TOP_BAR_MESSAGE_MAX} characters.`]
+  if (!errors['topBar.couponCode'] && couponCode && !COUPON_CODE.test(couponCode)) errors['topBar.couponCode'] = ["This coupon doesn't exist or isn't active."]
+  if (Object.keys(errors).length > 0) return { errors }
+  return { errors: {}, values: { enabled, message, messageBn: messageBn || null, couponCode: couponCode || null } }
+}
 
 /** PUT /home: the whole home content, every field checked; errors by path ("banners.0.title"). */
 export function validateHome(body) {
@@ -257,6 +287,13 @@ export function validateHome(body) {
       if (!Number.isInteger(seconds) || seconds < SLIDER_SECONDS.min || seconds > SLIDER_SECONDS.max) errors['slider.intervalSeconds'] = [`Choose ${SLIDER_SECONDS.min} to ${SLIDER_SECONDS.max} seconds.`]
       extra.slider = { autoplay: slider.autoplay !== false, intervalSeconds: seconds }
     }
+  }
+
+  // Phase 17 §2: the top promo strip (optional; an older client sends none and the API keeps it).
+  if (body.topBar !== undefined) {
+    const checked = checkTopBar(body.topBar)
+    Object.assign(errors, checked.errors)
+    if (checked.values) extra.topBar = checked.values
   }
 
   const ids = body.featuredProductIds

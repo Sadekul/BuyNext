@@ -99,14 +99,29 @@ function normalizeSlider(raw) {
 }
 
 /**
- * GET /home `{ data: { hero, banners, featured_products, hero_mode, slides, slider } }`
- * → `{ hero, banners, featuredProducts, heroMode, slides, slider }`. An answer
+ * Phase 17: `top_bar: { message, coupon_code|null } | null` → `{ message, couponCode } | null`.
+ * The API sends the message in the request language and a coupon code only when that coupon
+ * is active right now; anything else (no message, a stray type) hides the strip's promo.
+ */
+export function normalizeTopBar(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const message = typeof raw.message === 'string' ? raw.message.trim().slice(0, 200) : ''
+  if (!message) return null
+  const code = typeof raw.coupon_code === 'string' ? raw.coupon_code.trim() : ''
+  return { message, couponCode: /^[A-Za-z0-9_-]{1,64}$/.test(code) ? code : null }
+}
+
+/**
+ * GET /home `{ data: { hero, banners, featured_products, hero_mode, slides, slider, top_bar } }`
+ * → `{ hero, banners, featuredProducts, heroMode, slides, slider, topBar }`. An answer
  * without `hero_mode` (older API) or a slider without slides is banner mode.
  */
 export function normalizeHome(raw) {
   const data = raw?.data ?? {}
   const slides = normalizeSlides(data.slides)
   return {
+    // Phase 17: the top promo strip (null when the admin turned it off or left it empty).
+    topBar: normalizeTopBar(data.top_bar),
     hero: normalizeHero(data.hero),
     banners: normalizeBanners(data.banners),
     featuredProducts: (data.featured_products ?? []).map(normalizeProduct),
@@ -151,6 +166,8 @@ export function normalizeStoreSettings(raw) {
     storeName: data.store_name || null,
     supportEmail: data.support_email || null,
     supportPhone: data.support_phone || null,
+    // Phase 17: the store's postal address for the footer, when the API sends it (Settings → General `address`).
+    storeAddress: typeof data.address === 'string' && data.address.trim() ? data.address.trim() : null,
     shippingMethods: methods.map((method) => ({
       id: method.id,
       label: method.label,

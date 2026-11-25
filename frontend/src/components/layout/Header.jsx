@@ -6,31 +6,60 @@ import Logo from '../common/Logo'
 import SearchBar from '../common/SearchBar'
 import MainNavigation from './MainNavigation'
 import MobileNavigation from './MobileNavigation'
-import CurrencyPicker from './CurrencyPicker'
-import LanguageSwitch from './LanguageSwitch'
+import MegaMenu from './MegaMenu'
+import TopBar from './TopBar'
+import { DeliverToButton, DeliverToDialog } from './DeliverTo'
+import { MOBILE_SEARCH_INPUT_ID } from './BottomTabBar'
 import { ROUTES } from '../../constants/routes'
 import { useCart } from '../../hooks/useCart'
 import { useWishlist } from '../../hooks/useWishlist'
 import { useAuth } from '../../hooks/useAuth'
+import { useCategories } from '../../hooks/useCategories'
+import { useStoreSettings } from '../../hooks/useStoreSettings'
+import { useStickyHeader } from '../../hooks/useStickyHeader'
+import { topLevelCategories } from '../../utils/categories'
 import { formatNumber } from '../../utils/formatters'
+import { cn } from '../../utils/classNames'
 import './Header.css'
 
 /**
- * Site header: logo, search, account/wishlist/cart actions, and navigation.
- * Owns the `isMenuOpen` state because both the menu button (opens) and the
- * mobile drawer (closes) need it — the closest common parent holds the state.
+ * Site header (phase 17 marketplace layout), top to bottom:
+ * 1. TopBar: delivery line, the admin's promo and coupon, language and currency
+ *    (`compactTopBar` in the checkout: language and currency only). It scrolls away.
+ * 2. The bar: menu button (below 1024px), logo, wide search with a "Search in"
+ *    category select, "Deliver to" (Bangladesh stores), account, wishlist, cart.
+ * 3. Phones: the search box and the "Deliver to" line under the bar.
+ * 4. Desktop: "All categories" (mega menu) and the main category links.
+ * Sticky; turns compact further down without moving the page (useStickyHeader).
  *
+ * The menu drawer's open state can be owned by the layout (`menuOpen` and
+ * `onMenuOpenChange`, so the phone tab bar can open it too); otherwise here.
  * Cart and wishlist counts come from shared state (useCart, useWishlist).
  */
-function Header({ navLinks, mobileNavLinks = navLinks }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+function Header({ navLinks, mobileNavLinks = navLinks, menuOpen, onMenuOpenChange, compactTopBar = false }) {
+  const [ownMenuOpen, setOwnMenuOpen] = useState(false)
+  const isMenuOpen = menuOpen ?? ownMenuOpen
+  const setIsMenuOpen = onMenuOpenChange ?? setOwnMenuOpen
+  const [isDeliverToOpen, setIsDeliverToOpen] = useState(false)
   const { totals, openCart } = useCart()
   const { count: wishlistCount } = useWishlist()
   const { user, isAuthenticated } = useAuth()
+  const { settings } = useStoreSettings()
+  const { data: categories } = useCategories()
+  const { headerRef, topBarRef, compact } = useStickyHeader()
   const { t } = useTranslation('common')
 
+  // Phase 17: "Deliver to" only where the API knows the places (a Bangladeshi store).
+  const showDeliverTo = settings.bangladeshAddresses === true
+  const searchCategories = topLevelCategories(categories ?? []).map(({ slug, name }) => ({ slug, name }))
+  const openDeliverTo = () => setIsDeliverToOpen(true)
+
   return (
-    <header className="site-header">
+    <header className={cn('site-header', compact && 'site-header--compact')} ref={headerRef}>
+      <div ref={topBarRef}>
+        <TopBar compact={compactTopBar} />
+      </div>
+
       <div className="site-header__bar container">
         <button
           type="button"
@@ -46,16 +75,10 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
         <Logo />
 
         <div className="site-header__search">
-          <SearchBar />
+          <SearchBar categories={searchCategories} />
         </div>
 
-        {/* Phase 11: "show prices in" another currency, when the store offers one. */}
-        <div className="site-header__currency">
-          <CurrencyPicker />
-        </div>
-
-        {/* Phase 13: বাংলা / English. */}
-        <LanguageSwitch className="site-header__language" />
+        {showDeliverTo && <DeliverToButton className="site-header__deliver" onClick={openDeliverTo} isOpen={isDeliverToOpen} />}
 
         <nav className="site-header__actions" aria-label={t('header.actions')}>
           {/* The visible label is the start of the accessible name (WCAG 2.5.3). */}
@@ -83,16 +106,19 @@ function Header({ navLinks, mobileNavLinks = navLinks }) {
       </div>
 
       <div className="site-header__mobile-search container">
-        <SearchBar />
+        <SearchBar inputId={MOBILE_SEARCH_INPUT_ID} />
+        {showDeliverTo && <DeliverToButton className="deliver-to--row" onClick={openDeliverTo} isOpen={isDeliverToOpen} />}
       </div>
 
-      <MainNavigation links={navLinks} />
+      <div className="site-header__nav-row">
+        <div className="site-header__nav-inner container">
+          <MegaMenu />
+          <MainNavigation links={navLinks} />
+        </div>
+      </div>
 
-      <MobileNavigation
-        isOpen={isMenuOpen}
-        onClose={() => setIsMenuOpen(false)}
-        links={mobileNavLinks}
-      />
+      <MobileNavigation isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} links={mobileNavLinks} />
+      {showDeliverTo && <DeliverToDialog isOpen={isDeliverToOpen} onClose={() => setIsDeliverToOpen(false)} />}
     </header>
   )
 }

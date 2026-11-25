@@ -214,3 +214,67 @@ describe('PUT /api/admin/home: the slider', () => {
     expect(Object.keys((await response.json()).errors).sort()).toEqual(['heroMode', 'slider.intervalSeconds', 'slides.0.bn.primaryCtaLabel', 'slides.0.title', 'slides.1.primaryCta.url'])
   })
 })
+
+/*
+ * Phase 17 §2 (docs/backend/PHASE17_CONTRACT.md): the top promo strip,
+ * top_bar { enabled, message, message_bn, coupon_code } ↔ topBar { enabled, message, messageBn, couponCode }.
+ */
+describe('the top promo strip (Phase 17)', () => {
+  it('GET maps top_bar to topBar (strings for the form); none stored → hidden and empty', async () => {
+    fakeLaravel({ 'GET /api/admin/v1/home': { body: { data: { ...API_HOME, top_bar: { enabled: true, message: 'Free delivery over ৳999', message_bn: '৯৯৯ টাকার বেশি অর্ডারে ফ্রি ডেলিভারি', coupon_code: 'EID10' } } } } })
+    expect((await (await admin('home')).json()).topBar).toEqual({ enabled: true, message: 'Free delivery over ৳999', messageBn: '৯৯৯ টাকার বেশি অর্ডারে ফ্রি ডেলিভারি', couponCode: 'EID10' })
+
+    fakeLaravel({ 'GET /api/admin/v1/home': { body: { data: { ...API_HOME, top_bar: { enabled: false, message: 'Old', message_bn: null, coupon_code: null } } } } })
+    expect((await (await admin('home')).json()).topBar).toEqual({ enabled: false, message: 'Old', messageBn: '', couponCode: '' })
+
+    fakeLaravel({ 'GET /api/admin/v1/home': { body: { data: { hero: HERO, banners: [], featured_product_ids: [] } } } })
+    expect((await (await admin('home')).json()).topBar).toEqual({ enabled: false, message: '', messageBn: '', couponCode: '' })
+  })
+
+  it('PUT sends top_bar trimmed, the code upper case, empty Bangla and code as null; the answer is mapped back', async () => {
+    const calls = fakeLaravel({ 'PUT /api/admin/v1/home': { body: { data: { ...API_HOME, top_bar: { enabled: true, message: 'Eid sale', message_bn: null, coupon_code: 'EID10' } } } } })
+    const response = await admin('home', { method: 'PUT', body: { ...BODY, topBar: { enabled: true, message: ' Eid sale ', messageBn: '  ', couponCode: ' eid10 ' } } })
+    expect(response.status).toBe(200)
+    expect(sent(toApi(calls)[0]).top_bar).toEqual({ enabled: true, message: 'Eid sale', message_bn: null, coupon_code: 'EID10' })
+    expect((await response.json()).home.topBar).toEqual({ enabled: true, message: 'Eid sale', messageBn: '', couponCode: 'EID10' })
+  })
+
+  it('a hidden strip may keep an empty message; an older client sends no top_bar (the API keeps it)', async () => {
+    const calls = fakeLaravel({ 'PUT /api/admin/v1/home': { body: { data: API_HOME } } })
+    await admin('home', { method: 'PUT', body: { ...BODY, topBar: { enabled: false, message: '', messageBn: 'বাংলা', couponCode: '' } } })
+    expect(sent(toApi(calls)[0]).top_bar).toEqual({ enabled: false, message: '', message_bn: 'বাংলা', coupon_code: null })
+    await admin('home', { method: 'PUT', body: BODY })
+    expect(sent(toApi(calls)[1])).not.toHaveProperty('top_bar')
+  })
+
+  it('checks the strip before any call, errors by path', async () => {
+    const calls = fakeLaravel({})
+    const response = await admin('home', { method: 'PUT', body: { ...BODY, topBar: { enabled: true, message: '  ', messageBn: 'ক'.repeat(121), couponCode: 'NO SPACES' } } })
+    expect(response.status).toBe(422)
+    expect((await response.json()).errors).toEqual({
+      'topBar.message': ['Write the promo message, or turn the promo strip off.'],
+      'topBar.messageBn': ['Use up to 120 characters.'],
+      'topBar.couponCode': ["This coupon doesn't exist or isn't active."],
+    })
+    expect(toApi(calls)).toEqual([])
+
+    expect(validateHome({ ...BODY, topBar: { enabled: false, message: 'x'.repeat(121) } }).errors).toEqual({ 'topBar.message': ['Use up to 120 characters.'] })
+    expect(validateHome({ ...BODY, topBar: { enabled: 'yes', message: 'Hi' } }).errors['topBar.enabled']).toBeDefined()
+    expect(validateHome({ ...BODY, topBar: { enabled: true, message: 42 } }).errors['topBar.message']).toEqual(['Enter text.'])
+    expect(validateHome({ ...BODY, topBar: 'on' }).errors.topBar).toBeDefined()
+    expect(validateHome({ ...BODY, topBar: { enabled: true, message: 'x'.repeat(120), couponCode: 'AB' } }).errors).toEqual({ 'topBar.couponCode': [expect.any(String)] })
+    expect(validateHome({ ...BODY, topBar: { enabled: true, message: 'x'.repeat(120), messageBn: null, couponCode: null } }).values.topBar).toEqual({ enabled: true, message: 'x'.repeat(120), messageBn: null, couponCode: null })
+  })
+
+  it("the API's 422 (an inactive coupon, a long message) comes back on topBar.* paths", async () => {
+    fakeLaravel({
+      'PUT /api/admin/v1/home': {
+        status: 422,
+        body: { message: 'The given data was invalid.', errors: { 'top_bar.coupon_code': ["This coupon doesn't exist or isn't active."], 'top_bar.message_bn': ['Too long.'], 'top_bar.message': ['Required.'] } },
+      },
+    })
+    const response = await admin('home', { method: 'PUT', body: { ...BODY, topBar: { enabled: true, message: 'Sale', messageBn: '', couponCode: 'OLD10' } } })
+    expect(response.status).toBe(422)
+    expect((await response.json()).errors).toEqual({ 'topBar.couponCode': ["This coupon doesn't exist or isn't active."], 'topBar.messageBn': ['Too long.'], 'topBar.message': ['Required.'] })
+  })
+})

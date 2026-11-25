@@ -83,8 +83,10 @@ describe('home page from the CMS', () => {
     expect(screen.getByRole('img', { name: 'A lamp on a side table' })).toBeInTheDocument()
     expect(screen.getByText('Free shipping over $75')).toBeInTheDocument()
 
-    const promotions = screen.getByRole('region', { name: 'Promotions' })
-    expect(within(promotions).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['First banner', 'Second banner'])
+    // Phase 17: the first two active banners sit beside the hero; the promo row gets the rest (none here).
+    const offers = screen.getByRole('region', { name: 'Top offers' })
+    expect(within(offers).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['First banner', 'Second banner'])
+    expect(screen.queryByRole('region', { name: 'Promotions' })).not.toBeInTheDocument()
     expect(screen.queryByText('Hidden banner')).not.toBeInTheDocument()
 
     const featured = screen.getByRole('region', { name: /Featured products/ })

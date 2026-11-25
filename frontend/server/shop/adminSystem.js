@@ -193,11 +193,18 @@ function homeSlider(raw) {
   }
 }
 
-/** Home content (hero, banners, featured products; home slider: heroMode, slides, slider) → camelCase. */
+/** Phase 17 §2: the top promo strip → camelCase, every field a string for the form ('' = none); hidden and empty when the API has none. */
+export function homeTopBar(raw) {
+  const bar = raw && typeof raw === 'object' ? raw : {}
+  return { enabled: bar.enabled === true, message: text(bar.message), messageBn: text(bar.message_bn), couponCode: text(bar.coupon_code) }
+}
+
+/** Home content (hero, banners, featured products; home slider: heroMode, slides, slider; Phase 17: topBar) → camelCase. */
 export function homeContent(raw = {}) {
   const hero = raw.hero ?? {}
   return {
     ...homeSlider(raw),
+    topBar: homeTopBar(raw.top_bar),
     hero: {
       eyebrow: text(hero.eyebrow),
       title: text(hero.title),
@@ -285,6 +292,10 @@ export function toHomeBody(home) {
       })),
     }),
     ...(home.slider !== undefined && { slider: { autoplay: home.slider.autoplay, interval_seconds: home.slider.intervalSeconds } }),
+    // Phase 17: the top promo strip, only when the admin sent it (left out, the API keeps it).
+    ...(home.topBar !== undefined && {
+      top_bar: { enabled: home.topBar.enabled, message: home.topBar.message, message_bn: home.topBar.messageBn, coupon_code: home.topBar.couponCode },
+    }),
   }
 }
 

@@ -11,8 +11,9 @@ import {
 const MAX_PER_PAGE = 100
 
 // BuyNest sort fields → the API's `sort` names.
-// `createdAt` (newest first) is used by the home page's New arrivals (2026-11 redesign).
-const SORT_FIELDS = { price: 'price', rating: 'rating', discountPercentage: 'discount', title: 'name', createdAt: 'newest' }
+// `createdAt` (newest first) is used by the home page's New arrivals (2026-11 redesign);
+// `bestSelling` (units sold in the last 90 days, phase 17) by its "Best selling" tab and list.
+const SORT_FIELDS = { price: 'price', rating: 'rating', discountPercentage: 'discount', title: 'name', createdAt: 'newest', bestSelling: 'best_selling' }
 
 // Phase 10: "Search instead for <what was typed>": the API searches the words as typed, without correcting typos.
 // (the API's `correct=0`; the storefront's own address says ?exact=1).
@@ -41,8 +42,10 @@ export const laravelProvider = {
     listProducts: (options) => ({ path: '/api/catalog/products', params: pageParams(options) }),
     searchProducts: (query, options) => ({
       path: '/api/catalog/products',
-      params: { search: query, ...pageParams(options), ...(options.exact && { correct: 0 }) },
+      params: { search: query, ...pageParams(options), ...(options.exact && { correct: 0 }), ...(options.category && { category: options.category }) },
     }),
+    // Phase 17: the API searches within a category (`category` with `search`; subcategories included).
+    searchesWithinCategory: true,
     productsByCategory: (slug, options) => ({ path: '/api/catalog/products', params: { category: slug, ...pageParams(options) } }),
     productDetail: (id) => ({ path: `/api/catalog/products/${encodeURIComponent(id)}` }),
     suggestions: (query, limit) => ({ path: '/api/catalog/products', params: { search: query, per_page: limit, suggest: 1 } }),

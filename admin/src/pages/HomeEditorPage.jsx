@@ -13,6 +13,9 @@ import { BANNER_BANGLA_FIELDS, HERO_BANGLA_FIELDS, banglaValues, toBangla } from
 // Home page: single banner or slider (docs/backend/HOME_SLIDER_CONTRACT.md §4).
 import { BanglaGroup, HeroModeChoice, SlidesEditor } from '../components/HomeSlides'
 import { TONES, slideErrors, slideForm, sliderForm, toSlider, toSlides } from '../utils/homeSlides'
+// Phase 17 §2: the top promo strip above the store's header.
+import TopBarEditor from '../components/HomeTopBar'
+import { toTopBar, topBarErrors, topBarForm } from '../utils/homeTopBar'
 
 const MAX_BANNERS = 10
 const MAX_FEATURED = 8
@@ -25,7 +28,7 @@ const emptyBanner = (bangla = false) =>
   withKey({ id: null, eyebrow: '', title: '', description: '', cta: { label: '', url: '' }, imageUrl: '', imageAlt: '', tone: 'navy', isActive: true, ...(bangla && { bn: banglaValues(null, BANNER_BANGLA_FIELDS) }) })
 const heroBangla = (bn) => ({ ...banglaValues(bn, HERO_BANGLA_FIELDS), highlights: [0, 1, 2].map((index) => bn?.highlights?.[index] ?? '') })
 
-/** Content → Home page: the top of the page (single banner or slider), promo banners (ordered), and featured products. Needs content.view; saving content.edit. */
+/** Content → Home page: the top promo strip, the top of the page (single banner or slider), promo banners (ordered), and featured products. Needs content.view; saving content.edit. */
 function HomeEditorPage() {
   const home = useQuery({ queryKey: adminKeys.home, queryFn: ({ signal }) => getHome({ signal }) })
   if (home.isPending) return <Loading label="Loading the home page…" />
@@ -53,6 +56,7 @@ function HomeEditor({ saved }) {
   const [heroMode, setHeroMode] = useState(saved.heroMode === 'slider' ? 'slider' : 'banner')
   const [slides, setSlides] = useState(() => (Array.isArray(saved.slides) ? saved.slides : []).map(slideForm))
   const [slider, setSlider] = useState(() => sliderForm(saved.slider))
+  const [topBar, setTopBar] = useState(() => topBarForm(saved.topBar))
   const [errors, setErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [announcement, setAnnouncement] = useState('') // reorder/add/remove, for screen readers
@@ -139,6 +143,7 @@ function HomeEditor({ saved }) {
       if (!LINK.test(banner.cta.url)) found[`banners.${index}.cta.url`] = ['Use a store path like /products or an https:// address.']
     })
     Object.assign(found, slideErrors(heroMode, slides, slider))
+    Object.assign(found, topBarErrors(topBar))
     setErrors(found)
     if (Object.keys(found).length > 0) {
       setNotice({ tone: 'error', text: checkText(found) })
@@ -169,6 +174,7 @@ function HomeEditor({ saved }) {
       heroMode,
       slides: toSlides(slides),
       slider: toSlider(slider),
+      topBar: toTopBar(topBar),
     })
   }
 
@@ -177,7 +183,7 @@ function HomeEditor({ saved }) {
   return (
     <>
       <title>Home page | BuyNest Admin</title>
-      <PageHeader title="Home page" description="The store's front page: a single banner or a slider at the top, promo banners, and featured products." />
+      <PageHeader title="Home page" description="The store's front page: the promo strip above the header, a single banner or a slider at the top, promo banners, and featured products." />
       <div role={notice?.tone === 'error' ? 'alert' : 'status'}>
         {notice && (
           <p ref={noticeRef} tabIndex={-1} className={notice.tone === 'success' ? 'notice notice--success' : 'form-error'}>
@@ -191,6 +197,8 @@ function HomeEditor({ saved }) {
 
       <form className="form" noValidate onSubmit={submit}>
         <fieldset disabled={!editable} className="form__fieldset">
+          <TopBarEditor bar={topBar} setBar={setTopBar} err={err} />
+
           <HeroModeChoice mode={heroMode} onChange={chooseMode} error={err('heroMode')} />
 
           {heroMode === 'slider' && (

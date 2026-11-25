@@ -61,6 +61,8 @@ export function normalizeProduct(raw) {
     ...(raw.variants !== undefined && { variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant, raw)) }),
     // Phase 16 (list items): the variants' final price range ("From ৳x") and the colour swatches.
     ...(raw.price_range !== undefined && { priceRange: normalizePriceRange(raw.price_range) }),
+    // Phase 17 (sort=best_selling list items): units sold in the counted period (0 = never sold).
+    ...(raw.units_sold !== undefined && raw.units_sold !== null && { unitsSold: Math.max(0, Number(raw.units_sold) || 0) }),
     ...(raw.swatches !== undefined && { swatches: normalizeSwatches(raw.swatches) }),
     // Phase 11: the category's name (compare table), the product's specifications table,
     // its weight, review count and short description (compare), and its linked products.
@@ -205,6 +207,8 @@ export function normalizeProductPage(raw) {
     limit: perPage,
     ...(redirectUrl && { redirectUrl }),
     ...(correctedQuery && { correctedQuery }),
+    // Phase 17 (sort=best_selling): whether any product sold in the counted period. Absent = no sales.
+    ...(typeof raw.meta.has_sales === 'boolean' && { hasSales: raw.meta.has_sales }),
   }
 }
 

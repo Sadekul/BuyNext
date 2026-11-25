@@ -1,6 +1,7 @@
 .site-header {
   position: sticky;
-  top: 0;
+  /* Phase 17: the top bar scrolls away; the rest stays (useStickyHeader measures the bar). */
+  top: calc(-1 * var(--top-bar-height, 0px));
   z-index: var(--header-z);
   background: var(--color-glass);
   backdrop-filter: blur(10px);
@@ -18,29 +19,18 @@
 .site-header__search {
   display: none;
   flex: 1;
+  /* Let the search shrink so the logo and actions always fit (tablets, 768–1023px). */
+  min-width: 0;
   max-width: 40rem;
   margin-inline: auto;
 }
 
 .site-header__actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-1);
   margin-left: auto;
-}
-
-/* Phase 11: the currency picker sits just before the account actions. */
-.site-header__currency {
-  display: flex;
-  margin-left: auto;
-}
-
-.site-header__currency:empty {
-  display: none;
-}
-
-.site-header__currency:not(:empty) + .site-header__actions {
-  margin-left: 0;
 }
 
 .site-header__icon-button {
@@ -118,8 +108,14 @@
   }
 
   .site-header__bar {
-    gap: var(--space-6);
+    gap: var(--space-3);
     min-height: 5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .site-header__bar {
+    gap: var(--space-6);
   }
 }
 
@@ -144,31 +140,6 @@
   border-radius: 50%;
 }
 
-/* Phase 13: the language switch sits before the account actions. */
-.site-header__language {
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.site-header__currency:not(:empty) ~ .site-header__language {
-  margin-left: 0;
-}
-
-.site-header__language + .site-header__actions {
-  margin-left: 0;
-}
-
-/* Small phones: the switch is in the menu drawer and the footer instead. */
-@media (max-width: 479px) {
-  .site-header__language {
-    display: none;
-  }
-
-  .site-header__language + .site-header__actions {
-    margin-left: auto;
-  }
-}
-
 /* Redesign: on desktop the account link is a soft pill (icon + "Sign in" / "Hi, Name"). */
 @media (min-width: 1024px) {
   .site-header__account {
@@ -179,5 +150,102 @@
 
   .site-header__account:hover {
     border-color: var(--color-primary);
+  }
+}
+
+/* ---------- Phase 17: marketplace header ---------- */
+
+/* "Deliver to" sits between the search and the account actions (desktop); phones get a line under the search. */
+.site-header__deliver {
+  display: none;
+}
+
+.site-header__deliver + .site-header__actions {
+  margin-left: 0;
+}
+
+.site-header__mobile-search {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@media (min-width: 768px) {
+  .site-header__mobile-search {
+    display: none;
+  }
+}
+
+/* Tablets: just the pin (the name still says "Deliver to: …"); desktop: the two lines. */
+@media (min-width: 768px) {
+  .site-header__deliver {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .site-header__deliver .deliver-to__text {
+    display: none;
+  }
+}
+
+/* Desktop: "All categories" and the category links in one row. */
+.site-header__nav-row {
+  display: none;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.site-header__nav-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.site-header__nav-inner .main-nav {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border-top: 0;
+}
+
+@media (min-width: 1024px) {
+  .site-header__nav-row {
+    display: block;
+  }
+}
+
+/* Compact (scrolled down): a shorter bar and no "Deliver to" line on phones. The hook gives the
+   lost height back as margin, so the page doesn't move; heights aren't animated. */
+.site-header {
+  transition: box-shadow var(--transition-base);
+}
+
+.site-header--compact {
+  box-shadow: var(--shadow-md);
+}
+
+.site-header--compact .site-header__bar {
+  min-height: 3.5rem;
+}
+
+.site-header--compact .site-header__mobile-search .deliver-to--row {
+  display: none;
+}
+
+.site-header--compact .site-header__mobile-search {
+  padding-bottom: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .site-header--compact .site-header__bar {
+    min-height: 3.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header {
+    transition: none;
   }
 }

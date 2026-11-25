@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { SORT_OPTIONS } from '../../constants/catalog'
+import { availableSortOptions } from '../../constants/catalog'
 import './SortSelect.css'
 import { useTranslation } from 'react-i18next'
 
@@ -15,7 +15,8 @@ function SortSelect({ value, onChange, labels }) {
     <div className="sort-select">
       <label htmlFor={selectId}>{t('sort.label')}</label>
       <select id={selectId} value={value} onChange={(event) => onChange(event.target.value)}>
-        {SORT_OPTIONS.map((option) => (
+        {/* Phase 17: "Best selling" and "Newest" only where the API can sort by them. */}
+        {availableSortOptions().map((option) => (
           <option key={option.value} value={option.value}>
             {labels?.[option.value] ?? t(option.labelKey, { defaultValue: option.label })}
           </option>

@@ -14,7 +14,8 @@
 @media (min-width: 900px) {
   .product-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--space-6);
+    /* Phase 17: denser (was 1.5rem). */
+    gap: var(--space-4);
   }
 }
 

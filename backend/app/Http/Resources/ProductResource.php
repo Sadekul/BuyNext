@@ -128,6 +128,10 @@ class ProductResource extends JsonResource
                     'stock_quantity' => $variant->stock_quantity,
                     'in_stock' => $variant->stock_quantity > 0,
                 ])->values() : []),
+            // Phase 17: units sold in the last 90 days (orders not cancelled), only on ?sort=best_selling lists
+            // (the column comes from Product::orderByBestSelling()'s joined subquery; absent everywhere else).
+            'units_sold' => $this->when(array_key_exists('units_sold', $this->resource->getAttributes()),
+                fn () => (int) $this->resource->getAttributes()['units_sold']),
         ];
     }
 

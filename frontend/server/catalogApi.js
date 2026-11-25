@@ -19,6 +19,8 @@ import { serverMessage } from './i18n.js'
  *   GET /api/catalog/places/bd/districts?division=3 → GET /api/v1/places/bd/districts?division=3 (its districts; all 64 without it)
  *   GET /api/catalog/places/bd/areas?district=47    → GET /api/v1/places/bd/areas?district=47 (its upazilas and thanas)
  *                                        each { id, name (in the request language), name_en, name_bn, kind?, postcodes? }
+ *   GET /api/catalog/delivery/estimate?area_id=1001 → GET /api/v1/delivery/estimate?area_id=1001 (phase 17: "Deliver to":
+ *                                        { area, zone, methods, free_shipping_threshold, cod } for a Bangladesh area)
  * These pass the API's `data` on unchanged (snake_case); the storefront's adapter maps it.
  * Phase 10: a search the API corrected ("ihpone" → "iphone") says so in `meta.corrected_query`.
  *
@@ -77,9 +79,22 @@ function placesLookup(segments, url) {
   return `/api/v1/places/bd/${list}?${new URLSearchParams({ [parent]: id })}`
 }
 
+/** Phase 17: delivery/estimate?area_id=<numeric id> → the API's estimate path, or null. */
+function deliveryLookup(segments, url) {
+  if (segments.length !== 2 || segments[1] !== 'estimate') return null
+  const id = url.searchParams.get('area_id')
+  return isId(id) ? `/api/v1/delivery/estimate?${new URLSearchParams({ area_id: id })}` : null
+}
+
+// Phase 17: only the documented keys of a delivery estimate.
+const ESTIMATE_KEYS = ['area', 'zone', 'methods', 'free_shipping_threshold', 'cod']
+// Delivery prices are admin-editable: kept for ten minutes, like the API says.
+const DELIVERY_CACHE = 'public, max-age=600'
+
 /** /api/catalog/<segments> → the Laravel path, or null. */
 function upstreamPath(segments, url) {
   if (segments[0] === 'places') return placesLookup(segments.slice(1), url)
+  if (segments[0] === 'delivery') return deliveryLookup(segments, url)
   const [resource, id, ...rest] = segments
   if (rest.length > 0) return null
   if (resource === 'products' && id === 'compare') return compareLookup(url)
@@ -111,8 +126,10 @@ export async function handleCatalogRequest(request, segments) {
   const { status, data } = await laravel(path, { request, language })
   if (status !== 200) return json({ message: data?.message ?? serverMessage(request, 'catalogFailed') }, status)
   // Only the documented keys: Laravel's `links`, `meta.links`, and `meta.path` hold the API's internal address.
-  const body = { data: segments[0] === 'places' ? places(data?.data) : (data?.data ?? null), ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query']) }) }
+  const delivery = segments[0] === 'delivery'
+  const payload = segments[0] === 'places' ? places(data?.data) : delivery ? pick(data?.data ?? {}, ESTIMATE_KEYS) : (data?.data ?? null)
+  const body = { data: payload, ...(data?.meta && { meta: pick(data.meta, ['current_page', 'per_page', 'total', 'last_page', 'from', 'to', 'redirect_url', 'corrected_query', 'has_sales']) }) }
   const response = json(body)
-  response.headers.set('Cache-Control', segments[0] === 'places' ? PLACES_CACHE : CACHE)
+  response.headers.set('Cache-Control', segments[0] === 'places' ? PLACES_CACHE : delivery ? DELIVERY_CACHE : CACHE)
   return response
 }

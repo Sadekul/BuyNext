@@ -14,6 +14,13 @@ const { catalog, adapter } = apiProvider
  */
 export const CAN_SORT_BY_NEWEST = apiProvider.name === 'laravel'
 
+/**
+ * Phase 17: true when the catalog can list the best sellers first (BuyNest's API:
+ * `sort=best_selling`, units sold in real orders). DummyJSON has no sales data,
+ * so the demo leaves every "Best selling" list out rather than invent one.
+ */
+export const CAN_SORT_BY_BEST_SELLING = apiProvider.name === 'laravel'
+
 async function getProductPage({ path, params }, signal) {
   return adapter.productPage(await apiClient.get(path, { params, signal }))
 }
@@ -47,8 +54,13 @@ export function getProducts(options = {}) {
  * the results come ranked by relevance, and `correctedQuery` says when a typo
  * was corrected; `{ exact: true }` searches the words exactly as typed.
  */
-export function searchProducts(query, options = {}) {
-  return getProductList((pageOptions) => catalog.searchProducts(query, pageOptions), options)
+export async function searchProducts(query, options = {}) {
+  const page = await getProductList((pageOptions) => catalog.searchProducts(query, pageOptions), options)
+  // Phase 17: `{ category }` searches within one category. BuyNest's API does it (subcategories included);
+  // DummyJSON's search can't, so its results are narrowed here (its categories have no subcategories).
+  if (!options.category || catalog.searchesWithinCategory) return page
+  const items = page.items.filter((product) => product.category === options.category)
+  return { ...page, items, total: items.length }
 }
 
 /** Products in one category. */

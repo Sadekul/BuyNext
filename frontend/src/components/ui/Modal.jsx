@@ -53,16 +53,17 @@ function Modal({ isOpen, onClose, title, variant = 'center', footer, children })
       onClick={handleBackdropClick}
     >
       <div className="modal__panel">
-        <header className="modal__header">
+        {/* A div, not <header>: a dialog opened from the site header must not add a second banner landmark. */}
+        <div className="modal__header">
           <h2 id={titleId} className="modal__title">
             {title}
           </h2>
           <button type="button" className="modal__close" onClick={onClose} aria-label={t('ui.close')}>
             <LuX aria-hidden="true" />
           </button>
-        </header>
+        </div>
         <div className="modal__body">{children}</div>
-        {footer && <footer className="modal__footer">{footer}</footer>}
+        {footer && <div className="modal__footer">{footer}</div>}
       </div>
     </dialog>
   )

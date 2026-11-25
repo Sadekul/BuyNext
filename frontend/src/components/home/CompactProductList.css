@@ -1,0 +1,202 @@
+/*
+ * Compact product lists (phase 17). Phones: one row that swipes sideways
+ * inside the section (each list 85% wide, scroll-snap; the page never
+ * scrolls sideways). 640px: two per row. 1100px: all four side by side.
+ * Each row: a tinted thumbnail well, the name (its link is stretched over the
+ * row), stars, and the price (sale price coral-strong, original struck through).
+ */
+.product-lists__row {
+  display: grid;
+  grid-auto-columns: minmax(16rem, 85%);
+  grid-auto-flow: column;
+  gap: var(--space-4);
+  margin-inline: calc(var(--container-gutter) * -1);
+  padding: var(--space-1) var(--container-gutter) var(--space-3);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: var(--container-gutter);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.compact-list {
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  scroll-snap-align: start;
+}
+
+.compact-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-bg-tint);
+}
+
+.compact-list__title {
+  font-size: var(--text-lg);
+  color: var(--color-secondary);
+}
+
+.compact-list__all {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.5rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.compact-list__all:hover {
+  text-decoration: underline;
+}
+
+.compact-list__items {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.compact-product {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-base);
+}
+
+.compact-product:hover {
+  background: var(--color-bg-muted);
+}
+
+.compact-product__media {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.compact-product__media img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+}
+
+.compact-product__body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.compact-product__name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* The whole row opens the product (one link, named by the product). */
+.compact-product__name::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+}
+
+.compact-product__name:hover {
+  color: var(--color-primary);
+}
+
+.compact-product__name:focus-visible {
+  outline: none;
+}
+
+.compact-product:has(.compact-product__name:focus-visible) {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.compact-product .rating-stars {
+  font-size: var(--text-xs);
+}
+
+.compact-product__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.compact-product__price-current {
+  font-weight: 800;
+  color: var(--color-accent-strong);
+}
+
+.compact-product__price-original {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.compact-product__from {
+  font-weight: 600;
+}
+
+.compact-list__loading {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.compact-list__placeholder {
+  display: block;
+  height: 4.5rem;
+  border-radius: var(--radius-md);
+}
+
+@media (min-width: 640px) {
+  .product-lists__row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    margin-inline: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
+
+@media (min-width: 1100px) {
+  .product-lists__row--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .product-lists__row--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compact-product {
+    transition: none;
+  }
+}
+
+/* A single list fills the row on phones (nothing to swipe to). */
+.product-lists__row--1 {
+  grid-auto-columns: 100%;
+}

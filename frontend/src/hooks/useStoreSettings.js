@@ -15,6 +15,8 @@ export const DEFAULT_STORE_SETTINGS = {
   storeName: SITE.name,
   supportEmail: SITE.supportEmail,
   supportPhone: SITE.supportPhone,
+  // Phase 17: no postal address in the demo (the footer leaves the line out).
+  storeAddress: null,
   shippingMethods: SHIPPING_METHODS,
   standardShippingCost: SHIPPING_RULES.standardShippingCost,
   freeShippingThreshold: SHIPPING_RULES.freeShippingThreshold,

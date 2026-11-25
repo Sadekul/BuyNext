@@ -25,16 +25,24 @@ const DEBOUNCE_MS = 300
  *   Escape closes the list.
  *
  * `onSearch` is optional — the mobile menu uses it to close itself.
+ * `categories` (phase 17, optional: [{ slug, name }]) adds a "Search in" select
+ * after the box; a chosen category searches only there (`/products?q=…&category=slug`).
+ * It comes after the text box in the page order, so the box stays the first combobox.
  */
-function SearchBar({ placeholder: placeholderProp, onSearch }) {
+function SearchBar({ placeholder: placeholderProp, onSearch, categories, inputId: inputIdProp }) {
   const { t } = useTranslation('common')
   const placeholder = placeholderProp ?? t('search.placeholder')
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [active, setActive] = useState({ query: '', index: -1 })
+  const [category, setCategory] = useState('')
   const navigate = useNavigate()
-  const inputId = useId()
+  const generatedId = useId()
+  const inputId = inputIdProp ?? generatedId
   const listboxId = useId()
+  const categoryId = useId()
+  const categoryOptions = Array.isArray(categories) ? categories : []
+  const searchCategory = categoryOptions.some((option) => option.slug === category) ? category : ''
 
   const trimmedQuery = query.trim()
   const debouncedQuery = useDebouncedValue(trimmedQuery, DEBOUNCE_MS)
@@ -69,7 +77,8 @@ function SearchBar({ placeholder: placeholderProp, onSearch }) {
       window.location.assign(redirect)
       return
     }
-    goTo(redirect ?? `${ROUTES.products}?q=${encodeURIComponent(trimmedQuery)}`)
+    const inCategory = searchCategory ? `&category=${encodeURIComponent(searchCategory)}` : ''
+    goTo(redirect ?? `${ROUTES.products}?q=${encodeURIComponent(trimmedQuery)}${inCategory}`)
   }
 
   function handleSubmit(event) {
@@ -126,6 +135,21 @@ function SearchBar({ placeholder: placeholderProp, onSearch }) {
           placeholder={placeholder}
           autoComplete="off"
         />
+        {categoryOptions.length > 0 && (
+          <>
+            <label htmlFor={categoryId} className="visually-hidden">
+              {t('search.inCategory')}
+            </label>
+            <select id={categoryId} className="search-bar__category" value={searchCategory} onChange={(event) => setCategory(event.target.value)}>
+              <option value="">{t('search.allCategories')}</option>
+              {categoryOptions.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
         <button type="submit" className="search-bar__button" aria-label={t('search.submit')}>
           <LuSearch aria-hidden="true" />
         </button>

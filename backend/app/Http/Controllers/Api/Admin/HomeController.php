@@ -22,17 +22,19 @@ class HomeController extends Controller
         return response()->json(['data' => $this->payload($this->home->get())]);
     }
 
-    /** PUT /api/admin/v1/home { hero_mode?, hero, banners, slides?, slider?, featured_product_ids } - replaces the whole content. */
+    /** PUT /api/admin/v1/home { hero_mode?, hero, banners, slides?, slider?, top_bar?, featured_product_ids } - replaces the whole content. */
     public function update(Request $request): JsonResponse
     {
         // A save that leaves out the slider keys (an older client or script) keeps what is stored,
         // instead of resetting them: leaving out `slides` must never delete the slides.
+        // Phase 17: the same for the promo strip (`top_bar`). Its coupon is only checked when the code is new or changed
+        // (an unchanged code that expired since must not block other edits; the storefront hides it while inactive).
         $stored = $this->home->get();
-        $request->merge(collect(['hero_mode', 'slides', 'slider'])
+        $request->merge(collect(['hero_mode', 'slides', 'slider', 'top_bar'])
             ->reject(fn (string $key) => $request->exists($key))
             ->mapWithKeys(fn (string $key) => [$key => $stored[$key]])
             ->all());
-        $data = $request->validate($this->home->rules(), $this->home->messages());
+        $data = $request->validate($this->home->rules($stored['top_bar']['coupon_code']), $this->home->messages());
         $content = $this->home->normalize($data);
 
         $saved = DB::transaction(function () use ($content) {

@@ -33,7 +33,7 @@
   --color-sale-soft: #fff1ee;
   --color-warning: #b45309;
   --color-warning-soft: #fffbeb;
-  --color-success: #15803d;
+  --color-success: #166534; /* 6.3:1 even on the lavender tint (#f1efff), 7.1:1 on white */
   --color-success-soft: #f0fdf4;
   --color-star: #f59e0b;
   --color-danger: #b91c1c;
@@ -75,7 +75,8 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
-  --section-gap: clamp(3rem, 2rem + 4vw, 5rem);
+  /* Phase 17: denser marketplace layout (was clamp(3rem, 2rem + 4vw, 5rem)). */
+  --section-gap: clamp(2.25rem, 1.5rem + 3vw, 3.75rem);
 
   /* Shape and depth */
   --radius-sm: 0.5rem;

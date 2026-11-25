@@ -7,15 +7,17 @@ import './PromoBanner.css'
  * Promotional tile. `tone` picks the colour scheme from the stored keys "navy", "emerald",
  * "amber", or "rose" (tones.css maps them to ink, indigo, coral, and violet).
  * `large`: the big tile of the promo grid (more room for the photo and the title).
+ * `compact` (phase 17): a short tile for the column beside the hero; `headingLevel` its heading (h2 there).
  */
-function PromoBanner({ banner, large = false }) {
+function PromoBanner({ banner, large = false, compact = false, headingLevel = 3 }) {
   const { eyebrow, title, description, cta, image, imageAlt, tone } = banner
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
 
   return (
-    <article className={cn('promo-banner', `tone--${tone}`, large && 'promo-banner--large')}>
+    <article className={cn('promo-banner', `tone--${tone}`, large && 'promo-banner--large', compact && 'promo-banner--compact')}>
       <div className="promo-banner__copy">
         {eyebrow && <p className="promo-banner__eyebrow">{eyebrow}</p>}
-        <h3 className="promo-banner__title">{title}</h3>
+        <Heading className="promo-banner__title">{title}</Heading>
         {description && <p className="promo-banner__description">{description}</p>}
         {cta && (
           <Button to={cta.to} variant="light" size="sm" className="promo-banner__cta">

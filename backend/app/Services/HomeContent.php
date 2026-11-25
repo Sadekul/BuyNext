@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Models\Coupon;
 use App\Models\Product;
 use App\Support\Locale;
 use Closure;
@@ -27,6 +28,7 @@ use Illuminate\Validation\Rule;
  *   slides [up to 8: { id, eyebrow, title, description, primary_cta { label, url } | null,
  *            secondary_cta { label, url } | null, image_url, image_alt, tone, position, is_active, bn }]
  *   slider { autoplay, interval_seconds 3-15 }
+ *   top_bar { enabled, message ≤120 | null, message_bn ≤120 | null, coupon_code | null }   (phase 17: the promo strip above the header)
  */
 class HomeContent
 {
@@ -41,6 +43,13 @@ class HomeContent
     public const SLIDER_DEFAULTS = ['autoplay' => true, 'interval_seconds' => 6];
 
     public const NO_ACTIVE_SLIDE = 'Add at least one active slide, or show the single banner instead.';
+
+    /** Phase 17: the promo strip as stored before it was ever saved (hidden). */
+    public const TOP_BAR_DEFAULTS = ['enabled' => false, 'message' => null, 'message_bn' => null, 'coupon_code' => null];
+
+    public const TOP_BAR_MESSAGE_REQUIRED = 'Write the promo message, or turn the promo strip off.';
+
+    public const COUPON_NOT_ACTIVE = 'This coupon doesn\'t exist or isn\'t active.';
 
     // A link is an address on this site ("/products", never "//evil.example") or an http(s) one.
     private const LINK = 'regex:#^(/(?!/)\S*|https?://\S+)$#i';
@@ -64,7 +73,49 @@ class HomeContent
                 'interval_seconds' => (int) ($slider['interval_seconds'] ?? self::SLIDER_DEFAULTS['interval_seconds']),
             ],
             'featured_product_ids' => array_map('intval', $content['featured_product_ids'] ?? []),
+            'top_bar' => self::storedTopBar($content['top_bar'] ?? null), // phase 17
         ];
+    }
+
+    /** Phase 17: a stored promo strip with every key (content saved before phase 17 has none: hidden). */
+    private static function storedTopBar(mixed $topBar): array
+    {
+        $topBar = is_array($topBar) ? $topBar : [];
+
+        return [
+            'enabled' => (bool) ($topBar['enabled'] ?? false),
+            'message' => is_string($topBar['message'] ?? null) ? $topBar['message'] : null,
+            'message_bn' => is_string($topBar['message_bn'] ?? null) ? $topBar['message_bn'] : null,
+            'coupon_code' => is_string($topBar['coupon_code'] ?? null) ? $topBar['coupon_code'] : null,
+        ];
+    }
+
+    /**
+     * Phase 17: the strip for GET /api/v1/home: { message (request language, English fallback), coupon_code | null },
+     * or null when it is off or has no message. The code is only shown while it is an existing, active, currently
+     * valid coupon (Coupon::status() "active": switched on, started, not expired, not used up); else null.
+     */
+    private static function publicTopBar(array $topBar): ?array
+    {
+        if (! $topBar['enabled'] || ! filled($topBar['message'])) {
+            return null;
+        }
+
+        return [
+            'message' => Locale::isBangla() && filled($topBar['message_bn']) ? $topBar['message_bn'] : $topBar['message'],
+            'coupon_code' => self::activeCoupon($topBar['coupon_code'])?->code,
+        ];
+    }
+
+    /** Phase 17: the coupon with this code (any case) when it is one shoppers can type and it is active now; else null. */
+    public static function activeCoupon(?string $code): ?Coupon
+    {
+        if (! filled($code)) {
+            return null;
+        }
+        $coupon = Coupon::where('code', Coupon::normalize($code))->where('auto_apply', false)->first();
+
+        return $coupon?->status() === 'active' ? $coupon : null;
     }
 
     /** GET /api/v1/home: active banners only, and only products shoppers can buy (in the chosen order). */
@@ -85,6 +136,7 @@ class HomeContent
                 array_filter($content['banners'], fn ($banner) => $banner['is_active']))),
             'slides' => $slides,
             'slider' => $content['slider'],
+            'top_bar' => self::publicTopBar($content['top_bar']), // phase 17
             'featured_products' => $this->products($content['featured_product_ids'], Product::forSale()->with(['category', 'brand', ...Product::CARD_RELATIONS, ...CatalogController::translationRelations()])),
         ];
     }
@@ -165,8 +217,13 @@ class HomeContent
         return $this->get();
     }
 
-    /** Validation rules for PUT /api/admin/v1/home (the whole content is replaced). */
-    public function rules(): array
+    /**
+     * Validation rules for PUT /api/admin/v1/home (the whole content is replaced).
+     * $storedCouponCode: the promo strip's stored code. Only a new or changed code (compared trimmed, any case)
+     * must be an active coupon: an unchanged one that expired since must not block saving the rest of the page
+     * (GET /api/v1/home hides it while it isn't active).
+     */
+    public function rules(?string $storedCouponCode = null): array
     {
         $text = fn (int $max) => ['nullable', 'string', 'max:'.$max];
         $cta = fn (string $prefix) => [
@@ -264,6 +321,18 @@ class HomeContent
             'slider' => ['nullable', 'array'],
             'slider.autoplay' => ['nullable', 'boolean'],
             'slider.interval_seconds' => ['nullable', 'integer', 'between:3,15'],
+
+            // Phase 17: the promo strip (optional on PUT: missing = what is stored).
+            'top_bar' => ['nullable', 'array:enabled,message,message_bn,coupon_code'],
+            'top_bar.enabled' => ['nullable', 'boolean'],
+            'top_bar.message' => ['nullable', 'string', 'max:120', 'required_if_accepted:top_bar.enabled'],
+            'top_bar.message_bn' => $text(120),
+            'top_bar.coupon_code' => ['nullable', 'string', 'max:40', function (string $attribute, mixed $value, Closure $fail) use ($storedCouponCode) {
+                $unchanged = filled($storedCouponCode) && is_string($value) && Coupon::normalize($value) === Coupon::normalize($storedCouponCode);
+                if (! $unchanged && is_string($value) && trim($value) !== '' && ! self::activeCoupon($value)) {
+                    $fail(self::COUPON_NOT_ACTIVE);
+                }
+            }],
         ];
     }
 
@@ -286,6 +355,10 @@ class HomeContent
             'slides.*.tone.in' => 'Choose a color: navy, emerald, amber, or rose.',
             'slides.*.id.regex' => 'A slide id has only lower-case letters, digits, and dashes.',
             'slider.interval_seconds.between' => 'Show each slide for 3 to 15 seconds.',
+            'top_bar.message.required_if_accepted' => self::TOP_BAR_MESSAGE_REQUIRED,
+            'top_bar.message.max' => 'The promo message has at most 120 characters.',
+            'top_bar.message_bn.max' => 'The Bangla promo message has at most 120 characters.',
+            'top_bar.coupon_code.max' => self::COUPON_NOT_ACTIVE,
         ];
     }
 
@@ -336,6 +409,7 @@ class HomeContent
         $sorted = $this->sorted($slides);
         $slides = array_map(fn ($slide, $position) => [...$slide, 'position' => $position], $sorted, array_keys($sorted));
         $slider = $data['slider'] ?? [];
+        $topBar = $data['top_bar'] ?? [];
 
         return [
             'hero_mode' => $data['hero_mode'] ?? 'banner',
@@ -357,6 +431,12 @@ class HomeContent
                 'interval_seconds' => (int) ($slider['interval_seconds'] ?? self::SLIDER_DEFAULTS['interval_seconds']),
             ],
             'featured_product_ids' => array_values(array_map('intval', $data['featured_product_ids'])),
+            'top_bar' => [
+                'enabled' => (bool) ($topBar['enabled'] ?? false),
+                'message' => $text($topBar['message'] ?? null),
+                'message_bn' => $text($topBar['message_bn'] ?? null),
+                'coupon_code' => filled($topBar['coupon_code'] ?? null) ? Coupon::normalize($topBar['coupon_code']) : null,
+            ],
         ];
     }
 

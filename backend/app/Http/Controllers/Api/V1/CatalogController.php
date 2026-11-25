@@ -23,7 +23,7 @@ class CatalogController extends Controller
 
     /**
      * GET /api/v1/products?search&category&brand[]&min_price&max_price&min_rating&available
-     *     &sort=price|rating|discount|name|newest&direction=asc|desc&page&per_page&suggest&correct
+     *     &sort=price|rating|discount|name|newest|best_selling&direction=asc|desc&page&per_page&suggest&correct
      * Prices include catalog price rules for everyone (ProductResource); the price filters and
      * sort use the product's own sale price (rules are matched in PHP, not SQL).
      */
@@ -41,7 +41,8 @@ class CatalogController extends Controller
             'max_price' => ['nullable', 'numeric', 'min:0'],
             'min_rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'available' => ['nullable', 'boolean'],
-            'sort' => ['nullable', 'in:price,rating,discount,name,newest'],
+            // Phase 17: best_selling = units sold in the last 90 days (orders not cancelled), then rating, then id.
+            'sort' => ['nullable', 'in:price,rating,discount,name,newest,best_selling'],
             'direction' => ['nullable', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
@@ -76,8 +77,13 @@ class CatalogController extends Controller
         } else {
             $this->sort($query, $data['sort'] ?? null, $data['direction'] ?? null);
         }
+        // Phase 17: does anything in the whole filtered result have sales? (false: the "best selling" order is only the rating order)
+        $hasSales = ($data['sort'] ?? null) === 'best_selling'
+            ? (clone $query)->reorder()->where('best_sellers.units_sold', '>', 0)->exists()
+            : null;
         $page = $query->paginate($data['per_page'] ?? 12)->withQueryString();
         $products = ProductResource::collection($page);
+        $meta = $hasSales === null ? [] : ['has_sales' => $hasSales];
 
         // Phase 7: search terms. A search is counted (once per visitor per hour) and an exact term with a
         // redirect tells the storefront where to go (meta.redirect_url; null when the term has none).
@@ -87,11 +93,14 @@ class CatalogController extends Controller
             if (! $request->boolean('suggest')) {
                 $this->searchTerms->record($term, $page->total(), $request->ip());
             }
-            $products->additional(['meta' => [
+            $meta += [
                 'redirect_url' => $this->searchTerms->redirectFor($term),
                 // Phase 10 (part A): what was searched instead ("Showing results for …"), null when nothing was corrected.
                 'corrected_query' => $correctedQuery,
-            ]]);
+            ];
+        }
+        if ($meta !== []) {
+            $products->additional(['meta' => $meta]);
         }
 
         return $products;
@@ -183,7 +192,7 @@ class CatalogController extends Controller
     /** Without a sort: the catalog's own order (by id). Ties always fall back to the id, so pages never overlap. */
     private function sort($query, ?string $sort, ?string $direction): void
     {
-        // Sensible defaults: cheapest and A–Z first; best rated, biggest discount, and newest first.
+        // Sensible defaults: cheapest and A–Z first; best rated, biggest discount, newest, and best selling first.
         $direction ??= in_array($sort, ['price', 'name'], true) ? 'asc' : 'desc';
 
         match ($sort) {
@@ -192,8 +201,9 @@ class CatalogController extends Controller
             'discount' => $query->orderBy('discount_percent', $direction),
             'name' => $query->orderBy('name', $direction),
             'newest' => $query->orderBy('created_at', $direction),
+            'best_selling' => $query->orderByBestSelling($direction), // phase 17 (joins a grouped subquery: ids qualified below)
             default => null,
         };
-        $query->orderBy('id', $sort === 'newest' ? $direction : 'asc');
+        $query->orderBy('products.id', $sort === 'newest' ? $direction : 'asc');
     }
 }

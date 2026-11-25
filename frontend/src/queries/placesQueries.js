@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getAreas, getDistricts, getDivisions } from '../services/placesService'
+import { getDeliveryEstimate } from '../services/deliveryService'
 import { currentLanguage } from '../i18n'
 
 /* Phase 14: Bangladesh's places. They hardly ever change: kept for the visit. The order follows the language. */
@@ -22,3 +23,12 @@ export const areasQuery = (districtId) =>
 
 /** All 64 districts at once (names for saved addresses and orders, in the reader's language). */
 export const allDistrictsQuery = () => queryOptions({ queryKey: placesKeys.allDistricts(), queryFn: ({ signal }) => getDistricts(null, { signal }), staleTime: HOUR })
+
+/** Phase 17 "Deliver to": the zone, delivery charges and days, and cash on delivery for an area (10 minutes, like the API). */
+export const deliveryEstimateQuery = (areaId) =>
+  queryOptions({
+    queryKey: ['delivery', 'estimate', String(areaId), currentLanguage()],
+    queryFn: ({ signal }) => getDeliveryEstimate(areaId, { signal }),
+    staleTime: 10 * 60_000,
+    enabled: Boolean(areaId),
+  })

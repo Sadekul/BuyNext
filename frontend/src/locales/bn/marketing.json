@@ -81,6 +81,43 @@
       "link_one": "{{brand}}, {{count, number}}টি পণ্য",
       "link_other": "{{brand}}, {{count, number}}টি পণ্য",
       "count": "{{count, number}}"
+    },
+    "viewAllNamed": "সব দেখুন: {{title}}",
+    "offerColumn": "শীর্ষ অফার",
+    "top": {
+      "eyebrow": "সবার পছন্দ",
+      "title": "সেরা পণ্য",
+      "bestSelling": "সর্বাধিক বিক্রিত",
+      "trending": "ট্রেন্ডিং",
+      "newArrivals": "নতুন পণ্য",
+      "onSale": "ছাড়ে",
+      "about": {
+        "best-selling": "গত {{days, number}} দিনে সবচেয়ে বেশি বিক্রি হওয়া পণ্য।",
+        "trending": "ক্রেতাদের রেটিংয়ে সবচেয়ে এগিয়ে।",
+        "new": "দোকানে সবচেয়ে নতুন যোগ হওয়া পণ্য।",
+        "on-sale": "এই মুহূর্তে সবচেয়ে বড় ছাড়।"
+      },
+      "empty": "এখানে এখনো কিছু নেই।",
+      "failed": "এই পণ্যগুলো লোড করা যায়নি",
+      "loading": "পণ্য লোড হচ্ছে…"
+    },
+    "lists": {
+      "label": "পণ্যের সংক্ষিপ্ত তালিকা",
+      "bestSelling": "সর্বাধিক বিক্রিত",
+      "topRated": "সেরা রেটিং",
+      "onSale": "ছাড়ে",
+      "new": "নতুন",
+      "viewAll": "সব দেখুন",
+      "loading": "{{title}} লোড হচ্ছে…"
+    },
+    "coupon": {
+      "eyebrow": "কুপন",
+      "codeLabel": "কোড",
+      "copy": "কপি",
+      "copyLabel": "কুপন কোড {{code}} কপি করুন",
+      "copied": "{{code}} কপি হয়েছে। চেকআউটে লিখুন।",
+      "copyFailed": "কপি করা যায়নি। কোডটি সিলেক্ট করে নিজে কপি করুন।",
+      "hint": "চেকআউটে এই কোডটি লিখুন।"
     }
   },
   "categories": {
@@ -145,6 +182,20 @@
         "description": "Apple, Samsung সহ আরও অনেক ব্র্যান্ডের নতুন স্মার্টফোন।",
         "cta": "স্মার্টফোন কিনুন",
         "imageAlt": "iPhone 13 Pro স্মার্টফোন"
+      },
+      "cosy-home": {
+        "eyebrow": "আসবাব",
+        "title": "ঘরকে আরও আরামদায়ক করুন",
+        "description": "প্রতিটি ঘরের জন্য সোফা, খাট ও টেবিল।",
+        "cta": "আসবাব কিনুন",
+        "imageAlt": "Annibale Colombo সোফা"
+      },
+      "time-pieces": {
+        "eyebrow": "পুরুষদের ঘড়ি",
+        "title": "নতুন ঘড়ির সময় এসেছে",
+        "description": "Rolex, Longines সহ আরও অনেক ব্র্যান্ডের ক্লাসিক ও আধুনিক ঘড়ি।",
+        "cta": "ঘড়ি কিনুন",
+        "imageAlt": "কালো ডায়ালের Rolex Cellini Date ঘড়ি"
       }
     }
   },

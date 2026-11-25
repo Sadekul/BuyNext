@@ -41,6 +41,7 @@ import RewardPointsRedeem from '../components/checkout/RewardPointsRedeem'
 import ChargedInBaseNote from '../components/cart/ChargedInBaseNote'
 import { trackBeginCheckout } from '../utils/analytics'
 import { codRefused, codUnavailableText, usesBangladeshForm, zoneDeliveryText, zoneName } from '../utils/bangladesh'
+import { getDeliverTo, prefillDeliverTo } from '../utils/deliverTo'
 import './CheckoutPage.css'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -173,9 +174,10 @@ function CheckoutPage() {
   const savedAddresses = REAL_SHOP && user ? (addressRequest.data ?? []).filter((saved) => countries.includes(saved.country)) : []
   const savedShipping = defaultAddress(savedAddresses, 'shipping')
   const savedBilling = defaultAddress(savedAddresses, 'billing')
+  // Phase 17: the "Deliver to" area chosen in the header fills an empty Bangladesh division, district and area.
   const shippingDefaults = savedShipping
     ? toOrderAddress(savedShipping)
-    : {
+    : prefillDeliverTo({
         ...emptyAddress,
         firstName: profile?.firstName ?? '',
         lastName: profile?.lastName ?? '',
@@ -186,7 +188,7 @@ function CheckoutPage() {
           postalCode: address.postalCode,
           country: countries.includes(address.country) ? address.country : emptyAddress.country,
         }),
-      }
+      }, getDeliverTo(), settings)
   // A default billing address that differs from the shipping one is filled in separately.
   const separateBilling = savedBilling && !isSameAddress(savedBilling, shippingDefaults) ? toOrderAddress(savedBilling) : null
 

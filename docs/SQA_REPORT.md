@@ -340,6 +340,26 @@ No countdown in Today's deals: the API exposes no end date for price rules, and 
 
 Checks: frontend 898 unit tests; admin 222; browser checks 1,841 on the dev server (full run, with the motion suite rerun alone after R5: 7) and 1,834 on the production build (full run, all passing).
 
+## Phase 17 (marketplace-style storefront, Fastkart-like layout) — 2026-11-25
+
+Asked by the store owner ("I need this type of frontend design": Pixelstrap's Fastkart, a commercial ThemeForest template). Built as an **original** design in that style — no code, CSS, images, icons or text taken from the template — by four agents in parallel (backend; admin with its sign-in service routes; storefront shell; storefront home) against [backend/PHASE17_CONTRACT.md](backend/PHASE17_CONTRACT.md), then verified with the new `marketplace.mjs` browser suite (62 checks). Indigo + coral theme kept. Honest data throughout: "Best selling" only from real orders (`units_sold`, `meta.has_sales`), a coupon only while active, no invented "sold recently" or countdowns.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| M1 | Medium | "Best selling" stayed hidden although the store had sales: the storefront's proxy whitelists list `meta` keys and dropped the new `has_sales` | `has_sales` passed through (proxy test) |
+| M2 | Medium | With no recent sales, `sort=best_selling` falls back to rating order, which the home page would have labelled "Best selling" | The API adds `units_sold` and `meta.has_sales` (only on that sort); the home tab and list show only products that really sold, and hide otherwise |
+| M3 | Medium | On tablets (768–1023px) the new header spilled sideways (up to 170px): the search with its "Search in" select couldn't shrink | The search can shrink, tighter gaps below 1024px, the category select from 1024px; checked at 8 widths on 4 pages |
+| M4 | Low | An unchanged promo coupon that had expired would have blocked every home page save (the admin always sends the strip back) | Only a new or changed code is checked; an expired one just stops showing |
+| M5 | Low | Dialogs opened from the header (Deliver to) put a `<header>` landmark inside the site's banner; "Cash on delivery is available here." was 4.42:1 on the lavender tint | Dialog title and button rows are plain containers; the success green is darker (6.3:1 on the tint, 7.1:1 on white) |
+| M6 | Low | The footer's store address had no data: `/store` didn't send Settings → General's address | `/store` sends `address` (test) |
+| M7 | Low | The category icon row wrapped 10 + 2 on desktop | Even rows: 12 across from 1200px, 6 per row below |
+| M8 | Test | Three suites found the search box as "the first combobox"; the top bar's currency select and the "Search in" select could come first | They name it ("Search products") |
+| M9 | Test | Under a full run the loyalty suite's "Recently viewed" waited 15 s for the busier home page; the mega menu's keyboard check read the focus a frame before it moved; the marketing suite's saved-cart page once took over 15 s to load (production build) | 30 s waits for those rows; the check waits for focus; marketing passed 187/187 alone with no change |
+
+Not a bug, checked: the dev server makes each home page request twice (React's development double-run); the production build makes 9 requests and is idle in about 1.7 s.
+
+Checks: backend 587 feature tests (Pint clean); frontend 971 unit tests; admin 228; browser checks 1,903 on the dev server (full run, with the loyalty suite rerun alone after M9: 130) and 1,896 on the production build (full run, with the marketplace and marketing suites rerun alone: 62, 187). Not automated in the browser: the sticky header's compact state on scroll, hovering a card for its second photo, and a real phone's clipboard permission prompt.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

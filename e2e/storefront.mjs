@@ -71,7 +71,7 @@ await axe('catalog')
 
 // ---------- Search suggestions ----------
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
-const search = page.getByRole('combobox').first()
+const search = page.getByRole('combobox', { name: 'Search products' }).first()
 await search.fill('iphone')
 const suggestions = page.getByRole('listbox', { name: 'Search suggestions' }).first()
 log(await visible(suggestions), 'search: suggestions appear while typing')

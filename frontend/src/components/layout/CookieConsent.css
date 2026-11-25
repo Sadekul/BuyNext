@@ -3,7 +3,8 @@
 .cookie-consent {
   position: fixed;
   right: 0;
-  bottom: 0;
+  /* Phase 17: above the phone tab bar when it's there. */
+  bottom: var(--bottom-bar-offset, 0px);
   left: 0;
   z-index: calc(var(--header-z) + 5);
   max-height: 70vh;

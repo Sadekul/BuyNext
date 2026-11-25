@@ -697,7 +697,7 @@ try {
     await termDialog.getByRole('button', { name: 'Save redirect' }).click()
     log(await visible(status(admin, `Searching “${searchRedirectTerm}” now goes to /products/${productId}.`)), `search term "${searchRedirectTerm}" sends shoppers to the product`)
     await fresh.goto(`${BASE}/`, { waitUntil: 'networkidle' })
-    const search = fresh.getByRole('combobox').first()
+    const search = fresh.getByRole('combobox', { name: 'Search products' }).first()
     await search.fill(searchRedirectTerm)
     await fresh.waitForResponse((response) => response.url().includes(encodeURIComponent(searchRedirectTerm)), { timeout: 10000 }).catch(() => {})
     await search.press('Enter')

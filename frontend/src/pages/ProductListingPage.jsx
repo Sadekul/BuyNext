@@ -64,9 +64,11 @@ function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts'
   const searchQuery = searchParams.get('q')?.trim() ?? ''
   // Phase 10: "Search instead for …" asks for the words exactly as typed (no typo correction).
   const exact = Boolean(searchQuery) && searchParams.get('exact') === '1'
+  // Phase 17: a search within one category (the header's "Search in" select): /products?q=…&category=slug.
+  const searchCategory = searchCategoryParam(searchParams, searchQuery, categorySlug)
   const sortOption = getSortOption(searchParams.get('sort'), defaultSort)
   // The same cache entry as the results below (no extra request): did the API correct a typo?
-  const correctedQuery = useQuery({ ...catalogQuery({ searchQuery, categorySlug, exact }), enabled: Boolean(searchQuery) }).data?.correctedQuery ?? null
+  const correctedQuery = useQuery({ ...catalogQuery({ searchQuery, categorySlug, exact, searchCategory, serverSort: sortOption.serverSort }), enabled: Boolean(searchQuery) }).data?.correctedQuery ?? null
 
   // Phase 7: an exact search term the store sends straight to a page (the
   // same small request the search box's suggestions make, so usually cached).
@@ -86,12 +88,17 @@ function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts'
   const subcategories = currentCategory ? childCategories(categories, currentCategory.slug) : []
 
   let heading = title
-  if (searchQuery) heading = t('listing.resultsFor', { query: correctedQuery ?? searchQuery })
+  const searchCategoryName = searchCategory ? (categories.find((category) => category.slug === searchCategory)?.name ?? searchCategory) : null
+  if (searchQuery) {
+    heading = searchCategory
+      ? t('listing.resultsInCategory', { query: correctedQuery ?? searchQuery, category: searchCategoryName })
+      : t('listing.resultsFor', { query: correctedQuery ?? searchQuery })
+  }
   else if (categorySlug) heading = currentCategory?.name ?? t('listing.category')
 
   // A new scope (search or category) = a new `key`, so React throws away the
   // old Catalog's local state (open quick view, mobile filter panel).
-  const scopeKey = searchQuery ? `search:${exact ? 'exact:' : ''}${searchQuery}` : `category:${categorySlug ?? 'all'}`
+  const scopeKey = searchQuery ? `search:${exact ? 'exact:' : ''}${searchCategory ? `in:${searchCategory}:` : ''}${searchQuery}` : `category:${categorySlug ?? 'all'}`
 
   // Search and link-preview tags: a category's own SEO fields (admin, phase 5) when set.
   // Search results are left out of search engines (noindex): they're endless and thin.
@@ -122,7 +129,7 @@ function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts'
         {correctedQuery && (
           <p className="listing__correction">
             <Trans t={t} i18nKey="listing.showingFor" values={{ corrected: correctedQuery }} components={{ strong: <strong /> }} />{' '}
-            <Link to={`${ROUTES.products}?${new URLSearchParams({ q: searchQuery, exact: '1' })}`}>
+            <Link to={`${ROUTES.products}?${new URLSearchParams({ q: searchQuery, exact: '1', ...(searchCategory && { category: searchCategory }) })}`}>
               <Trans t={t} i18nKey="listing.searchInstead" values={{ query: searchQuery }} components={{ em: <em /> }} />
             </Link>
           </p>
@@ -160,6 +167,8 @@ function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts'
           key={scopeKey}
           searchQuery={searchQuery}
           exact={exact}
+          searchCategory={searchCategory}
+          searchCategoryName={searchCategoryName}
           categorySlug={categorySlug}
           categoryName={currentCategory?.name}
           sortOption={sortOption}
@@ -168,6 +177,12 @@ function ProductListingPage({ title: titleProp, titleKey = 'listing.allProducts'
       )}
     </div>
   )
+}
+
+/** Phase 17: `?category=slug` next to a search on /products (a well-formed slug), else ''. */
+function searchCategoryParam(searchParams, searchQuery, categorySlug) {
+  const slug = searchParams.get('category') ?? ''
+  return searchQuery && !categorySlug && /^[a-z0-9-]{1,80}$/.test(slug) ? slug : ''
 }
 
 /** A category that doesn't exist: an admin redirect (phase 7, e.g. a renamed category) wins, else "not found". */
@@ -183,10 +198,10 @@ function UnknownCategory({ slug }) {
 }
 
 /** Fetches one scope, then filters, sorts, and paginates it on the client. */
-function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, defaultSort }) {
+function Catalog({ searchQuery, exact, searchCategory = '', searchCategoryName = null, categorySlug, categoryName, sortOption, defaultSort }) {
   const { t } = useTranslation('catalog')
   // Search and category are fetched on the server; each scope is cached separately.
-  const request = useQuery(catalogQuery({ searchQuery, categorySlug, exact }))
+  const request = useQuery(catalogQuery({ searchQuery, categorySlug, exact, searchCategory, serverSort: sortOption.serverSort }))
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [areFiltersOpen, setAreFiltersOpen] = useState(false)
@@ -257,6 +272,13 @@ function Catalog({ searchQuery, exact, categorySlug, categoryName, sortOption, d
       id: 'q',
       label: t('listing.chipSearch', { query: searchQuery }),
       onRemove: () => setSearchParams(withParam(withParam(withParam(searchParams, 'q', null), 'exact', null), 'page', null)),
+    })
+  }
+  if (searchCategory) {
+    chips.push({
+      id: 'search-category',
+      label: t('listing.chipCategory', { name: searchCategoryName ?? searchCategory }),
+      onRemove: () => setSearchParams(withParam(withParam(searchParams, 'category', null), 'page', null)),
     })
   }
   if (categorySlug) {

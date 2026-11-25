@@ -1,8 +1,8 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
-import AnnouncementBar from '../components/layout/AnnouncementBar'
 import Header from '../components/layout/Header'
+import BottomTabBar from '../components/layout/BottomTabBar'
 import Footer from '../components/layout/Footer'
 import OfflineBanner from '../components/layout/OfflineBanner'
 import ScrollToTop from '../components/common/ScrollToTop'
@@ -13,12 +13,9 @@ import CompareBar from '../components/layout/CompareBar'
 import WishlistSyncNotice from '../components/layout/WishlistSyncNotice'
 import LanguageHint from '../components/layout/LanguageHint'
 import Loader from '../components/ui/Loader'
-import { storeAnnouncements } from '../constants/site'
 import { ROUTES } from '../constants/routes'
 import { useNavLinks } from '../hooks/useNavLinks'
 import { usePageMetaDefaults } from '../hooks/usePageMetaDefaults'
-import { useStoreSettings } from '../hooks/useStoreSettings'
-import { formatBasePrice } from '../utils/formatters'
 
 /**
  * Shared page shell. <Outlet /> is where React Router renders the matched
@@ -32,9 +29,11 @@ function MainLayout() {
   const { links, mobileLinks } = useNavLinks()
   // Description, canonical link, and Open Graph tags on every page (utils/pageMeta.js).
   usePageMetaDefaults()
-  // Phase 12: the free-shipping threshold in the store's currency (৳ in a taka store).
-  const { settings } = useStoreSettings()
   const { t } = useTranslation('common')
+  // Phase 17: the checkout keeps the shopper on task: no promo or delivery line in the top bar, no tab bar.
+  const inCheckout = pathname.startsWith(ROUTES.checkout)
+  // The menu drawer opens from the header's menu button and from the phone tab bar's "Categories".
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
     <>
@@ -47,9 +46,8 @@ function MainLayout() {
       {/* Phase 10: asks before any statistics load (only when the store uses them); sends page views after. */}
       <CookieConsent />
       <OfflineBanner />
-      {/* Redesign: one closable message; not in the checkout, where nothing should pull the shopper away. */}
-      {!pathname.startsWith(ROUTES.checkout) && <AnnouncementBar messages={storeAnnouncements(settings.freeShippingThreshold, formatBasePrice)} />}
-      <Header navLinks={links} mobileNavLinks={mobileLinks} />
+      {/* Phase 17: the header starts with the top bar (delivery line, promo and coupon, language, currency). */}
+      <Header navLinks={links} mobileNavLinks={mobileLinks} menuOpen={isMenuOpen} onMenuOpenChange={setIsMenuOpen} compactTopBar={inCheckout} />
       <main id="main-content" tabIndex={-1}>
         <ErrorBoundary key={pathname}>
           <Suspense fallback={<PageLoader />}>
@@ -60,6 +58,8 @@ function MainLayout() {
       {/* Phase 11: "Compare (3) · Clear", while products are picked for comparison. */}
       <CompareBar />
       <Footer />
+      {/* Phase 17: Home, Categories, Search, Wishlist, Cart on phones (never in the checkout). */}
+      {!inCheckout && <BottomTabBar onOpenCategories={() => setIsMenuOpen(true)} />}
       <CartDrawer />
       {/* Phase 11: why a wishlist change didn't stick (the account's wishlist is on the server). */}
       <WishlistSyncNotice />

@@ -48,6 +48,27 @@ export const promoBanners = [
     imageAlt: 'iPhone 13 Pro smartphone',
     tone: 'amber',
   },
+  // Phase 17: the first two sit beside the hero, the rest form the promo row below the top products.
+  {
+    id: 'cosy-home',
+    eyebrow: 'Furniture',
+    title: 'Make your home cosier',
+    description: 'Sofas, beds and tables for every room.',
+    cta: { label: 'Shop furniture', to: ROUTES.category('furniture') },
+    image: 'https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-sofa/thumbnail.webp',
+    imageAlt: 'Annibale Colombo sofa',
+    tone: 'rose',
+  },
+  {
+    id: 'time-pieces',
+    eyebrow: "Men's watches",
+    title: 'Time for a new watch',
+    description: 'Classic and modern watches from Rolex, Longines and more.',
+    cta: { label: 'Shop watches', to: ROUTES.category('mens-watches') },
+    image: 'https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/thumbnail.webp',
+    imageAlt: 'Rolex Cellini Date watch with a black dial',
+    tone: 'navy',
+  },
 ]
 
 // `icon` is a key the BenefitsSection component maps to an icon component.

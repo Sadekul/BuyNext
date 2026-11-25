@@ -104,7 +104,7 @@ describe('the top of the home page: single banner or slider', () => {
     ])
     // The hero is saved too (switching back never loses it).
     expect(body.hero).toMatchObject({ title: 'Hello' })
-  })
+  }, 15_000) // types a whole slide into the full home form (Phase 17 added the promo strip): slow in jsdom
 
   it('moves and deletes slides (after confirming), keeping focus on the moved slide', async () => {
     const fetchMock = setup(home({ heroMode: 'slider', slides: [slide('slide-a', 'Laptops'), slide('slide-b', 'Scents', { position: 1, isActive: false })] }))

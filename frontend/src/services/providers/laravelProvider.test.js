@@ -26,4 +26,10 @@ describe('Laravel catalog through /api/catalog', () => {
     expect(init.credentials).toBe('omit')
     expect(init.headers['X-XSRF-TOKEN']).toBeUndefined()
   })
+
+  it('asks for the best sellers with sort=best_selling (phase 17)', async () => {
+    const fetchMock = mockFetch({ 'GET /api/catalog/products': { body: { data: [RESOURCE], meta: { current_page: 1, per_page: 12, total: 1 } } } })
+    await getProducts({ limit: 12, sortBy: 'bestSelling', order: 'desc' })
+    expect(Object.fromEntries(fetchMock.mock.calls[0][0].searchParams)).toEqual({ per_page: '12', page: '1', sort: 'best_selling', direction: 'desc' })
+  })
 })

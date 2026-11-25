@@ -81,6 +81,43 @@
       "link_one": "{{brand}}, {{count, number}} product",
       "link_other": "{{brand}}, {{count, number}} products",
       "count": "{{count, number}}"
+    },
+    "viewAllNamed": "View all: {{title}}",
+    "offerColumn": "Top offers",
+    "top": {
+      "eyebrow": "Most loved",
+      "title": "Top products",
+      "bestSelling": "Best selling",
+      "trending": "Trending",
+      "newArrivals": "New arrivals",
+      "onSale": "On sale",
+      "about": {
+        "best-selling": "Most units sold in the last {{days, number}} days.",
+        "trending": "Rated highest by our shoppers.",
+        "new": "The latest additions to the store.",
+        "on-sale": "Our biggest discounts right now."
+      },
+      "empty": "Nothing to show here yet.",
+      "failed": "We couldn't load these products",
+      "loading": "Loading products…"
+    },
+    "lists": {
+      "label": "Product highlights",
+      "bestSelling": "Best selling",
+      "topRated": "Top rated",
+      "onSale": "On sale",
+      "new": "New",
+      "viewAll": "View all",
+      "loading": "Loading {{title}}…"
+    },
+    "coupon": {
+      "eyebrow": "Coupon",
+      "codeLabel": "Code",
+      "copy": "Copy",
+      "copyLabel": "Copy coupon code {{code}}",
+      "copied": "Copied {{code}}. Enter it at checkout.",
+      "copyFailed": "Couldn't copy. Select the code and copy it yourself.",
+      "hint": "Enter this code at checkout."
     }
   },
   "categories": {
@@ -145,6 +182,20 @@
         "description": "The latest smartphones from Apple, Samsung and more.",
         "cta": "Shop smartphones",
         "imageAlt": "iPhone 13 Pro smartphone"
+      },
+      "cosy-home": {
+        "eyebrow": "Furniture",
+        "title": "Make your home cosier",
+        "description": "Sofas, beds and tables for every room.",
+        "cta": "Shop furniture",
+        "imageAlt": "Annibale Colombo sofa"
+      },
+      "time-pieces": {
+        "eyebrow": "Men's watches",
+        "title": "Time for a new watch",
+        "description": "Classic and modern watches from Rolex, Longines and more.",
+        "cta": "Shop watches",
+        "imageAlt": "Rolex Cellini Date watch with a black dial"
       }
     }
   },

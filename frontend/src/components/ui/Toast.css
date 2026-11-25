@@ -1,7 +1,8 @@
 .toast-region {
   position: fixed;
   right: var(--space-4);
-  bottom: var(--space-4);
+  /* Phase 17: above the phone tab bar when it's there. */
+  bottom: calc(var(--space-4) + var(--bottom-bar-offset, 0px));
   left: var(--space-4);
   z-index: 60;
   display: flex;

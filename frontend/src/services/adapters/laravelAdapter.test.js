@@ -72,3 +72,19 @@ describe('phase 16 fields', () => {
     expect(normalizeProduct({ id: 2, name: 'Mug', price: '5.00' })).not.toHaveProperty('swatches')
   })
 })
+
+describe('phase 17 best-selling fields', () => {
+  it('maps units_sold on list items and meta.has_sales on the page', () => {
+    const page = normalizeProductPage({ data: [{ ...resource, units_sold: 7 }, { ...resource, id: 2, units_sold: 0 }], meta: { current_page: 1, per_page: 12, total: 2, has_sales: true } })
+    expect(page.hasSales).toBe(true)
+    expect(page.items.map((item) => item.unitsSold)).toEqual([7, 0])
+  })
+
+  it('leaves both out when the API doesn’t send them (treated as no sales)', () => {
+    const page = normalizeProductPage({ data: [resource], meta: { current_page: 1, per_page: 12, total: 1 } })
+    expect(page).not.toHaveProperty('hasSales')
+    expect(page.items[0]).not.toHaveProperty('unitsSold')
+    expect(normalizeProduct({ ...resource, units_sold: null })).not.toHaveProperty('unitsSold')
+    expect(normalizeProduct({ ...resource, units_sold: 'x' }).unitsSold).toBe(0)
+  })
+})

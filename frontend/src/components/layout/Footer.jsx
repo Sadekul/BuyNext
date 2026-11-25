@@ -2,8 +2,9 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitch from './LanguageSwitch'
 import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from 'react-icons/fa6'
-import { LuMail, LuPhone } from 'react-icons/lu'
+import { LuMail, LuMapPin, LuPhone } from 'react-icons/lu'
 import Logo from '../common/Logo'
+import PaymentBadges from './PaymentBadges'
 import { FOOTER_LINK_GROUPS, SITE, SOCIAL_LINKS } from '../../constants/site'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import { analyticsAvailable, openCookieSettings } from '../../utils/analytics'
@@ -37,6 +38,13 @@ function Footer() {
           <Logo tone="light" showTagline />
           <p className="site-footer__about">{t('footer.about')}</p>
           <ul className="site-footer__contact">
+            {/* Phase 17: the store's postal address, when the API sends one. */}
+            {settings.storeAddress && (
+              <li>
+                <LuMapPin aria-hidden="true" />
+                <span className="site-footer__address">{settings.storeAddress}</span>
+              </li>
+            )}
             <li>
               <LuMail aria-hidden="true" />
               <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
@@ -60,6 +68,11 @@ function Footer() {
             </ul>
           </nav>
         ))}
+      </div>
+
+      {/* Phase 17: the ways to pay this store offers (own text badges, no brand logos). */}
+      <div className="site-footer__payments container">
+        <PaymentBadges paymentMethods={settings.paymentMethods} />
       </div>
 
       <div className="site-footer__bottom">

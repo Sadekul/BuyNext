@@ -22,7 +22,8 @@ export const STORAGE_KEYS = {
   recentlyViewed: 'buynest.recentlyViewed.v1', // the last 12 products opened, newest first
   currency: 'buynest.currency.v1', // the display currency the shopper chose (prices are still charged in the store currency)
   languageHint: 'buynest.languageHint.v1', // phase 13: the "বাংলায় দেখুন" hint was shown and closed (never again)
-  announcement: 'buynest.announcement.v1', // redesign: the announcement-bar message the shopper closed (a new message shows again)
+  announcement: 'buynest.announcement.v1', // redesign / phase 17: the top-bar promo message the shopper closed (a new message shows again)
+  deliverTo: 'buynest.deliverTo.v1', // phase 17: the "Deliver to" area (Division → District → Area) chosen in the header
 }
 
 /** The per-account stores that "Remember me" decides about at sign-out. */

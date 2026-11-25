@@ -55,6 +55,7 @@ use App\Http\Controllers\Api\V1\ClientErrorController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
 use App\Http\Controllers\Api\V1\CustomerCartController;
+use App\Http\Controllers\Api\V1\DeliveryController;
 use App\Http\Controllers\Api\V1\GiftCardController;
 use App\Http\Controllers\Api\V1\InvoicePdfController;
 use App\Http\Controllers\Api\V1\MyAccountController;
@@ -160,6 +161,8 @@ Route::prefix('v1')->group(function () {
         Route::get('places/bd/divisions', [PlaceController::class, 'divisions']);
         Route::get('places/bd/districts', [PlaceController::class, 'districts']);
         Route::get('places/bd/areas', [PlaceController::class, 'areas']);
+        // Phase 17: "Deliver to": zone, delivery charges and days, and cash on delivery for an area (before the cart).
+        Route::get('delivery/estimate', [DeliveryController::class, 'estimate']);
     });
     // Cart pricing: public, but a customer token (optional) identifies the shopper for per-customer coupon limits.
     Route::post('cart/validate', [CartController::class, 'validateCart'])->middleware(['customer.optional', 'throttle:api']);

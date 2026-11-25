@@ -167,3 +167,35 @@
     transform: none;
   }
 }
+
+/*
+ * Phase 17: the compact tile beside the hero (HeroRow). Shorter, smaller type,
+ * the description kept to two lines; the photo a small disc at the side.
+ */
+.promo-banner.promo-banner--compact {
+  gap: var(--space-3);
+  min-height: 9.5rem;
+  padding: var(--space-5);
+}
+
+.promo-banner--compact .promo-banner__copy {
+  gap: var(--space-2);
+}
+
+.promo-banner--compact .promo-banner__title {
+  font-size: var(--text-xl);
+}
+
+.promo-banner--compact .promo-banner__description {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.promo-banner--compact .promo-banner__visual {
+  width: 34%;
+  max-width: 8.5rem;
+}

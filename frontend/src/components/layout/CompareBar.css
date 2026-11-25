@@ -1,6 +1,7 @@
 .compare-bar {
   position: sticky;
-  bottom: 0;
+  /* Phase 17: above the phone tab bar when it's there. */
+  bottom: var(--bottom-bar-offset, 0px);
   z-index: calc(var(--header-z) - 1);
   background: var(--color-secondary);
   color: var(--color-text-inverse);

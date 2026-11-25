@@ -41,7 +41,7 @@ function MainNavigation({ links }) {
 
   return (
     <nav className="main-nav" aria-label={t('nav.main')} ref={navRef}>
-      <ul className="main-nav__list container">
+      <ul className="main-nav__list">
         {links.map((link) => {
           const id = link.id ?? link.to
           return link.children?.length > 0 ? (

@@ -1,0 +1,150 @@
+/* Phase 17 "Deliver to": a two-line button in the header, and its dialog. */
+.deliver-to {
+  display: inline-flex;
+  flex-shrink: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  color: var(--color-secondary);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.deliver-to:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-border);
+}
+
+.deliver-to__icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--color-accent-strong);
+}
+
+.deliver-to__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.deliver-to__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.deliver-to__value {
+  max-width: 11rem;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Phones: one slim line under the search ("Deliver to Banani, Dhaka"). */
+.deliver-to--row {
+  width: 100%;
+  min-height: 2.25rem;
+  padding-inline: 0;
+  border: 0;
+}
+
+.deliver-to--row .deliver-to__text {
+  flex-direction: row;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.deliver-to--row .deliver-to__value {
+  max-width: none;
+}
+
+.deliver-to-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.deliver-to-panel__intro,
+.deliver-to-panel__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.deliver-to-panel__fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.deliver-to-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.deliver-to-estimate {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  background: var(--color-bg-tint);
+  border-radius: var(--radius-md);
+}
+
+.deliver-to-estimate__title {
+  font-size: var(--text-base);
+  color: var(--color-secondary);
+}
+
+.deliver-to-estimate__zone {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.deliver-to-estimate__methods {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.deliver-to-estimate__methods li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  align-items: baseline;
+}
+
+.deliver-to-estimate__method {
+  font-weight: 600;
+}
+
+.deliver-to-estimate__price {
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.deliver-to-estimate__eta {
+  color: var(--color-text-muted);
+}
+
+.deliver-to-estimate__cod {
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.deliver-to-estimate__cod--no {
+  color: var(--color-accent-strong);
+}
+
+.deliver-to-estimate__failed {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}

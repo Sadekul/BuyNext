@@ -8,6 +8,7 @@ import {
   getCompareProducts,
 } from '../services/productService'
 import { getCategories } from '../services/categoryService'
+import { rankedItems } from '../utils/homeSections'
 import { currentLanguage } from '../i18n'
 
 /*
@@ -25,7 +26,7 @@ export const productKeys = {
     return ['products', currentLanguage()]
   },
   list: () => [...productKeys.all, 'list', 'all'],
-  newest: (limit) => [...productKeys.all, 'list', 'newest', limit],
+  ranked: (ranking, limit) => [...productKeys.all, 'list', 'ranked', ranking, limit],
   catalog: (scope) => [...productKeys.all, 'catalog', scope],
   detail: (id) => [...productKeys.all, 'detail', String(id)],
   related: (categorySlug) => [...productKeys.all, 'related', categorySlug],
@@ -52,11 +53,16 @@ export const allProductsQuery = () =>
     queryFn: async ({ signal }) => (await getProducts({ all: true, signal })).items,
   })
 
-/** The newest products first (the home page's New arrivals; BuyNest's API only, see CAN_SORT_BY_NEWEST). */
-export const newestProductsQuery = (limit = 12) =>
+/**
+ * Phase 17: one of the home page's rankings (utils/homeSections.js HOME_RANKINGS: best selling,
+ * top rated, newest, on sale), sorted by the API → the products it really has (rankedItems:
+ * best selling only with real sales, on sale only real discounts). The "Top products" tabs and
+ * the compact lists share one cache entry per ranking.
+ */
+export const rankedProductsQuery = (ranking, limit = 12) =>
   queryOptions({
-    queryKey: productKeys.newest(limit),
-    queryFn: async ({ signal }) => (await getProducts({ sortBy: 'createdAt', order: 'desc', limit, signal })).items,
+    queryKey: productKeys.ranked(ranking.id, limit),
+    queryFn: async ({ signal }) => rankedItems(ranking, await getProducts({ sortBy: ranking.sortBy, order: 'desc', limit, signal })),
     staleTime: 5 * 60_000,
   })
 
@@ -66,14 +72,22 @@ export const newestProductsQuery = (limit = 12) =>
  * the API's order (most relevant first, with BuyNest's API); `correctedQuery`
  * is the corrected spelling the API searched for instead, or null.
  * `exact`: search the words as typed ("Search instead for …").
+ * `serverSort` (phase 17): a sort field only the API can sort by (`bestSelling`, `createdAt`,
+ * constants/catalog.js SORT_OPTIONS `serverSort`): the scope comes in that order and the
+ * client keeps it (utils/catalog.js has no comparator for these).
  */
-export const catalogQuery = ({ searchQuery, categorySlug, exact = false }) =>
+export const catalogQuery = ({ searchQuery, categorySlug, exact = false, searchCategory = '', serverSort = null }) =>
   queryOptions({
-    queryKey: productKeys.catalog(searchQuery ? { q: searchQuery, ...(exact && { exact: true }) } : { category: categorySlug ?? 'all' }),
+    queryKey: productKeys.catalog({
+      ...(searchQuery ? { q: searchQuery, ...(exact && { exact: true }), ...(searchCategory && { in: searchCategory }) } : { category: categorySlug ?? 'all' }),
+      // Phase 17: a sort only the API can do (best selling, newest) is part of the scope.
+      ...(serverSort && { sort: serverSort }),
+    }),
     queryFn: async ({ signal }) => {
-      const options = { all: true, signal }
+      const options = { all: true, signal, ...(serverSort && { sortBy: serverSort, order: 'desc' }) }
       if (searchQuery) {
-        const page = await searchProducts(searchQuery, { ...options, exact })
+        // Phase 17: `searchCategory` searches within one category (with its subcategories, on BuyNest's API).
+        const page = await searchProducts(searchQuery, { ...options, exact, ...(searchCategory && { category: searchCategory }) })
         return { items: page.items, correctedQuery: exact ? null : (page.correctedQuery ?? null) }
       }
       if (categorySlug) return { items: (await getProductsByCategory(categorySlug, options)).items, correctedQuery: null }
