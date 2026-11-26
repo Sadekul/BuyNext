@@ -138,6 +138,8 @@ const status = (page, text) => page.getByRole('status').filter({ hasText: text }
 async function newPage(viewport = { width: 1280, height: 900 }) {
   const context = await browser.newContext({ viewport, bypassCSP: true })
   context.setDefaultTimeout(15000)
+  // Page loads wait for a quiet network; under a full run the busy dev server sometimes needs more than 15 s (SQA D2).
+  context.setDefaultNavigationTimeout(45000)
   return watchErrors(await context.newPage(), errors)
 }
 /** One part of the suite: a failure is reported and the next part still runs. */
@@ -187,6 +189,7 @@ let group
 try {
   const adminCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, bypassCSP: true })
   adminCtx.setDefaultTimeout(15000)
+  adminCtx.setDefaultNavigationTimeout(45000)
   admin = watchErrors(await adminCtx.newPage(), errors)
   await adminSignIn(admin, ADMIN_USER)
   await admin.getByRole('heading', { name: 'Overview' }).waitFor()

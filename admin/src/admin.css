@@ -3255,3 +3255,225 @@ code.path {
 .slider-settings input[type='number'] {
   max-width: 8rem;
 }
+
+/* ---------- Phase 18: couriers ---------- */
+.copy-button__status:empty {
+  display: none;
+}
+
+.copy-button__status {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Book courier: the courier choice as radio cards (the radio stays visible: state is never colour alone). */
+.courier-choice__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.courier-choice__card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.courier-choice__card.is-chosen {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.courier-choice__card:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.courier-choice__name {
+  font-weight: 700;
+}
+
+.courier-choice__meta {
+  grid-column: 2;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.courier-recipient h3,
+.courier-shipment__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.courier-recipient .details {
+  padding: var(--space-2) 0;
+}
+
+.courier-recipient p {
+  margin: 0;
+}
+
+/* The order page's parcel card. */
+.courier-shipment__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.courier-shipment__body p {
+  margin: 0;
+}
+
+.courier-shipment__details {
+  padding: 0;
+}
+
+.courier-shipment__code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.courier-shipment__code code {
+  overflow-wrap: anywhere;
+}
+
+.courier-shipment__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.courier-shipment__announce:empty {
+  display: none;
+}
+
+.courier-shipment .courier-timeline {
+  margin: 0;
+}
+
+.courier-callout {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-warning-soft);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+}
+
+.courier-callout svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-warning);
+}
+
+/* Settings → Couriers. */
+.courier-cards {
+  display: grid;
+  gap: var(--space-5);
+}
+
+@media (min-width: 1100px) {
+  .courier-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.courier-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-right: var(--space-5);
+}
+
+.courier-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.courier-card__body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.courier-card__balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.courier-card__balance p {
+  margin: 0;
+}
+
+.courier-card__balance-value {
+  font-weight: 700;
+}
+
+.courier-card__setup summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.courier-card__setup ol {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+.courier-card__env {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+}
+
+.courier-card__env code,
+.courier-shipment__code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* The bulk booking's result dialog. */
+.courier-results section + section {
+  margin-top: var(--space-4);
+}
+
+.courier-results__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-success);
+}
+
+.courier-results__title--failed {
+  color: var(--color-sale);
+}
+
+.courier-results__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+

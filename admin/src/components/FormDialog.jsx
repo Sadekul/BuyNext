@@ -6,7 +6,7 @@ import { useEffect, useId, useRef } from 'react'
  * `error` is the form-level message (announced); field errors belong on the
  * fields themselves (components/Field.jsx).
  */
-function FormDialog({ isOpen, title, description, submitLabel, onSubmit, onCancel, busy = false, error, danger = false, wide = false, children }) {
+function FormDialog({ isOpen, title, description, submitLabel, onSubmit, onCancel, busy = false, disabled = false, error, danger = false, wide = false, children }) {
   const ref = useRef(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -30,7 +30,7 @@ function FormDialog({ isOpen, title, description, submitLabel, onSubmit, onCance
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
-            if (!busy) onSubmit()
+            if (!busy && !disabled) onSubmit()
           }}
         >
           <h2 id={titleId}>{title}</h2>
@@ -45,7 +45,7 @@ function FormDialog({ isOpen, title, description, submitLabel, onSubmit, onCance
             <button type="button" className="btn btn--outline" onClick={onCancel}>
               Cancel
             </button>
-            <button type="submit" className={`btn ${danger ? 'btn--danger' : 'btn--primary'}`} disabled={busy}>
+            <button type="submit" className={`btn ${danger ? 'btn--danger' : 'btn--primary'}`} disabled={busy || disabled}>
               {busy ? 'Working…' : submitLabel}
             </button>
           </div>

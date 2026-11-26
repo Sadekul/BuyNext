@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Settings;
 use Illuminate\Support\Facades\Schedule;
 
 // Deletes sign-ups that never confirmed their email (Customer::prunable).
@@ -29,3 +30,7 @@ Schedule::command('buynest:payments:expire-sslcommerz')->everyFiveMinutes()->wit
 // Phase 10 (part A): the search vocabulary follows catalog changes on its own; this daily
 // run also catches anything changed with plain SQL.
 Schedule::command('buynest:search:reindex')->dailyAt('04:10')->withoutOverlapping(30)->onOneServer();
+
+// Phase 18: ask the couriers about open parcels (Settings → Couriers → auto-sync; webhooks usually come first).
+Schedule::command('buynest:couriers:sync')->everyThirtyMinutes()->withoutOverlapping(20)->onOneServer()
+    ->when(fn () => (bool) app(Settings::class)->get('courier_auto_sync', true));

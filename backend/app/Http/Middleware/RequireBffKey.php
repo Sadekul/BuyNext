@@ -15,15 +15,25 @@ use Symfony\Component\HttpFoundation\Response;
  * photos (/storage) aren't API routes and stay open. Off in local development,
  * where the browser checks call the API directly.
  *
+ * Phase 18: the couriers' webhooks (DIRECT_PATHS) are exempt: Steadfast and
+ * Pathao post them from their own servers, with their own shared secret.
+ *
  * Phase 9 (part B): as route middleware `bff.key:always` it checks the key
  * whatever BUYNEST_REQUIRE_BFF_KEY says (browser error reports: only the
  * sign-in service may forward them), and refuses when no key is configured.
  */
 class RequireBffKey
 {
+    /** Phase 18: API routes outside services call directly (never through the sign-in service). */
+    public const DIRECT_PATHS = ['api/v1/couriers/steadfast/webhook', 'api/v1/couriers/pathao/webhook'];
+
     public function handle(Request $request, Closure $next, ?string $mode = null): Response
     {
         if ($mode !== 'always' && ! config('buynest.require_bff_key')) {
+            return $next($request);
+        }
+        // Phase 18: the couriers post their webhooks straight to the API (their own shared secret is the proof).
+        if ($mode !== 'always' && $request->is(...self::DIRECT_PATHS)) {
             return $next($request);
         }
 

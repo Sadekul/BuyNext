@@ -31,7 +31,8 @@ class ShipmentController extends Controller
             'confirmation_override' => ['nullable', 'string', 'min:3', 'max:500'], // phase 14: ship an unconfirmed COD order anyway (reason)
         ], [
             'carrier.required' => 'Choose a carrier.',
-            'carrier.in' => 'Choose a carrier: DHL, FedEx, UPS, USPS, or other.',
+            // Phase 18: the Bangladeshi couriers too (Steadfast and Pathao can also be booked through their API).
+            'carrier.in' => 'Choose a carrier: DHL, FedEx, UPS, USPS, Steadfast, Pathao, RedX, Paperfly, Sundarban Courier, or other.',
             'tracking_number.regex' => 'A tracking number has only letters, digits, spaces, and dashes.',
         ]);
         if (! Order::where('number', strtoupper($number))->exists()) {
@@ -60,7 +61,7 @@ class ShipmentController extends Controller
     }
 
     /**
-     * GET /api/admin/v1/shipments?carrier&from&to&search&page&per_page - newest first.
+     * GET /api/admin/v1/shipments?carrier&delivery_status&from&to&search&page&per_page - newest first.
      * search: shipment number, tracking number, or order number. from/to: the shipment date (inclusive).
      */
     public function index(Request $request): AnonymousResourceCollection
@@ -71,10 +72,12 @@ class ShipmentController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'search' => ['nullable', 'string', 'max:100'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'delivery_status' => ['nullable', Rule::in(Shipment::DELIVERY_STATUSES)], // phase 18
         ]);
 
-        $shipments = Shipment::with(['order.items', 'admin'])
+        $shipments = Shipment::with(['order.items', 'admin', 'events'])
             ->when($data['carrier'] ?? null, fn ($query, $carrier) => $query->where('carrier', $carrier))
+            ->when($data['delivery_status'] ?? null, fn ($query, $status) => $query->where('delivery_status', $status))
             ->when($data['from'] ?? null, fn ($query, $from) => $query->where('created_at', '>=', $from.' 00:00:00'))
             ->when($data['to'] ?? null, fn ($query, $to) => $query->where('created_at', '<=', $to.' 23:59:59'))
             ->when($data['search'] ?? null, function ($query, $search) {
@@ -92,7 +95,7 @@ class ShipmentController extends Controller
     /** GET /api/admin/v1/shipments/{number} - with its order summary and the items shipped. */
     public function show(string $number): JsonResponse
     {
-        $shipment = Shipment::with(['order.items', 'admin'])->where('number', strtoupper($number))->first();
+        $shipment = Shipment::with(['order.items', 'admin', 'events'])->where('number', strtoupper($number))->first();
 
         return $shipment
             ? response()->json(['data' => (new AdminShipmentResource($shipment))->detail()->resolve()])

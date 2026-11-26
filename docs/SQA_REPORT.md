@@ -380,6 +380,25 @@ Intentional differences from the reference: search and "All categories" sit on a
 
 Checks: frontend 971 unit tests; admin 228; browser checks 1,889 on the dev server (full run, with the marketing suite rerun alone after F6: 187) and 1,877 of 1,881 on the production build (full run; the four failures are F7–F9, and the security, slider, extras and marketplace suites then passed alone: 20, 41, 164, 62).
 
+## Phase 18 (courier integration: Steadfast and Pathao) — 2026-11-26
+
+Asked by the store owner after the Bangladesh delivery work. Built by three agents in parallel (backend; admin app with its sign-in service routes; storefront) against [backend/PHASE18_CONTRACT.md](backend/PHASE18_CONTRACT.md), then a fourth wrote the new `courier.mjs` browser suite (113 checks) with local stand-in Steadfast and Pathao servers and a second API in taka pointed at them. **No real courier was called**; the couriers' wire formats come from their published merchant APIs and community SDKs, and must be checked with sandbox credentials before going live (launch step in [BANGLADESH.md](BANGLADESH.md)). The lead reviewed the webhooks (secret compared with `hash_equals`, 401 / 404 / no-op answers) and the delivered-parcel logic (cash never more than due, never backwards, cancelled orders untouched).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| D1 | Medium | The booking dialog showed the customer's account name, but the courier is sent the shipping address's name (they can differ: a gift, a relative) — found by the browser suite | The dialog shows the shipping name (account name only as a fallback) |
+| D2 | Medium | With `BUYNEST_REQUIRE_BFF_KEY=true` (production) the API would have refused the couriers' webhooks: they post straight to the API, without the storefront's key | The two webhook paths skip the key check; the courier's shared secret is the proof |
+| D3 | Low | Steadfast's `tracking_update` webhooks carry a message but no status: treated as a status they would have reset the parcel | They add a timeline entry only when the message is new; the status stays |
+| D4 | Low | A late or repeated courier message could have moved a delivered / returned / cancelled parcel back to "on the way" | Finished parcels stay finished (only the last-checked time changes) |
+| D5 | Low | A courier booking can take longer than the sign-in service's usual 15 s wait, which would report a booking that went through as failed | Booking and "Refresh status" wait 60 s, bulk booking 300 s |
+| D6 | Test | The orders grid's new filter, if named "Delivery status", would also match the admin suite's `getByLabel('Status')` | Named "Delivery progress" |
+| D7 | Test | The marketing suite gave page loads the same 15 s as clicks; under a full dev run three different page loads in it (cart rules, saved cart, SEO and search) each once took longer | Page loads in that suite wait up to 45 s; other waits stay 15 s |
+| D8 | Medium | The "To confirm" queue still listed cash-on-delivery orders that had been shipped anyway (with a reason) or delivered, so staff could call about parcels already on their way; old test orders piled up and pushed real ones to page 2 (found by the delivery suite on the production build) | The queue shows only orders that haven't shipped yet (feature test) |
+
+Not automated: a real courier account (sandbox or live), the courier's own tracking pages (links only), and a real webhook from the internet reaching a local machine.
+
+Checks: backend 643 feature tests (Pint clean; the D8 check added to an existing test); frontend 1,011 unit tests; admin 246; browser checks 2,013 of 2,014 on the dev server (full run; the marketing suite then passed alone after D7: 187) and 2,008 of 2,009 on the production build (full run; the one failure is D8, and the delivery suite then passed alone after the fix: 175).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

@@ -282,5 +282,45 @@
     "unreachableLine": "We'll call {{phone}} again. Please keep your phone nearby.",
     "confirmed": "Confirmed",
     "confirmedLine": "Thanks for confirming by phone. We're preparing your order."
+  },
+  "delivery": {
+    "progress": "Delivery progress",
+    "steps": {
+      "booked": "Booked",
+      "picked_up": "Picked up",
+      "in_transit": "On the way",
+      "out_for_delivery": "Out for delivery",
+      "delivered": "Delivered"
+    },
+    "statuses": {
+      "booked": "Booked",
+      "picked_up": "Picked up",
+      "in_transit": "On the way",
+      "out_for_delivery": "Out for delivery",
+      "delivered": "Delivered",
+      "partly_delivered": "Partly delivered",
+      "on_hold": "On hold",
+      "returned": "Returned",
+      "cancelled": "Delivery cancelled",
+      "shipped": "Shipped"
+    },
+    "stepDone": " (done)",
+    "now": "Now",
+    "status": "Status: {{status}}",
+    "courier": "Sent with {{courier}}",
+    "trackingCode": "Tracking code",
+    "copy": "Copy tracking code",
+    "copied": "Tracking code copied.",
+    "copyFailed": "Couldn't copy: the code is selected, copy it by hand.",
+    "trackOn": "Track on {{courier}}",
+    "updates": "Delivery updates",
+    "noUpdates": "No updates from the courier yet.",
+    "notice": {
+      "on_hold": "The courier has put your parcel on hold for now. The courier or our team will contact you; you don't need to do anything yet.",
+      "partly_delivered": "Part of your parcel was delivered. Our team will contact you about the rest.",
+      "returned": "The courier is returning this parcel to us. Our team will contact you about what happens next.",
+      "cancelled": "The courier delivery was cancelled. Our team will contact you about what happens next."
+    },
+    "listLabel": "Delivery: {{status}}"
   }
 }

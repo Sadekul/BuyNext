@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { LuPackage } from 'react-icons/lu'
 import OrderStatusBadge from '../components/orders/OrderStatusBadge'
+import { deliveryStatusLabel, latestCourierShipment } from '../utils/delivery'
 import Pagination from '../components/common/Pagination'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -30,6 +31,8 @@ function NoOrders() {
 function OrderRow({ order }) {
   const { t } = useTranslation('orders')
   const id = order.number ?? order.id
+  // Phase 18: where the newest courier parcel is ("Delivery: On the way"), in words.
+  const delivery = latestCourierShipment(order)
   return (
     <li className="orders__item">
       <div className="orders__thumbs" aria-hidden="true">
@@ -44,6 +47,7 @@ function OrderRow({ order }) {
         <span className="orders__meta">
           {formatDate(new Date(order.placedAt).toISOString())} · {t('list.items', { count: order.totals.itemCount })}
         </span>
+        {delivery && <span className="orders__delivery">{t('delivery.listLabel', { status: deliveryStatusLabel(delivery.deliveryStatus, delivery.deliveryStatusLabel) })}</span>}
       </div>
       <OrderStatusBadge status={order.status} />
       <span className="orders__total">{formatBasePrice(order.totals.total, order.currency)}</span>

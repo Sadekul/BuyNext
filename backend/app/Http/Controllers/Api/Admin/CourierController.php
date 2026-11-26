@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Services\BdAddresses;
+use App\Services\Couriers\Couriers;
 use App\Services\PackingSlips;
 use App\Services\Pricing;
 use App\Services\Settings;
@@ -89,9 +89,8 @@ class CourierController extends Controller
     public static function row(Order $order, int $defaultWeight): array
     {
         $address = $order->shipping_address ?? [];
-        $lines = BdAddresses::lines($address, 'en');
-        $grams = $order->items->filter(fn ($item) => ! $item->isGiftCard())->sum(fn ($item) => $item->quantity
-            * (int) ($item->variant?->weight ?? $item->product?->weight ?? $defaultWeight));
+        // Phase 18: phone, address line and weight are shared with the courier bookings (Couriers).
+        $grams = Couriers::parcelGrams($order, $defaultWeight);
         $note = array_filter([
             $order->deliveryZone?->name,
             Pricing::toCents($order->advance_paid ?? 0) > 0 ? 'Advance paid '.Pricing::format(Pricing::toCents($order->advance_paid)) : null,
@@ -102,9 +101,8 @@ class CourierController extends Controller
             $order->number,
             trim(($address['first_name'] ?? '').' '.($address['last_name'] ?? '')),
             // Bangladeshi couriers take the 11-digit local form (01712345678); a leading "+" would also be escaped as a formula.
-            preg_match('/^\+880(1\d{9})$/', (string) $order->phone, $m) ? '0'.$m[1] : $order->phone,
-            $lines ? implode(', ', array_slice($lines, 0, -1)) : implode(', ', array_filter([$address['line1'] ?? null, $address['line2'] ?? null,
-                $address['city'] ?? null, $address['state'] ?? null, $address['postal_code'] ?? null])),
+            Couriers::localPhone($order->phone),
+            Couriers::addressLine($address),
             $address['city'] ?? '',
             $address['area'] ?? '',
             Pricing::format($order->isCod() ? $order->codDueCents() : 0),

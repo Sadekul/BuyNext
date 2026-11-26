@@ -27,12 +27,15 @@ use Throwable;
  */
 class OrderConfirmationController extends Controller
 {
-    /** GET /api/admin/v1/orders/to-confirm?per_page= → pending and unreachable COD orders, oldest first. */
+    /**
+     * GET /api/admin/v1/orders/to-confirm?per_page= → pending and unreachable COD orders that haven't shipped yet, oldest first.
+     * Phase 18: an order shipped anyway (with a reason) or already delivered no longer needs the call, so it leaves the queue.
+     */
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
         $orders = Order::where('payment_method', 'cod')->whereIn('confirmation_status', ['pending', 'unreachable'])
-            ->whereNotIn('status', ['cancelled', 'closed'])
+            ->whereIn('status', ['pending_payment', 'processing'])
             ->with(['customer', 'deliveryZone', 'confirmationLogs'])
             ->orderBy('placed_at')->orderBy('id')
             ->paginate($data['per_page'] ?? 20)->withQueryString();

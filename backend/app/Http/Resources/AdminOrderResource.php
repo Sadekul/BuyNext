@@ -26,6 +26,8 @@ class AdminOrderResource extends OrderResource
                 ? ['id' => $this->createdBy->id, 'name' => $this->createdBy->name] : null,
             // Phase 10 (part B): gift cards bought with this order (made when it was paid).
             'gift_cards_issued' => $this->giftCardsIssued(),
+            // Phase 18: the latest shipment's delivery status (the orders grid column), null before shipping.
+            'delivery_status' => $this->shipments->last()?->delivery_status,
             // Phase 14: the phone confirmation (logs on the detail answer).
             'confirmation' => [
                 'status' => $this->confirmation_status,
@@ -82,7 +84,8 @@ class AdminOrderResource extends OrderResource
             'payment_status' => $entry->payment_status,
             'note' => $entry->note,
             'admin_id' => $entry->admin_id,
-            'admin_name' => $entry->admin?->name,
+            // Phase 18: a system actor ("Steadfast") on steps a courier reported.
+            'admin_name' => $entry->admin?->name ?? $entry->actor,
             'customer_notified' => $entry->customer_notified,
             'created_at' => $entry->created_at?->toIso8601ZuluString(),
         ];

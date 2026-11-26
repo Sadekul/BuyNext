@@ -104,6 +104,36 @@ return [
     ],
 
     /*
+     * Phase 18: courier bookings (docs/BANGLADESH.md → Couriers). A courier is
+     * "set up" only when its credentials are here; without them staff ship
+     * by hand as before. Credentials live in backend/.env only and are never
+     * logged or sent to the admin. The API URLs are only changed for local
+     * tests against a stand-in server.
+     */
+    'couriers' => [
+        'steadfast' => [
+            'api_key' => env('STEADFAST_API_KEY') ?: null,
+            'secret_key' => env('STEADFAST_SECRET_KEY') ?: null,
+            'api_url' => rtrim((string) (env('STEADFAST_API_URL') ?: 'https://portal.packzy.com/api/v1'), '/'),
+            // Steadfast sends it as "Authorization: Bearer …" on its webhook (set the same value in its panel).
+            'webhook_token' => env('STEADFAST_WEBHOOK_TOKEN') ?: null,
+        ],
+        'pathao' => [
+            'client_id' => env('PATHAO_CLIENT_ID') ?: null,
+            'client_secret' => env('PATHAO_CLIENT_SECRET') ?: null,
+            'username' => env('PATHAO_USERNAME') ?: null,
+            'password' => env('PATHAO_PASSWORD') ?: null,
+            'store_id' => env('PATHAO_STORE_ID') ?: null,
+            'mode' => env('PATHAO_MODE') === 'live' ? 'live' : 'sandbox',
+            'api_url' => rtrim((string) (env('PATHAO_API_URL') ?: (env('PATHAO_MODE') === 'live' ? 'https://api-hermes.pathao.com' : 'https://courier-api-sandbox.pathao.com')), '/'),
+            // Pathao sends it as X-PATHAO-Signature, and expects it back (its integration check).
+            'webhook_secret' => env('PATHAO_WEBHOOK_SECRET') ?: null,
+        ],
+        'timeout_seconds' => 20,
+        'connect_timeout_seconds' => 5,
+    ],
+
+    /*
      * Phase 12: the money formats the store knows. The store currency itself
      * is BUYNEST_CURRENCY (store.currency below): a deployment setting, since
      * prices in the database have no currency of their own (docs/CURRENCY.md).

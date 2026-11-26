@@ -280,7 +280,33 @@ export const fromShipment = (raw) => ({
   trackingNumber: raw.tracking_number ?? null,
   trackingUrl: httpsUrl(raw.tracking_url),
   createdAt: raw.created_at,
+  // Phase 18: a courier's delivery progress, only when the API sends it (older answers and manual shipments as before).
+  ...fromDelivery(raw),
 })
+
+// Phase 18 (docs/backend/PHASE18_CONTRACT.md §1): our normalised delivery statuses ("shipped" = a manual shipment).
+export const DELIVERY_STATUSES = ['booked', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'partly_delivered', 'on_hold', 'returned', 'cancelled', 'shipped']
+const deliveryStatus = (value) => (DELIVERY_STATUSES.includes(value) ? value : null)
+
+/** One of the shipment's courier updates, as customers see it: status, label, message, when (never the raw status or source). */
+const fromShipmentEvent = (raw) => ({
+  deliveryStatus: deliveryStatus(raw.delivery_status),
+  label: str(raw.label)?.slice(0, 80) ?? null,
+  message: str(raw.message)?.slice(0, 500) ?? null,
+  occurredAt: str(raw.occurred_at) ?? null,
+})
+
+/**
+ * Phase 18: `delivery_status`, its translated label, and the courier's updates (oldest first, as the API
+ * sends them). Only the four customer keys pass: a courier's fee, the cash collected, its raw status, and
+ * staff notes never reach the browser even if an answer carried them.
+ */
+function fromDelivery(raw) {
+  const status = deliveryStatus(raw.delivery_status)
+  if (!status) return {}
+  const events = (Array.isArray(raw.events) ? raw.events : []).filter((event) => event && typeof event === 'object').slice(-50).map(fromShipmentEvent).filter((event) => event.deliveryStatus && event.occurredAt)
+  return { deliveryStatus: status, deliveryStatusLabel: str(raw.delivery_status_label)?.slice(0, 80) ?? null, events }
+}
 // Phase 12: a 3-letter currency code (an order's, an invoice's), or nothing.
 export const currencyCode = (value) => (typeof value === 'string' && /^[A-Za-z]{3}$/.test(value.trim()) ? value.trim().toUpperCase() : undefined)
 const withCurrency = (raw) => (currencyCode(raw?.currency) ? { currency: currencyCode(raw.currency) } : {})

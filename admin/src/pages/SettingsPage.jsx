@@ -15,7 +15,7 @@ import { formatMoney, getStoreCurrency, storeCode } from '../utils/format'
 import { paymentProviderNote } from '../utils/payments'
 import StatusBadge from '../components/StatusBadge'
 // Phase 14 §3 and §4: delivery zones, the default country, cash on delivery.
-import { LuMapPinned } from 'react-icons/lu'
+import { LuMapPinned, LuTruck } from 'react-icons/lu'
 import { getDeliveryZones, phase14Keys } from '../api/phase14'
 import { COD_ADVANCE, advanceAvailability } from '../utils/bangladesh'
 
@@ -303,6 +303,11 @@ function ShippingForm({ saved }) {
           {' · '}
           <Link to="/settings/delivery-zones">
             <LuMapPinned aria-hidden="true" /> Delivery zones
+          </Link>
+          {/* Phase 18: Steadfast and Pathao. */}
+          {' · '}
+          <Link to="/settings/couriers">
+            <LuTruck aria-hidden="true" /> Couriers
           </Link>
         </p>
       )}

@@ -49,6 +49,8 @@ import { GiftCardDetailPage, GiftCardsPage } from './pages/GiftCardsPages'
 // Phase 14: Settings → Delivery zones, Sales → To confirm.
 import DeliveryZonesPage from './pages/DeliveryZonesPage'
 import ToConfirmPage from './pages/ToConfirmPage'
+// Phase 18: Settings → Couriers (Steadfast, Pathao).
+import CouriersPage from './pages/CouriersPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -134,6 +136,8 @@ export function AdminRoutes() {
             {/* Phase 14: Bangladesh delivery zones (changed with settings.edit), cash on delivery orders to confirm by phone. */}
             <Route path="settings/delivery-zones" element={guarded('settings.view', <DeliveryZonesPage />)} />
             <Route path="to-confirm" element={guarded('orders.edit', <ToConfirmPage />)} />
+            {/* Phase 18: couriers and their booking defaults (changed with settings.edit). */}
+            <Route path="settings/couriers" element={guarded('settings.view', <CouriersPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

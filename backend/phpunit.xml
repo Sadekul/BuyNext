@@ -38,6 +38,18 @@
         <!-- Stripe off unless a test turns it on (tests fake Stripe with Http::fake, never the real API) -->
         <env name="STRIPE_SECRET_KEY" value=""/>
         <env name="STRIPE_WEBHOOK_SECRET" value=""/>
+        <!-- Phase 18: couriers "not set up" unless a test turns one on (tests fake them with Http::fake) -->
+        <env name="STEADFAST_API_KEY" value=""/>
+        <env name="STEADFAST_SECRET_KEY" value=""/>
+        <env name="STEADFAST_API_URL" value=""/>
+        <env name="STEADFAST_WEBHOOK_TOKEN" value=""/>
+        <env name="PATHAO_CLIENT_ID" value=""/>
+        <env name="PATHAO_CLIENT_SECRET" value=""/>
+        <env name="PATHAO_USERNAME" value=""/>
+        <env name="PATHAO_PASSWORD" value=""/>
+        <env name="PATHAO_STORE_ID" value=""/>
+        <env name="PATHAO_API_URL" value=""/>
+        <env name="PATHAO_WEBHOOK_SECRET" value=""/>
         <!-- Phase 9 (part B): never send test errors to Sentry; backups go to a faked local disk -->
         <env name="SENTRY_LARAVEL_DSN" value=""/>
         <env name="BACKUP_DISK" value="local"/>

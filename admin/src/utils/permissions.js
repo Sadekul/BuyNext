@@ -35,6 +35,8 @@ import {
   // Phase 14.
   LuMapPinned,
   LuPhoneCall,
+  // Phase 18.
+  LuPackageSearch,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -161,6 +163,8 @@ const LIVE_NAV = [
   { to: '/settings/shipping-rates', label: 'Shipping table rates', icon: LuTable2, permission: 'settings.edit' },
   // Phase 14 §3.
   { to: '/settings/delivery-zones', label: 'Delivery zones', icon: LuMapPinned, permission: 'settings.edit' },
+  // Phase 18 §2: Steadfast and Pathao (read with settings.view).
+  { to: '/settings/couriers', label: 'Couriers', icon: LuPackageSearch, permission: 'settings.view' },
   {
     heading: 'System',
     items: [

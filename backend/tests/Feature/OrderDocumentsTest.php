@@ -192,6 +192,8 @@ class OrderDocumentsTest extends TestCase
             'number' => 'SHP-'.(100000 + $shipment->id), 'order_number' => $number, 'carrier' => 'ups', 'carrier_label' => 'UPS',
             'tracking_number' => '1Z999AA10123456784', 'tracking_url' => 'https://www.ups.com/track?tracknum=1Z999AA10123456784',
             'created_at' => $shipment->created_at->toIso8601ZuluString(), 'admin_name' => 'Store Admin', 'note' => 'Two boxes.',
+            // Phase 18: a manual shipment has no courier booking or timeline.
+            'delivery_status' => 'shipped', 'delivery_status_label' => 'Shipped', 'courier' => null, 'events' => [],
         ]);
         $this->assertSame('shipped', Order::sole()->status);
         Mail::assertSent(ShipmentMail::class, function ($mail) {

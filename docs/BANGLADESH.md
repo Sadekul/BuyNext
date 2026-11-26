@@ -169,3 +169,88 @@ and must be checked with the courier. To upload:
 3. Fill the courier-only fields (delivery type, item type, pickup store) and upload.
 
 If you settle on one courier, a fixed column mapping can be added later as a preset after checking their template.
+
+## Couriers (Steadfast and Pathao)
+
+Phase 18 books parcels with **Steadfast** (Packzy) and **Pathao** straight from the order page: the courier gets the
+order, BuyNest saves the consignment and tracking code, customers follow the parcel on their order page, and a delivered
+cash on delivery parcel records the cash and marks the order paid. **RedX, Paperfly and Sundarban Courier** are
+*manual carriers*: choose them in the Ship dialog and type the tracking number (RedX gets a tracking page link). API
+details: `docs/backend/PHASE18_CONTRACT.md`.
+
+**Not verified yet.** The couriers' request and answer formats come from their published merchant APIs and community
+SDKs, not from a real account. Each courier's wire format sits in one class (`app/Services/Couriers/SteadfastGateway.php`,
+`PathaoGateway.php`), so a correction is a one-file change. The tracking page links in `Shipment::CARRIERS` are also to
+be checked.
+
+**Nothing changes until you set a courier up.** Without its keys a courier shows "Not set up", its webhook answers 404,
+and staff ship by hand as before. Couriers collect taka: booking is refused unless the store currency is BDT.
+
+### Setting up
+
+1. Open a merchant account with the courier and get the API credentials (Steadfast: *API key* and *secret key*;
+   Pathao: *client id*, *client secret*, your merchant login, and the *store id* of your pickup store).
+2. Put them in `backend/.env` (never committed; never shown in the admin) and restart the API:
+
+| Variable | Meaning |
+|---|---|
+| `STEADFAST_API_KEY`, `STEADFAST_SECRET_KEY` | Steadfast's API key and secret key |
+| `STEADFAST_API_URL` | Only for local tests against a stand-in (default `https://portal.packzy.com/api/v1`) |
+| `STEADFAST_WEBHOOK_TOKEN` | A long random value you also enter in Steadfast's webhook settings (sent as `Authorization: Bearer …`) |
+| `PATHAO_CLIENT_ID`, `PATHAO_CLIENT_SECRET` | Pathao merchant API client |
+| `PATHAO_USERNAME`, `PATHAO_PASSWORD` | The merchant panel login the API signs in with |
+| `PATHAO_STORE_ID` | The pickup store's id in Pathao |
+| `PATHAO_MODE` | `sandbox` (default) or `live` |
+| `PATHAO_API_URL` | Only for local tests (default: `https://courier-api-sandbox.pathao.com`, or `https://api-hermes.pathao.com` when live) |
+| `PATHAO_WEBHOOK_SECRET` | A long random value you also enter in Pathao's webhook settings (sent as `X-PATHAO-Signature`) |
+
+3. In the admin, **Settings → Couriers** shows each courier as *Set up*, its mode, the Steadfast balance, and the
+   **webhook URL** to copy into the courier's panel:
+   - Steadfast: `{API address}/api/v1/couriers/steadfast/webhook`
+   - Pathao: `{API address}/api/v1/couriers/pathao/webhook`
+
+   These are the **API's** address (APP_URL), not the storefront's: the couriers post straight to Laravel, not through
+   the storefront's sign-in service (they are exempt from `BUYNEST_REQUIRE_BFF_KEY`; their shared secret is the proof).
+   Pathao checks the URL when you save it: BuyNest answers its check with `202` and the secret header it expects.
+4. Choose the default courier, a default note ("Handle with care"), Pathao's item type (parcel / document) and delivery
+   type (normal / on demand), and whether to **auto-sync**.
+
+### Booking
+
+- **Order page → Book courier** (permission *Create shipments*): the courier, the cash to collect (the COD amount due,
+  0 for prepaid orders; staff may change it), the weight (from the items, as in the courier CSV), the note, and for
+  Pathao the city → zone → area (pre-selected when our district and area names match Pathao's; never guessed).
+  The same rules as shipping by hand apply (paid or COD, phone-confirmed COD unless overridden with a reason).
+- The customer's mobile is sent as `01XXXXXXXXX`, the address as one line in English (as in the courier CSV).
+- The order number is the courier's invoice / merchant order id, so an order is booked once: a second booking is refused,
+  and a retry after a timeout is refused by the courier as a duplicate ("check the courier's panel before trying again").
+- If the courier refuses, its reason is shown and nothing is saved. On success the order is *Shipped* with the tracking
+  code (Steadfast's tracking code, Pathao's consignment id) and the customer gets the usual "on its way" email.
+- **Orders grid → Book with Steadfast** books up to 50 selected orders; one failing doesn't stop the others. (Pathao is
+  booked one order at a time, because each needs its city and zone.)
+
+### Status updates
+
+The courier's webhook (or **Refresh status**, or the auto-sync every 30 minutes for open parcels of the last 30 days)
+updates the parcel's status and its timeline, which customers see on their order page (without fees, cash figures or the
+courier's raw status):
+
+| Delivery status | What BuyNest does |
+|---|---|
+| Booked, Picked up, On the way, Out for delivery | Timeline only |
+| **Delivered** | A shipped order becomes *Delivered* ("Delivered — reported by {courier}", the customer is emailed). For COD, the cash the courier reports collected (else the booked COD amount) is recorded exactly as staff would: invoice, paid (or *partially paid* + a staff notification when less was collected). |
+| Partly delivered | Order unchanged; staff notification "check and record the cash" |
+| Returned, Cancelled | Order unchanged; staff notification — handle the return or cancellation on the order page |
+| On hold | Staff notification (once per parcel per day) |
+
+Orders never move backwards, cancelled or closed orders are never touched, and cash is never recorded twice. The same
+update arriving twice adds nothing. A webhook with a missing or wrong secret is refused (401); one about an unknown
+parcel is answered as received and logged, so the courier doesn't retry forever.
+
+### Launch steps
+
+1. **Verify each courier with sandbox credentials before going live**: book a test parcel, check the request fields,
+   the answer, the tracking link, a status update through the webhook and through *Refresh status*, and (Steadfast)
+   the balance. Correct the gateway class if anything differs.
+2. Switch Pathao to `PATHAO_MODE=live` with live credentials; enter the webhook URLs and secrets in both panels.
+3. Make sure the scheduler runs (`php artisan schedule:work` / cron) if you rely on auto-sync.

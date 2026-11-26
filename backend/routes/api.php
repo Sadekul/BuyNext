@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\BackupController;
 use App\Http\Controllers\Api\Admin\CatalogRuleController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CouponController;
+use App\Http\Controllers\Api\Admin\CourierBookingController;
 use App\Http\Controllers\Api\Admin\CourierController;
 use App\Http\Controllers\Api\Admin\CreditMemoController;
 use App\Http\Controllers\Api\Admin\CurrencyController;
@@ -53,6 +54,7 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\ClientErrorController;
 use App\Http\Controllers\Api\V1\ContentController;
+use App\Http\Controllers\Api\V1\CourierWebhookController;
 use App\Http\Controllers\Api\V1\CustomerAuthController;
 use App\Http\Controllers\Api\V1\CustomerCartController;
 use App\Http\Controllers\Api\V1\DeliveryController;
@@ -188,6 +190,9 @@ Route::prefix('v1')->group(function () {
     // Phase 12: SSLCommerz's return trip (forwarded by the sign-in service) and its IPN. No sign-in: val_id is validated with SSLCommerz.
     Route::post('payments/sslcommerz/return', [SslCommerzController::class, 'return'])->middleware('throttle:sslcommerz');
     Route::post('payments/sslcommerz/ipn', [SslCommerzController::class, 'ipn'])->middleware('throttle:sslcommerz');
+    // Phase 18: the couriers' status webhooks (straight from the courier, not through the sign-in service; the shared secret is the proof).
+    Route::post('couriers/steadfast/webhook', [CourierWebhookController::class, 'steadfast'])->middleware('throttle:120,1');
+    Route::post('couriers/pathao/webhook', [CourierWebhookController::class, 'pathao'])->middleware('throttle:120,1');
     Route::post('gift-cards/check', [GiftCardController::class, 'check'])->middleware('throttle:gift-card-check');
     // Phase 11: a shared wishlist (public, no personal data).
     Route::get('wishlists/{token}', [WishlistController::class, 'shared'])->where('token', '[A-Za-z0-9_-]{1,64}')->middleware('throttle:wishlist-share');
@@ -306,6 +311,18 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('orders/{number}/packing-slip.pdf', [CourierController::class, 'packingSlip'])->middleware('can.admin:orders.view');
         Route::post('orders/packing-slips', [CourierController::class, 'packingSlips'])->middleware('can.admin:orders.view');
         Route::get('orders/export/courier.csv', [CourierController::class, 'courierCsv'])->middleware('can.admin:orders.view');
+        // Phase 18: courier bookings (Steadfast, Pathao).
+        Route::get('couriers', [CourierBookingController::class, 'index'])->middleware('can.admin:orders.view|settings.view');
+        Route::put('couriers/settings', [CourierBookingController::class, 'updateSettings'])->middleware('can.admin:settings.edit');
+        Route::middleware('can.admin:shipments.create')->controller(CourierBookingController::class)->group(function () {
+            Route::get('couriers/pathao/cities', 'cities');
+            Route::get('couriers/pathao/cities/{city}/zones', 'zones')->whereNumber('city');
+            Route::get('couriers/pathao/zones/{zone}/areas', 'areas')->whereNumber('zone');
+            Route::post('orders/courier-bookings', 'bulk');
+            Route::get('orders/{number}/courier-booking', 'defaults');
+            Route::post('orders/{number}/courier-booking', 'store');
+            Route::post('shipments/{number}/sync', 'sync');
+        });
         Route::get('orders/{number}', [AdminOrderController::class, 'show'])->middleware('can.admin:orders.view');
         // Phase 8: a (new) Stripe payment link for an unpaid card order, to copy and send.
         Route::post('orders/{number}/payment-link', [AdminOrderController::class, 'paymentLink'])->middleware('can.admin:orders.edit');

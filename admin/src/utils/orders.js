@@ -112,7 +112,19 @@ export function giftCardSplit(order, totalCents, limits) {
   return { last4: card.last4 ?? null, toCardCents: toCard, otherCents: Math.max(totalCents - toCard, 0) }
 }
 
-export const CARRIERS = { dhl: 'DHL', fedex: 'FedEx', ups: 'UPS', usps: 'USPS', other: 'Other carrier' }
+// Phase 18: + the Bangladesh couriers (booked by hand here; Steadfast and Pathao can also be booked through their API with "Book courier").
+export const CARRIERS = {
+  dhl: 'DHL',
+  fedex: 'FedEx',
+  ups: 'UPS',
+  usps: 'USPS',
+  steadfast: 'Steadfast',
+  pathao: 'Pathao',
+  redx: 'RedX',
+  paperfly: 'Paperfly',
+  sundarban: 'Sundarban Courier',
+  other: 'Other carrier',
+}
 
 export const COUPON_TYPES = { percent: 'Percent off', fixed: 'Fixed amount off', free_shipping: 'Free shipping' }
 

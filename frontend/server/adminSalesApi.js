@@ -5,6 +5,8 @@ import { laravelSalesData } from './shop/adminSales.js'
 import { localeRule } from './adminPhase13Api.js'
 // Phase 14: Bangladesh addresses (division, district, area; mobile numbers), the grid's zone/COD/confirmation filters.
 import { BD_MOBILE_MESSAGE, bdAddressPlaces, bdMobile, bdPostcode, isBangladesh, orderPhase14Filters } from './adminPhase14Api.js'
+// Phase 18: the Bangladesh couriers as carriers.
+import { MANUAL_CARRIERS } from './adminPhase18Api.js'
 
 /*
  * Phase 6 admin routes (docs/backend/PHASE6_CONTRACT.md), Laravel only:
@@ -269,7 +271,8 @@ export function validateAdminOrder(body, { quote }) {
 
 export const BULK_ORDER_ACTIONS = ['invoice', 'ship', 'cancel']
 export const MAX_BULK_ORDERS = 100
-const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
+// Phase 18: + the Bangladesh couriers (adminPhase18Api.js).
+const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other', ...MANUAL_CARRIERS]
 const isOrderNumber = (value) => typeof value === 'string' && /^BN-\d{1,12}$/.test(value)
 
 export function validateBulkOrders(body) {

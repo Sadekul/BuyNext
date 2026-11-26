@@ -121,6 +121,12 @@ class Settings
         'cod_advance' => 'none', // none | delivery_charge (paid online through SSLCommerz first)
         'cod_zones' => [], // delivery zone codes; [] = everywhere
         'cod_require_confirmation' => false,
+        // Phase 18: Settings → Couriers (PUT /api/admin/v1/couriers/settings, not a settings group here).
+        'courier_default' => null, // null | steadfast | pathao: preselected in the booking dialog
+        'courier_auto_sync' => true, // buynest:couriers:sync every 30 minutes
+        'courier_note_template' => null, // the booking's default note to the courier ("Handle with care")
+        'courier_pathao_item_type' => 'parcel', // parcel | document
+        'courier_pathao_delivery_type' => 'normal', // normal | on_demand
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'cod_fee'];

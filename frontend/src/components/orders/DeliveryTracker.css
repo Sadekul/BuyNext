@@ -1,0 +1,197 @@
+/* Phase 18: a courier shipment's delivery tracker (vertical, so it fits a 390px screen without sideways scroll). */
+.delivery-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-tracker__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary-strong);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-full);
+}
+
+.delivery-tracker__status--delivered {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.delivery-tracker__status--on_hold,
+.delivery-tracker__status--partly_delivered,
+.delivery-tracker__status--returned,
+.delivery-tracker__status--cancelled {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.delivery-tracker__steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delivery-tracker__step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.delivery-tracker__step:last-child {
+  padding-bottom: 0;
+}
+
+/* The line between two steps (solid once the next step was reached). */
+.delivery-tracker__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  left: calc(0.75rem - 1px);
+  width: 2px;
+  background: var(--color-border-strong);
+}
+
+.delivery-tracker__step--done:not(:last-child)::after {
+  background: var(--color-primary);
+}
+
+.delivery-tracker__dot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-text-inverse);
+  background: var(--color-bg);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 50%;
+}
+
+.delivery-tracker__dot svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.delivery-tracker__step--done .delivery-tracker__dot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Now: a ring with a truck (shape and words as well as colour). */
+.delivery-tracker__step--current:not(.delivery-tracker__step--done) .delivery-tracker__dot {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.delivery-tracker__step-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 1.5rem;
+}
+
+.delivery-tracker__step--done,
+.delivery-tracker__step--current {
+  color: var(--color-text);
+}
+
+.delivery-tracker__step--current {
+  font-weight: 700;
+}
+
+.delivery-tracker__now {
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.delivery-tracker__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+}
+
+.delivery-tracker__notice > svg {
+  flex: none;
+  margin-top: 0.125rem;
+  color: var(--color-warning);
+}
+
+.delivery-tracker__code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.delivery-tracker__code p {
+  min-width: 0;
+}
+
+.delivery-tracker__code code {
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.delivery-tracker__copied {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.delivery-tracker__copied:empty {
+  display: none;
+}
+
+.delivery-tracker__subheading {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.delivery-tracker__events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.delivery-tracker__events li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border-strong);
+}
+
+.delivery-tracker__events time {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

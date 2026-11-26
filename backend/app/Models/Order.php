@@ -237,7 +237,8 @@ class Order extends Model
     }
 
     /** What resources need to show an order with its documents (eager load, no N+1). */
-    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'creditMemos.admin', 'creditMemos.items.orderItem', 'giftCard', 'deliveryZone']; // phase 10 (part B): giftCard
+    // Phase 10 (part B): giftCard. Phase 18: shipments.events (the courier timeline).
+    public const DOCUMENTS = ['invoices.admin', 'shipments.admin', 'shipments.events', 'creditMemos.admin', 'creditMemos.items.orderItem', 'giftCard', 'deliveryZone'];
 
     /** Money recorded by invoices, in cents. */
     public function paidCents(): int

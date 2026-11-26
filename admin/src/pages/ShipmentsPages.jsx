@@ -10,6 +10,14 @@ import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { formatCount, formatDate, formatDateTime } from '../utils/format'
 import { CARRIERS, orderStatus } from '../utils/orders'
+// Phase 18: where a courier's parcel is.
+import { deliveryStatus } from '../utils/couriers'
+
+/** Phase 18: the parcel's delivery status; manual shipments have no courier updates. */
+function Delivery({ shipment }) {
+  if (!shipment.deliveryStatus) return <span className="muted">—</span>
+  return <StatusBadge {...deliveryStatus(shipment.deliveryStatus, shipment.deliveryStatusLabel)} />
+}
 
 /*
  * Sales → Shipments (docs/backend/PHASE6_CONTRACT.md §5): every parcel sent,
@@ -108,6 +116,7 @@ export function ShipmentsPage() {
                 <th scope="col">Date</th>
                 <th scope="col">Carrier</th>
                 <th scope="col">Tracking</th>
+                <th scope="col">Delivery status</th>
                 <th scope="col" className="num">
                   Items
                 </th>
@@ -128,6 +137,9 @@ export function ShipmentsPage() {
                   <td>{shipment.carrierLabel}</td>
                   <td>
                     <Tracking shipment={shipment} />
+                  </td>
+                  <td>
+                    <Delivery shipment={shipment} />
                   </td>
                   <td className="num">{shipment.itemCount === null ? '—' : formatCount(shipment.itemCount)}</td>
                 </tr>
@@ -213,6 +225,15 @@ export function ShipmentDetailPage() {
             <dd>
               <Tracking shipment={data} />
             </dd>
+            {data.deliveryStatus && (
+              <>
+                <dt>Delivery status</dt>
+                <dd>
+                  <Delivery shipment={data} />
+                  {data.courier?.consignmentId && <span className="muted"> · consignment {data.courier.consignmentId}</span>}
+                </dd>
+              </>
+            )}
             {data.note && (
               <>
                 <dt>Note</dt>

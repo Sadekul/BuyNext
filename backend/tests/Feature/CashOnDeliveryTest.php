@@ -245,6 +245,8 @@ class CashOnDeliveryTest extends TestCase
         $this->admin('GET', "/api/admin/v1/orders/{$second}")->assertJsonPath('data.confirmation.logs.0.outcome', 'override')
             ->assertJsonPath('data.confirmation.logs.0.note', 'Regular customer');
         $this->assertDatabaseHas('audit_log', ['action' => 'order.confirmation_overridden']);
+        // Phase 18: shipped anyway, it no longer needs the call, so it leaves the "To confirm" queue.
+        $this->admin('GET', '/api/admin/v1/orders/to-confirm')->assertOk()->assertJsonPath('meta.total', 0);
 
         // Cancelling at the confirmation restocks and emails the customer.
         $third = $this->codOrder()->json('data.number');

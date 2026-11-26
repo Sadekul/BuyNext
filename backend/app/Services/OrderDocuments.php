@@ -112,8 +112,12 @@ class OrderDocuments
      * The whole amount due → an invoice for the rest of the order (paid).
      * Less → an invoice for what was collected (when > 0), partially_paid, and
      * the rest stays in cod_due (a $note is required, and staff are notified).
+     *
+     * Phase 18: $admin is null when a courier reported the cash (a delivered
+     * COD parcel); $actor ("Steadfast") then names who did it in the history,
+     * and the audit entry has no admin (actor "system").
      */
-    public function collect(Order $order, Admin $admin, int $cents, ?string $note, string $errorKey = 'collected_amount'): ?Invoice
+    public function collect(Order $order, ?Admin $admin, int $cents, ?string $note, string $errorKey = 'collected_amount', ?string $actor = null): ?Invoice
     {
         $due = $order->codDueCents();
         $problem = match (true) {
@@ -136,9 +140,9 @@ class OrderDocuments
             .($advance > 0 ? ' Advance paid online: '.$order->money(Pricing::format($advance)).'.' : '');
         $invoice = null;
         if ($cents === $due) {
-            $invoice = $this->createInvoice($order, $admin, Pricing::toCents($order->grand_total) - $order->paidCents(), trim($lines.' '.($note ?? '')), false, null);
+            $invoice = $this->createInvoice($order, $admin, Pricing::toCents($order->grand_total) - $order->paidCents(), trim($lines.' '.($note ?? '')), false, null, $actor);
         } elseif ($cents > 0) {
-            $invoice = $this->createInvoice($order, $admin, $cents, trim($lines.' '.$note), false, 'partially_paid');
+            $invoice = $this->createInvoice($order, $admin, $cents, trim($lines.' '.$note), false, 'partially_paid', $actor);
         }
         $order->forceFill(['cod_due' => Pricing::format($due - $cents), 'cod_collected' => Pricing::format($collected)])->save();
 
@@ -148,16 +152,18 @@ class OrderDocuments
                 'status' => $order->status,
                 'payment_status' => $order->payment_status,
                 'note' => "Short collection: {$order->money(Pricing::format($cents))} collected, {$short} still to collect. {$note}",
-                'admin_id' => $admin->id,
+                'admin_id' => $admin?->id,
+                'actor' => $admin ? null : $actor,
                 'customer_notified' => false,
             ]);
             app(AdminNotifications::class)->notify('cod_short_collection', "order:{$order->id}", "Short cash collection on order {$order->number}",
-                "{$admin->name} collected {$order->money(Pricing::format($cents))}; {$short} is still to collect. Note: {$note}", "/orders/{$order->number}");
+                ($admin?->name ?? $actor ?? 'The courier')." collected {$order->money(Pricing::format($cents))}; {$short} is still to collect. Note: {$note}",
+                "/orders/{$order->number}");
         }
         $this->audit->record('order.cash_collected', "Cash collected for order {$order->number}: {$order->money(Pricing::format($cents))}"
-            .($cents < $due ? ' (short)' : '').'.', 'order', $order->id,
+            .($cents < $due ? ' (short)' : '').($admin ? '' : " (reported by {$actor})").'.', 'order', $order->id,
             ['before' => ['cod_due' => Pricing::format($due)], 'after' => ['cod_due' => Pricing::format($due - $cents), 'collected' => Pricing::format($cents),
-                'payment_status' => $order->payment_status]], $admin);
+                'payment_status' => $order->payment_status, ...($admin ? [] : ['actor' => 'system'])]], $admin, anonymous: $admin === null);
 
         return $invoice;
     }
@@ -166,7 +172,7 @@ class OrderDocuments
      * An invoice of $cents: the order becomes paid when the invoices reach the
      * grand total (or $paymentStatus), and pending_payment → processing.
      */
-    private function createInvoice(Order $order, ?Admin $admin, int $cents, ?string $note, bool $notify, ?string $paymentStatus): Invoice
+    private function createInvoice(Order $order, ?Admin $admin, int $cents, ?string $note, bool $notify, ?string $paymentStatus, ?string $actor = null): Invoice
     {
         $paymentBefore = $order->payment_status;
         $invoice = $order->invoices()->create([
@@ -193,6 +199,7 @@ class OrderDocuments
                 // Phase 10 (part B): the payment's own note ("Paid by card through Stripe.", "Paid through PayPal.", "Paid with gift card ••••ABCD.").
                 .($admin ? '' : ' '.($note ?? 'Paid online.')),
             'admin_id' => $admin?->id,
+            'actor' => $admin ? null : $actor, // phase 18: "Steadfast" when a courier reported the cash
             'customer_notified' => $notify,
         ]);
         $this->audit->record('invoice.created', "Invoice {$invoice->number} created for order {$order->number} ({$order->money($invoice->amount)}).",
@@ -209,16 +216,15 @@ class OrderDocuments
     }
 
     /**
-     * Ships every item (one shipment per order in phase 3): processing → shipped.
-     * Cash on delivery (and cash, phase 6) may ship unpaid; card/PayPal/bank transfer must be invoiced first.
-     * $historyNote replaces the generated history note (the PATCH shortcut
-     * keeps phase 2's behaviour: the staff note IS the history note).
+     * Why $order can't ship now (null: it can). ship() refuses with it; phase
+     * 18's courier booking asks first, before calling the courier, so a
+     * parcel is never booked for an order that then can't ship.
      */
-    public function ship(Order $order, Admin $admin, string $carrier, ?string $trackingNumber, ?string $note, bool $notify,
-        ?string $historyNote = null, string $errorKey = 'order', ?string $confirmationOverride = null): Shipment
+    public function shipProblem(Order $order, ?string $confirmationOverride = null): ?string
     {
         $notPaidYet = 'Invoice this order before shipping it: it hasn\'t been paid yet.';
-        $problem = match (true) {
+
+        return match (true) {
             $order->shipments()->exists(), in_array($order->status, ['shipped', 'delivered'], true) => 'This order has already been shipped.',
             $order->status === 'pending_payment' => $notPaidYet,
             $order->status !== 'processing' => 'A '.str_replace('_', ' ', $order->status).' order can\'t be shipped.',
@@ -227,7 +233,18 @@ class OrderDocuments
             $order->awaitsConfirmation() && blank($confirmationOverride) => self::UNCONFIRMED,
             default => null,
         };
-        if ($problem) {
+    }
+
+    /**
+     * Ships every item (one shipment per order in phase 3): processing → shipped.
+     * Cash on delivery (and cash, phase 6) may ship unpaid; card/PayPal/bank transfer must be invoiced first.
+     * $historyNote replaces the generated history note (the PATCH shortcut
+     * keeps phase 2's behaviour: the staff note IS the history note).
+     */
+    public function ship(Order $order, Admin $admin, string $carrier, ?string $trackingNumber, ?string $note, bool $notify,
+        ?string $historyNote = null, string $errorKey = 'order', ?string $confirmationOverride = null): Shipment
+    {
+        if ($problem = $this->shipProblem($order, $confirmationOverride)) {
             throw ValidationException::withMessages([$errorKey => $problem]);
         }
         if ($order->awaitsConfirmation()) {

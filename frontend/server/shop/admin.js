@@ -13,6 +13,8 @@ import { paymentPhase12, withCurrency } from './adminPhase12.js'
 import { BANGLA_FILTERS, orderLocale, productPhase13, toBanglaBody, toSpecificationRows } from './adminPhase13.js'
 // Phase 14: delivery zone and time, cash on delivery amounts, phone confirmation; the order address's area name.
 import { addressArea, orderPhase14 } from './adminPhase14.js'
+// Phase 18: courier bookings on shipments, the grid's delivery status.
+import { orderRowPhase18, shipmentPhase18 } from './adminPhase18.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -155,6 +157,8 @@ function adminOrderRow(raw) {
     ...orderLocale(raw),
     // Phase 14: deliveryZone, codDue, confirmationStatus (only what the API sent).
     ...orderPhase14(raw),
+    // Phase 18: the latest shipment's delivery status (only when the API sent one).
+    ...orderRowPhase18(raw),
   }
 }
 
@@ -316,7 +320,8 @@ function listParams({ q, limit, skip, ...filters }) {
 
 // ---- phase 3 documents (docs/backend/PHASE3_CONTRACT.md) ----
 
-const adminShipment = (raw) => ({ ...fromShipment(raw), orderNumber: raw.order_number ?? null, adminName: raw.admin_name ?? null, note: raw.note ?? null })
+// Phase 18: + the courier booking, delivery status and events (only when the API sent them).
+const adminShipment = (raw) => ({ ...fromShipment(raw), orderNumber: raw.order_number ?? null, adminName: raw.admin_name ?? null, note: raw.note ?? null, ...shipmentPhase18(raw) })
 
 /** InvoiceResource → the admin's invoice (lists may leave out the items and totals). */
 export function adminInvoice(raw) {

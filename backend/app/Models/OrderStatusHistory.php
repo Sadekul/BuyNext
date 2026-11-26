@@ -10,8 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * One step in an order's life (placed, paid, shipped...). admin_id says which
  * staff member did it (null for the checkout itself). A note counts as
  * internal unless the customer was notified about that step.
+ * Phase 18: actor names a system actor ("Steadfast") on steps no staff member took.
  */
-#[Fillable(['order_id', 'status', 'payment_status', 'note', 'admin_id', 'customer_notified'])]
+#[Fillable(['order_id', 'status', 'payment_status', 'note', 'admin_id', 'actor', 'customer_notified'])]
 class OrderStatusHistory extends Model
 {
     protected $table = 'order_status_history';

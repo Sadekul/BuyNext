@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router'
-import { LuExternalLink, LuFileText, LuPhoneCall, LuUndo2 } from 'react-icons/lu'
+import { LuFileText, LuPhoneCall, LuUndo2 } from 'react-icons/lu'
+import DeliveryTracker from './DeliveryTracker'
 import OrderHistory from './OrderHistory'
 import OrderItems from './OrderItems'
 import OrderStatus from './OrderStatus'
@@ -46,7 +47,10 @@ function AddressBlock({ address }) {
   )
 }
 
-/** Shipments with carrier, tracking number, and a link to the carrier's tracking page (new tab). */
+/**
+ * Shipments with carrier, tracking number, and a link to the carrier's tracking page (new tab).
+ * Phase 18: a courier shipment shows its delivery tracker (steps, notice, tracking code, updates).
+ */
 function Shipments({ shipments }) {
   const { t } = useTranslation('orders')
   if (!shipments?.length) return null
@@ -56,18 +60,7 @@ function Shipments({ shipments }) {
       <ul className="order-view__documents">
         {shipments.map((shipment) => (
           <li key={shipment.number}>
-            <p>
-              <strong>{shipment.carrierLabel}</strong>
-              {shipment.trackingNumber ? t('view.tracking', { number: shipment.trackingNumber }) : t('view.noTracking')}
-            </p>
-            <p className="order-view__muted">{t('view.shippedOn', { date: formatDate(shipment.createdAt) })}</p>
-            {shipment.trackingUrl && (
-              // noopener: the carrier's page can't reach back into this tab.
-              <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="order-view__link">
-                {t('view.trackWith', { carrier: shipment.carrierLabel })} <LuExternalLink aria-hidden="true" />
-                <span className="visually-hidden">{t('view.newTab')}</span>
-              </a>
-            )}
+            <DeliveryTracker shipment={shipment} />
           </li>
         ))}
       </ul>

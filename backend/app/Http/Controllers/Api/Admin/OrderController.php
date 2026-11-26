@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminOrderResource;
 use App\Mail\OrderStatusMail;
 use App\Models\Order;
+use App\Models\Shipment;
 use App\Services\Audit;
 use App\Services\OrderDocuments;
 use App\Services\Payments\OnlinePayments;
@@ -27,7 +28,7 @@ use Throwable;
 /** Orders, as shop staff manage them: list, detail, and moving them along (deliver, cancel, notes; ship and mark paid as shortcuts). */
 class OrderController extends Controller
 {
-    /** GET /api/admin/v1/orders?search&status&payment_status&source&customer_id&page&per_page - newest first. */
+    /** GET /api/admin/v1/orders?search&status&payment_status&source&customer_id&delivery_status&page&per_page - newest first. */
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $this->filters($request);
@@ -293,6 +294,8 @@ class OrderController extends Controller
             'delivery_zone' => ['nullable', 'string', 'max:40'],
             'cod' => ['nullable', 'boolean'],
             'confirmation_status' => ['nullable', Rule::in(Order::CONFIRMATION_STATUSES)],
+            // Phase 18: the courier's delivery status of the order's shipment.
+            'delivery_status' => ['nullable', Rule::in(Shipment::DELIVERY_STATUSES)],
         ]);
     }
 
@@ -315,7 +318,8 @@ class OrderController extends Controller
             ->when($data['delivery_zone'] ?? null, fn ($query, $zone) => $query->where('delivery_zone_code', $zone))
             ->when(isset($data['cod']) && $data['cod'] !== null, fn ($query) => filter_var($data['cod'], FILTER_VALIDATE_BOOLEAN)
                 ? $query->where('payment_method', 'cod') : $query->where('payment_method', '!=', 'cod'))
-            ->when($data['confirmation_status'] ?? null, fn ($query, $status) => $query->where('confirmation_status', $status));
+            ->when($data['confirmation_status'] ?? null, fn ($query, $status) => $query->where('confirmation_status', $status))
+            ->when($data['delivery_status'] ?? null, fn ($query, $status) => $query->whereHas('shipments', fn ($s) => $s->where('delivery_status', $status)));
     }
 
     private function find(string $number): ?Order

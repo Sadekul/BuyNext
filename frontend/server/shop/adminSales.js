@@ -7,6 +7,8 @@ import { customerPoints } from './adminPhase11.js'
 import { withCurrency } from './adminPhase12.js'
 // Phase 13: the customer's language.
 import { customerLocale } from './adminPhase13.js'
+// Phase 18: courier bookings on shipments.
+import { shipmentPhase18 } from './adminPhase18.js'
 
 /*
  * Phase 6 of the admin (docs/backend/PHASE6_CONTRACT.md) from BuyNest's
@@ -238,6 +240,8 @@ export function adminShipmentDetail(raw) {
         shippingMethod: order.shipping_method?.label ?? (typeof order.shipping_method === 'string' ? order.shipping_method : null),
       },
     }),
+    // Phase 18: the courier booking, delivery status and events (only when the API sent them).
+    ...shipmentPhase18(raw),
   }
 }
 

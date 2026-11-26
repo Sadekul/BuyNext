@@ -31,6 +31,8 @@ import { matchPhase12Route } from './adminPhase12Api.js'
 import { banglaFilter, checkProductBangla, cleanSpecificationsBangla, matchPhase13Route, specificationsBanglaProblem } from './adminPhase13Api.js'
 // Phase 14: places, delivery zones, phone confirmation, courier files (adminPhase14Api.js); grid filters, collection, shipping override.
 import { checkCollection, checkConfirmationOverride, matchPhase14Route, orderPhase14Filters } from './adminPhase14Api.js'
+// Phase 18: couriers (Steadfast, Pathao), booking, status sync (adminPhase18Api.js); the grid's delivery status filter, the new carriers.
+import { MANUAL_CARRIERS, matchPhase18Route, orderPhase18Filters } from './adminPhase18Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -155,7 +157,7 @@ const ID_FORMATS = {
 }
 // Phase 8: + payment-link (a Stripe payment link for an unpaid card order).
 const ORDER_DOCUMENTS = ['invoices', 'shipments', 'credit-memos', 'refundable', 'packing-slip', 'returns', 'payment-link']
-const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other']
+const CARRIERS = ['dhl', 'fedex', 'ups', 'usps', 'other', ...MANUAL_CARRIERS]
 // Phase 7 (marketing): + buy_x_get_y.
 const COUPON_TYPES = ['percent', 'fixed', 'free_shipping', 'buy_x_get_y']
 const COUPON_FILTERS = ['active', 'inactive', 'scheduled', 'expired', 'used_up']
@@ -457,7 +459,7 @@ const ROUTES = {
         paymentStatus: oneOf(searchParams.get('paymentStatus'), ['paid', 'unpaid']),
         source: oneOf(searchParams.get('source'), ['storefront', 'admin']),
         // Phase 14: delivery zone, cash on delivery, phone confirmation.
-        extra: orderPhase14Filters(ctx.url),
+        extra: { ...orderPhase14Filters(ctx.url), ...orderPhase18Filters(ctx.url) },
         limit,
         skip,
       }
@@ -648,6 +650,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 18: couriers[/settings | /pathao/…], orders/courier-bookings, orders/:number/courier-booking, shipments/:number/sync.
+  const phase18 = matchPhase18Route(method, segments)
+  if (phase18 !== undefined) return phase18
   // Phase 14: places/bd/…, delivery-zones[/…], orders/to-confirm, orders/:number/confirmation|packing-slip.pdf, orders/packing-slips, orders/export/courier.csv.
   const phase14 = matchPhase14Route(method, segments)
   if (phase14 !== undefined) return phase14

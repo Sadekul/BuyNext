@@ -332,3 +332,12 @@
 - A reference's colours aren't automatically accessible: its coral-red fails with white text, so a deeper red carries text and the bright one stays decorative
 - Never open a file for writing before reading it in the same script: `open(p, 'w')` empties it first
 - Compare screenshots side by side with the reference at the same widths, then list the intentional differences instead of leaving them implicit
+
+## Phase 18: courier integration (2026-11-25)
+
+- One driver interface (book, status, balance, normalise) and one class per courier: a courier's wire format is a one-file change when the real sandbox disagrees with the docs we had
+- Couriers speak their own status words; the store keeps its own short list (booked → delivered, plus on hold / returned / cancelled) and keeps the raw word for staff
+- Webhooks are idempotent and one-way: the same message twice adds nothing, and a late message never moves a finished parcel back
+- Automatic changes only where they are safe (delivered → delivered and cash recorded); anything that needs a person (returned, partly delivered) becomes an alert, not an order change
+- Booking locks the order row while the courier answers, so two clicks can't book twice; the order number is the courier's invoice id, so a retry after a timeout is refused as a duplicate
+- External services are tested with stand-in servers and a second API whose environment points at them: real code paths, zero real calls

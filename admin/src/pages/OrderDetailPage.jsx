@@ -26,6 +26,11 @@ import ConfirmationLog from '../components/ConfirmationLog'
 import { CodCollectionDialog } from '../components/OrderActionDialogs'
 import { packingSlipPdfUrl } from '../api/phase14'
 import { amountToCollect, awaitsConfirmation, confirmationOf, confirmationStatus, etaText, formatBdMobile, isBangladesh, isCod, telHref } from '../utils/bangladesh'
+// Phase 18: book a courier (Steadfast, Pathao), the parcel's status and timeline.
+import { getCouriers, phase18Keys } from '../api/phase18'
+import { CourierBookingDialog } from '../components/CourierBookingDialog'
+import CourierShipment from '../components/CourierShipment'
+import { deliveryStatus } from '../utils/couriers'
 
 /** Demo: a DummyJSON cart shown as an order. */
 function DemoOrderDetailPage() {
@@ -183,6 +188,13 @@ function Documents({ order }) {
             {shipments.map((shipment) => (
               <li key={shipment.number}>
                 <Link to={`/shipments/${shipment.number}`}>{shipment.number}</Link> · {shipment.carrierLabel} · {formatDate(shipment.createdAt)}
+                {/* Phase 18: where a courier's parcel is (manual shipments have no updates). */}
+                {shipment.deliveryStatus && shipment.deliveryStatus !== 'shipped' && (
+                  <>
+                    {' '}
+                    <StatusBadge {...deliveryStatus(shipment.deliveryStatus, shipment.deliveryStatusLabel)} />
+                  </>
+                )}
                 {shipment.trackingNumber && (
                   <>
                     {' · '}
@@ -299,7 +311,10 @@ function LiveOrderDetailPage() {
   const queryClient = useQueryClient()
   const location = useLocation()
   const order = useQuery({ queryKey: adminKeys.order(orderId), queryFn: ({ signal }) => getOrder(orderId, { signal }) })
-  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'refund' | 'return' | 'delivered' | 'cancelled' | 'confirm:<outcome>'
+  const [dialog, setDialog] = useState(null) // 'invoice' | 'ship' | 'courier' | 'refund' | 'return' | 'delivered' | 'cancelled' | 'confirm:<outcome>'
+  // Phase 18: whether a courier is set up, for "Book courier" (only asked while the order still waits to ship).
+  const waitsToShip = ['pending_payment', 'processing'].includes(order.data?.status) && !(order.data?.shipments?.length > 0)
+  const couriers = useQuery({ queryKey: phase18Keys.couriers, queryFn: ({ signal }) => getCouriers({ signal }), enabled: can('shipments.create') && waitsToShip, staleTime: 60_000, retry: false })
   // An order just created (Create order) arrives with what happened.
   const [notice, setNotice] = useState(location.state?.notice ?? null)
   const noticeRef = useRef(null)
@@ -326,6 +341,18 @@ function LiveOrderDetailPage() {
     return: possible.return && can('returns.manage'),
   }
   const nothingToDo = !Object.values(possible).some(Boolean)
+  // Phase 18 §2: "Book courier" sits next to Ship; when it can't be used yet, it stays visible, disabled, with the reason.
+  const showCourier = can('shipments.create') && waitsToShip
+  const configuredCouriers = (couriers.data?.couriers ?? []).filter((courier) => courier.configured)
+  const courierBlocked = !possible.ship
+    ? 'Book a courier once the order is processing (paid, or cash on delivery).'
+    : couriers.isPending
+      ? 'Checking which couriers are set up…'
+      : couriers.error
+        ? `Couldn't check the couriers: ${couriers.error.message}`
+        : configuredCouriers.length === 0
+          ? 'No courier is set up yet (Settings → Couriers).'
+          : null
   const nothingAllowed = !nothingToDo && !Object.values(actions).some(Boolean)
 
   function open(name, event) {
@@ -567,6 +594,17 @@ function LiveOrderDetailPage() {
                       Ship
                     </button>
                   )}
+                  {showCourier && (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={Boolean(courierBlocked)}
+                      aria-describedby={courierBlocked ? 'book-courier-reason' : undefined}
+                      onClick={(event) => open('courier', event)}
+                    >
+                      Book courier
+                    </button>
+                  )}
                   {actions.deliver && (
                     <button type="button" className="btn btn--primary" onClick={(event) => open('delivered', event)}>
                       Mark as delivered
@@ -613,6 +651,17 @@ function LiveOrderDetailPage() {
                   ) : (
                     <p className="field__hint">No payment provider is connected yet: invoice the order once the money has arrived. It then moves to Processing and can be shipped.</p>
                   ))}
+                {showCourier && courierBlocked && (
+                  <p id="book-courier-reason" className="field__hint">
+                    {courierBlocked}
+                    {configuredCouriers.length === 0 && !couriers.isPending && !couriers.error && can('settings.view') && (
+                      <>
+                        {' '}
+                        <Link to="/settings/couriers">Set up a courier</Link>
+                      </>
+                    )}
+                  </p>
+                )}
                 {/* Phase 14 §4. */}
                 {actions.ship && awaitsConfirmation(data) && (
                   <p className="field__hint">This cash on delivery order isn't confirmed by phone yet. Confirm it below first, or ship it anyway with a reason.</p>
@@ -647,6 +696,21 @@ function LiveOrderDetailPage() {
             ))}
           </p>
         </section>
+
+        {/* Phase 18 §2: each parcel booked with a courier: status, amounts, Refresh status, timeline. */}
+        {(data.shipments ?? [])
+          .filter((shipment) => shipment.courier)
+          .map((shipment) => (
+            <CourierShipment
+              key={shipment.number}
+              order={data}
+              shipment={shipment}
+              canRefresh={can('shipments.create')}
+              onRefreshed={() => {
+                for (const key of [adminKeys.order(orderId), ['orders'], ['shipments']]) queryClient.invalidateQueries({ queryKey: key })
+              }}
+            />
+          ))}
 
         <section className="panel" aria-labelledby="customer-title">
           <h2 id="customer-title" className="panel__title">
@@ -811,6 +875,7 @@ function LiveOrderDetailPage() {
       </div>
 
       {Dialog && <Dialog order={data} onDone={done} onCancel={cancel} />}
+      {dialog === 'courier' && <CourierBookingDialog order={data} onDone={done} onCancel={cancel} />}
       {collects && <CodCollectionDialog order={data} onDone={done} onCancel={cancel} />}
       {((dialog === 'delivered' && !collects) || dialog === 'cancelled') && <StatusDialog order={data} status={dialog} onDone={done} onCancel={cancel} />}
       {dialog?.startsWith('confirm:') && (

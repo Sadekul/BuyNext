@@ -169,7 +169,7 @@ export function ShipDialog({ order, onDone, onCancel }) {
           </select>
         )}
       </Field>
-      <Field label="Tracking number (optional)" error={errors.trackingNumber?.[0]} hint="DHL, FedEx, UPS, and USPS numbers become a tracking link in the customer's email and order page.">
+      <Field label="Tracking number (optional)" error={errors.trackingNumber?.[0]} hint="DHL, FedEx, UPS, USPS, Steadfast, Pathao, and RedX numbers become a tracking link in the customer's email and order page.">
         {(a11y) => <input {...a11y} value={tracking} maxLength={64} autoComplete="off" onChange={(event) => setTracking(event.target.value)} />}
       </Field>
       <NoteAndEmail note={note} setNote={setNote} notify={notify} setNotify={setNotify} error={errors.note?.[0]} emailLabel="Email the customer the tracking details" />

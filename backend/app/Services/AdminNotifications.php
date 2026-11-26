@@ -9,7 +9,8 @@ use Illuminate\Support\Carbon;
 /**
  * Phase 7: creates entries for the admin notification bell (low stock, new
  * return requests, reviews waiting, failed newsletter batches, and since
- * phase 8 Stripe payments that don't match their order).
+ * phase 8 Stripe payments that don't match their order; phase 18: courier
+ * parcels that need staff).
  *
  * No duplicates: a notification of the same type for the same subject
  * ("product:12") isn't created again while no admin has read the previous
@@ -30,6 +31,8 @@ class AdminNotifications
         'backup_failed' => ['critical', 'backups.view'],
         // Phase 14: less cash than due was collected on a cash on delivery order.
         'cod_short_collection' => ['warning', 'orders.view'],
+        // Phase 18: a courier reports a parcel partly delivered, returned, cancelled, or on hold.
+        'courier_update' => ['warning', 'orders.view'],
     ];
 
     /** Returns the new notification, or null when an unread one for the same subject exists. */
