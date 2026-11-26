@@ -8,11 +8,6 @@
   border-radius: var(--radius-md);
 }
 
-/* Grid cards measure their own width, so the quick-add button can sit on the photo's corner (100cqw = photo size). */
-.product-card--grid {
-  container-type: inline-size;
-}
-
 /* The photo on a flat light-grey tile with 8px corners. */
 .product-card__media {
   display: block;
@@ -153,35 +148,12 @@
   color: var(--color-primary);
 }
 
-/* Grid: a square quick-add button on the photo's bottom-right corner, above the stretched title link.
-   Mouse devices reveal it on hover or keyboard focus; touch screens always show it. */
-.product-card__quick-add {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-}
-
-.product-card--grid .product-card__quick-add {
-  position: absolute;
-  top: calc(100cqw - 2.75rem - var(--space-3));
-  right: var(--space-3);
-  border-radius: var(--radius-sm);
-}
-
-.product-card__quick-add:hover:not(:disabled) svg {
-  transform: rotate(90deg);
-}
-
-.product-card__quick-add svg {
-  transition: transform var(--transition-base);
-}
-
 .product-card__price-original {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
-/* "Choose options" (products with choices): a quieter full-width button under the price. */
+/* "Add to cart" (filled) and "Choose options" (outline): a full-width button with text under the price. */
 .product-card--grid .product-card__action {
   margin-top: var(--space-2);
 }
@@ -229,15 +201,9 @@
   color: var(--color-primary);
 }
 
-/* With a quick-add square on the same corner, "Quick view" leaves room for it. */
-.product-card--grid:has(.product-card__quick-add) .product-card__quick-view {
-  right: calc(var(--space-3) + 2.75rem + var(--space-2));
-}
-
 /* Devices with a real hover: reveal on hover or keyboard focus. Touch: always visible. */
 @media (hover: hover) {
-  .product-card__quick-view,
-  .product-card--grid .product-card__quick-add {
+  .product-card__quick-view {
     opacity: 0;
     transform: translateY(0.5rem);
     transition:
@@ -248,8 +214,6 @@
 
   .product-card:hover .product-card__quick-view,
   .product-card__quick-view:focus-visible,
-  .product-card:hover .product-card__quick-add,
-  .product-card:focus-within .product-card__quick-add,
   .product-card:focus-within .product-card__quick-view {
     opacity: 1;
     transform: none;
@@ -403,7 +367,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .product-card:hover .product-card__media img,
-  .product-card .product-card__quick-add,
   .product-card .product-card__quick-view {
     transform: none;
     transition: none;

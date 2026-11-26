@@ -71,16 +71,15 @@ describe('ProductCard', () => {
   })
 
   // 2026 redesign
-  it('grid: a round quick-add button keeps the name "Add to cart"; list: the text button', () => {
+  it('grid and list: a full-width "Add to cart" button with its text (no round "+" button)', () => {
     const { unmount } = renderWithProviders(<ProductCard product={iphone13} onAddToCart={vi.fn()} />)
-    const quick = screen.getByRole('button', { name: 'Add to cart' })
-    expect(quick).toHaveClass('product-card__quick-add', 'btn--icon')
-    expect(quick.closest('.product-card__buy')).not.toBeNull()
+    const button = screen.getByRole('button', { name: 'Add to cart' })
+    expect(button).toHaveTextContent('Add to cart')
+    expect(button).toHaveClass('product-card__action')
+    expect(button).not.toHaveClass('btn--icon')
     unmount()
     renderWithProviders(<ProductCard product={iphone13} layout="list" onAddToCart={vi.fn()} />)
-    const button = screen.getByRole('button', { name: 'Add to cart' })
-    expect(button).not.toHaveClass('product-card__quick-add')
-    expect(button).toHaveTextContent('Add to cart')
+    expect(screen.getByRole('button', { name: 'Add to cart' })).toHaveTextContent('Add to cart')
   })
 
   it('configurable products keep "Choose options" (no quick add)', () => {

@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { Link } from 'react-router'
-import { LuEye, LuPlus, LuShoppingBag } from 'react-icons/lu'
+import { LuEye, LuShoppingBag } from 'react-icons/lu'
 import Button from '../ui/Button'
 import ProductBadge from './ProductBadge'
 import RatingStars from './RatingStars'
@@ -37,8 +37,9 @@ function secondPhoto(product) {
  * (WishlistButton reads the wishlist context), shown unless showWishlist={false}.
  *
  * 2026 redesign: on a mouse hover the card shows the product's second photo (when it
- * has one), and in the grid a simple product gets a round quick-add button next to the
- * price (same accessible name as before: "Add to cart"). `isNew` adds a "New" badge
+ * has one). A simple product has a full-width "Add to cart" button with its text under the
+ * price, as in the first design (the small round "+" button was dropped at the owner's request),
+ * like "Choose options" on products with choices. `isNew` adds a "New" badge
  * (e.g. on a "New arrivals" row); it defaults to the product's own `isNew` flag.
  */
 function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showWishlist = true, showCompare = true, isNew = product.isNew === true }) {
@@ -61,7 +62,6 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
   const isGiftCard = isGiftCardProduct(product)
   const choosesOnPage = product.hasVariants || isGiftCard
 
-  const quickAdd = layout === 'grid'
 
   return (
     <article
@@ -168,20 +168,6 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
               </>
             )}
           </p>
-          {/* Grid: a round quick-add button beside the price; the hidden text keeps its name ("Add to cart", "Sold out"). */}
-          {onAddToCart && !choosesOnPage && quickAdd && (
-            <Button
-              variant={canBuy ? 'primary' : 'outline'}
-              size="sm"
-              disabled={!canBuy}
-              onClick={() => onAddToCart(product)}
-              className="btn--icon product-card__quick-add"
-              title={t(isOutOfStock ? 'card.soldOut' : canBuy ? 'card.addToCart' : 'card.unavailable')}
-            >
-              {canBuy ? <LuPlus aria-hidden="true" /> : <LuShoppingBag aria-hidden="true" />}
-              <span className="visually-hidden">{t(isOutOfStock ? 'card.soldOut' : canBuy ? 'card.addToCart' : 'card.unavailable')}</span>
-            </Button>
-          )}
         </div>
 
         {/* A product with options (size, color) is bought on its page, where a variant is chosen;
@@ -198,7 +184,7 @@ function ProductCard({ product, layout = 'grid', onAddToCart, onQuickView, showW
             {t(isGiftCard ? 'card.chooseAmount' : 'card.chooseOptions')}
           </Button>
         )}
-        {onAddToCart && !choosesOnPage && !quickAdd && (
+        {onAddToCart && !choosesOnPage && (
           <Button
             variant={canBuy ? 'primary' : 'outline'}
             size="sm"
