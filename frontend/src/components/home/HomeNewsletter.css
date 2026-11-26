@@ -1,12 +1,13 @@
 /*
- * Newsletter (2026-11-25 restyle): a flat dark slate block (#3d4654, 10px
- * corners). White title (9.5:1), amber subtitle (#ffb321, 5.3:1), the email
- * field in a white box with an envelope icon, the red Subscribe button
- * attached to it (#d32f2f, white text 5:1), the error on a white pill.
+ * Newsletter (2026-11-25 restyle; palette A 2026-11-26): a flat deep green block
+ * (#064e3b, 10px corners). White title (9.7:1), light orange subtitle (#fdba74,
+ * 5.8:1), the email field in a white box with an envelope icon, the orange
+ * Subscribe button attached to it (#c2410c, white text 5.2:1), the error on a white pill.
  * The form itself (components/forms/Newsletter) is unchanged.
  */
 .home-newsletter {
-  --newsletter-slate: #3d4654;
+  --newsletter-slate: var(--color-primary-strong); /* deep green #064e3b */
+  --newsletter-highlight: #fdba74;
 
   padding-block: var(--section-gap);
 }
@@ -25,7 +26,7 @@
 }
 
 .home-newsletter .newsletter__icon {
-  color: var(--color-star);
+  color: var(--newsletter-highlight);
   background: rgb(255 255 255 / 0.08);
   border: 1px solid rgb(255 255 255 / 0.25);
 }
@@ -39,7 +40,7 @@
 .home-newsletter .newsletter__text {
   margin-top: var(--space-1);
   font-weight: 600;
-  color: var(--color-star);
+  color: var(--newsletter-highlight);
 }
 
 /* The field and the button in one white box (wraps onto two rows on narrow phones). */
@@ -76,13 +77,13 @@
 }
 
 .home-newsletter .newsletter__form .btn:hover:not(:disabled) {
-  background: #b3261e;
-  border-color: #b3261e;
+  background: #9a3412;
+  border-color: #9a3412;
   box-shadow: none;
   transform: none;
 }
 
-/* White rings on the slate; the field's own ring sits inside the white box. */
+/* White rings on the green; the field's own ring sits inside the white box. */
 .home-newsletter .newsletter :focus-visible {
   outline-color: var(--color-text-inverse);
 }

@@ -4,20 +4,20 @@
  * brand change (or a future dark theme) happens in one place.
  */
 :root {
-  /* Brand: steel blue + coral-red, flat and light (2026-11-25, matching the store owner's reference design) */
-  --color-primary: #417394; /* white text 5.1:1 */
-  --color-primary-hover: #355f7a;
-  --color-primary-soft: #eef3f7;
-  --color-primary-strong: #2c5068;
+  /* Brand: emerald + orange, flat and light (palette A, chosen by the store owner 2026-11-26; layout from the 2026-11-25 reference restyle) */
+  --color-primary: #047857; /* emerald (2026-11-26, palette A): white text 5.5:1, 5.2:1 as text on #f8f8f8 */
+  --color-primary-hover: #065f46;
+  --color-primary-soft: #ecfdf5;
+  --color-primary-strong: #064e3b;
   --color-secondary: #222222; /* titles */
   --color-secondary-hover: #3a3a3a;
-  /* Coral-red: bright for shapes and large type only; "strong" for buttons, sale prices and small text (white 5:1) */
-  --color-accent: #ff4f4f;
-  --color-accent-strong: #d32f2f;
-  --color-accent-soft: #fff1f1;
+  /* Orange: bright #f97316 for shapes, badges' fills and icons only (white text on it fails: 2.8:1); "strong" #c2410c for buttons, sale prices and small text (white 5.2:1, 4.9:1 as text on its soft tint) */
+  --color-accent: #f97316;
+  --color-accent-strong: #c2410c;
+  --color-accent-soft: #fff7ed;
   /* Flat look: the "gradients" are solid colours now (kept as tokens so older rules still resolve). */
-  --gradient-brand: linear-gradient(0deg, #417394, #417394);
-  --gradient-warm: linear-gradient(0deg, #ff4f4f, #ff4f4f);
+  --gradient-brand: linear-gradient(0deg, #047857, #047857);
+  --gradient-warm: linear-gradient(0deg, #f97316, #f97316);
 
   /* Surfaces and text */
   --color-bg: #ffffff;
@@ -30,8 +30,8 @@
   --color-border-strong: #dddddd;
 
   /* Accents: sales, warnings, success, ratings */
-  --color-sale: #d32f2f;
-  --color-sale-soft: #fff1f1;
+  --color-sale: #c2410c;
+  --color-sale-soft: #fff7ed;
   --color-warning: #b45309;
   --color-warning-soft: #fffbeb;
   --color-success: #166534; /* 6.3:1 even on the lavender tint (#f1efff), 7.1:1 on white */
@@ -42,15 +42,15 @@
 
   /* On ink (footer, toasts, dark bars): body text, muted text, hairlines, overlays */
   --color-on-dark: #e8eaed;
-  --color-on-dark-muted: #b8bec7; /* 8.5:1 on the footer #1d2328 */
+  --color-on-dark-muted: #b8bec7; /* 8.1:1 on the footer #0b2b22 */
   --color-on-dark-line: rgb(255 255 255 / 0.14);
   --color-on-dark-hover: rgb(255 255 255 / 0.1);
-  --color-overlay: rgb(29 35 40 / 0.55);
-  --color-primary-glow: rgb(65 115 148 / 0.35);
-  --color-accent-glow: rgb(255 79 79 / 0.14);
+  --color-overlay: rgb(11 43 34 / 0.55);
+  --color-primary-glow: rgb(4 120 87 / 0.35);
+  --color-accent-glow: rgb(249 115 22 / 0.14);
   --color-glass: rgb(255 255 255 / 0.94);
   --color-swatch-edge: rgb(0 0 0 / 0.18);
-  --ring-focus: 0 0 0 3px rgb(65 115 148 / 0.25);
+  --ring-focus: 0 0 0 3px rgb(4 120 87 / 0.25);
   --ring-error: 0 0 0 3px rgb(211 47 47 / 0.18);
 
   /* Typography */
@@ -88,8 +88,8 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 10px 24px rgb(0 0 0 / 0.08);
-  --shadow-glow: 0 6px 16px rgb(65 115 148 / 0.2);
-  --shadow-primary: 0 4px 12px rgb(65 115 148 / 0.2);
+  --shadow-glow: 0 6px 16px rgb(4 120 87 / 0.2);
+  --shadow-primary: 0 4px 12px rgb(4 120 87 / 0.2);
 
   /* Motion */
   --transition-fast: 150ms ease;
@@ -101,7 +101,7 @@
   --header-z: 50;
 }
 
-/* The dark footer of the reference design (charcoal). */
+/* The dark footer: deep forest green (palette A). */
 :root {
-  --color-footer: #1d2328;
+  --color-footer: #0b2b22;
 }

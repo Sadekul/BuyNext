@@ -13,7 +13,7 @@ export const HERO_MODES = [
 // store (frontend/src/components/home/tones.css, dark text on every one): navy → blue grey, emerald → grey,
 // amber → beige, rose → pink.
 export const TONES = [
-  { value: 'navy', label: 'Blue grey' },
+  { value: 'navy', label: 'Mint' },
   { value: 'emerald', label: 'Grey' },
   { value: 'amber', label: 'Beige' },
   { value: 'rose', label: 'Pink' },

@@ -3,8 +3,8 @@
  *   phones: one column
  *   ≥ 768px: two columns; with 3+ banners the first spans two rows
  * Tones: tones.css (light, flat backgrounds). Flat like the reference: dark
- * text, an italic accent line in deep steel blue (#2c5068, ≥ 7.3:1 on every
- * tone), and a red "Shop now"-style button (#d32f2f, white text 5:1).
+ * text, an italic accent line in deep green (#064e3b, ≥ 8.3:1 on every
+ * tone), and an orange "Shop now"-style button (#c2410c, white text 5.2:1).
  */
 .promo-grid {
   display: grid;
@@ -74,8 +74,8 @@
 }
 
 .promo-banner .promo-banner__cta:hover:not(:disabled) {
-  background: #b3261e;
-  border-color: #b3261e;
+  background: #9a3412;
+  border-color: #9a3412;
   box-shadow: none;
   transform: none;
 }

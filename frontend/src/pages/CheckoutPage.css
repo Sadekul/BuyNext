@@ -98,7 +98,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Restyle: flat steps; the step being filled in gets a steel-blue hairline (no glow). */
+/* Restyle: flat steps; the step being filled in gets a emerald hairline (no glow). */
 .checkout__section:focus-within {
   border-color: var(--color-primary);
 }

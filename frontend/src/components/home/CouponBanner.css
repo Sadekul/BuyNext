@@ -1,8 +1,8 @@
 /*
- * Coupon banner (phase 17; 2026-11-25 restyle): a solid steel-blue band,
- * centred, white text throughout (#fff on #417394 5.1:1), the code in a
+ * Coupon banner (phase 17; 2026-11-25 restyle): a solid emerald band,
+ * centred, white text throughout (#fff on #047857 5.5:1), the code in a
  * dashed white box ("Use code: SAVE10"), then a white Copy button with
- * steel-blue text (5.1:1). The status line is white too; focus rings are white.
+ * emerald text (5.5:1). The status line is white too; focus rings are white.
  */
 .coupon-band__panel {
   display: grid;

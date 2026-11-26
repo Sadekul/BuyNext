@@ -56,7 +56,7 @@
   min-width: 0;
 }
 
-/* Small red uppercase kicker: #b3261e is ≥ 5.6:1 on every tone. */
+/* Small deep-orange uppercase kicker: #9a3412 is ≥ 6.3:1 on every tone. */
 .hero-slider__eyebrow {
   color: var(--tone-kicker);
 }
@@ -154,7 +154,7 @@
   height: 6px;
 }
 
-/* The passed slides and the shown one's fill: steel blue. */
+/* The passed slides and the shown one's fill: emerald. */
 .hero-slider__dot--done .hero-slider__track {
   background: var(--color-primary);
 }
@@ -239,7 +239,7 @@
   transition: transform var(--transition-fast);
 }
 
-/* Steel blue with a white icon (5.1:1). */
+/* Emerald with a white icon (5.5:1). */
 .hero-slider__button:hover {
   color: var(--color-text-inverse);
   background: var(--color-primary);

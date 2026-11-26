@@ -1,7 +1,7 @@
 /*
  * Brand chips (2026-11-25 restyle, flat): light grey tiles with 8px corners,
- * no shadow; hover / focus: a steel-blue border. The initial sits on a small
- * square in turn steel blue or ink (white letter, 5.1:1 / 15.9:1). They wrap
+ * no shadow; hover / focus: a emerald border. The initial sits on a small
+ * square in turn emerald or ink (white letter, 5.5:1 / 15.9:1). They wrap
  * onto as many rows as needed (never a sideways scroll).
  */
 .brand-strip__list {

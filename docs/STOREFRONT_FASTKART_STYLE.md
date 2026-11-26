@@ -4,6 +4,9 @@
 
 Everything built in phases 1–17 keeps working: all features, English + Bangla (Bangla digits), phones (no sideways scroll at 390–1440px, tablets included), WCAG 2.1 AA (contrast ≥ 4.5:1 for text, keyboard, focus, reduced motion), the DummyJSON demo mode, existing accessible names/texts the unit tests and browser suites use (check `e2e/*.mjs`), honest data (no fake urgency).
 
+
+> **Colours changed 2026-11-26 (palette A, the store owner's pick from six options shown on the real store):** emerald `#047857` (hover `#065f46`, strong `#064e3b`, soft `#ecfdf5`) replaces steel blue; orange `#f97316` (shapes only) with `#c2410c` for buttons, sale prices and small text (white 5.2:1) replaces coral-red; footer deep green `#0b2b22`; newsletter band `#064e3b` with a `#fdba74` subtitle; banner tones mint `#e6f4ee` / grey / beige / pink with a deep-orange `#9a3412` kicker (≥ 6.3:1 on every tone, because `#c2410c` is 4.46:1 on pink); the admin's tone label "Blue grey" is now "Mint". Layout unchanged. The table below is the original steel-blue theme. Checked: axe on 8 pages × 2 widths and Bangla (no violations), no sideways scroll, unit tests, slider / storefront / marketplace suites.
+
 ## Theme (done — `frontend/src/assets/styles/tokens.css`, `index.html`)
 
 | Token | Value | Notes |

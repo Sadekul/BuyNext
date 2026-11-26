@@ -2,10 +2,10 @@
  * Compact product lists (phase 17; 2026-11-25 restyle, flat). Phones: one row
  * that swipes sideways inside the section (each list 85% wide, scroll-snap;
  * the page never scrolls sideways). 640px: two per row. 1100px: all four side
- * by side. No card: each list is a title with a steel-blue underline segment
+ * by side. No card: each list is a title with a emerald underline segment
  * over a grey hairline, then rows of a square light grey thumbnail, the name
  * on one line (its link is stretched over the row), stars, and the price in
- * steel blue (#417394 on white 5.1:1), the original struck through in grey.
+ * emerald (#047857 on white 5.5:1), the original struck through in grey.
  */
 .product-lists__row {
   display: grid;
@@ -37,7 +37,7 @@
   border-bottom: 1px solid var(--color-border-strong);
 }
 
-/* The steel-blue segment over the hairline (a shape). */
+/* The emerald segment over the hairline (a shape). */
 .compact-list__head::after {
   position: absolute;
   inset-inline-start: 0;

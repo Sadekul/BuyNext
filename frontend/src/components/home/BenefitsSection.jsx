@@ -10,7 +10,7 @@ const BENEFIT_ICONS = {
   support: LuHeadphones,
 }
 
-/** The store's promises as four flat, light grey tiles, each with a steel-blue line icon. */
+/** The store's promises as four flat, light grey tiles, each with a emerald line icon. */
 function BenefitsSection({ benefits }) {
   const { t } = useTranslation('marketing')
   return (

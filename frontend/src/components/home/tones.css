@@ -1,34 +1,34 @@
 /*
- * Home page tones (2026-11-25 restyle: flat, light, steel blue). Slides and
- * promo banners store one of four tone keys from the admin: "navy",
- * "emerald", "amber", "rose". The keys stay; they now mean light, flat
- * backgrounds with DARK text (the admin's labels: Blue grey, Grey, Beige, Pink):
+ * Home page tones (2026-11-25 restyle: flat and light; palette A emerald + orange
+ * from 2026-11-26). Slides and promo banners store one of four tone keys from the
+ * admin: "navy", "emerald", "amber", "rose". The keys stay; they mean light, flat
+ * backgrounds with DARK text (the admin's labels: Mint, Grey, Beige, Pink):
  *
- *   navy    → blue grey  #e7eef3
+ *   navy    → mint       #e6f4ee
  *   emerald → grey       #f2f2f2
  *   amber   → beige      #f8eee4
  *   rose    → pink       #fbeaec
  *
- * Contrast on the darkest of them (blue grey): ink #222 13.6:1, muted
- * #4a5568 6.4:1, the kicker red #b3261e 5.6:1, the small-text blue
- * #2c5068 7.3:1. The brand's #417394 and #d32f2f only reach ~4.3:1 on these
- * tints, so they are used as button backgrounds (white text 5.1:1 / 5:1),
- * never as small text on a tone.
+ * Contrast on every tone: ink #222 ≥ 13.6:1, muted #4a5568 ≥ 6.4:1, the
+ * kicker deep orange #9a3412 ≥ 6.3:1, the small-text deep green #064e3b
+ * ≥ 8.3:1. The brand's #047857 and #c2410c only reach ~4.5–4.8:1 on these
+ * tints (the orange 4.46:1 on pink), so they are used as button backgrounds
+ * (white text 5.5:1 / 5.2:1), never as small text on a tone.
  */
 :root {
-  --tone-blue-grey: #e7eef3;
+  --tone-mint: #e6f4ee;
   --tone-grey: #f2f2f2;
   --tone-beige: #f8eee4;
   --tone-pink: #fbeaec;
   /* Text on the tones */
-  --tone-kicker: #b3261e;
+  --tone-kicker: #9a3412;
   --tone-link: var(--color-primary-strong);
-  /* Slider controls on the tones: ≥ 3:1 against every tint (non-text contrast). */
+  /* Slider controls on the tones: ≥ 3:1 against every tint (non-text contrast; 4.8:1 on mint). */
   --tone-control: #5f6b78;
 }
 
 .tone--navy {
-  background: var(--tone-blue-grey);
+  background: var(--tone-mint);
 }
 
 .tone--emerald {

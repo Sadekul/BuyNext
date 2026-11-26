@@ -140,7 +140,7 @@
   min-width: 0;
 }
 
-/* Restyle: the price in steel blue (5.1:1), the original struck through in grey. */
+/* Restyle: the price in emerald (5.5:1), the original struck through in grey. */
 .product-card__price-current {
   font-family: var(--font-heading);
   font-size: var(--text-base);

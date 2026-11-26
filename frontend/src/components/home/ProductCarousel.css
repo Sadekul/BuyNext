@@ -23,7 +23,7 @@
   gap: var(--space-2);
 }
 
-/* Flat square-cornered arrows: white with an ink icon; steel blue with a white icon on hover (5.1:1). */
+/* Flat square-cornered arrows: white with an ink icon; emerald with a white icon on hover (5.5:1). */
 .home-carousel__button {
   display: inline-grid;
   place-items: center;

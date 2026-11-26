@@ -1,7 +1,7 @@
 /*
  * "Shop by category" (2026-11-25 restyle): equal light grey square tiles
  * (8px corners, flat), a thin line icon centred above the name. Hover / focus:
- * a steel-blue border and icon. Phones: one row of square tiles that scrolls
+ * a emerald border and icon. Phones: one row of square tiles that scrolls
  * sideways inside the section (scroll-snap; the page itself never scrolls
  * sideways). From 640px: a grid of 4, then 6 per row (12 categories = two
  * even rows), the tiles a little wider than tall like the reference.

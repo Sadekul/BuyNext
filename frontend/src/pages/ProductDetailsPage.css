@@ -244,7 +244,7 @@
 }
 .product-details__lead { font-weight: 500; }
 
-/* ---- 2026-11 restyle: flat, steel blue ---- */
+/* ---- 2026-11 restyle: flat, emerald ---- */
 .product-details__back {
   color: var(--color-secondary);
   transition:
@@ -271,7 +271,7 @@
   letter-spacing: -0.01em;
 }
 
-/* Price on the page itself (no panel), in steel blue like the cards; a hairline below. */
+/* Price on the page itself (no panel), in emerald like the cards; a hairline below. */
 .product-details__price {
   padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--color-border);
@@ -351,7 +351,7 @@
   color: var(--color-primary-strong);
 }
 
-/* Section headings: a short steel-blue segment over a grey hairline. */
+/* Section headings: a short emerald segment over a grey hairline. */
 .product-details__section h2 {
   position: relative;
   padding-bottom: var(--space-3);

@@ -1,8 +1,8 @@
 /*
  * Today's deals (2026-11-25 restyle, flat): a white panel with a hairline
  * border and a red top edge (a shape). Text is the page's: ink title, muted
- * description, a small red kicker (#d32f2f on white 5:1), "All deals" in
- * steel blue. The "Up to 20% off" sticker is solid red with white text (5:1),
+ * description, a small orange kicker (#c2410c on white 5.2:1), "All deals" in
+ * emerald. The "Up to 20% off" sticker is solid red with white text (5:1),
  * square-cornered and upright. The product cards are the site's own.
  */
 .deals-band__panel {

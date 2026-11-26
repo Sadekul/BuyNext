@@ -42,7 +42,7 @@
 .quick-view__price-current {
   font-size: var(--text-2xl);
   font-weight: 700;
-  color: var(--color-primary); /* restyle: steel-blue prices, like the cards */
+  color: var(--color-primary); /* restyle: emerald prices, like the cards */
 }
 
 .quick-view__saving {

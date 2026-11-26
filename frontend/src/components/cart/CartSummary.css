@@ -38,7 +38,7 @@
   color: var(--color-success);
 }
 
-/* Restyle: the total under a hairline (the panel is already grey), the amount in steel blue. */
+/* Restyle: the total under a hairline (the panel is already grey), the amount in emerald. */
 .cart-summary__total {
   margin-top: var(--space-1);
   padding-top: var(--space-4);
