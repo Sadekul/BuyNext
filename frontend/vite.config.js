@@ -7,6 +7,7 @@ import { defineConfig, loadEnv } from 'vite'
 import { handleApiRequest } from './server/api.js'
 import { handleMediaRequest } from './server/mediaApi.js'
 import { handleSeoRequest } from './server/seoApi.js'
+import { DEMO_HOSTS, demoGateMiddleware } from './server/demoGate.js'
 
 /*
  * The shop owner's dashboard (../admin, a separate React app) at /admin/:
@@ -194,17 +195,31 @@ function contentSecurityPolicy(mode) {
   }
 }
 
+/*
+ * Online demo (docs/DEMO.md): with BUYNEST_DEMO_PASSWORD set, `npm run preview` asks every visitor for
+ * that password (server/demoGate.js) and accepts the Cloudflare quick tunnel's host names. Mounted first,
+ * so the gate also covers the sign-in service, the admin and media. Never active in `npm run dev`.
+ */
+function demoGate() {
+  return {
+    name: 'buynest-demo-gate',
+    configurePreviewServer(server) {
+      server.middlewares.use(demoGateMiddleware(process.env.BUYNEST_DEMO_PASSWORD))
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   if (!process.env.VITEST) loadServerEnv(mode)
   return {
-    plugins: [react(), apiServices(), adminApp(), contentSecurityPolicy(mode)],
+    plugins: [demoGate(), react(), apiServices(), adminApp(), contentSecurityPolicy(mode)],
     server: {
       // The admin dev server (see adminApp above); ws: hot reload for admin pages.
       proxy: { '/admin/': { target: `http://localhost:${ADMIN_PORT}`, ws: true } },
     },
     // Preview serves the built admin from dist/admin instead (not the dev proxy).
-    preview: { proxy: {} },
+    preview: { proxy: {}, ...(process.env.BUYNEST_DEMO_PASSWORD && { allowedHosts: DEMO_HOSTS }) },
     // Vitest reuses this config, so tests compile JSX exactly like the app.
     test: {
       environment: 'jsdom', // a simulated browser DOM
