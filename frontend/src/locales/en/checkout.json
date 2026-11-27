@@ -134,6 +134,7 @@
     "phone": "Phone",
     "phoneHintSslcommerz": "Needed for paying through SSLCommerz, and for delivery updates.",
     "phoneHint": "For delivery updates only.",
+    "smsUpdates": "We'll text order updates to this number.",
     "shippingAddress": "Shipping address",
     "savedShipping": "Saved shipping addresses",
     "saveAddress": "Save this address to my address book",

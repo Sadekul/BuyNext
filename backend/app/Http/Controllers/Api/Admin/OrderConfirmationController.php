@@ -11,6 +11,7 @@ use App\Services\Audit;
 use App\Services\BdAddresses;
 use App\Services\OrderDocuments;
 use App\Services\Pricing;
+use App\Services\Sms\Sms;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ class OrderConfirmationController extends Controller
      * POST /api/admin/v1/orders/{number}/confirmation { outcome: confirmed|unreachable|cancelled, note?, reason?, notify_customer? }
      * → { data: AdminOrderResource }. 422 { errors: { order } } when the order isn't waiting for a confirmation.
      */
-    public function store(Request $request, string $number, OrderDocuments $documents, Audit $audit): JsonResponse
+    public function store(Request $request, string $number, OrderDocuments $documents, Audit $audit, Sms $sms): JsonResponse
     {
         $data = $request->validate([
             'outcome' => ['required', Rule::in(['confirmed', 'unreachable', 'cancelled'])],
@@ -71,7 +72,7 @@ class OrderConfirmationController extends Controller
         $notify = (bool) ($data['notify_customer'] ?? true);
         $admin = $request->user();
 
-        $order = DB::transaction(function () use ($number, $data, $admin, $documents, $audit, $notify) {
+        $order = DB::transaction(function () use ($number, $data, $admin, $documents, $audit, $notify, $sms) {
             $order = Order::where('number', strtoupper($number))->lockForUpdate()->firstOrFail();
             if (! $order->awaitsConfirmation() || in_array($order->status, ['cancelled', 'closed'], true)) {
                 throw ValidationException::withMessages(['order' => $order->confirmation_status === null
@@ -100,6 +101,10 @@ class OrderConfirmationController extends Controller
                     'admin_id' => $admin->id,
                     'customer_notified' => $data['outcome'] === 'confirmed' && $notify,
                 ]);
+                // Phase 20: the "order confirmed" text with the email (sent after the commit; a cancel texts through its history step).
+                if ($data['outcome'] === 'confirmed' && $notify) {
+                    $sms->sendForOrder($order, 'order_confirmed');
+                }
             }
             $audit->record('order.confirmation', "Order {$order->number} phone confirmation: {$data['outcome']}.", 'order', $order->id,
                 ['before' => ['confirmation_status' => $before], 'after' => ['confirmation_status' => $data['outcome'], 'note' => $note, 'reason' => $reason]], $admin);

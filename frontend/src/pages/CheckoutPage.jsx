@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { LuLock, LuShoppingBag, LuTriangleAlert, LuUserRound } from 'react-icons/lu'
+import { LuLock, LuMessageSquareText, LuShoppingBag, LuTriangleAlert, LuUserRound } from 'react-icons/lu'
 import AddressFields from '../components/checkout/AddressFields'
 import CouponForm from '../components/cart/CouponForm'
 import ChoiceCards from '../components/forms/ChoiceCards'
@@ -594,6 +594,12 @@ function CheckoutForm({ defaultValues, isCheckingPrices, refreshProducts, settin
                 error={errors.phone?.message}
               />
             </div>
+            {/* Phase 20: the store texts order updates (GET /store `sms_updates`); nothing when it's off. */}
+            {REAL_SHOP && settings.smsUpdates === true && (
+              <p className="checkout__note checkout__sms">
+                <LuMessageSquareText aria-hidden="true" /> {t('page.smsUpdates')}
+              </p>
+            )}
           </section>
 
           {requiresShipping ? (

@@ -45,6 +45,8 @@ export const DEFAULT_STORE_SETTINGS = {
   cod: null,
   // Phase 19: no welcome coupon in the demo (or while the real settings load): nothing is promised.
   welcomeOffer: null,
+  // Phase 20: no order texts in the demo (or while the real settings load): checkout promises none.
+  smsUpdates: false,
 }
 
 /**

@@ -134,6 +134,34 @@ return [
     ],
 
     /*
+     * Phase 20: SMS order notifications (docs/BANGLADESH.md → SMS). Off until
+     * staff turn it on (Settings → SMS). The "log" driver (the default) only
+     * saves the text (dev SMS inbox at /dev/sms); a provider is "set up" only
+     * when its credentials are here, which live in backend/.env only and are
+     * never logged or sent to the admin. The API URLs are only changed for
+     * local tests against a stand-in server.
+     */
+    'sms' => [
+        'driver' => 'log',
+        'ssl_wireless' => [
+            'api_token' => env('SMS_SSL_WIRELESS_API_TOKEN') ?: null,
+            'sid' => env('SMS_SSL_WIRELESS_SID') ?: null,
+            'api_url' => rtrim((string) (env('SMS_SSL_WIRELESS_API_URL') ?: 'https://smsplus.sslwireless.com'), '/'),
+        ],
+        'bulksmsbd' => [
+            'api_key' => env('SMS_BULKSMSBD_API_KEY') ?: null,
+            'sender_id' => env('SMS_BULKSMSBD_SENDER_ID') ?: null,
+            'api_url' => rtrim((string) (env('SMS_BULKSMSBD_API_URL') ?: 'http://bulksmsbd.net/api'), '/'),
+        ],
+        'timeout_seconds' => 15,
+        'connect_timeout_seconds' => 5,
+        // The one-tap confirmation link of a cash on delivery order works this long.
+        'confirm_link_hours' => 72,
+        // Automatic and manual retries of a failed text stop after this many attempts.
+        'max_attempts' => 5,
+    ],
+
+    /*
      * Phase 12: the money formats the store knows. The store currency itself
      * is BUYNEST_CURRENCY (store.currency below): a deployment setting, since
      * prices in the database have no currency of their own (docs/CURRENCY.md).

@@ -17,6 +17,8 @@ import { addressArea, orderPhase14 } from './adminPhase14.js'
 import { orderRowPhase18, shipmentPhase18 } from './adminPhase18.js'
 // Phase 19: a coupon's source, issued-to email and "first order only".
 import { couponPhase19 } from './adminPhase19.js'
+// Phase 20: the texts (SMS) sent for an order.
+import { orderPhase20 } from './adminPhase20.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -223,6 +225,8 @@ export function adminOrderDetail(raw) {
     ...orderLocale(raw),
     // Phase 14: delivery zone and time, COD fee, advance, cash to collect, the phone confirmation and its log.
     ...orderPhase14(raw),
+    // Phase 20: the texts sent for the order (only when the API sent the list).
+    ...orderPhase20(raw),
     shippingAddress: addressArea(order.shippingAddress, raw.shipping_address),
     history: (raw.history ?? []).map((entry) => ({
       status: entry.status,

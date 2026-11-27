@@ -30,6 +30,8 @@ import { amountToCollect, awaitsConfirmation, confirmationOf, confirmationStatus
 import { getCouriers, phase18Keys } from '../api/phase18'
 import { CourierBookingDialog } from '../components/CourierBookingDialog'
 import CourierShipment from '../components/CourierShipment'
+// Phase 20: the texts (SMS) sent for the order.
+import OrderSms from '../components/OrderSms'
 import { deliveryStatus } from '../utils/couriers'
 
 /** Demo: a DummyJSON cart shown as an order. */
@@ -850,6 +852,9 @@ function LiveOrderDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Phase 20 §2: the texts sent for the order (only when the API sends the list). */}
+        {Array.isArray(data.sms) && <OrderSms order={data} />}
 
         <section className="panel" aria-labelledby="history-title">
           <h2 id="history-title" className="panel__title">

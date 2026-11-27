@@ -413,6 +413,20 @@ Not automated: real email delivery (the dev mailbox is used), and a shopper swit
 
 Checks: backend 659 feature tests (Pint clean); frontend 1,062 unit tests; admin 258; browser checks 2,088 of 2,088 on the dev server (full run) and 2,061 of 2,063 on the production build (full run; the accounts suite did not finish once, W3; accounts, then extras after W1, passed alone: 19, 164).
 
+## Phase 20 (SMS notifications for orders) — 2026-11-27
+
+Asked by the store owner after SMS order texts were recommended. Built by three agents in parallel (backend; admin app with its sign-in service routes; storefront) against [backend/PHASE20_CONTRACT.md](backend/PHASE20_CONTRACT.md); a fourth wrote the `sms.mjs` browser suite (95 checks) on the log driver and the dev SMS inbox. **Off by default; no real SMS** until a provider account is added; the SSL Wireless and BulkSMSBD wire formats are unverified (a test SMS is a launch step in [BANGLADESH.md](BANGLADESH.md)). The lead reviewed the one-tap link (hashed 256-bit token, GET never changes anything, POST locks the order, single-purpose, 72 h, throttled, cancel follows the staff rules so a shipped or invoiced order can't be cancelled).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| S1 | Medium | **Pre-existing, found by the full run:** after an admin signs in, the app loads the role's permissions from `/me`; when that request failed or was slow it kept the sign-in answer, which has no permission list, and "no list" means "show everything" (meant for demo accounts). Under load a Viewer briefly saw Create order and the Invoice / Ship / Cancel bulk actions (the API still refused them: 403) | `/me` is tried three times; if it still fails the app **fails closed** with an empty permission list (unit tests) |
+| S2 | Test | The courier suite starts its own storefront dev server; under the full run its first page compile took over 15 s | Page loads in that suite wait up to 45 s (as the marketing suite since D7) |
+| S3 | Test | The SMS suite expected the confirmation link on the address under test; the link uses the API's configured storefront address, which is the dev server's even while the production build is tested on another port | It checks for a `/c/` link on any storefront address and opens the token on the address under test |
+
+Known and accepted: the one-tap link is visible in the SMS log to staff who can view orders (they can already confirm orders themselves); a "review" (risky) SSLCommerz payment gets no "order received" text when staff later invoice it by hand; Bangla default texts need the owner's review (the confirmation text with its link is close to 2 SMS parts).
+
+Checks: backend 682 feature tests (Pint clean); frontend 1,118 unit tests; admin 287; browser checks 2,124 of 2,129 on the dev server (full run; customers and courier then passed alone: 161, 113; S1 and S2 fixed) and 2,175 of 2,176 on the production build (full run; the one failure is S3, then the SMS suite passed on both: 95, 95).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

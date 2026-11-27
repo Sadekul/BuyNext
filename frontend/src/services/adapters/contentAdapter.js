@@ -210,6 +210,8 @@ export function normalizeStoreSettings(raw) {
     ...normalizeBangladeshSettings(data, countriesOf(data)),
     // Phase 19: the welcome coupon shoppers can earn (null = off: nothing about it is shown).
     welcomeOffer: normalizeWelcomeOffer(data.welcome_offer),
+    // Phase 20: the store texts order updates (SMS on): checkout says so next to the phone field. Only `true` counts.
+    smsUpdates: data.sms_updates === true,
   }
 }
 

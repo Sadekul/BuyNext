@@ -99,6 +99,7 @@ class Order extends Model
             'cod_collected' => 'decimal:2',
             'confirmation_attempts' => 'integer',
             'confirmed_at' => 'datetime',
+            'sms_confirm_expires_at' => 'datetime', // phase 20: the one-tap confirmation link
         ];
     }
 
@@ -125,6 +126,12 @@ class Order extends Model
     public function shipments(): HasMany
     {
         return $this->hasMany(Shipment::class)->orderBy('id');
+    }
+
+    /** Phase 20: the texts sent to the customer about this order, oldest first. */
+    public function smsMessages(): HasMany
+    {
+        return $this->hasMany(SmsMessage::class)->orderBy('id');
     }
 
     public function creditMemos(): HasMany

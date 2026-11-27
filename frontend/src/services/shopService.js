@@ -214,3 +214,21 @@ export function cancelOrder(number, { reason, email } = {}) {
   const body = { ...(reason?.trim() && { reason: reason.trim() }), ...(email && { email: email.trim() }) }
   return apiClient.post(`/api/shop/orders/${encodeURIComponent(number)}/cancel`, body, SHOP)
 }
+
+/*
+ * Phase 20: the one-tap link in the cash on delivery text (/c/:token). No
+ * sign-in: the token is the proof. GET only reads (link previews and SMS apps
+ * open links); POST answers it. ApiError 404 for an expired or unknown link,
+ * 422 when the order can't be cancelled any more, 429 after too many tries.
+ */
+
+/** GET /api/shop/order-confirmations/:token → { number, total, itemsCount, placedAt, status }. */
+export function getOrderConfirmation(token, { signal } = {}) {
+  return apiClient.get(`/api/shop/order-confirmations/${encodeURIComponent(token)}`, { ...SHOP, signal })
+}
+
+/** POST /api/shop/order-confirmations/:token { action: 'confirm' | 'cancel', reason? } → the summary with its new status. */
+export function answerOrderConfirmation(token, { action, reason } = {}) {
+  const body = { action, ...(action === 'cancel' && reason?.trim() && { reason: reason.trim() }) }
+  return apiClient.post(`/api/shop/order-confirmations/${encodeURIComponent(token)}`, body, SHOP)
+}

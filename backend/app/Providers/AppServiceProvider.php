@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Models\DevMail;
+use App\Models\OrderStatusHistory;
+use App\Models\Shipment;
 use App\Services\CatalogRules;
 use App\Services\HtmlSanitizer;
 use App\Services\Settings;
+use App\Services\Sms\Sms;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSent;
@@ -70,6 +73,12 @@ class AppServiceProvider extends ServiceProvider
         ]);
         RateLimiter::for('data-export', fn (Request $request) => Limit::perHour(3)->by('export:'.($request->user()?->getKey() ?? $request->ip())));
         // End of phase 9 part A limits.
+
+        // Phase 20: order texts follow the "notify the customer" choice of each shipment and status step
+        // (order_shipped; order_delivered and order_cancelled), in one place for every path that makes them
+        // (staff, bulk actions, couriers, the customer). Nothing happens while SMS is off.
+        Shipment::created(fn (Shipment $shipment) => app(Sms::class)->shipmentCreated($shipment));
+        OrderStatusHistory::created(fn (OrderStatusHistory $row) => app(Sms::class)->historyCreated($row));
 
         // Local test inbox: keep a copy of every email sent (see DevMailboxController).
         if ($this->app->environment('local') && config('buynest.dev_mailbox')) {

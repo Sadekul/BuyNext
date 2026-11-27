@@ -34,7 +34,7 @@ class OrderController extends Controller
         $data = $this->filters($request);
         $data += $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        $orders = $this->filtered($data)->with(['items', 'customer', 'createdBy', ...Order::DOCUMENTS])
+        $orders = $this->filtered($data)->with(['items', 'customer', 'createdBy', 'smsMessages', ...Order::DOCUMENTS])
             ->latest('id')
             ->paginate($data['per_page'] ?? 20)
             ->withQueryString();

@@ -493,6 +493,8 @@ async function runChecks(couriersAtStart) {
   async function newPage({ viewport = { width: 1280, height: 900 }, lang } = {}) {
     const context = await browser.newContext({ viewport, bypassCSP: true })
     context.setDefaultTimeout(15000)
+    // This suite starts its own storefront dev server: under a full run its first page compiles can take over 15 s (SQA S2).
+    context.setDefaultNavigationTimeout(45000)
     if (lang) await context.addCookies([{ name: 'buynest_lang', value: lang, url: BASE }])
     lastPage = watchErrors(await context.newPage(), errors)
     return lastPage

@@ -34,3 +34,7 @@ Schedule::command('buynest:search:reindex')->dailyAt('04:10')->withoutOverlappin
 // Phase 18: ask the couriers about open parcels (Settings → Couriers → auto-sync; webhooks usually come first).
 Schedule::command('buynest:couriers:sync')->everyThirtyMinutes()->withoutOverlapping(20)->onOneServer()
     ->when(fn () => (bool) app(Settings::class)->get('courier_auto_sync', true));
+
+// Phase 20: failed order texts are sent again (last 24 hours, up to 5 attempts) while SMS is on.
+Schedule::command('buynest:sms:retry')->everyTenMinutes()->withoutOverlapping(10)->onOneServer()
+    ->when(fn () => (bool) app(Settings::class)->get('sms_enabled', false));

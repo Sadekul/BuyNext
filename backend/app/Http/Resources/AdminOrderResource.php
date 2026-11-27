@@ -35,6 +35,15 @@ class AdminOrderResource extends OrderResource
                 'confirmed_at' => $this->confirmed_at?->toIso8601ZuluString(),
                 ...($this->relationLoaded('confirmationLogs') ? ['logs' => $this->confirmationLogs->map->toApi()->values()] : []),
             ],
+            // Phase 20: the texts sent to the customer about this order (id: for the order page's Retry).
+            'sms' => $this->smsMessages->map(fn ($message) => [
+                'id' => $message->id,
+                'event' => $message->event,
+                'status' => $message->status,
+                'to' => $message->to,
+                'sent_at' => $message->sent_at?->toIso8601ZuluString(),
+                'error' => $message->error,
+            ])->values(),
         ];
     }
 

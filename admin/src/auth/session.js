@@ -38,12 +38,26 @@ export async function checkAdminSession({ signal } = {}) {
   }
 }
 
-/** After a sign-in answer that set the session: tell other tabs, and load the role and permissions. */
+/**
+ * After a sign-in answer that set the session: tell other tabs, and load the role and permissions.
+ * The sign-in answer has no role or permissions; /me has them (BuyNest accounts). If /me can't be
+ * loaded (a slow or busy server), try twice more, then fail closed: an empty permission list hides
+ * every screen and button that needs one until the page is reloaded. Returning the sign-in answer
+ * as it was would have shown everything, since "no list" means "show all" for demo accounts
+ * (found by the customers suite under a full run: a Viewer briefly saw Create order and bulk actions).
+ */
 async function signedIn(user) {
   notifyOtherTabs()
-  // The sign-in answer has no role or permissions; /me has them (BuyNest accounts).
-  if (REAL_ACCOUNTS && !user?.permissions) return api.get('/api/admin/me').catch(() => user)
-  return user
+  if (!REAL_ACCOUNTS || user?.permissions) return user
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await api.get('/api/admin/me')
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) throw error
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)))
+    }
+  }
+  return { ...user, permissions: [], permissionsUnavailable: true }
 }
 
 /**

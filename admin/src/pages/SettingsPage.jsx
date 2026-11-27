@@ -16,6 +16,8 @@ import { paymentProviderNote } from '../utils/payments'
 import StatusBadge from '../components/StatusBadge'
 // Phase 14 §3 and §4: delivery zones, the default country, cash on delivery.
 import { LuMapPinned, LuTruck } from 'react-icons/lu'
+// Phase 20: Settings → SMS.
+import { LuSmartphone } from 'react-icons/lu'
 import { getDeliveryZones, phase14Keys } from '../api/phase14'
 import { COD_ADVANCE, advanceAvailability } from '../utils/bangladesh'
 
@@ -308,6 +310,11 @@ function ShippingForm({ saved }) {
           {' · '}
           <Link to="/settings/couriers">
             <LuTruck aria-hidden="true" /> Couriers
+          </Link>
+          {/* Phase 20: order texts to customers. */}
+          {' · '}
+          <Link to="/settings/sms">
+            <LuSmartphone aria-hidden="true" /> SMS notifications
           </Link>
         </p>
       )}
@@ -946,6 +953,7 @@ function CodForm({ saved, settings }) {
       <p id="cod-confirm-hint" className="field__hint">
         New cash on delivery orders wait in <Link to="/to-confirm">Sales → To confirm</Link> until staff call the customer. Unconfirmed orders can't be shipped unless staff give a
         reason.
+        {/* Phase 20: the customer can confirm from a one-tap SMS link instead. */} Customers can also confirm from a text: <Link to="/settings/sms">Settings → SMS</Link>.
       </p>
       {err(errors, 'requireConfirmation') && <p className="field__error">{err(errors, 'requireConfirmation')}</p>}
     </SettingsGroup>

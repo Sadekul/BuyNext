@@ -7,6 +7,9 @@ import {
   LuUsersRound,
   LuFolderTree,
   LuMessageSquareText,
+  // Phase 20.
+  LuMessageSquareMore,
+  LuSmartphone,
   LuFileText,
   LuHouse,
   LuLayoutDashboard,
@@ -126,6 +129,8 @@ const LIVE_NAV = [
       { to: '/returns', label: 'Returns', icon: LuPackageOpen, permission: 'returns.view' },
       { to: '/invoices', label: 'Invoices', icon: LuFileText, permission: 'orders.view' },
       { to: '/credit-memos', label: 'Credit memos', icon: LuUndo2, permission: 'orders.view' },
+      // Phase 20 §2: every order text sent (or tried).
+      { to: '/sms', label: 'SMS log', icon: LuMessageSquareMore, permission: 'orders.view' },
     ],
   },
   {
@@ -169,6 +174,8 @@ const LIVE_NAV = [
   { to: '/settings/delivery-zones', label: 'Delivery zones', icon: LuMapPinned, permission: 'settings.edit' },
   // Phase 18 §2: Steadfast and Pathao (read with settings.view).
   { to: '/settings/couriers', label: 'Couriers', icon: LuPackageSearch, permission: 'settings.view' },
+  // Phase 20 §2: SMS notifications for orders (read with settings.view).
+  { to: '/settings/sms', label: 'SMS', icon: LuSmartphone, permission: 'settings.view' },
   {
     heading: 'System',
     items: [

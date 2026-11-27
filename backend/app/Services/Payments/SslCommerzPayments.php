@@ -11,6 +11,7 @@ use App\Services\Audit;
 use App\Services\OrderDocuments;
 use App\Services\Pricing;
 use App\Services\Settings;
+use App\Services\Sms\Sms;
 use App\Support\Currency;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
@@ -676,6 +677,8 @@ class SslCommerzPayments
             : $this->documents->invoice($order, null, $method === 'SSLCommerz' ? 'Paid through SSLCommerz.' : "Paid with {$method} through SSLCommerz.", true);
         $invoice->load(['order']);
         $mail = [$order->email, new InvoiceMail($invoice)];
+        // Phase 20: the "order received" text goes once the payment is in (sent after the commit).
+        app(Sms::class)->paid($order);
 
         return 'paid';
     }

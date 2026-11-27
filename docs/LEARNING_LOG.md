@@ -350,3 +350,12 @@
 - Personal codes are checked twice: in the cart with what is known, and again at checkout when the email is certain
 - Side effects of a main action (sending a code after sign-up) never block that action: failures are reported, and the email goes after the database commit
 - When work is cut off mid-way (a usage limit here), resuming the same builders keeps their context; check for empty files before carrying on
+
+## Phase 20: SMS notifications for orders (2026-11-27)
+
+- Hook notifications to the facts the app already records (a shipment created, a history row with "customer notified") instead of copying a send call next to every email: courier, bulk and manual shipping all text the customer through one listener
+- A unique "dedupe key" per order and event makes sending idempotent even when two requests race
+- Links in SMS get opened by phone apps and link previews: a GET must never change anything; the customer acts with a button (POST)
+- Store only a hash of a link token, make it single-purpose and short-lived, and rate-limit the endpoint
+- SMS length is part of the design: Bangla switches the whole text to Unicode (70 characters per part instead of 160), so the admin shows a live parts counter and English money is written "Tk" to stay in the cheaper encoding
+- A dev "SMS inbox" (like the email test inbox) lets the browser suite read real messages without any provider

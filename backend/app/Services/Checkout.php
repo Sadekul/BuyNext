@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\CouponRedemption;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Services\Sms\Sms;
 use App\Support\Currency;
 use App\Support\Locale;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -133,6 +134,8 @@ class Checkout
             } catch (Throwable $e) {
                 report($e);
             }
+            // Phase 20: the "order received" (or COD "please confirm") text, unless the order waits for an online payment.
+            app(Sms::class)->placed($order);
         }
 
         return $order;

@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\Admin\SearchTermController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\ShipmentController;
 use App\Http\Controllers\Api\Admin\ShippingRateController;
+use App\Http\Controllers\Api\Admin\SmsController;
 use App\Http\Controllers\Api\Admin\StockAlertReportController;
 use App\Http\Controllers\Api\Admin\TwoFactorController;
 use App\Http\Controllers\Api\Admin\UrlRedirectController;
@@ -63,6 +64,7 @@ use App\Http\Controllers\Api\V1\GiftCardController;
 use App\Http\Controllers\Api\V1\InvoicePdfController;
 use App\Http\Controllers\Api\V1\MyAccountController;
 use App\Http\Controllers\Api\V1\NewsletterController;
+use App\Http\Controllers\Api\V1\OrderConfirmationLinkController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PayPalWebhookController;
 use App\Http\Controllers\Api\V1\PlaceController;
@@ -206,6 +208,12 @@ Route::prefix('v1')->group(function () {
     Route::post('stock-alerts/unsubscribe', [StockAlertController::class, 'unsubscribe'])->middleware('throttle:stock-alerts');
     Route::post('client-errors', ClientErrorController::class)->middleware(['bff.key:always', 'throttle:client-errors']);
     // End of phase 9 part B public store routes.
+
+    // Phase 20: the one-tap confirmation link of a cash on delivery order (no sign-in: the token is the proof; GET changes nothing).
+    Route::middleware('throttle:20,1')->controller(OrderConfirmationLinkController::class)->group(function () {
+        Route::get('order-confirmations/{token}', 'show')->where('token', '[A-Za-z0-9_-]{1,100}');
+        Route::post('order-confirmations/{token}', 'store')->where('token', '[A-Za-z0-9_-]{1,100}');
+    });
 });
 
 /*
@@ -503,5 +511,12 @@ Route::prefix('admin/v1')->group(function () {
             Route::get('backups/{name}/download', 'download')->name('admin.backups.download');
         });
         // End of phase 9 part B admin routes.
+
+        // Phase 20: Settings → SMS and the SMS log.
+        Route::get('sms', [SmsController::class, 'show'])->middleware('can.admin:settings.view');
+        Route::put('sms/settings', [SmsController::class, 'update'])->middleware('can.admin:settings.edit');
+        Route::post('sms/test', [SmsController::class, 'test'])->middleware('can.admin:settings.edit');
+        Route::get('sms/messages', [SmsController::class, 'messages'])->middleware('can.admin:orders.view');
+        Route::post('sms/messages/{id}/retry', [SmsController::class, 'retry'])->whereNumber('id')->middleware('can.admin:orders.edit');
     });
 });

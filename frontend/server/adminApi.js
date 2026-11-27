@@ -35,6 +35,8 @@ import { checkCollection, checkConfirmationOverride, matchPhase14Route, orderPha
 import { MANUAL_CARRIERS, matchPhase18Route, orderPhase18Filters } from './adminPhase18Api.js'
 // Phase 19: the welcome coupon (adminPhase19Api.js); the coupon list's source filter, "first order only".
 import { checkCouponPhase19, couponSourceFilter, matchPhase19Route } from './adminPhase19Api.js'
+// Phase 20: SMS notifications for orders (adminPhase20Api.js): settings, test send, the SMS log, retry.
+import { matchPhase20Route } from './adminPhase20Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -656,6 +658,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 20: sms, sms/settings, sms/test, sms/messages[/:id/retry].
+  const phase20 = matchPhase20Route(method, segments)
+  if (phase20 !== undefined) return phase20
   // Phase 19: marketing/welcome-coupon[/codes].
   const phase19 = matchPhase19Route(method, segments)
   if (phase19 !== undefined) return phase19

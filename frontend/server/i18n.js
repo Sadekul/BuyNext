@@ -66,6 +66,11 @@ const MESSAGES = {
     bn: 'এই নিশ্চিতকরণ লিংকটি সঠিক নয় বা এর মেয়াদ শেষ। নতুন লিংক পেতে আবার সাবস্ক্রাইব করুন।',
   },
   newsletterUnsubscribeInvalid: { en: 'This unsubscribe link is invalid.', bn: 'এই আনসাবস্ক্রাইব লিংকটি সঠিক নয়।' },
+  // Phase 20: the one-tap link in the cash on delivery text (/c/:token), when it isn't a link at all.
+  orderLinkInvalid: {
+    en: "This link isn't valid or has expired. You can still find your order with Track your order.",
+    bn: 'এই লিংকটি সঠিক নয় বা এর মেয়াদ শেষ। "আপনার অর্ডার ট্র্যাক করুন" থেকে আপনি এখনও অর্ডারটি খুঁজে পাবেন।',
+  },
   demoOnly: { en: 'This needs the BuyNest backend; the demo accounts cannot do it.', bn: 'এর জন্য BuyNest-এর ব্যাকএন্ড দরকার; ডেমো অ্যাকাউন্ট দিয়ে এটি করা যায় না।' },
   usernamePassword: { en: 'Enter your username and password.', bn: 'আপনার ইউজারনেম ও পাসওয়ার্ড লিখুন।' },
 }

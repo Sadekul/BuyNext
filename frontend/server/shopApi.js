@@ -6,6 +6,7 @@ import { laravelNewsletter } from './shop/newsletter.js'
 import { laravelCart } from './shop/cart.js'
 import { laravelAccount } from './shop/account.js'
 import { isShareToken, laravelRewards, laravelWishlist } from './shop/phase11.js'
+import { laravelOrderConfirmations } from './shop/orderConfirmations.js'
 import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
 
 /*
@@ -108,6 +109,12 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  * method `zone`, `etaDaysMin`, `etaDaysMax`. Orders carry `deliveryZone`, `advancePaid`, `codDue`, `codFee`,
  * `confirmationStatus` (pending | confirmed | unreachable | cancelled) and payment status "partially_paid".
  * The places themselves are public: GET /api/catalog/places/bd/* (catalogApi.js).
+ *
+ * Phase 20 (docs/backend/PHASE20_CONTRACT.md §3; shop/orderConfirmations.js), no sign-in (the link's token is the proof):
+ *   GET  /api/shop/order-confirmations/:token  → { number, total, itemsCount, placedAt, status } (changes nothing)
+ *   POST /api/shop/order-confirmations/:token  { action: 'confirm' | 'cancel', reason? } → the same, with the new status
+ *                                              (+ `message` when the API sends one). The API's 404 (expired / unknown
+ *                                              link), 422 (can't be cancelled any more) and 429 (throttle) go through.
  *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
@@ -345,6 +352,16 @@ const ROUTES = {
     return reply(await laravelWishlist.shared(param, request))
   },
 
+  // ---- phase 20: the one-tap confirmation link in the cash on delivery text (/c/:token) ----
+
+  async 'GET order-confirmations/:token'({ request, param }) {
+    return reply(await laravelOrderConfirmations.get(param, request))
+  },
+
+  async 'POST order-confirmations/:token'({ request, param }) {
+    return reply(await laravelOrderConfirmations.respond(param, await readBody(request), request), 200)
+  },
+
   async 'GET me/rewards'({ request, cookies, url }) {
     if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelRewards.get(cookies[CUSTOMER.access], pageOf(url), request))
@@ -383,6 +400,10 @@ function matchRoute(method, segments) {
   }
   if (segments.length === 2 && segments[0] === 'wishlists' && isShareToken(segments[1])) {
     return { route: ROUTES[`${method} wishlists/:token`], param: segments[1] }
+  }
+  // Any token shape reaches the route, which answers a malformed one with the same plain 404 as an expired one.
+  if (segments.length === 2 && segments[0] === 'order-confirmations' && segments[1].length <= 200) {
+    return { route: ROUTES[`${method} order-confirmations/:token`], param: segments[1] }
   }
   if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'stock-alerts' && isAlertId(segments[2])) {
     return { route: ROUTES[`${method} me/stock-alerts/:id`], param: segments[2] }

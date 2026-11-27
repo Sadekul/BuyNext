@@ -16,6 +16,7 @@ use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\RewardPoints;
 use App\Services\Settings;
+use App\Services\Sms\Sms;
 use App\Services\WelcomeCoupons;
 use App\Support\Currency;
 use App\Support\Locale;
@@ -102,6 +103,8 @@ class ContentController extends Controller
             // Phase 19: the welcome coupon the newsletter and sign-up may promise ({ type, value, label, min_subtotal,
             // valid_days, first_order_only, triggers }), or null while it is off.
             'welcome_offer' => app(WelcomeCoupons::class)->offer(),
+            // Phase 20: only while SMS order texts are on: checkout says "We'll text order updates to this number."
+            ...(app(Sms::class)->enabled() ? ['sms_updates' => true] : []),
         ]]);
     }
 }

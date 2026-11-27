@@ -254,3 +254,70 @@ parcel is answered as received and logged, so the courier doesn't retry forever.
    the balance. Correct the gateway class if anything differs.
 2. Switch Pathao to `PATHAO_MODE=live` with live credentials; enter the webhook URLs and secrets in both panels.
 3. Make sure the scheduler runs (`php artisan schedule:work` / cron) if you rely on auto-sync.
+
+## SMS order notifications
+
+Phase 20 texts customers at each step of an order, because in Bangladesh most orders are cash on delivery and people
+read SMS more than email. A cash on delivery order that needs confirmation gets a **one-tap confirmation link**, so the
+"To confirm" list fills itself without a phone call. Only order texts (transactional), never marketing. API details:
+`docs/backend/PHASE20_CONTRACT.md`.
+
+**Nothing changes until you switch it on** (Settings → SMS). Off, no text is written or sent anywhere.
+
+**Not verified yet.** The providers' request and answer formats come from their published API notes and community SDKs,
+not from a real account. Each provider's wire format sits in one class (`app/Services/Sms/SslWirelessDriver.php`,
+`BulkSmsBdDriver.php`), so a correction is a one-file change.
+
+### Providers
+
+| Provider | What it needs (in `backend/.env`, never shown in the admin) |
+|---|---|
+| **Test mode (log)** — the default | Nothing. Texts are only saved: read them in the admin's SMS log or the dev SMS inbox at `{API address}/dev/sms` (local development only). |
+| **SSL Wireless** (SMS Plus) | `SMS_SSL_WIRELESS_API_TOKEN`, `SMS_SSL_WIRELESS_SID` (your approved sender / SID). `SMS_SSL_WIRELESS_API_URL` only for local tests (default `https://smsplus.sslwireless.com`). |
+| **BulkSMSBD** | `SMS_BULKSMSBD_API_KEY`, `SMS_BULKSMSBD_SENDER_ID`. `SMS_BULKSMSBD_API_URL` only for local tests (default `http://bulksmsbd.net/api`). |
+
+A provider without its credentials shows "Not set up" and can't be chosen. Restart the API after changing `.env`.
+
+### Events
+
+Texts go at the same moments as the matching customer email, and follow the same "Notify the customer" choice:
+
+| Event | When |
+|---|---|
+| Order received | The order is placed and isn't waiting for an online payment (cash on delivery, bank transfer, cash, gift card), or when the online payment (card, PayPal, SSLCommerz, a COD advance) comes in |
+| Please confirm (COD) | Instead of "order received", for a COD order that needs confirmation (Settings → Payment methods → Cash on delivery) |
+| Order confirmed | Staff confirm it by phone (with notify), or the customer taps the link |
+| On its way | A shipment is created with notify (Ship dialog, courier booking, bulk ship), with the courier and tracking link when there is one |
+| Delivered | The order becomes delivered with notify (staff, or the courier's report) |
+| Cancelled | The order becomes cancelled with notify (staff, the confirmation outcome, the customer's own cancel or the link). Not for an online-payment order whose payment never came (it was never texted as received). |
+
+Each text goes once per order (once per shipment for "on its way"). Only Bangladeshi mobile numbers (`01XXXXXXXXX`,
+`+8801…`) are texted; other numbers are skipped. A failed text never stops the order change: it is kept as *failed*,
+retried automatically every 10 minutes for 24 hours (up to 5 attempts, `php artisan buynest:sms:retry`, needs the
+scheduler), and staff can retry it from the SMS log or the order page.
+
+Texts are in the customer's language (else the order's), with Bangla digits when the store uses them. English texts
+write taka as "Tk 1,060" so they stay in one plain (GSM) SMS; any Bangla makes a text Unicode (70 characters per SMS,
+67 per part), and providers bill per part. Staff can edit every text in English and Bangla (up to 480 characters) with
+the variables `{store} {order} {total} {name} {courier} {tracking} {tracking_url} {confirm_url} {order_url}`; an empty
+text goes back to the default. Unknown variables are left out; without a tracking or confirmation link the sentence
+holding it is left out. **The Bangla defaults are a first draft: please review them.**
+
+### One-tap confirmation link
+
+With "Include a one-tap confirmation link" on, the "please confirm" text carries `{storefront}/c/{token}`. The page
+shows only the order number, total, item count and date (no name, address or phone) with **Confirm my order** and
+**Cancel this order**. Opening the link changes nothing (SMS apps and link previews open links on their own); only the
+buttons do. Confirm = staff choosing "confirmed" (email, "order confirmed" text); cancel = the confirmation outcome
+"cancelled" (stock back, email, text), only while the order isn't shipped or invoiced. The link works for 72 hours and
+once: afterwards it shows the result. The database keeps only the token's SHA-256 (the token itself is in the text,
+which the SMS log shows to staff with order access).
+
+### Launch steps
+
+1. Open an account with SSL Wireless or BulkSMSBD and get a **sender ID approved** (BTRC rules; this takes days).
+2. Put the credentials in `backend/.env`, restart the API, choose the provider in **Settings → SMS**.
+3. **Send a test SMS from Settings → SMS before going live** to your own phone, in English and in Bangla, and check it
+   arrives, reads correctly and the SMS log shows *sent*. If the provider answers differently than expected, correct
+   its driver class.
+4. Review the Bangla texts, choose the events, turn SMS on, and make sure the scheduler runs (automatic retries).

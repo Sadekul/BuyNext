@@ -1,0 +1,82 @@
+/* Phase 20: the one-tap confirmation link from the cash on delivery text (/c/:token). Tokens only; fits 390px. */
+.sms-confirm__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-primary);
+}
+
+.sms-confirm__summary {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sms-confirm__summary > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+.sms-confirm__summary dt {
+  color: var(--color-text-muted);
+}
+
+.sms-confirm__summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+.sms-confirm__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sms-confirm__result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-inline-start: 4px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.sms-confirm__result--good {
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+}
+
+.sms-confirm__result p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sms-confirm__result:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.sms-confirm__icon {
+  flex: none;
+  margin-top: 0.125rem;
+  font-size: 1.25rem;
+  color: var(--color-success);
+}
+
+.sms-confirm__icon--muted {
+  color: var(--color-text-muted);
+}

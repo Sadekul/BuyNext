@@ -48,7 +48,8 @@ describe('navigation and permissions', () => {
     start(VIEWER, '/customers/5', { 'GET /api/admin/customers/5': { body: NADIA } })
     expect(await screen.findByRole('heading', { name: 'Nadia Rahman' })).toBeInTheDocument()
     const nav = within(screen.getByRole('navigation', { name: 'Admin' }))
-    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual(['Orders', 'Shipments', 'Returns', 'Invoices', 'Credit memos', 'All customers', 'Customer groups'])
+    // Phase 20: + Sales → SMS log (orders.view).
+    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual(['Orders', 'Shipments', 'Returns', 'Invoices', 'Credit memos', 'SMS log', 'All customers', 'Customer groups'])
     for (const name of ['Send password reset', 'Block', 'Delete', 'Create order', 'Save account']) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeDisabled()
   })

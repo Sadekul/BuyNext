@@ -53,6 +53,20 @@
   color: var(--color-text-muted);
 }
 
+/* Phase 20: "We'll text order updates to this number." under the phone field (SMS on). */
+.checkout__sms {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.checkout__sms svg {
+  flex: none;
+  margin-top: 0.2em;
+  color: var(--color-primary);
+}
+
 .checkout__error {
   display: flex;
   flex-direction: column;

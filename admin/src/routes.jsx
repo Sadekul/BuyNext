@@ -53,6 +53,9 @@ import ToConfirmPage from './pages/ToConfirmPage'
 import CouriersPage from './pages/CouriersPage'
 // Phase 19: Marketing → Welcome coupon.
 import WelcomeCouponPage from './pages/WelcomeCouponPage'
+// Phase 20: Settings → SMS, Sales → SMS log.
+import SmsSettingsPage from './pages/SmsSettingsPage'
+import SmsLogPage from './pages/SmsLogPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -142,6 +145,9 @@ export function AdminRoutes() {
             <Route path="settings/couriers" element={guarded('settings.view', <CouriersPage />)} />
             {/* Phase 19: the welcome coupon (read with coupons.view, changed with coupons.edit). */}
             <Route path="welcome-coupon" element={guarded('coupons.view', <WelcomeCouponPage />)} />
+            {/* Phase 20: SMS notifications (settings.view, changed with settings.edit) and the SMS log (orders.view, Retry with orders.edit). */}
+            <Route path="settings/sms" element={guarded('settings.view', <SmsSettingsPage />)} />
+            <Route path="sms" element={guarded('orders.view', <SmsLogPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

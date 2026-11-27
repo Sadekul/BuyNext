@@ -34,8 +34,9 @@ class OrderDocuments
      * statuses that can't move to cancelled. The caller sends the email.
      * Phase 8: $admin is null when Stripe's payment page expired (webhook);
      * an open Stripe payment page is closed, so it can't be paid any more.
+     * Phase 20: $actor names who cancelled when no staff member did ("Customer (SMS link)").
      */
-    public function cancel(Order $order, ?Admin $admin, ?string $note, bool $notify, string $errorKey = 'order'): void
+    public function cancel(Order $order, ?Admin $admin, ?string $note, bool $notify, string $errorKey = 'order', ?string $actor = null): void
     {
         $from = $order->status;
         if (! $order->canMoveTo('cancelled')) {
@@ -65,6 +66,7 @@ class OrderDocuments
             'payment_status' => $order->payment_status,
             'note' => $note ?? 'Order cancelled; items returned to stock.',
             'admin_id' => $admin?->id,
+            'actor' => $admin ? null : $actor,
             'customer_notified' => $notify,
         ]);
         $this->audit->record('order.status_changed', "Order {$order->number}: {$from} → cancelled.", 'order', $order->id,

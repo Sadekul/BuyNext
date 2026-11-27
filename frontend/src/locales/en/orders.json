@@ -322,5 +322,38 @@
       "cancelled": "The courier delivery was cancelled. Our team will contact you about what happens next."
     },
     "listLabel": "Delivery: {{status}}"
+  },
+  "smsConfirm": {
+    "title": "Confirm your order",
+    "doneTitle": "Your order",
+    "invalidTitle": "This link can't be used",
+    "loading": "Loading your order…",
+    "retry": "Try again",
+    "intro": "Please check your cash on delivery order and confirm it, so we can get it ready to send.",
+    "summary": "Order summary",
+    "number": "Order number",
+    "placed": "Placed on",
+    "items": "Items",
+    "itemsCount_one": "{{count, number}} item",
+    "itemsCount_other": "{{count, number}} items",
+    "total": "Total to pay on delivery",
+    "confirm": "Confirm my order",
+    "confirming": "Confirming…",
+    "cancel": "Cancel this order",
+    "dialogTitle": "Cancel order {{number}}?",
+    "dialogExplain": "We won't send this order, and you won't pay anything.",
+    "why": "Why are you cancelling? <optional>(optional)</optional>",
+    "hint": "Up to {{max, number}} characters. It's kept with the order.",
+    "keep": "Keep my order",
+    "cancelConfirm": "Yes, cancel this order",
+    "cancelling": "Cancelling…",
+    "confirmed": "Thank you, your order {{number}} is confirmed. We'll text you when it ships.",
+    "cancelled": "Your order {{number}} is cancelled.",
+    "alreadyConfirmed": "Your order {{number}} is already confirmed. We'll text you when it ships.",
+    "alreadyCancelled": "Your order {{number}} was already cancelled.",
+    "expired": "This confirmation link has expired. You can still see order {{number}} with Track your order.",
+    "notWaiting": "Order {{number}} doesn't need confirming any more. You can see where it is with Track your order.",
+    "invalid": "This link isn't valid or has expired. You can still find your order with Track your order.",
+    "track": "Track your order"
   }
 }

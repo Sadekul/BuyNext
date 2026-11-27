@@ -25,6 +25,7 @@ export const ROUTES = {
   accountDeleted: '/goodbye', // after deleting the account (REAL_SHOP)
   stockAlertsUnsubscribe: '/stock-alerts/unsubscribe', // the link in back-in-stock emails (REAL_SHOP)
   giftCardBalance: '/gift-cards/balance', // check a gift card's balance (REAL_SHOP, phase 10)
+  smsConfirm: (token) => `/c/${token}`, // the one-tap link in the cash on delivery text (REAL_SHOP, phase 20)
   login: '/login',
   register: '/register',
   forgotPassword: '/forgot-password',

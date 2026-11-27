@@ -135,6 +135,13 @@ class Settings
         'welcome_coupon_min_subtotal' => null, // money string, or null for no minimum
         'welcome_coupon_valid_days' => 30, // 1–365
         'welcome_coupon_first_order_only' => true,
+        // Phase 20: Settings → SMS (PUT /api/admin/v1/sms/settings; off by default). sms_templates: { event: { en, bn } },
+        // a missing or empty text = the default (App\Services\Sms\Sms::DEFAULT_TEMPLATES).
+        'sms_enabled' => false,
+        'sms_provider' => 'log', // log | ssl_wireless | bulksmsbd
+        'sms_events' => ['order_placed', 'cod_confirm_request', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled'],
+        'sms_templates' => [],
+        'sms_confirm_link' => true, // the COD confirmation request carries the one-tap link
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'cod_fee'];
