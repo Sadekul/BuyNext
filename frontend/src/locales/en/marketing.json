@@ -205,5 +205,33 @@
     "failed": "We couldn't load this page",
     "home": "Home",
     "support": "Customer support"
+  },
+  "welcome": {
+    "percentOff": "{{value}}% off",
+    "amountOff": "{{amount}} off",
+    "titleFirstOrder": "Get {{offer}} your first order",
+    "title": "Get {{offer}}",
+    "newsletterText": "Confirm your email and we'll send your personal code.",
+    "minimum": "Orders over {{min}}.",
+    "signupFirstOrder": "Create an account and get {{offer}} your first order.",
+    "signup": "Create an account and get {{offer}}.",
+    "signupHint": "We'll email your personal code once you confirm your email.",
+    "codeSent": "Your welcome code is on its way to your inbox.",
+    "cardTitle": "Your welcome code",
+    "offerFirstOrder": "{{offer}} your first order",
+    "codeLabel": "Code",
+    "copy": "Copy",
+    "copyLabel": "Copy welcome code {{code}}",
+    "copied": "Code {{code}} copied.",
+    "copyFailed": "Couldn't copy. The code is selected: copy it by hand.",
+    "useBy": "Use by {{date}}",
+    "expiredOn": "Expired on {{date}}",
+    "useAtCheckout": "Enter it at checkout. It works once, with this account's email.",
+    "statusLabel": "Status:",
+    "status": {
+      "active": "Active",
+      "used": "Used",
+      "expired": "Expired"
+    }
   }
 }

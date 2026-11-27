@@ -51,6 +51,8 @@ import DeliveryZonesPage from './pages/DeliveryZonesPage'
 import ToConfirmPage from './pages/ToConfirmPage'
 // Phase 18: Settings → Couriers (Steadfast, Pathao).
 import CouriersPage from './pages/CouriersPage'
+// Phase 19: Marketing → Welcome coupon.
+import WelcomeCouponPage from './pages/WelcomeCouponPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -138,6 +140,8 @@ export function AdminRoutes() {
             <Route path="to-confirm" element={guarded('orders.edit', <ToConfirmPage />)} />
             {/* Phase 18: couriers and their booking defaults (changed with settings.edit). */}
             <Route path="settings/couriers" element={guarded('settings.view', <CouriersPage />)} />
+            {/* Phase 19: the welcome coupon (read with coupons.view, changed with coupons.edit). */}
+            <Route path="welcome-coupon" element={guarded('coupons.view', <WelcomeCouponPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

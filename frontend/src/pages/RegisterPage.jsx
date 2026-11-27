@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { LuCircleCheck } from 'react-icons/lu'
+import { LuCircleCheck, LuTicket } from 'react-icons/lu'
 import FormField, { CheckboxField } from '../components/forms/FormField'
 import Button from '../components/ui/Button'
 import { registerCustomer, registerDemoCustomer } from '../services/authService'
@@ -10,6 +10,8 @@ import { ROUTES } from '../constants/routes'
 import { SITE } from '../constants/site'
 import { validateRegistration } from '../utils/validation'
 import { withoutField } from '../utils/serverErrors'
+import { useStoreSettings } from '../hooks/useStoreSettings'
+import { minimumLine, offerFor, offerLabel } from '../utils/welcomeOffer'
 import './AuthPages.css'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -19,6 +21,8 @@ import { Trans, useTranslation } from 'react-i18next'
  * account unconfirmed and emails a 6-digit code; the customer continues on
  * /verify-email. DummyJSON demo: a username instead of a phone, and the
  * account is only simulated.
+ * Phase 19: while the store's welcome coupon is on for new accounts (GET
+ * /store `welcome_offer.triggers` has "signup"), a small note promises it.
  */
 const EMPTY_FORM = {
   firstName: '',
@@ -32,6 +36,10 @@ const EMPTY_FORM = {
 
 function RegisterPage() {
   const { t } = useTranslation('auth')
+  const { t: tm } = useTranslation('marketing')
+  const { settings } = useStoreSettings()
+  // The code is issued by BuyNest accounts only (when the new email is confirmed).
+  const welcomeOffer = REAL_ACCOUNTS ? offerFor(settings.welcomeOffer, 'signup') : null
   const navigate = useNavigate()
   const location = useLocation()
   const [values, setValues] = useState(EMPTY_FORM)
@@ -107,6 +115,17 @@ function RegisterPage() {
           <h1 className="auth-card__title">{t('register.title')}</h1>
           <p className="auth-card__subtitle">{t('register.subtitle')}</p>
         </header>
+
+        {welcomeOffer && (
+          <p className="auth-welcome">
+            <LuTicket className="auth-welcome__icon" aria-hidden="true" />
+            <span>
+              <strong>{tm(welcomeOffer.firstOrderOnly ? 'welcome.signupFirstOrder' : 'welcome.signup', { offer: offerLabel(welcomeOffer, tm) })}</strong>{' '}
+              {minimumLine(welcomeOffer.minSubtotal, tm)}
+              <span className="auth-welcome__hint">{tm('welcome.signupHint')}</span>
+            </span>
+          </p>
+        )}
 
         {generalError && (
           <p className="auth-alert auth-alert--error" role="alert">

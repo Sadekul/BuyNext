@@ -121,5 +121,8 @@
     "Order total": "অর্ডারের মোট",
     "Refunded in total": "মোট রিফান্ড হয়েছে",
     "Thank you for shopping with :store.": ":store-এ কেনাকাটার জন্য ধন্যবাদ।",
-    "Questions about this document? Write to :email.": "এই ডকুমেন্ট নিয়ে কোনো প্রশ্ন আছে? :email ঠিকানায় লিখুন।"
+    "Questions about this document? Write to :email.": "এই ডকুমেন্ট নিয়ে কোনো প্রশ্ন আছে? :email ঠিকানায় লিখুন।",
+    ":offer your first order": "আপনার প্রথম অর্ডারে :offer",
+    ":offer your next order": "আপনার পরের অর্ডারে :offer",
+    "Valid on orders of :amount or more.": ":amount বা তার বেশি মূল্যের অর্ডারে প্রযোজ্য।"
 }

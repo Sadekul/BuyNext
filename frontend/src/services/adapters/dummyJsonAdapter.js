@@ -1,3 +1,5 @@
+import { normalizeWelcomeCoupon } from '../../utils/welcomeOffer'
+
 /*
  * Adapter (normalization layer) for DummyJSON responses.
  *
@@ -97,5 +99,7 @@ export function normalizeUser(raw) {
     ...(raw.locale !== undefined && { locale: raw.locale === 'en' || raw.locale === 'bn' ? raw.locale : null }),
     // BuyNest accounts (phase 9): a new email waiting for its confirmation code.
     ...(typeof raw.pendingEmail === 'string' && raw.pendingEmail && { pendingEmail: raw.pendingEmail }),
+    // BuyNest accounts (phase 19): the customer's personal welcome code ({ code, label, minSubtotal, expiresAt, status }).
+    ...(normalizeWelcomeCoupon(raw.welcomeCoupon) && { welcomeCoupon: normalizeWelcomeCoupon(raw.welcomeCoupon) }),
   }
 }

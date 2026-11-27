@@ -16,6 +16,7 @@ use App\Services\Payments\StripePayments;
 use App\Services\Pricing;
 use App\Services\RewardPoints;
 use App\Services\Settings;
+use App\Services\WelcomeCoupons;
 use App\Support\Currency;
 use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
@@ -98,6 +99,9 @@ class ContentController extends Controller
                     ->map(fn (CurrencyRate $rate) => ['code' => $rate->code, 'symbol' => $rate->symbol, 'rate' => $rate->rate, 'decimals' => $rate->decimals])
                     ->values()->all(),
             ],
+            // Phase 19: the welcome coupon the newsletter and sign-up may promise ({ type, value, label, min_subtotal,
+            // valid_days, first_order_only, triggers }), or null while it is off.
+            'welcome_offer' => app(WelcomeCoupons::class)->offer(),
         ]]);
     }
 }

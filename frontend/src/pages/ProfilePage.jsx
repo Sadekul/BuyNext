@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuPencil } from 'react-icons/lu'
 import EditNameForm from '../components/forms/EditNameForm'
 import ChangeEmailForm from '../components/account/ChangeEmailForm'
+import WelcomeCodeCard from '../components/account/WelcomeCodeCard'
 import { CheckboxField } from '../components/forms/FormField'
 import { profileQuery, userKeys } from '../queries/userQueries'
 import { updateProfile } from '../services/authService'
@@ -62,7 +63,12 @@ function ProfilePage() {
   const newsletter = useMutation({
     mutationFn: (subscribed) => authorizedRequest(() => updateProfile({ newsletter: subscribed })),
     onSuccess: (updated, subscribed) => {
-      queryClient.setQueryData(profileKey, (current) => ({ ...current, newsletter: updated.newsletter ?? subscribed }))
+      queryClient.setQueryData(profileKey, (current) => ({
+        ...current,
+        newsletter: updated.newsletter ?? subscribed,
+        // Phase 19: switching the newsletter on may have issued a welcome code.
+        ...(updated.welcomeCoupon && { welcomeCoupon: updated.welcomeCoupon }),
+      }))
     },
   })
 
@@ -123,6 +129,9 @@ function ProfilePage() {
           </div>
         ))}
       </dl>
+
+      {/* Phase 19: the customer's personal welcome code, when they have one. */}
+      {REAL_ACCOUNTS && profile.welcomeCoupon && <WelcomeCodeCard coupon={profile.welcomeCoupon} />}
 
       {REAL_ACCOUNTS && typeof profile.newsletter === 'boolean' && (
         <section className="profile__newsletter" aria-labelledby="profile-newsletter-title">

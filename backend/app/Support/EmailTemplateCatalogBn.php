@@ -212,6 +212,16 @@ final class EmailTemplateCatalogBn
                     .'<p><strong>ডেলিভারির ঠিকানা</strong></p>{{ address }}'
                     .self::QUESTIONS,
             ],
+            // Phase 19.
+            'welcome_coupon' => [
+                'subject' => 'আপনার স্বাগত কোড: {{ offer_line }}',
+                'body' => '<h2>{{ store_name }}-এ আপনাকে স্বাগতম</h2>'
+                    .'<p>প্রিয় {{ customer_name }},</p>'
+                    .'<p>আমাদের সাথে যুক্ত হওয়ার জন্য ধন্যবাদ। {{ offer_line }} পেতে এটি আপনার ব্যক্তিগত কোড:</p>'
+                    .'<blockquote><h3>{{ code }}</h3></blockquote>'
+                    .'<p>{{ min_spend_line }} {{ expires_on }}-এর মধ্যে ব্যবহার করুন। কোডটি একবারই, শুধু এই ইমেইল ঠিকানা দিয়ে ব্যবহার করা যাবে।</p>'
+                    .'{{ button }}',
+            ],
         ];
     }
 }

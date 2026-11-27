@@ -345,6 +345,8 @@ describe('sales documents and coupons', () => {
       code: 'SPRING15', description: '15% off spring', type: 'percent', value: 15, minSubtotal: null, startsAt: null, endsAt: new Date('2026-12-31T23:59').toISOString(), usageLimit: null, usageLimitPerCustomer: 1, isActive: true,
       // Phase 7: the cart price rule fields, at their defaults (a code for the whole cart, everyone).
       autoApply: false, buyQuantity: null, getQuantity: null, freeShipping: false, appliesTo: 'all', categoryIds: [], productIds: [], customerGroupIds: [],
+      // Phase 19: "First order only", off by default.
+      firstOrderOnly: false,
     })
   })
 })

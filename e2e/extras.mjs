@@ -590,7 +590,14 @@ async function runChecks() {
 
     // A real search (the results page) is recorded, unlike the suggestions for the same word.
     await page.goto(`${BASE}/products?q=${suggestTerm}`, { waitUntil: 'networkidle' })
-    log((await terms(suggestTerm))?.hits === 1, `the results page records what the shopper typed ("${suggestTerm}": ${(await terms(suggestTerm))?.hits} hit)`)
+    // The hit is saved by the search request itself; under load it can land a moment after the page is idle,
+    // so read it until it appears (up to 5 s) and judge and print the same reading (SQA W1).
+    let recorded = null
+    for (let tries = 0; tries < 10 && recorded?.hits !== 1; tries++) {
+      if (tries) await page.waitForTimeout(500)
+      recorded = await terms(suggestTerm)
+    }
+    log(recorded?.hits === 1, `the results page records what the shopper typed ("${suggestTerm}": ${recorded?.hits} hit)`)
 
     // An exact SKU ranks first.
     const sku = 'SMA-APP-IPH-122'

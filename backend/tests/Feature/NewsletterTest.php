@@ -58,7 +58,7 @@ class NewsletterTest extends TestCase
         $this->assertStringContainsString(urlencode($token), Mail::sent(NewsletterConfirmationMail::class)->last()->render());
         $this->postJson('/api/v1/newsletter/confirm', ['token' => 'wrong'])->assertUnprocessable()->assertJsonValidationErrors('token');
         $this->postJson('/api/v1/newsletter/confirm', ['token' => $token])->assertOk()
-            ->assertJsonPath('data', ['email' => 'ava@example.com', 'status' => 'subscribed']);
+            ->assertJsonPath('data', ['email' => 'ava@example.com', 'status' => 'subscribed', 'welcome_coupon_sent' => false]); // phase 19: off
         $this->postJson('/api/v1/newsletter/confirm', ['token' => $token])->assertOk(); // clicked twice
 
         $this->postJson('/api/v1/newsletter', ['email' => 'late@example.com']);

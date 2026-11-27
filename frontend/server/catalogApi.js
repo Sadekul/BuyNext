@@ -12,6 +12,7 @@ import { serverMessage } from './i18n.js'
  *   GET /api/catalog/home           → GET /api/v1/home         ({ data: { hero, banners, featured_products, hero_mode, slides, slider } })
  *   GET /api/catalog/pages/:slug    → GET /api/v1/pages/:slug  ({ data }, published pages only)
  *   GET /api/catalog/store          → GET /api/v1/store        ({ data }: shipping, countries, payment, tax rules)
+ *                                   (phase 19: + `welcome_offer`, passed on as the API sends it, like every key of `data`)
  *   GET /api/catalog/redirects?path=/old → GET /api/v1/redirects?path=/old ({ data: { from_path, to_path, status_code } }, or 404)
  *                                        the admin's URL redirects, checked by the storefront's "not found" page (phase 7)
  *   GET /api/catalog/products/compare?ids=1,2,3 → GET /api/v1/products/compare?ids=1,2,3 (phase 11: 2–4 products side by side)

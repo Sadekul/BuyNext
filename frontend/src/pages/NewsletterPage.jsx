@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { useMutation } from '@tanstack/react-query'
-import { LuMailCheck, LuMailX } from 'react-icons/lu'
+import { LuMailCheck, LuMailX, LuTicket } from 'react-icons/lu'
 import PageMeta from '../components/common/PageMeta'
 import Button from '../components/ui/Button'
 import Loader from '../components/ui/Loader'
@@ -53,9 +53,18 @@ function NewsletterPage({ action }) {
     body = <p className="auth-alert auth-alert--error" role="alert">{t(config.missing)}</p>
   } else if (request.isSuccess) {
     body = (
-      <p className="auth-alert auth-alert--success" role="status">
-        {request.data?.message || t(action === 'confirm' ? 'newsletterPage.subscribed' : 'newsletterPage.unsubscribed')}
-      </p>
+      <>
+        <p className="auth-alert auth-alert--success" role="status">
+          {request.data?.message || t(action === 'confirm' ? 'newsletterPage.subscribed' : 'newsletterPage.unsubscribed')}
+        </p>
+        {/* Phase 19: this confirmation issued a welcome code (the API says so; never guessed). */}
+        {action === 'confirm' && request.data?.welcomeCouponSent === true && (
+          <p className="auth-welcome" role="status">
+            <LuTicket className="auth-welcome__icon" aria-hidden="true" />
+            <span>{t('welcome.codeSent')}</span>
+          </p>
+        )}
+      </>
     )
   } else if (errorMessage) {
     body = <p className="auth-alert auth-alert--error" role="alert">{errorMessage}</p>

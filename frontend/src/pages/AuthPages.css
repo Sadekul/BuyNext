@@ -89,6 +89,38 @@
   background: var(--color-success-soft);
 }
 
+/* Phase 19: the welcome coupon note (sign-up page, newsletter confirmation): orange tint, dark text (the icon and the offer in strong orange, 4.9:1). */
+.auth-welcome {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.auth-welcome__icon {
+  flex: none;
+  margin-top: 0.125rem;
+  font-size: 1.125rem;
+  color: var(--color-accent-strong);
+}
+
+.auth-welcome strong {
+  color: var(--color-accent-strong);
+}
+
+.auth-welcome__hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+
 .auth-demo {
   display: flex;
   flex-wrap: wrap;

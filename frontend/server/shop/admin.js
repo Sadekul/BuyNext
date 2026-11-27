@@ -15,6 +15,8 @@ import { BANGLA_FILTERS, orderLocale, productPhase13, toBanglaBody, toSpecificat
 import { addressArea, orderPhase14 } from './adminPhase14.js'
 // Phase 18: courier bookings on shipments, the grid's delivery status.
 import { orderRowPhase18, shipmentPhase18 } from './adminPhase18.js'
+// Phase 19: a coupon's source, issued-to email and "first order only".
+import { couponPhase19 } from './adminPhase19.js'
 
 /*
  * The admin dashboard's products, orders, and overview from BuyNest's Laravel
@@ -413,6 +415,8 @@ export function adminCoupon(raw) {
     buyQuantity: raw.buy_quantity ?? null,
     getQuantity: raw.get_quantity ?? null,
     autoApply: raw.auto_apply === true,
+    // Phase 19: source (staff | welcome), issuedToEmail, firstOrderOnly.
+    ...couponPhase19(raw),
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
   }
@@ -439,6 +443,8 @@ const COUPON_FIELDS = {
   buyQuantity: 'buy_quantity',
   getQuantity: 'get_quantity',
   autoApply: 'auto_apply',
+  // Phase 19.
+  firstOrderOnly: 'first_order_only',
 }
 const COUPON_MONEY = ['value', 'minSubtotal']
 const toCouponBody = (values) =>

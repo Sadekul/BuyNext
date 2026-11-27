@@ -5,6 +5,8 @@ import Button from '../ui/Button'
 import Modal from '../ui/Modal'
 import { REAL_SHOP } from '../../constants/shop'
 import { subscribeToNewsletter } from '../../services/newsletterService'
+import { useStoreSettings } from '../../hooks/useStoreSettings'
+import { minimumLine, offerFor, offerTitle } from '../../utils/welcomeOffer'
 import './Newsletter.css'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -17,6 +19,9 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * (double opt-in). Its answer is the same for every address, so the form
  * can't be used to find out who is subscribed.
  * DEMO: nothing is sent anywhere; the modal says so.
+ * Phase 19: while the store's welcome coupon is on for newsletter sign-ups
+ * (GET /store `welcome_offer.triggers`), the block promises it ("Get 10% off
+ * your first order"); otherwise its texts are exactly as before.
  */
 function Newsletter() {
   const { t } = useTranslation('marketing')
@@ -24,6 +29,8 @@ function Newsletter() {
   const [error, setError] = useState('')
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [confirmation, setConfirmation] = useState('')
+  const offer = offerFor(useStoreSettings().settings.welcomeOffer, 'newsletter')
+  const offerMinimum = offer ? minimumLine(offer.minSubtotal, t) : null
   const inputId = useId()
   const errorId = useId()
   const subscribe = useMutation({
@@ -60,9 +67,11 @@ function Newsletter() {
           <LuMail className="newsletter__icon" aria-hidden="true" />
           <div>
             <h2 id="newsletter-title" className="newsletter__title">
-              {t('newsletter.title')}
+              {offer ? offerTitle(offer, t) : t('newsletter.title')}
             </h2>
-            <p className="newsletter__text">{t('newsletter.text')}</p>
+            <p className="newsletter__text">
+              {offer ? [t('welcome.newsletterText'), offerMinimum].filter(Boolean).join(' ') : t('newsletter.text')}
+            </p>
           </div>
         </div>
 

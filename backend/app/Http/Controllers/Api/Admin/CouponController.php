@@ -21,27 +21,34 @@ class CouponController extends Controller
 
     private const AUDITED = ['code', 'description', 'type', 'value', 'min_subtotal', 'starts_at', 'ends_at',
         'usage_limit', 'usage_limit_per_customer', 'is_active',
-        'customer_group_ids', 'applies_to', 'category_ids', 'product_ids', 'free_shipping', 'buy_quantity', 'get_quantity', 'auto_apply'];
+        'customer_group_ids', 'applies_to', 'category_ids', 'product_ids', 'free_shipping', 'buy_quantity', 'get_quantity', 'auto_apply',
+        'first_order_only']; // phase 19
 
     public function __construct(private Audit $audit) {}
 
-    /** GET /api/admin/v1/coupons?search&status&kind=code|automatic&page&per_page - newest first. */
+    /**
+     * GET /api/admin/v1/coupons?search&status&kind=code|automatic&source=staff|welcome&page&per_page - newest first.
+     * Phase 19: without source, every coupon (as before); the admin app asks for source=staff itself.
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(Coupon::STATUSES)],
             'kind' => ['nullable', Rule::in(['code', 'automatic'])],
+            'source' => ['nullable', Rule::in(Coupon::SOURCES)], // phase 19
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $coupons = Coupon::query()
             ->when($data['search'] ?? null, function ($query, $search) {
                 $like = '%'.addcslashes($search, '%_\\').'%';
-                $query->where(fn ($q) => $q->where('code', 'like', $like)->orWhere('description', 'like', $like));
+                $query->where(fn ($q) => $q->where('code', 'like', $like)->orWhere('description', 'like', $like)
+                    ->orWhere('issued_to_email', 'like', $like)); // phase 19: find a customer's welcome code by email
             })
             ->when($data['status'] ?? null, fn ($query, $status) => $query->withStatus($status))
             ->when($data['kind'] ?? null, fn ($query, $kind) => $query->where('auto_apply', $kind === 'automatic'))
+            ->when($data['source'] ?? null, fn ($query, $source) => $query->where('source', $source))
             ->latest('id')
             ->paginate($data['per_page'] ?? 20)
             ->withQueryString();
@@ -66,12 +73,22 @@ class CouponController extends Controller
         return (new CouponResource($coupon->fresh()))->response()->setStatusCode(201);
     }
 
-    /** PATCH /api/admin/v1/coupons/{id} - any of the create fields. */
+    /**
+     * PATCH /api/admin/v1/coupons/{id} - any of the create fields.
+     * Phase 19: a welcome code was promised to one customer as it is, so only
+     * is_active (switching it off or on again) is applied; other fields are ignored.
+     */
     public function update(Request $request, int $id): CouponResource|JsonResponse
     {
         $coupon = Coupon::find($id);
         if (! $coupon) {
             return $this->notFound();
+        }
+        if ($coupon->source === 'welcome') {
+            $data = $request->validate(['is_active' => ['sometimes', 'boolean']]);
+            $this->save($coupon, array_key_exists('is_active', $data) ? ['is_active' => (bool) $data['is_active']] : []);
+
+            return new CouponResource($coupon->fresh());
         }
         $this->save($coupon, $this->validated($request, $coupon));
 
@@ -140,6 +157,7 @@ class CouponController extends Controller
             'free_shipping' => ['sometimes', 'boolean'],
             'buy_quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
             'get_quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'first_order_only' => ['sometimes', 'boolean'], // phase 19
         ], [
             'code.required' => 'Enter a code.',
             'code.regex' => 'A code has only letters, digits, dashes, and underscores.',

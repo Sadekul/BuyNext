@@ -399,6 +399,20 @@ Not automated: a real courier account (sandbox or live), the courier's own track
 
 Checks: backend 643 feature tests (Pint clean; the D8 check added to an existing test); frontend 1,011 unit tests; admin 246; browser checks 2,013 of 2,014 on the dev server (full run; the marketing suite then passed alone after D7: 187) and 2,008 of 2,009 on the production build (full run; the one failure is D8, and the delivery suite then passed alone after the fix: 175).
 
+## Phase 19 (welcome coupon) — 2026-11-27
+
+Asked by the store owner ("start next steps", after the welcome coupon was recommended). Built by three agents in parallel (backend; admin app with its sign-in service routes; storefront) against [backend/PHASE19_CONTRACT.md](backend/PHASE19_CONTRACT.md); all three were cut off once by a usage limit and resumed the next day with their context (no file was left empty). A fourth agent wrote the `welcome.mjs` browser suite (72 checks). **Off by default**: with the setting off every page and test behaves as before. The lead reviewed the grant (one per email through a unique table, only confirmed addresses, mail after commit, failures never block sign-up or the newsletter) and the coupon checks (personal email, first order only, re-checked at checkout).
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| W1 | Test | The extras suite read a search term's hit count twice (once to judge, once to print); under the full production run the first read came a moment before the hit was saved ("records … 1 hit" reported as a failure) | It waits up to 5 s for the hit and judges and prints the same reading |
+| W2 | Low | The admin preview showed a fixed discount as "৳100.00 off" while the store shows "৳100 off" | Whole amounts without ".00" in the preview, like the store |
+| W3 | Test | Under the full production run the accounts suite's first page load (home, waiting for a quiet network) took over 30 s once, and the extras suite's analytics `begin_checkout` event was missed once | Both passed alone with no change (accounts 19/19, extras 164/164) |
+
+Not automated: real email delivery (the dev mailbox is used), and a shopper switching language between subscribing and confirming (the email follows the customer's or the request's language). The Bangla wording of the new email and messages should be reviewed by a native speaker.
+
+Checks: backend 659 feature tests (Pint clean); frontend 1,062 unit tests; admin 258; browser checks 2,088 of 2,088 on the dev server (full run) and 2,061 of 2,063 on the production build (full run; the accounts suite did not finish once, W3; accounts, then extras after W1, passed alone: 19, 164).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

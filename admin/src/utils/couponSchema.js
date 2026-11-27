@@ -39,6 +39,8 @@ export const couponSchema = z
     usageLimit: z.string(),
     usageLimitPerCustomer: z.string(),
     isActive: z.boolean(),
+    // Phase 19: only for a shopper's first order (no earlier order that wasn't cancelled).
+    firstOrderOnly: z.boolean(),
   })
   .superRefine((values, ctx) => {
     const problem = (path, message) => ctx.addIssue({ code: 'custom', path: [path], message })
@@ -77,6 +79,7 @@ export const EMPTY_COUPON = {
   usageLimit: '',
   usageLimitPerCustomer: '',
   isActive: true,
+  firstOrderOnly: false,
 }
 
 // <input type="datetime-local"> works in the admin's own time zone; the API stores UTC.
@@ -111,6 +114,7 @@ export function couponToForm(coupon) {
     usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',
     usageLimitPerCustomer: coupon.usageLimitPerCustomer ? String(coupon.usageLimitPerCustomer) : '',
     isActive: coupon.isActive,
+    firstOrderOnly: coupon.firstOrderOnly === true,
   }
 }
 
@@ -137,6 +141,7 @@ export function toCouponPayload(values) {
     usageLimit: numberOrNull(values.usageLimit),
     usageLimitPerCustomer: numberOrNull(values.usageLimitPerCustomer),
     isActive: values.isActive,
+    firstOrderOnly: values.firstOrderOnly,
   }
 }
 
@@ -148,6 +153,9 @@ export function describeCouponValue(coupon, formatMoney) {
   if (coupon.type === 'buy_x_get_y') return `Buy ${coupon.buyQuantity}, get ${coupon.getQuantity} free${extra}`
   return 'Free shipping'
 }
+
+/** Phase 19: a code the store emailed to one new customer (read-only, except switching it off). */
+export const isWelcomeCode = (coupon) => coupon?.source === 'welcome'
 
 /** The list's name for a rule: its code, or (automatic rules) its description. */
 export const couponName = (coupon) => coupon.code || coupon.description || `Automatic rule #${coupon.id}`

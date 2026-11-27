@@ -7,7 +7,9 @@ import { serverMessage } from '../i18n.js'
  * in their account instead (PUT /api/auth/profile { newsletter }).
  *
  *   POST /api/v1/newsletter              { email, source } → 202 (the same answer for every address)
- *   POST /api/v1/newsletter/confirm      { token }         → 200 { message, data: { email, status } }
+ *   POST /api/v1/newsletter/confirm      { token }         → 200 { message, data: { email, status }, welcome_coupon_sent? }
+ *                                        (phase 19: `welcome_coupon_sent` true when this confirmation issued a welcome code;
+ *                                        accepted at the top level or inside `data`) → { …, welcomeCouponSent }
  *   POST /api/v1/newsletter/unsubscribe  { token }         → 200 { message, data: { email, status } }
  *
  * Only these fields go through, both ways. Resolves to
@@ -35,6 +37,8 @@ const fromStatus = (data) => ({
   message: str(data.message) ?? '',
   email: str(data.data?.email) ?? null,
   status: ['pending', 'subscribed', 'unsubscribed'].includes(data.data?.status) ? data.data.status : null,
+  // Phase 19: whether this confirmation issued a welcome code (left out when the API doesn't say).
+  ...(typeof (data.welcome_coupon_sent ?? data.data?.welcome_coupon_sent) === 'boolean' && { welcomeCouponSent: data.welcome_coupon_sent ?? data.data.welcome_coupon_sent }),
 })
 
 /** A token that fails the format check gets the API's own wording, without asking it. */

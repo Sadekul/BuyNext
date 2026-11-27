@@ -7,6 +7,7 @@ use App\Mail\NewsletterConfirmationMail;
 use App\Models\Customer;
 use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
+use App\Support\Locale;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -66,10 +67,15 @@ class Newsletter
         });
     }
 
-    /** The confirmation link was clicked: the subscriber, now subscribed, or null for a bad/expired token. */
-    public function confirm(string $token): ?NewsletterSubscriber
+    /**
+     * The confirmation link was clicked: the subscriber, now subscribed, or null for a bad/expired token.
+     * Phase 19: the address is confirmed, so it may earn the welcome code; $welcomeCouponSent
+     * says whether this confirmation issued one (granting never stops the confirmation).
+     */
+    public function confirm(string $token, ?bool &$welcomeCouponSent = null): ?NewsletterSubscriber
     {
-        return DB::transaction(function () use ($token) {
+        $welcomeCouponSent = false;
+        $subscriber = DB::transaction(function () use ($token) {
             $subscriber = NewsletterSubscriber::where('confirm_token_hash', hash('sha256', $token))->lockForUpdate()->first();
             if (! $subscriber || ! $subscriber->confirm_sent_at || $subscriber->confirm_sent_at->lt(now()->subDays(self::CONFIRM_DAYS))) {
                 return null;
@@ -80,6 +86,13 @@ class Newsletter
 
             return $subscriber;
         });
+        if ($subscriber) {
+            $customer = Customer::where('email', $subscriber->email)->first();
+            $welcomeCouponSent = app(WelcomeCoupons::class)->tryGrant($subscriber->email, 'newsletter', $customer,
+                Locale::forCustomer($customer) ?? Locale::current()) !== null;
+        }
+
+        return $subscriber;
     }
 
     public function unsubscribe(NewsletterSubscriber $subscriber): NewsletterSubscriber
@@ -97,12 +110,16 @@ class Newsletter
         return NewsletterSubscriber::where('email', mb_strtolower($customer->email))->where('status', 'subscribed')->exists();
     }
 
-    /** Account → newsletter toggle: the email is verified, so no confirmation is needed. */
+    /**
+     * Account → newsletter toggle: the email is verified, so no confirmation is needed.
+     * Phase 19: switching it on may earn the welcome code (once per address and per customer).
+     */
     public function setForCustomer(Customer $customer, bool $subscribed): void
     {
         $email = mb_strtolower($customer->email);
         $subscriber = NewsletterSubscriber::firstOrNew(['email' => $email], ['source' => 'account']);
         $subscriber->customer_id = $customer->id;
+        $newlySubscribed = $subscribed && $subscriber->status !== 'subscribed';
         if ($subscribed && $subscriber->status !== 'subscribed') {
             $subscriber->forceFill(['status' => 'subscribed', 'confirmed_at' => now(), 'unsubscribed_at' => null, 'confirm_token_hash' => null]);
             if ($subscriber->exists) {
@@ -113,6 +130,9 @@ class Newsletter
         }
         if ($subscriber->exists || $subscribed) {
             $subscriber->save();
+        }
+        if ($newlySubscribed && $customer->hasVerifiedEmail()) {
+            app(WelcomeCoupons::class)->tryGrant($email, 'newsletter', $customer);
         }
     }
 

@@ -1,3 +1,4 @@
+import { normalizeWelcomeOffer } from '../../utils/welcomeOffer'
 import { normalizeProduct } from './laravelAdapter'
 import { ALL_PAYMENT_METHODS, SHIPPING_RULES } from '../../constants/store'
 import { DEFAULT_STORE_CURRENCY, sanitizeStoreCurrency } from '../../utils/displayCurrency'
@@ -207,6 +208,8 @@ export function normalizeStoreSettings(raw) {
     // Phase 14: the country new addresses start with, Bangladesh's Division → District → Area
     // address form, and the store's cash on delivery rules (null: none sent).
     ...normalizeBangladeshSettings(data, countriesOf(data)),
+    // Phase 19: the welcome coupon shoppers can earn (null = off: nothing about it is shown).
+    welcomeOffer: normalizeWelcomeOffer(data.welcome_offer),
   }
 }
 

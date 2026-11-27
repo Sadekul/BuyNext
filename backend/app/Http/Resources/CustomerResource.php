@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\Newsletter;
+use App\Services\WelcomeCoupons;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,8 @@ class CustomerResource extends JsonResource
             'newsletter' => app(Newsletter::class)->isSubscribed($this->resource),
             'locale' => $this->locale, // phase 13: "en" | "bn" | null (= the store default)
             'reward_points' => (int) ($this->reward_points ?? 0), // phase 11: the reward point balance
+            // Phase 19: the account's welcome code { code, label, min_subtotal, first_order_only, expires_at, status } or null.
+            'welcome_coupon' => app(WelcomeCoupons::class)->forEmail((string) $this->email),
             'created_at' => $this->created_at?->toIso8601ZuluString(),
         ];
     }

@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'code', 'description', 'type', 'value', 'min_subtotal', 'starts_at', 'ends_at',
     'usage_limit', 'usage_limit_per_customer', 'is_active',
     'customer_group_ids', 'applies_to', 'category_ids', 'product_ids', 'free_shipping', 'buy_quantity', 'get_quantity', 'auto_apply',
+    'source', 'issued_to_email', 'first_order_only', // phase 19
 ])]
 class Coupon extends Model
 {
@@ -35,6 +36,9 @@ class Coupon extends Model
     public const APPLIES_TO = ['all', 'categories', 'products'];
 
     public const STATUSES = ['active', 'inactive', 'scheduled', 'expired', 'used_up'];
+
+    /** Phase 19: staff-made rules, or personal codes issued by WelcomeCoupons. */
+    public const SOURCES = ['staff', 'welcome'];
 
     protected function casts(): array
     {
@@ -54,6 +58,7 @@ class Coupon extends Model
             'buy_quantity' => 'integer',
             'get_quantity' => 'integer',
             'auto_apply' => 'boolean',
+            'first_order_only' => 'boolean', // phase 19
         ];
     }
 
@@ -77,6 +82,10 @@ class Coupon extends Model
      * $groupId: the shopper's customer group (guests: General).
      * $hasEligibleLines: false when no line of the cart is one the rule applies to
      * (only checked for rules limited to categories or products).
+     * Phase 19: a personal code (issued_to_email) and "first order only" are
+     * checked against the shopper too: the account's email when signed in,
+     * else the checkout email. With neither known yet they are skipped, and
+     * checkout (which always has the email) checks them again.
      */
     public function problemFor(int $subtotalCents, ?int $customerId = null, ?string $email = null, ?int $groupId = null,
         bool $hasEligibleLines = true): ?string
@@ -93,6 +102,23 @@ class Coupon extends Model
         $groups = array_map('intval', $this->customer_group_ids ?? []);
         if ($groups !== [] && ! in_array($groupId, $groups, true)) {
             return __('This code isn\'t available for your account.');
+        }
+        // Phase 19: personal (welcome) codes and first-order-only rules.
+        if ($this->issued_to_email !== null || $this->first_order_only) {
+            $shopperEmail = $customerId !== null ? Customer::whereKey($customerId)->value('email') : null;
+            $shopperEmail = mb_strtolower(trim((string) ($shopperEmail ?? $email)));
+            if ($this->issued_to_email !== null && $shopperEmail !== '' && $shopperEmail !== mb_strtolower($this->issued_to_email)) {
+                return __('This code isn\'t available for your account.');
+            }
+            if ($this->first_order_only && ($customerId !== null || $shopperEmail !== '')) {
+                $ordered = Order::where('status', '!=', 'cancelled')
+                    ->where(fn ($q) => $q->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
+                        ->when($shopperEmail !== '', fn ($q) => $q->orWhere('email', $shopperEmail)))
+                    ->exists();
+                if ($ordered) {
+                    return __('This code is for your first order only.');
+                }
+            }
         }
         if (! $hasEligibleLines && $this->applies_to !== 'all') {
             return __('This code applies to :items only.', ['items' => $this->appliesToLabel()]);

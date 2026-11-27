@@ -38,6 +38,10 @@ class CouponResource extends JsonResource
             'free_shipping' => $this->free_shipping,
             'buy_quantity' => $this->buy_quantity,
             'get_quantity' => $this->get_quantity,
+            // Phase 19: staff | welcome (a personal welcome code, issued to one email address), and "first order only".
+            'source' => $this->source ?? 'staff',
+            'issued_to_email' => $this->issued_to_email,
+            'first_order_only' => (bool) $this->first_order_only,
             'status' => $this->status(),
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'updated_at' => $this->updated_at?->toIso8601ZuluString(),

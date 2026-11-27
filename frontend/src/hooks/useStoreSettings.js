@@ -43,6 +43,8 @@ export const DEFAULT_STORE_SETTINGS = {
   defaultCountry: null,
   bangladeshAddresses: false,
   cod: null,
+  // Phase 19: no welcome coupon in the demo (or while the real settings load): nothing is promised.
+  welcomeOffer: null,
 }
 
 /**

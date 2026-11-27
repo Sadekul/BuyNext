@@ -1,0 +1,126 @@
+/*
+ * Phase 19: the welcome code card on the account overview. Light, flat, like
+ * the other account sections: an orange-tinted card while the code can be
+ * used (dark text; the ticket icon and status in strong orange, 4.9:1 on the
+ * tint), plain grey once used or expired. The status always has a word and
+ * an icon; the code wraps instead of pushing the page sideways on phones.
+ */
+.welcome-code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.welcome-code--active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.welcome-code__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.welcome-code__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.welcome-code__icon {
+  flex: none;
+  color: var(--color-accent-strong);
+}
+
+.welcome-code__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.125rem var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+.welcome-code--active .welcome-code__status {
+  color: var(--color-success);
+  border-color: currentcolor;
+}
+
+.welcome-code__offer {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-accent-strong);
+  overflow-wrap: anywhere;
+}
+
+.welcome-code:not(.welcome-code--active) .welcome-code__offer {
+  color: var(--color-text-muted);
+}
+
+.welcome-code__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+}
+
+.welcome-code__box {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-bg);
+  border: 1.5px dashed var(--color-accent-strong);
+  border-radius: var(--radius-sm);
+}
+
+.welcome-code:not(.welcome-code--active) .welcome-code__box {
+  border-color: var(--color-border-strong);
+}
+
+.welcome-code__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.welcome-code__code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.welcome-code:not(.welcome-code--active) .welcome-code__code {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.welcome-code__copy-status {
+  min-height: 1.25em;
+  font-size: var(--text-sm);
+  color: var(--color-success);
+}
+
+.welcome-code__meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

@@ -11,8 +11,8 @@ import StatusBadge from '../components/StatusBadge'
 import { ErrorState, Loading } from '../components/States'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { CategoryChecklist, GroupChecklist, ProductPicker } from '../components/RuleScope'
-import { APPLIES_TO, CART_RULE_TYPES, EMPTY_COUPON, couponName, couponSchema, couponToForm, toCouponPayload } from '../utils/couponSchema'
-import { formatCount, storeCode } from '../utils/format'
+import { APPLIES_TO, CART_RULE_TYPES, EMPTY_COUPON, couponName, couponSchema, couponToForm, describeCouponValue, isWelcomeCode, toCouponPayload } from '../utils/couponSchema'
+import { formatCount, formatDateTime, formatMoney, storeCode } from '../utils/format'
 import { couponStatus } from '../utils/orders'
 
 /** /coupons/new and /coupons/:couponId: one form for adding and editing a code. */
@@ -23,6 +23,8 @@ function CouponFormPage() {
 
   if (!isNew && coupon.isPending) return <Loading label="Loading the coupon…" />
   if (!isNew && coupon.error) return <ErrorState error={coupon.error} onRetry={coupon.refetch} />
+  // Phase 19: a welcome code is the store's own, for one email address: read-only, except Active.
+  if (!isNew && isWelcomeCode(coupon.data)) return <WelcomeCodePage key={couponId} coupon={coupon.data} />
 
   const title = isNew ? 'Add coupon' : couponName(coupon.data)
   return (
@@ -215,6 +217,14 @@ function CouponForm({ couponId, initial }) {
             {(a11y) => <input {...a11y} type="number" inputMode="numeric" min="1" step="1" {...register('usageLimitPerCustomer')} />}
           </Field>
         </div>
+        {/* Phase 19. No “code” in the label (see "How shoppers get it"). */}
+        <label className="checkbox">
+          <input type="checkbox" {...register('firstOrderOnly')} aria-describedby="coupon-first-order-hint" />
+          First order only
+        </label>
+        <p id="coupon-first-order-hint" className="field__hint">
+          Shoppers who already placed an order (one that wasn’t cancelled) can’t use it.
+        </p>
         <label className="checkbox">
           <input type="checkbox" {...register('isActive')} />
           {autoApply ? 'Active (applies by itself within the dates and limits above)' : 'Active (shoppers can use it within the dates and limits above)'}
@@ -234,6 +244,99 @@ function CouponForm({ couponId, initial }) {
         </Link>
       </div>
     </form>
+  )
+}
+
+/**
+ * Phase 19: a welcome code (Marketing → Welcome coupon emailed it to one new
+ * customer). Its terms are shown, not edited; staff can only switch it off
+ * (or back on).
+ */
+function WelcomeCodePage({ coupon }) {
+  const { can } = useAdminAuth()
+  const editable = can('coupons.edit')
+  const queryClient = useQueryClient()
+  const [isActive, setIsActive] = useState(coupon.isActive)
+  const save = useMutation({
+    mutationFn: () => updateCoupon(coupon.id, { isActive }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['coupons'] })
+      queryClient.setQueryData(adminKeys.coupon(coupon.id), { ...response.coupon, live: true })
+    },
+  })
+  const terms = [
+    ['Sent to', coupon.issuedToEmail ?? '—'],
+    ['Discount', describeCouponValue(coupon, formatMoney)],
+    ['Minimum spend', coupon.minSubtotal ? formatMoney(coupon.minSubtotal) : 'None'],
+    ['First order only', coupon.firstOrderOnly ? 'Yes' : 'No'],
+    ['Valid from', formatDateTime(coupon.startsAt)],
+    ['Expires', formatDateTime(coupon.endsAt, 'Never')],
+    ['Uses', `${formatCount(coupon.timesUsed)} of ${formatCount(coupon.usageLimit ?? 1)}`],
+  ]
+  return (
+    <>
+      <title>{`${coupon.code} | BuyNest Admin`}</title>
+      <Link to="/coupons?source=welcome" className="back-link">
+        <LuArrowLeft aria-hidden="true" /> Welcome codes
+      </Link>
+      <PageHeader title={coupon.code} description={`Welcome code for ${coupon.issuedToEmail ?? 'a new customer'}`} actions={<StatusBadge {...couponStatus(coupon.status)} />} />
+      <form
+        className="form"
+        aria-labelledby="welcome-code-title"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault()
+          save.mutate()
+        }}
+      >
+        <h2 id="welcome-code-title" className="panel__title welcome-code__title">
+          Welcome code
+        </h2>
+        <p className="field__hint">
+          The store emailed this code to one new customer; only that email address can use it. Its terms can’t be changed (the settings under <Link to="/welcome-coupon">Welcome coupon</Link> apply
+          to new codes), but you can switch it off.
+        </p>
+        <dl className="welcome-code-terms">
+          {terms.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div role="status">{save.isSuccess && <p className="notice notice--success">Changes saved.</p>}</div>
+        {save.error && (
+          <p className="form-error" role="alert">
+            {save.error.message}
+          </p>
+        )}
+        <fieldset disabled={!editable} className="form__fieldset">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(event) => {
+                save.reset()
+                setIsActive(event.target.checked)
+              }}
+            />
+            Active (the customer can use it until it expires)
+          </label>
+        </fieldset>
+        <div className="form__actions">
+          {editable ? (
+            <button type="submit" className="btn btn--primary" disabled={save.isPending || isActive === coupon.isActive}>
+              {save.isPending ? 'Saving…' : 'Save changes'}
+            </button>
+          ) : (
+            <span className="muted">Your role can view this code but not change it.</span>
+          )}
+          <Link to="/coupons?source=welcome" className="btn btn--outline">
+            Back to welcome codes
+          </Link>
+        </div>
+      </form>
+    </>
   )
 }
 

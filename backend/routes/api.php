@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\Admin\ShippingRateController;
 use App\Http\Controllers\Api\Admin\StockAlertReportController;
 use App\Http\Controllers\Api\Admin\TwoFactorController;
 use App\Http\Controllers\Api\Admin\UrlRedirectController;
+use App\Http\Controllers\Api\Admin\WelcomeCouponController;
 use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CatalogController;
@@ -356,6 +357,10 @@ Route::prefix('admin/v1')->group(function () {
         Route::get('coupons/{id}', [CouponController::class, 'show'])->whereNumber('id')->middleware('can.admin:coupons.view');
         Route::patch('coupons/{id}', [CouponController::class, 'update'])->whereNumber('id')->middleware('can.admin:coupons.edit');
         Route::delete('coupons/{id}', [CouponController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:coupons.edit');
+        // Phase 19: Marketing → Welcome coupon (same permissions as coupons).
+        Route::get('marketing/welcome-coupon', [WelcomeCouponController::class, 'show'])->middleware('can.admin:coupons.view');
+        Route::put('marketing/welcome-coupon', [WelcomeCouponController::class, 'update'])->middleware('can.admin:coupons.edit');
+        Route::get('marketing/welcome-coupon/codes', [WelcomeCouponController::class, 'codes'])->middleware('can.admin:coupons.view');
 
         // Phase 7: price rules and search terms (part A). Catalog price rules are read with coupons.view.
         Route::get('catalog-rules', [CatalogRuleController::class, 'index'])->middleware('can.admin:coupons.view');

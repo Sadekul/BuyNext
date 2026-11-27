@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Mail\WelcomeCouponMail;
 use App\Services\ShippingRates;
 
 /**
@@ -459,6 +460,29 @@ final class EmailTemplateCatalog
                     .'<p><strong>Shipping to</strong></p>{{ address }}'
                     .self::QUESTIONS,
             ],
+            // Phase 19: the welcome coupon (one personal code per confirmed email address).
+            'welcome_coupon' => [
+                'name' => 'Welcome code',
+                'description' => 'Sent once to a new customer (verified sign-up) or newsletter subscriber (confirmed) while the welcome coupon is on, with their personal code.',
+                'variables' => [
+                    'customer_name' => ['Customer first name (or “there”)', 'text'],
+                    'code' => ['The personal code', 'text'],
+                    'offer' => ['The discount, e.g. “10% off”', 'text'],
+                    'offer_line' => ['The discount and the order, e.g. “10% off your first order”', 'text'],
+                    'min_spend_line' => ['“Valid on orders of … or more.”, empty without a minimum', 'text'],
+                    'expires_on' => ['The last day the code works', 'text'],
+                    'shop_url' => ['Link to the store', 'url'],
+                    'button' => ['“Start shopping” button', 'block'],
+                ],
+                'required' => [['code']],
+                'subject' => 'Your welcome code: {{ offer_line }}',
+                'body' => '<h2>Welcome to {{ store_name }}</h2>'
+                    .'<p>Hi {{ customer_name }},</p>'
+                    .'<p>Thanks for joining us. Here is your personal code for {{ offer_line }}:</p>'
+                    .'<blockquote><h3>{{ code }}</h3></blockquote>'
+                    .'<p>{{ min_spend_line }} Use it by {{ expires_on }}. It works once, with this email address only.</p>'
+                    .'{{ button }}',
+            ],
         ];
     }
 
@@ -565,6 +589,9 @@ final class EmailTemplateCatalog
                 'delivery_estimate' => __('Inside Dhaka').' · '.ShippingRates::etaText(1, 2),
                 'address' => EmailBlocks::address($address),
             ],
+            // Phase 19.
+            'welcome_coupon' => WelcomeCouponMail::values('WELCOME-K7P2QX', 'percent', '10.00', '50.00', true, now()->addDays(30),
+                'Ava', config('buynest.storefront_url')),
         };
 
         return $values;

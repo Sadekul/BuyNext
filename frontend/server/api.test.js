@@ -751,6 +751,8 @@ describe('catalog and shop (VITE_API_PROVIDER=laravel)', () => {
         id: 3, code: 'WINTER5', description: '$5 off', type: 'fixed', value: 5, minSubtotal: 25, startsAt: null, endsAt: '2026-12-31T23:59:00Z', usageLimit: 100, usageLimitPerCustomer: 1, timesUsed: 0, isActive: true, status: 'active', createdAt: 'T', updatedAt: 'T',
         // Phase 7 cart price rule fields, defaulted for a phase 3 coupon.
         customerGroupIds: [], appliesTo: 'all', categoryIds: [], productIds: [], freeShipping: false, buyQuantity: null, getQuantity: null, autoApply: false,
+        // Phase 19 fields, defaulted for an older coupon: a staff coupon, for anyone, any order.
+        source: 'staff', issuedToEmail: null, firstOrderOnly: false,
       })
       expect(Object.fromEntries(new URLSearchParams(calls[1].search))).toEqual({ page: '1', per_page: '20', search: 'win', status: 'expired' })
       await admin('coupons?status=used_up')

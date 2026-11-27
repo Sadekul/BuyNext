@@ -33,6 +33,8 @@ import { banglaFilter, checkProductBangla, cleanSpecificationsBangla, matchPhase
 import { checkCollection, checkConfirmationOverride, matchPhase14Route, orderPhase14Filters } from './adminPhase14Api.js'
 // Phase 18: couriers (Steadfast, Pathao), booking, status sync (adminPhase18Api.js); the grid's delivery status filter, the new carriers.
 import { MANUAL_CARRIERS, matchPhase18Route, orderPhase18Filters } from './adminPhase18Api.js'
+// Phase 19: the welcome coupon (adminPhase19Api.js); the coupon list's source filter, "first order only".
+import { checkCouponPhase19, couponSourceFilter, matchPhase19Route } from './adminPhase19Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -86,6 +88,7 @@ import { MANUAL_CARRIERS, matchPhase18Route, orderPhase18Filters } from './admin
  *   GET    /api/admin/coupons?q&status&kind&limit&skip  (status: active | inactive | scheduled | expired | used_up; phase 7 kind: code | automatic)
  *            phase 7 coupon fields: customerGroupIds, appliesTo (all | categories | products), categoryIds, productIds, freeShipping,
  *            buyQuantity, getQuantity (type buy_x_get_y), autoApply (code null)
+ *            phase 19: ?source=staff|welcome (none: all); + source, issuedToEmail (welcome codes), firstOrderOnly (editable)
  *   POST   /api/admin/coupons                      → 201 { coupon } (validated)
  *   GET    /api/admin/coupons/:id
  *   PATCH  /api/admin/coupons/:id                  → { coupon } (validated, partial)
@@ -320,6 +323,8 @@ export function validateCoupon(body, { partial }) {
   if (values.description === '') values.description = null
   // Phase 7 (marketing): groups, eligible lines, free shipping, buy X get Y, automatic rules (adminMarketingApi.js).
   checkCouponRuleFields(body, values, errors, { partial })
+  // Phase 19: "First order only" (adminPhase19Api.js).
+  checkCouponPhase19(body, values, errors)
   if (values.type === 'free_shipping' || values.type === 'buy_x_get_y') values.value = 0 // no amount: free shipping, or the free units
   else if (values.type && values.value === undefined && !errors.value && !partial) errors.value = ['Enter the discount.']
   if (values.type === 'percent' && values.value !== undefined && (values.value < 1 || values.value > 100)) errors.value = ['Enter a percentage from 1 to 100.']
@@ -579,7 +584,8 @@ const ROUTES = {
   async 'GET coupons'(ctx) {
     if (!realData()) return liveOnly()
     // Phase 7 (marketing): ?kind=code|automatic.
-    const filters = { ...listFilters(ctx.url), status: oneOf(ctx.url.searchParams.get('status'), COUPON_FILTERS), kind: oneOf(ctx.url.searchParams.get('kind'), COUPON_KINDS) }
+    // Phase 19: ?source=staff|welcome.
+    const filters = { ...listFilters(ctx.url), status: oneOf(ctx.url.searchParams.get('status'), COUPON_FILTERS), kind: oneOf(ctx.url.searchParams.get('kind'), COUPON_KINDS), ...couponSourceFilter(ctx.url) }
     return fromLaravel(await laravelAdminData.listCoupons(ctx.token, filters, ctx.request))
   },
 
@@ -650,6 +656,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 19: marketing/welcome-coupon[/codes].
+  const phase19 = matchPhase19Route(method, segments)
+  if (phase19 !== undefined) return phase19
   // Phase 18: couriers[/settings | /pathao/…], orders/courier-bookings, orders/:number/courier-booking, shipments/:number/sync.
   const phase18 = matchPhase18Route(method, segments)
   if (phase18 !== undefined) return phase18

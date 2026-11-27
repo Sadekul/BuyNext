@@ -3477,3 +3477,86 @@ code.path {
   overflow-wrap: anywhere;
 }
 
+
+/* ---------- Phase 19: Marketing → Welcome coupon ---------- */
+@media (min-width: 1100px) {
+  .stats--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.stats--four {
+  margin-bottom: 0;
+}
+
+/* The on/off switch with its state in words beside it (wraps under it on phones). */
+.welcome-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.welcome-switch .checkbox {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.welcome-preview {
+  margin-top: var(--space-5);
+}
+
+.welcome-preview__heading {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-base);
+}
+
+/* The store's promise as shoppers will read it: a soft tinted card, the title in bold. */
+.welcome-preview__card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.welcome-preview__card p {
+  margin: 0;
+}
+
+.welcome-preview__title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.welcome-codes__title {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-lg);
+}
+
+/* A welcome code's terms (read-only on its page). */
+.welcome-code-terms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.welcome-code-terms dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.welcome-code-terms dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.welcome-code__title {
+  padding: 0;
+}

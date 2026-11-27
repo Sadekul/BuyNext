@@ -10,6 +10,7 @@ use App\Models\OneTimeCode;
 use App\Services\OneTimeCodes;
 use App\Services\RewardPoints;
 use App\Services\TokenPairs;
+use App\Services\WelcomeCoupons;
 use App\Support\Locale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,8 +79,10 @@ class CustomerAuthController extends Controller
         $customer->last_login_at = now();
         $customer->save();
         // Phase 11: the signup bonus once the email is verified (once per account; nothing while rewards are off).
+        // Phase 19: and the welcome code (once per email address; nothing while it is off; never blocks the sign-in).
         if ($firstVerification) {
             app(RewardPoints::class)->signup($customer);
+            app(WelcomeCoupons::class)->tryGrant($customer->email, 'signup', $customer, $customer->locale);
         }
 
         return $this->signedIn($customer, $request->boolean('remember'));
@@ -194,6 +197,7 @@ class CustomerAuthController extends Controller
         $customer->save();
         if ($firstVerification) {
             app(RewardPoints::class)->signup($customer); // phase 11: once per account
+            app(WelcomeCoupons::class)->tryGrant($customer->email, 'signup', $customer, $customer->locale); // phase 19
         }
         $this->tokens->revokeAll($customer); // every other device is signed out
 

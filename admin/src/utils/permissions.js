@@ -37,6 +37,8 @@ import {
   LuPhoneCall,
   // Phase 18.
   LuPackageSearch,
+  // Phase 19.
+  LuBadgePercent,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -139,6 +141,8 @@ const LIVE_NAV = [
       // Phase 7 (marketing): price rules, newsletter, abandoned carts, search terms.
       { to: '/catalog-rules', label: 'Catalog price rules', icon: LuPercent, permission: 'coupons.view' },
       { to: '/coupons', label: 'Coupons', icon: LuTicketPercent, permission: 'coupons.view' },
+      // Phase 19 §2: the welcome coupon (the coupon permissions).
+      { to: '/welcome-coupon', label: 'Welcome coupon', icon: LuBadgePercent, permission: 'coupons.view' },
       // Phase 10 §5.
       { to: '/gift-cards', label: 'Gift cards', icon: LuGift, permission: 'gift_cards.view' },
       { to: '/newsletter/subscribers', label: 'Newsletter subscribers', icon: LuMailPlus, permission: 'newsletter.view' },

@@ -127,6 +127,14 @@ class Settings
         'courier_note_template' => null, // the booking's default note to the courier ("Handle with care")
         'courier_pathao_item_type' => 'parcel', // parcel | document
         'courier_pathao_delivery_type' => 'normal', // normal | on_demand
+        // Phase 19: the welcome coupon (Marketing → Welcome coupon, PUT /api/admin/v1/marketing/welcome-coupon; off by default).
+        'welcome_coupon_enabled' => false,
+        'welcome_coupon_triggers' => ['signup', 'newsletter'], // a non-empty subset
+        'welcome_coupon_type' => 'percent', // percent | fixed
+        'welcome_coupon_value' => '10', // percent 1–90; fixed > 0 and ≤ 100000
+        'welcome_coupon_min_subtotal' => null, // money string, or null for no minimum
+        'welcome_coupon_valid_days' => 30, // 1–365
+        'welcome_coupon_first_order_only' => true,
     ];
 
     private const MONEY_KEYS = ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'cod_fee'];

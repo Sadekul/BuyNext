@@ -60,7 +60,8 @@ describe('navigation and permissions', () => {
     start(VIEWER, '/catalog-rules', { 'GET /api/admin/catalog-rules': { body: { rules: [RULE], total: 1, live: true } } })
     expect(await screen.findByRole('link', { name: 'Winter sale' })).toBeInTheDocument()
     expect(within(nav().getByRole('list', { name: 'Marketing' })).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Catalog price rules', 'Coupons', 'Newsletter subscribers', 'Newsletter campaigns', 'Abandoned carts', 'Search terms',
+      // Phase 19: + Welcome coupon (the coupon permissions).
+      'Catalog price rules', 'Coupons', 'Welcome coupon', 'Newsletter subscribers', 'Newsletter campaigns', 'Abandoned carts', 'Search terms',
     ])
     expect(screen.queryByRole('link', { name: 'Add rule' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Winter sale' })).not.toBeInTheDocument()

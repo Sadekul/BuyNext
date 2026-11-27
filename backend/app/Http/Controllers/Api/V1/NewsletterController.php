@@ -33,18 +33,19 @@ class NewsletterController extends Controller
         return response()->json(['message' => __(self::ACCEPTED)], 202);
     }
 
-    /** POST /api/v1/newsletter/confirm { token } */
+    /** POST /api/v1/newsletter/confirm { token } → { message, data: { email, status, welcome_coupon_sent } } */
     public function confirm(Request $request): JsonResponse
     {
         $data = $request->validate(['token' => ['required', 'string', 'max:200']]);
-        $subscriber = $this->newsletter->confirm($data['token']);
+        $subscriber = $this->newsletter->confirm($data['token'], $welcomeCouponSent);
         if (! $subscriber) {
             throw ValidationException::withMessages(['token' => __('This confirmation link is invalid or has expired. Subscribe again to get a new one.')]);
         }
 
         return response()->json([
             'message' => __('You\'re subscribed to the :store newsletter.', ['store' => app(Settings::class)->get('store_name')]),
-            'data' => ['email' => $subscriber->email, 'status' => $subscriber->status],
+            // Phase 19: true when this confirmation earned the welcome code (it is on its way by email).
+            'data' => ['email' => $subscriber->email, 'status' => $subscriber->status, 'welcome_coupon_sent' => $welcomeCouponSent],
         ]);
     }
 

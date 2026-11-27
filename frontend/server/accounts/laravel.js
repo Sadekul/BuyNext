@@ -43,6 +43,25 @@ const customerGroup = (group) =>
     ? { name: group.name, discountPercent: Number(group.discount_percent ?? 0) || 0 }
     : undefined
 
+/*
+ * Phase 19 (docs/backend/PHASE19_CONTRACT.md §1 API): `welcome_coupon`
+ * { code, label, min_subtotal, first_order_only, expires_at, status: active|used|expired } or
+ * null. Only these keys, and only a well-formed code and status.
+ */
+const WELCOME_STATUSES = ['active', 'used', 'expired']
+const textOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : typeof value === 'number' && Number.isFinite(value) ? String(value) : null)
+export function welcomeCoupon(raw) {
+  if (!raw || typeof raw !== 'object' || typeof raw.code !== 'string' || !/^[A-Z0-9-]{1,40}$/.test(raw.code.trim())) return undefined
+  return {
+    code: raw.code.trim(),
+    label: textOrNull(raw.label),
+    minSubtotal: textOrNull(raw.min_subtotal),
+    expiresAt: textOrNull(raw.expires_at),
+    status: WELCOME_STATUSES.includes(raw.status) ? raw.status : 'active',
+    ...(typeof raw.first_order_only === 'boolean' && { firstOrderOnly: raw.first_order_only }),
+  }
+}
+
 export const customerProfile = (customer) => ({
   id: customer.id,
   firstName: customer.first_name,
@@ -58,6 +77,8 @@ export const customerProfile = (customer) => ({
   ...(typeof customer.pending_email === 'string' && customer.pending_email && { pendingEmail: customer.pending_email }),
   // Phase 13: the account's language ('en' | 'bn', null = the store default); left out by an older API.
   ...('locale' in customer && { locale: customer.locale === 'en' || customer.locale === 'bn' ? customer.locale : null }),
+  // Phase 19: the customer's personal welcome code (left out when the API sends none, or an older API).
+  ...(welcomeCoupon(customer.welcome_coupon) && { welcomeCoupon: welcomeCoupon(customer.welcome_coupon) }),
 })
 /*
  * Phase 4: the admin's role ({ id, name }) and permission keys, so the admin

@@ -341,3 +341,12 @@
 - Automatic changes only where they are safe (delivered → delivered and cash recorded); anything that needs a person (returned, partly delivered) becomes an alert, not an order change
 - Booking locks the order row while the courier answers, so two clicks can't book twice; the order number is the courier's invoice id, so a retry after a timeout is refused as a duplicate
 - External services are tested with stand-in servers and a second API whose environment points at them: real code paths, zero real calls
+
+## Phase 19: welcome coupon (2026-11-27)
+
+- A promotion is only honest if the page that promises it reads the same switch that grants it: the storefront shows "Get 10% off" from the API's `welcome_offer`, never from hard-coded text
+- "One per email, ever" lives in its own table with a unique index, so it survives deleted coupons and accounts and decides races between two requests
+- Rewards go only to confirmed addresses (verified account email, confirmed newsletter link), otherwise anyone could mint codes for made-up emails
+- Personal codes are checked twice: in the cart with what is known, and again at checkout when the email is certain
+- Side effects of a main action (sending a code after sign-up) never block that action: failures are reported, and the email goes after the database commit
+- When work is cut off mid-way (a usage limit here), resuming the same builders keeps their context; check for empty files before carrying on
