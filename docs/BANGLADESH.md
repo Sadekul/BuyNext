@@ -255,6 +255,54 @@ parcel is answered as received and logged, so the courier doesn't retry forever.
 2. Switch Pathao to `PATHAO_MODE=live` with live credentials; enter the webhook URLs and secrets in both panels.
 3. Make sure the scheduler runs (`php artisan schedule:work` / cron) if you rely on auto-sync.
 
+## Cash reports and courier payments
+
+Phase 21. In a cash-on-delivery shop most money is not in your account on the day of the sale: it is with a courier's
+rider, with the courier, or still with the customer. **Reports** (admin sidebar) answers where it is. Every figure comes
+from what the store recorded; anything unknown is shown as unknown ("Not reported", "—"), never guessed.
+
+**First, set the time zone.** *Settings → General → Time zone* → **Asia/Dhaka**. Until then report days run on UTC, so
+"today" would start at 6 a.m. in Dhaka. Every report and the dashboard chart follow it.
+
+- **Sales and products**: as before, plus sales **by payment method** (cash on delivery; bKash, Nagad and cards through
+  SSLCommerz apart) and **by delivery zone** (Inside Dhaka, …; "No zone" for addresses outside Bangladesh).
+- **Money in**: money that arrived each day, by channel: each online provider, cash on delivery advances paid online,
+  **cash collected by each courier** (for example *Cash collected by Steadfast*), **cash collected by your own staff**,
+  gift cards and reward points, and refunds paid out.
+- **Cash on delivery**: one card per courier: what it **collected** for you, its **fees**, what it has **paid you**, and
+  what it **still owes** (collected − fees − payments; all time, not only the dates chosen). Below it, the period's parcels
+  per courier (shipped, delivered, returned, cancelled) and **Still to collect**: orders shipped whose cash hasn't come
+  in yet, oldest first, with *Older than 7 / 14 / 30 days* filters. A parcel that came back (returned) is not "still to
+  collect": it brings in no cash.
+- **Courier payments**: when a courier sends you money (bank or bKash transfer, usually every few days), record it:
+  courier, amount received, the fees it kept if its statement lists them, the date it arrived, and the transfer reference.
+  BuyNest warns if the same courier, amount and date is already recorded (record it anyway only for a real second
+  payment). Recording needs the **Record courier payments** permission: Owner only, until you tick it for another role in
+  *System → Roles*. Everyone with *View and download reports* can see the payments.
+
+**Whose cash is it?** Cash from a parcel sent with a courier (Steadfast, Pathao, RedX, Paperfly, Sundarban) counts as
+that courier's, whether the courier reported it (booked through BuyNest) or your staff recorded it with *Mark as
+delivered*: the rider collected it. "Collected by staff" is only for deliveries you make yourselves.
+
+**Reconciling with a courier's statement** (every time a payment arrives):
+
+1. Open *Reports → Cash on delivery* and the courier's card.
+2. Compare *Collected* with the statement's collected total. A difference usually means a delivered parcel whose cash
+   wasn't recorded: find it in *Still to collect*, open the order and *Mark as delivered*.
+3. Record the payment in *Courier payments* with the statement's reference. If the courier's fees are **"Not reported"**
+   (couriers booked by hand, such as RedX, don't tell BuyNest their fee per parcel), type the fees from the statement into
+   *Fees kept*, so the balance is after fees.
+4. The card should now say what the courier still owes you. Two warnings can appear:
+   - **"Paid more than recorded — check the payments"**: the payments are more than the cash recorded for that courier.
+     A payment may have been typed twice, or a collection is missing.
+   - **"You owe <courier> ৳…"**: no payment yet, and its fees (returned parcels included) are more than the cash it
+     collected. Settle the difference with the courier, or check for a collection that wasn't recorded.
+
+**Downloads**: *Money in*, the courier balances and *Still to collect* download as CSV files that open in Excel with
+Bangla names intact.
+
+Later step: reading payment statements straight from the courier APIs, after testing with your own sandbox accounts.
+
 ## SMS order notifications
 
 Phase 20 texts customers at each step of an order, because in Bangladesh most orders are cash on delivery and people

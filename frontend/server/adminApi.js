@@ -37,6 +37,8 @@ import { MANUAL_CARRIERS, matchPhase18Route, orderPhase18Filters } from './admin
 import { checkCouponPhase19, couponSourceFilter, matchPhase19Route } from './adminPhase19Api.js'
 // Phase 20: SMS notifications for orders (adminPhase20Api.js): settings, test send, the SMS log, retry.
 import { matchPhase20Route } from './adminPhase20Api.js'
+// Phase 21: sales and cash reports (adminPhase21Api.js): money in, cash on delivery, still to collect, courier payments.
+import { matchPhase21Route } from './adminPhase21Api.js'
 
 /*
  * BuyNest admin service, at /api/admin/* (used by the admin app in buynest/admin).
@@ -658,6 +660,9 @@ const ROUTES = {
  * invoices and credit memos only by theirs (INV-…, CM-…).
  */
 function matchRoute(method, segments) {
+  // Phase 21: reports/payments[.csv], reports/cod[.csv], reports/cod/outstanding[.csv], courier-payouts[/:id].
+  const phase21 = matchPhase21Route(method, segments)
+  if (phase21 !== undefined) return phase21
   // Phase 20: sms, sms/settings, sms/test, sms/messages[/:id/retry].
   const phase20 = matchPhase20Route(method, segments)
   if (phase20 !== undefined) return phase20

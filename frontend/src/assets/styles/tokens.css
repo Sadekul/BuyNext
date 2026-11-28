@@ -40,6 +40,11 @@
   --color-danger: #b91c1c;
   --color-warning-border: #fde68a;
 
+  /* Charts (admin reports, phase 21): one hue per series, each ≥ 3:1 on white and on #f8f8f8; labels stay in the text colours */
+  --color-chart-1: #047857; /* emerald (= primary): online, 5.5:1 */
+  --color-chart-2: #c2410c; /* deep orange: cash on delivery, 5.2:1 */
+  --color-chart-3: #64748b; /* slate: other, 4.8:1 */
+
   /* On ink (footer, toasts, dark bars): body text, muted text, hairlines, overlays */
   --color-on-dark: #e8eaed;
   --color-on-dark-muted: #b8bec7; /* 8.1:1 on the footer #0b2b22 */

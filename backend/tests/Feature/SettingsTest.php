@@ -66,6 +66,7 @@ class SettingsTest extends TestCase
             'support_email' => 'support@buynest.example.com',
             'support_phone' => '+1 (555) 010-2030',
             'address' => null, // phase 17
+            'timezone' => 'UTC', // phase 21
             'shipping_methods' => [
                 ['id' => 'standard', 'label' => 'Standard', 'eta' => '3–5 business days', 'price' => '4.99'],
                 ['id' => 'express', 'label' => 'Express', 'eta' => '1–2 business days', 'price' => '12.99'],

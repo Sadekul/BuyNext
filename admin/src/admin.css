@@ -3777,3 +3777,214 @@ code.path {
   color: var(--color-sale);
   overflow-wrap: anywhere;
 }
+
+/* ---------- Phase 21: sales and cash reports ---------- */
+
+/* Horizontal bars (sales by payment method / delivery zone): label and amount in text, the bar only shows size. */
+.hbars {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.hbars__row {
+  display: grid;
+  grid-template-areas:
+    'label value'
+    'bar bar';
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+@media (min-width: 640px) {
+  .hbars__row {
+    grid-template-areas: 'label bar value';
+    grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto;
+  }
+}
+
+.hbars__label {
+  grid-area: label;
+  overflow-wrap: anywhere;
+}
+
+.hbars__value {
+  grid-area: value;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.hbars__track {
+  grid-area: bar;
+  display: block;
+  height: 0.75rem;
+  background: var(--color-bg-muted);
+  border-radius: 0 4px 4px 0;
+}
+
+.hbars__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--color-chart-1);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Stacked columns (money in): the parts bottom-up, split by a 1px gap in the page colour so neighbours never touch. */
+.chart__stack {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  display: flex;
+  flex-direction: column-reverse;
+  width: min(24px, 70%);
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+}
+
+.chart__part {
+  flex: 1 1 0;
+  min-height: 1px;
+}
+
+.chart__part + .chart__part {
+  border-bottom: 1px solid var(--color-bg);
+}
+
+.chart__part--1 {
+  background: var(--color-chart-1);
+}
+
+.chart__part--2 {
+  background: var(--color-chart-2);
+}
+
+.chart__part--3 {
+  background: var(--color-chart-3);
+}
+
+.chart__slot:hover .chart__stack {
+  opacity: 0.8;
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.chart__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chart__swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+}
+
+@media (forced-colors: active) {
+  .hbars__bar,
+  .chart__part,
+  .chart__swatch {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .chart__part + .chart__part {
+    border-bottom-color: Canvas;
+  }
+}
+
+/* Cash on delivery: one card per courier. */
+.cash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  list-style: none;
+}
+
+.cash-card {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.cash-card__title {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.cash-card__owed {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-card__owed--warning {
+  color: var(--color-warning);
+  font-size: var(--text-base);
+}
+
+.cash-card__owed--warning svg {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.cash-card__detail {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.cash-card__figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.cash-card__figures dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.cash-card__figures dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-card__link {
+  justify-self: start;
+}
+
+.cash-filters {
+  padding: 0 var(--space-5);
+}
+
+.cash-note {
+  display: block;
+}

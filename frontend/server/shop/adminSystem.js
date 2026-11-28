@@ -4,6 +4,8 @@ import { camelPath } from './laravel.js'
 import { salesCurrencies, settingsStore } from './adminPhase12.js'
 // Phase 13: the Bangla texts of CMS pages and home blocks.
 import { banglaOf, banglaTexts, heroBangla, toBannerBangla, toHeroBangla, toSlideBangla, withBanglaBody } from './adminPhase13.js'
+// Phase 21 §1: the sales report's split by payment method and by delivery zone.
+import { salesBreakdowns } from './adminPhase21.js'
 
 /*
  * Phase 4 of the admin (docs/backend/PHASE4_CONTRACT.md) from BuyNest's
@@ -26,13 +28,26 @@ const FIELD_NAMES = { role_id: 'roleId', is_active: 'isActive', is_published: 'i
 
 const fieldName = (field) => FIELD_NAMES[field] ?? camelPath(field)
 
-export function failed({ status, data }, toField = fieldName) {
+// Phase 21: a 409 "this looks like a duplicate" names the existing record; by default only its id is kept.
+const duplicateId = (raw) => {
+  const id = Number.isInteger(raw) ? raw : Number.isInteger(raw?.id) ? raw.id : null
+  return id === null ? null : { id }
+}
+
+/**
+ * A failed API answer → { ok: false, status, body } with only the listed
+ * fields: message, errors (field names mapped), code, permission, and
+ * (phase 21) duplicateOf, mapped by `toDuplicate` (an allow-list too).
+ */
+export function failed({ status, data }, toField = fieldName, toDuplicate = duplicateId) {
   const body = { message: data?.message ?? 'The request failed.' }
   if (data?.errors && typeof data.errors === 'object') {
     body.errors = Object.fromEntries(Object.entries(data.errors).map(([field, messages]) => [toField(field), messages]))
   }
   if (typeof data?.code === 'string') body.code = data.code
   if (typeof data?.permission === 'string') body.permission = data.permission
+  const duplicate = data?.duplicate_of !== undefined && data.duplicate_of !== null ? toDuplicate(data.duplicate_of) : null
+  if (duplicate) body.duplicateOf = duplicate
   return { ok: false, status, body }
 }
 const answer = (result, okStatuses, map) => (okStatuses.includes(result.status) ? { ok: true, status: result.status, data: map(result.data) } : failed(result))
@@ -317,6 +332,8 @@ const REPORT_MAPS = {
     series: (data?.series ?? []).map((point) => ({ period: point.period, orders: point.orders ?? 0, gross: money(point.gross) ?? 0, refunds: money(point.refunds) ?? 0, net: money(point.net) ?? 0 })),
     // Phase 12 §5: the totals count the store currency only; other currencies of the period on their own.
     ...salesCurrencies(data),
+    // Phase 21 §1: byPaymentMethod [{ method, label, orders, gross, refunds, net }], byDeliveryZone [{ zoneCode|null, name, … }] (when the API sends them).
+    ...salesBreakdowns(data),
   }),
   products: (data) => ({
     products: (Array.isArray(data) ? data : []).map((row) => ({ productId: row.product_id ?? null, name: row.name ?? '', sku: row.sku ?? null, units: row.units ?? 0, revenue: money(row.revenue) ?? 0 })),
@@ -360,7 +377,16 @@ export const CSV_REPORTS = ['sales', 'products']
  */
 const SETTINGS = {
   // Phase 13: + the store's default language (en | bn) and whether Bangla writes numbers with Bangla digits.
-  general: { store_name: 'storeName', support_email: 'supportEmail', support_phone: 'supportPhone', address: 'address', default_locale: 'defaultLocale', bangla_digits: 'banglaDigits' },
+  // Phase 21 §1: + the time zone reports use for their dates ("UTC", "Asia/Dhaka").
+  general: {
+    store_name: 'storeName',
+    support_email: 'supportEmail',
+    support_phone: 'supportPhone',
+    address: 'address',
+    default_locale: 'defaultLocale',
+    bangla_digits: 'banglaDigits',
+    store_timezone: 'storeTimezone',
+  },
   shipping: {
     standard_price: 'standardPrice',
     free_shipping_threshold: 'freeShippingThreshold',
@@ -524,4 +550,10 @@ export const laravelSystemData = {
   },
 }
 
-const rangeOf = (meta) => ({ ...pick(meta, ['from', 'to']), ...(meta.group_by && { groupBy: meta.group_by }) })
+/** A time zone name as PHP and Intl write them ("UTC", "Asia/Dhaka", "America/Argentina/Buenos_Aires"). */
+export const isTimezoneName = (value) => typeof value === 'string' && value.length <= 64 && /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/.test(value)
+
+/** A report's meta → its range: from, to, groupBy, and (phase 21) the time zone its dates are in. */
+export function rangeOf(meta) {
+  return { ...pick(meta, ['from', 'to']), ...(meta.group_by && { groupBy: meta.group_by }), ...(isTimezoneName(meta.timezone) && { timezone: meta.timezone }) }
+}

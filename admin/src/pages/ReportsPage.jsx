@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { LuDownload } from 'react-icons/lu'
 import { adminKeys, getReport, reportCsvUrl } from '../api/admin'
@@ -11,88 +11,24 @@ import { formatCount, formatCountCompact, formatDate, formatMoney, formatMoneyCo
 import Pagination from '../components/Pagination'
 // Phase 11 §1 and §4.
 import { formatPoints } from '../utils/rewards'
-
-const GROUPS = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-]
-const MAX_DAYS = 366
-const DAY_MS = 86_400_000
-
-// Dates are the store's (UTC for now, contract §4): YYYY-MM-DD in UTC.
-const isoDay = (date) => date.toISOString().slice(0, 10)
-function defaultRange() {
-  const today = new Date()
-  return { from: isoDay(new Date(today.getTime() - 29 * DAY_MS)), to: isoDay(today) }
-}
-const dayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-const monthFormat = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-/** "2026-11-10" → "Nov 10" (day), "Week of Nov 10" (week), "Nov 2026" (month). */
-function periodLabel(period, groupBy) {
-  const date = new Date(period.length === 7 ? `${period}-01T00:00:00Z` : `${period}T00:00:00Z`)
-  if (Number.isNaN(date.getTime())) return period
-  if (groupBy === 'month') return monthFormat.format(date)
-  return groupBy === 'week' ? `Week of ${dayFormat.format(date)}` : dayFormat.format(date)
-}
+// Phase 21: the store time zone, the shared period form, sales by payment method and by delivery zone.
+import { useReportRange } from '../hooks/useReportRange'
+import ReportRangeForm from '../components/ReportRangeForm'
+import { HorizontalBars } from '../components/ReportCharts'
+import { periodLabel, zoneWords } from '../utils/reportRange'
 
 /** Reports: sales over a date range, best sellers, customers, coupons, low stock. Needs reports.view. */
 function ReportsPage() {
-  const [params, setParams] = useSearchParams()
-  const fallback = defaultRange()
-  const range = {
-    from: params.get('from') ?? fallback.from,
-    to: params.get('to') ?? fallback.to,
-    groupBy: GROUPS.some((group) => group.value === params.get('groupBy')) ? params.get('groupBy') : 'day',
-  }
-  const [draft, setDraft] = useState(range)
-  const [problem, setProblem] = useState(null)
-
-  function apply(event) {
-    event.preventDefault()
-    const days = (Date.parse(draft.to) - Date.parse(draft.from)) / DAY_MS
-    if (!draft.from || !draft.to || Number.isNaN(days)) return setProblem('Choose both dates.')
-    if (days < 0) return setProblem('The start date must be on or before the end date.')
-    if (days >= MAX_DAYS) return setProblem(`Choose at most ${MAX_DAYS} days.`)
-    setProblem(null)
-    setParams(draft)
-  }
+  // Phase 21: dates are days in the store time zone (the sales answer says which).
+  const { range, zone, noteZone, apply } = useReportRange()
 
   return (
     <>
-      <title>Reports | BuyNest Admin</title>
-      <PageHeader title="Reports" description="Orders that weren't cancelled, in UTC dates. Net is after discounts and refunds." />
+      <title>Sales and products | BuyNest Admin</title>
+      <PageHeader title="Sales and products" description={`Orders that weren't cancelled. Dates in ${zoneWords(zone)}. Net is after discounts and refunds.`} />
+      <ReportRangeForm key={`${range.from}|${range.to}|${range.groupBy}`} range={range} onApply={apply} />
 
-      <form className="toolbar" aria-label="Report period" noValidate onSubmit={apply}>
-        <label className="toolbar__select">
-          <span>From</span>
-          <input type="date" value={draft.from} max={draft.to} required onChange={(event) => setDraft({ ...draft, from: event.target.value })} />
-        </label>
-        <label className="toolbar__select">
-          <span>To</span>
-          <input type="date" value={draft.to} min={draft.from} required onChange={(event) => setDraft({ ...draft, to: event.target.value })} />
-        </label>
-        <label className="toolbar__select">
-          <span>Group by</span>
-          <select value={draft.groupBy} onChange={(event) => setDraft({ ...draft, groupBy: event.target.value })}>
-            {GROUPS.map((group) => (
-              <option key={group.value} value={group.value}>
-                {group.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="btn btn--outline">
-          Show
-        </button>
-      </form>
-      {problem && (
-        <p className="form-error" role="alert">
-          {problem}
-        </p>
-      )}
-
-      <SalesReport range={range} />
+      <SalesReport range={range} onZone={noteZone} />
       <div className="panels">
         <BestSellers range={range} />
         <CustomersReport range={range} />
@@ -124,8 +60,12 @@ function CsvLink({ name, range, label }) {
   )
 }
 
-function SalesReport({ range }) {
+function SalesReport({ range, onZone }) {
   const sales = useReport('sales', range)
+  const reportedZone = sales.data?.range?.timezone
+  useEffect(() => {
+    if (reportedZone) onZone(reportedZone)
+  }, [reportedZone, onZone])
   if (sales.isPending) return <Loading label="Loading sales…" />
   if (sales.error) return <ErrorState error={sales.error} onRetry={sales.refetch} />
   const { totals, series } = sales.data
@@ -160,6 +100,99 @@ function SalesReport({ range }) {
         </header>
         {series.length === 0 ? <Empty>No sales in this period.</Empty> : <NetChart series={series} groupBy={range.groupBy} />}
       </section>
+      {/* Phase 21 §2: the same orders split two ways (store currency only; each adds up to the totals). */}
+      {(sales.data.byPaymentMethod || sales.data.byDeliveryZone) && (
+        <div className="panels">
+          {sales.data.byPaymentMethod && (
+            <SalesBreakdown
+              id="by-method"
+              title="By payment method"
+              column="Payment method"
+              noun={['payment method', 'payment methods']}
+              rows={sales.data.byPaymentMethod.map((row) => ({ ...row, key: row.method }))}
+              currency={currency}
+            />
+          )}
+          {sales.data.byDeliveryZone && (
+            <SalesBreakdown
+              id="by-zone"
+              title="By delivery zone"
+              column="Delivery zone"
+              noun={['delivery zone', 'delivery zones']}
+              rows={sales.data.byDeliveryZone.map((row) => ({ ...row, key: row.zoneCode ?? 'none', label: row.name || 'No zone (outside Bangladesh or a free-text address)' }))}
+              currency={currency}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Phase 21 §2: gross sales per payment method or delivery zone, as bars
+ * (biggest first, as the API orders them) with a text summary, and every
+ * figure in the table.
+ */
+function SalesBreakdown({ id, title, column, noun, rows, currency }) {
+  const gross = rows.reduce((sum, row) => sum + Math.round(row.gross * 100), 0) / 100
+  const top = rows.reduce((best, row) => (row.gross > (best?.gross ?? -Infinity) ? row : best), null)
+  const share = (value) => (gross > 0 ? `${Math.round((value / gross) * 100)}%` : '—')
+  const summary = top
+    ? `${rows.length} ${rows.length === 1 ? noun[0] : noun[1]}. Largest: ${top.label}, ${formatMoney(top.gross, currency)} gross (${share(top.gross)} of ${formatMoney(gross, currency)}).${currency ? ` Amounts in ${currency}.` : ''}`
+    : ''
+  return (
+    <section className="panel" aria-labelledby={`${id}-title`}>
+      <header className="panel__header">
+        <h3 id={`${id}-title`}>{title}</h3>
+      </header>
+      {rows.length === 0 ? (
+        <Empty>No sales in this period.</Empty>
+      ) : (
+        <div className="chart">
+          <HorizontalBars rows={rows.map((row) => ({ key: row.key, label: row.label, value: row.gross }))} titleId={`${id}-title`} summaryId={`${id}-summary`} summary={summary} currency={currency} />
+          <details className="chart__table">
+            <summary>Show the numbers as a table</summary>
+            <div className="table-wrap">
+              <table className="table">
+                <caption className="visually-hidden">Sales {title.toLowerCase()}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{column}</th>
+                    <th scope="col" className="num">
+                      Orders
+                    </th>
+                    <th scope="col" className="num">
+                      Gross
+                    </th>
+                    <th scope="col" className="num">
+                      Refunds
+                    </th>
+                    <th scope="col" className="num">
+                      Net
+                    </th>
+                    <th scope="col" className="num">
+                      Share of gross
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.key}>
+                      <th scope="row">{row.label}</th>
+                      <td className="num">{formatCount(row.orders)}</td>
+                      <td className="num">{formatMoney(row.gross, currency)}</td>
+                      <td className="num">{formatMoney(row.refunds, currency)}</td>
+                      <td className="num">{formatMoney(row.net, currency)}</td>
+                      <td className="num">{share(row.gross)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
     </section>
   )
 }

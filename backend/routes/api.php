@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController
 use App\Http\Controllers\Api\Admin\CouponController;
 use App\Http\Controllers\Api\Admin\CourierBookingController;
 use App\Http\Controllers\Api\Admin\CourierController;
+use App\Http\Controllers\Api\Admin\CourierPayoutController;
 use App\Http\Controllers\Api\Admin\CreditMemoController;
 use App\Http\Controllers\Api\Admin\CurrencyController;
 use App\Http\Controllers\Api\Admin\CustomerAddressController;
@@ -461,7 +462,20 @@ Route::prefix('admin/v1')->group(function () {
             Route::get('low-stock', 'lowStock');
             Route::get('wishlist', 'wishlist'); // phase 11
             Route::get('rewards', 'rewards'); // phase 11
+            // Phase 21: money in, cash on delivery and couriers, cash still to collect.
+            Route::get('payments', 'payments');
+            Route::get('payments.csv', 'paymentsCsv');
+            Route::get('cod', 'cod');
+            Route::get('cod.csv', 'codCsv');
+            Route::get('cod/outstanding', 'codOutstanding');
+            Route::get('cod/outstanding.csv', 'codOutstandingCsv');
         });
+
+        // Phase 21: courier payments received (listing: reports.view; recording, changing, deleting: cash.manage).
+        Route::get('courier-payouts', [CourierPayoutController::class, 'index'])->middleware('can.admin:reports.view');
+        Route::post('courier-payouts', [CourierPayoutController::class, 'store'])->middleware('can.admin:cash.manage');
+        Route::patch('courier-payouts/{id}', [CourierPayoutController::class, 'update'])->whereNumber('id')->middleware('can.admin:cash.manage');
+        Route::delete('courier-payouts/{id}', [CourierPayoutController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:cash.manage');
 
         Route::get('settings', [SettingsController::class, 'show'])->middleware('can.admin:settings.view');
         Route::patch('settings', [SettingsController::class, 'update'])->middleware('can.admin:settings.edit');

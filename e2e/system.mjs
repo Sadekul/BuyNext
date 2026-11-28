@@ -57,8 +57,8 @@ try {
   await adminSignIn(admin, ADMIN_USER)
   await admin.getByRole('heading', { name: 'Overview' }).waitFor()
   const nav = admin.getByRole('navigation').first()
-  for (const item of ['Products', 'Orders', 'Coupons', 'Reports', 'Settings', 'Admin users', 'Audit log']) {
-    if (!(await nav.getByRole('link', { name: item }).isVisible())) log(false, `owner nav is missing "${item}"`)
+  for (const item of ['Products', 'Orders', 'Coupons', 'Sales and products', 'Money in', 'Cash on delivery', 'Courier payments', 'Settings', 'Admin users', 'Audit log']) {
+    if (!(await nav.getByRole('link', { name: item, exact: true }).isVisible())) log(false, `owner nav is missing "${item}"`)
   }
   log(await nav.getByRole('link', { name: 'Admin users' }).isVisible(), 'Owner: every section in the menu, including System')
 

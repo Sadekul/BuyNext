@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+
+// findBy…/waitFor give up after 1 s by default; on a busy computer a page can take longer to show its data,
+// so wait up to 5 s (as the storefront's tests do). A missing element still fails, only later.
+configure({ asyncUtilTimeout: 5000 })
 
 afterEach(() => {
   cleanup()

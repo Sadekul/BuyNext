@@ -57,7 +57,7 @@ describe('permissions in the admin app', () => {
     })
     renderApp('/reports')
     expect(await screen.findByRole('heading', { name: "You don't have access" })).toBeInTheDocument()
-    expect(screen.getByText('View reports')).toBeInTheDocument()
+    expect(screen.getByText('View and download reports')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 

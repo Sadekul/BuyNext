@@ -6,13 +6,16 @@ use App\Models\Coupon;
 use App\Models\CouponRedemption;
 use App\Models\CreditMemo;
 use App\Models\Customer;
+use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\RewardTransaction;
 use App\Models\WishlistItem;
+use App\Services\Payments\SslCommerzPayments;
 use App\Support\Currency;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +25,12 @@ use Illuminate\Support\Facades\DB;
  *
  * Counted orders: every order that isn't cancelled, by the date it was placed.
  * Refunds: credit memos by the date they were created (when the money went back).
- * Dates are whole days in the store time zone (UTC for now), both ends included.
+ * Dates are whole days in the store time zone, both ends included.
+ *
+ * Phase 21: the store time zone is a setting (store_timezone, default UTC).
+ * SQL compares whole UTC instants only (bounds()); rows are put into days in
+ * PHP (localDate()), never with CONVERT_TZ (MySQL's zone tables may be
+ * missing). With UTC every answer is the same as before.
  */
 class Reports
 {
@@ -33,21 +41,27 @@ class Reports
      *   series: [{ period, orders, gross, refunds, net }] } - every period in the range, zeros included.
      * gross = what customers were charged (grand totals); net = gross − refunds;
      * average_order = net / orders (like the dashboard).
+     *
+     * Phase 21: by_payment_method [{ method, label, orders, gross, refunds, net }] and
+     * by_delivery_zone [{ zone_code|null, name, orders, gross, refunds, net }], both most gross first,
+     * both in the store currency and adding up to the totals. Refunds go to the order's method / zone.
      */
     public function sales(CarbonImmutable $from, CarbonImmutable $to, string $groupBy): array
     {
         // Phase 12: money is added up per currency, never across currencies: the totals and series are the
         // store currency's; other_currencies lists the rest (orders placed before a currency switch).
         $store = Currency::store();
-        $days = $this->orders($from, $to)->where('currency', $store)
-            ->selectRaw('date(placed_at) as day, count(*) as orders, sum(discount_total) as discounts, '
-                .'sum(shipping_total) as shipping, sum(tax_total) as tax, sum(grand_total) as gross')
-            ->groupBy('day')->get();
+        // Phase 21: one row per order (the day is found in PHP, in the store time zone).
+        $orders = $this->orders($from, $to)->where('currency', $store)
+            ->get(['id', 'placed_at', 'discount_total', 'shipping_total', 'tax_total', 'grand_total', 'payment_method', 'payment_provider',
+                'payment_details', 'delivery_zone_code']);
         $units = (int) OrderItem::whereIn('order_id', $this->orders($from, $to)->select('id'))->sum('quantity');
         $memos = fn () => CreditMemo::whereBetween('credit_memos.created_at', $this->bounds($from, $to))
             ->join('orders', 'orders.id', '=', 'credit_memos.order_id');
-        $refundDays = $memos()->where('orders.currency', $store)
-            ->selectRaw('date(credit_memos.created_at) as day, sum(credit_memos.total) as refunds')->groupBy('day')->pluck('refunds', 'day');
+        $refundRows = Order::query()->join('credit_memos', 'credit_memos.order_id', '=', 'orders.id')
+            ->whereBetween('credit_memos.created_at', $this->bounds($from, $to))->where('orders.currency', $store)
+            ->get(['orders.id', 'orders.payment_method', 'orders.payment_provider', 'orders.payment_details', 'orders.delivery_zone_code',
+                'credit_memos.created_at as memo_created_at', 'credit_memos.total as memo_total']);
         $otherOrders = $this->orders($from, $to)->where('currency', '!=', $store)
             ->selectRaw('currency, count(*) as orders, sum(grand_total) as gross')->groupBy('currency')->get()->keyBy('currency');
         $otherRefunds = $memos()->where('orders.currency', '!=', $store)
@@ -65,21 +79,38 @@ class Reports
             $series[$period] = ['period' => $period, 'orders' => 0, 'gross' => 0, 'refunds' => 0];
         }
         $totals = ['orders' => 0, 'discounts' => 0, 'shipping' => 0, 'tax' => 0, 'gross' => 0, 'refunds' => 0];
-        foreach ($days as $day) {
-            $period = $this->periodOf(CarbonImmutable::parse($day->day), $groupBy);
-            $series[$period]['orders'] += (int) $day->orders;
-            $series[$period]['gross'] += Pricing::toCents((string) $day->gross);
-            $totals['orders'] += (int) $day->orders;
-            foreach (['discounts', 'shipping', 'tax', 'gross'] as $field) {
-                $totals[$field] += Pricing::toCents((string) $day->{$field});
-            }
+        $methods = [];
+        $zones = [];
+        $add = function (array &$buckets, ?string $key, int $orders, int $gross, int $refunds) {
+            $bucket = $buckets[$key ?? ''] ?? ['key' => $key, 'orders' => 0, 'gross' => 0, 'refunds' => 0];
+            $bucket['orders'] += $orders;
+            $bucket['gross'] += $gross;
+            $bucket['refunds'] += $refunds;
+            $buckets[$key ?? ''] = $bucket;
+        };
+        foreach ($orders as $order) {
+            $period = $this->periodOf($this->localDate($order->placed_at), $groupBy);
+            $gross = Pricing::toCents((string) $order->grand_total);
+            $series[$period]['orders']++;
+            $series[$period]['gross'] += $gross;
+            $totals['orders']++;
+            $totals['discounts'] += Pricing::toCents((string) $order->discount_total);
+            $totals['shipping'] += Pricing::toCents((string) $order->shipping_total);
+            $totals['tax'] += Pricing::toCents((string) $order->tax_total);
+            $totals['gross'] += $gross;
+            $add($methods, $this->methodOf($order), 1, $gross, 0);
+            $add($zones, $order->delivery_zone_code, 1, $gross, 0);
         }
-        foreach ($refundDays as $day => $refunds) {
-            $period = $this->periodOf(CarbonImmutable::parse($day), $groupBy);
-            $series[$period]['refunds'] += Pricing::toCents((string) $refunds);
-            $totals['refunds'] += Pricing::toCents((string) $refunds);
+        foreach ($refundRows as $row) {
+            $period = $this->periodOf($this->localDate($row->memo_created_at), $groupBy);
+            $refunds = Pricing::toCents((string) $row->memo_total);
+            $series[$period]['refunds'] += $refunds;
+            $totals['refunds'] += $refunds;
+            $add($methods, $this->methodOf($row), 0, 0, $refunds);
+            $add($zones, $row->delivery_zone_code, 0, 0, $refunds);
         }
         $net = $totals['gross'] - $totals['refunds'];
+        $zoneNames = DeliveryZone::pluck('name', 'code');
 
         return [
             'currency' => $store, // phase 12
@@ -102,7 +133,60 @@ class Reports
                 'refunds' => Pricing::format($row['refunds']),
                 'net' => Pricing::format($row['gross'] - $row['refunds']),
             ], $series)),
+            // Phase 21.
+            'by_payment_method' => $this->breakdown($methods, fn (array $row) => ['method' => $row['key'], 'label' => $this->methodLabel($row['key'])]),
+            'by_delivery_zone' => $this->breakdown($zones, fn (array $row) => [
+                'zone_code' => $row['key'],
+                'name' => $row['key'] === null ? self::NO_ZONE : ($zoneNames[$row['key']] ?? $row['key']),
+            ]),
         ];
+    }
+
+    /** Phase 21: by_delivery_zone's name for orders without a zone. */
+    public const NO_ZONE = 'No zone (outside Bangladesh or a free-text address)';
+
+    /**
+     * Phase 21: the method an order is counted under: its payment_method, except SSLCommerz orders, which use
+     * the wallet or card they were paid with ("sslcommerz:bkash", "sslcommerz:card"; "sslcommerz:other" when unknown).
+     * A COD order whose advance went through SSLCommerz stays "cod".
+     */
+    public function methodOf(Order $order): string
+    {
+        if ($order->payment_method === 'sslcommerz') {
+            return 'sslcommerz:'.(SslCommerzPayments::methodCode($order) ?? 'other');
+        }
+
+        return (string) ($order->payment_method ?: 'other');
+    }
+
+    /** Phase 21: "Cash on delivery", "bKash (SSLCommerz)", ... */
+    public function methodLabel(string $method): string
+    {
+        if (str_starts_with($method, 'sslcommerz:')) {
+            return (self::SSLCOMMERZ_LABELS[substr($method, 11)] ?? 'Other').' (SSLCommerz)';
+        }
+
+        return config("buynest.store.payment_methods.{$method}") ?? config("buynest.store.admin_payment_methods.{$method}")
+            ?? self::OTHER_METHOD_LABELS[$method] ?? ucfirst(str_replace('_', ' ', $method));
+    }
+
+    private const SSLCOMMERZ_LABELS = ['bkash' => 'bKash', 'nagad' => 'Nagad', 'rocket' => 'Rocket', 'upay' => 'Upay', 'card' => 'Card',
+        'internet_banking' => 'Internet banking', 'other' => 'Other'];
+
+    private const OTHER_METHOD_LABELS = ['gift_card' => 'Gift card', 'reward_points' => 'Reward points', 'other' => 'Other'];
+
+    /** Phase 21: buckets { key, orders, gross, refunds } (cents) → API rows, most gross first. */
+    private function breakdown(array $buckets, callable $head): array
+    {
+        usort($buckets, fn (array $a, array $b) => [$b['gross'], $b['orders'], (string) $a['key']] <=> [$a['gross'], $a['orders'], (string) $b['key']]);
+
+        return array_map(fn (array $row) => [
+            ...$head($row),
+            'orders' => $row['orders'],
+            'gross' => Pricing::format($row['gross']),
+            'refunds' => Pricing::format($row['refunds']),
+            'net' => Pricing::format($row['gross'] - $row['refunds']),
+        ], $buckets);
     }
 
     /**
@@ -244,15 +328,15 @@ class Reports
      */
     public function rewards(CarbonImmutable $from, CarbonImmutable $to, string $groupBy, RewardPoints $points): array
     {
-        $rows = RewardTransaction::whereBetween('created_at', $this->bounds($from, $to))
-            ->selectRaw('date(created_at) as day, type, sum(points) as points')->groupBy('day', 'type')->get();
+        // Phase 21: one row per transaction (the day is found in PHP, in the store time zone).
+        $rows = RewardTransaction::whereBetween('created_at', $this->bounds($from, $to))->toBase()->get(['created_at', 'type', 'points']);
         $series = [];
         foreach ($this->periods($from, $to, $groupBy) as $period) {
             $series[$period] = ['period' => $period, 'issued' => 0, 'spent' => 0];
         }
         $totals = ['issued' => 0, 'spent' => 0, 'returned' => 0, 'reversed' => 0, 'adjusted' => 0];
         foreach ($rows as $row) {
-            $period = $this->periodOf(CarbonImmutable::parse($row->day), $groupBy);
+            $period = $this->periodOf($this->localDate($row->created_at), $groupBy);
             $sum = (int) $row->points;
             match ($row->type) {
                 'earn', 'signup', 'review' => [$series[$period]['issued'] += $sum, $totals['issued'] += $sum],
@@ -279,17 +363,51 @@ class Reports
         return Order::where('status', '!=', 'cancelled')->whereBetween('placed_at', $this->bounds($from, $to));
     }
 
-    /** The first and last second of the range, as the database compares them. */
-    private function bounds(CarbonImmutable $from, CarbonImmutable $to): array
+    /** Phase 21: the store time zone ("UTC", "Asia/Dhaka"). */
+    public function timezone(): string
     {
-        return [$from->startOfDay()->toDateTimeString(), $to->endOfDay()->toDateTimeString()];
+        return $this->settings->timezone();
+    }
+
+    /** Phase 21: today in the store time zone (midnight). */
+    public function today(): CarbonImmutable
+    {
+        return CarbonImmutable::today($this->timezone());
+    }
+
+    /** Phase 21: a YYYY-MM-DD date as a day in the store time zone. */
+    public function day(string $date): CarbonImmutable
+    {
+        return CarbonImmutable::parse($date, $this->timezone())->startOfDay();
+    }
+
+    /**
+     * The first and last second of the range, as the database compares them. Phase 21: the days are
+     * the store time zone's, turned into UTC instants (the database keeps UTC).
+     */
+    public function bounds(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $zone = $this->timezone();
+
+        return [
+            CarbonImmutable::parse($from->toDateString(), $zone)->startOfDay()->utc()->toDateTimeString(),
+            CarbonImmutable::parse($to->toDateString(), $zone)->endOfDay()->utc()->toDateTimeString(),
+        ];
+    }
+
+    /** Phase 21: the day (in the store time zone) of a time the database keeps in UTC. */
+    public function localDate(DateTimeInterface|string $value): CarbonImmutable
+    {
+        $time = $value instanceof DateTimeInterface ? CarbonImmutable::instance($value) : CarbonImmutable::parse($value, 'UTC');
+
+        return CarbonImmutable::parse($time->setTimezone($this->timezone())->toDateString(), 'UTC');
     }
 
     /**
      * Every period from $from to $to: days "2026-11-10", weeks by their
      * Monday "2026-11-09", months "2026-11".
      */
-    private function periods(CarbonImmutable $from, CarbonImmutable $to, string $groupBy): array
+    public function periods(CarbonImmutable $from, CarbonImmutable $to, string $groupBy): array
     {
         $periods = [];
         for ($day = $from; $day <= $to; $day = $day->addDay()) {
@@ -299,7 +417,7 @@ class Reports
         return array_keys($periods);
     }
 
-    private function periodOf(CarbonImmutable $day, string $groupBy): string
+    public function periodOf(CarbonImmutable $day, string $groupBy): string
     {
         return match ($groupBy) {
             'week' => $day->startOfWeek(CarbonImmutable::MONDAY)->toDateString(),

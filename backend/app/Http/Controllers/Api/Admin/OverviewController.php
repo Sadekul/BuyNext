@@ -12,6 +12,7 @@ use App\Models\OrderReturn;
 use App\Models\Product;
 use App\Models\Review;
 use App\Services\Pricing;
+use App\Services\Reports;
 use App\Services\SearchTerms;
 use App\Services\Settings;
 use App\Support\Currency;
@@ -140,22 +141,29 @@ class OverviewController extends Controller
         return response()->json(['data' => $data]);
     }
 
-    /** The last 30 days (UTC, today included): [{ date, orders, revenue }], zeros for quiet days. */
+    /**
+     * The last 30 days (today included): [{ date, orders, revenue }], zeros for quiet days.
+     * Phase 21: days in the store time zone (UTC by default), found in PHP (Reports::localDate()).
+     */
     private function revenueChart(): array
     {
-        $from = now()->utc()->startOfDay()->subDays(29);
-        $rows = Order::where('status', '!=', 'cancelled')->where('currency', Currency::store())->where('placed_at', '>=', $from)
-            ->selectRaw('DATE(placed_at) as day, COUNT(*) as orders, SUM(grand_total) as revenue')
-            ->groupBy('day')->get()->keyBy(fn ($row) => (string) $row->day);
+        $reports = app(Reports::class);
+        $today = $reports->today();
+        $from = $today->subDays(29);
+        $days = [];
+        $orders = Order::where('status', '!=', 'cancelled')->where('currency', Currency::store())
+            ->where('placed_at', '>=', $from->utc()->toDateTimeString())->toBase()->get(['placed_at', 'grand_total']);
+        foreach ($orders as $order) {
+            $day = $reports->localDate($order->placed_at)->toDateString();
+            $days[$day] ??= ['orders' => 0, 'revenue' => 0];
+            $days[$day]['orders']++;
+            $days[$day]['revenue'] += Pricing::toCents((string) $order->grand_total);
+        }
 
         $chart = [];
-        for ($day = $from->copy(); $day->lte(now()->utc()); $day->addDay()) {
-            $row = $rows->get($day->toDateString());
-            $chart[] = [
-                'date' => $day->toDateString(),
-                'orders' => (int) ($row->orders ?? 0),
-                'revenue' => Pricing::format(Pricing::toCents((string) ($row->revenue ?? 0))),
-            ];
+        for ($day = $from; $day <= $today; $day = $day->addDay()) {
+            $row = $days[$day->toDateString()] ?? ['orders' => 0, 'revenue' => 0];
+            $chart[] = ['date' => $day->toDateString(), 'orders' => $row['orders'], 'revenue' => Pricing::format($row['revenue'])];
         }
 
         return $chart;

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { LIVE_DATA } from '../api/mode'
 import { getStoreInfo, phase12Keys } from '../api/phase12'
 import { getStoreCurrency, setStoreCurrency } from '../utils/format'
+import { rememberZone } from '../utils/reportRange'
 
 /*
  * Phase 12 §1: the store currency for every money display. Read once per
@@ -53,5 +54,8 @@ export function useStoreCurrency() {
     setStoreCurrency(currency)
     remember(currency)
   }
+  // Phase 21: the store time zone, known from the first page (before any report has loaded),
+  // so report periods and the courier payment date start on the store's today. Idempotent.
+  rememberZone(store.data?.timezone)
   return getStoreCurrency().code
 }

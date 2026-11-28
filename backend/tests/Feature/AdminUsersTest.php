@@ -52,7 +52,7 @@ class AdminUsersTest extends TestCase
     {
         $groups = $this->asAdmin($this->headers, 'GET', '/api/admin/v1/permissions')->assertOk()->json('data');
 
-        $this->assertSame(['dashboard', 'catalog', 'sales', 'customers', 'marketing', 'content', 'reports', 'settings', 'system'], array_column($groups, 'group'));
+        $this->assertSame(['dashboard', 'catalog', 'sales', 'customers', 'marketing', 'content', 'reports', 'cash', 'settings', 'system'], array_column($groups, 'group'));
         $this->assertSame(['key' => 'orders.edit', 'label' => 'Change order status, add notes, cancel'], $groups[2]['permissions'][1]);
         $this->assertCount(count(Permissions::all()), array_merge(...array_column($groups, 'permissions')));
     }

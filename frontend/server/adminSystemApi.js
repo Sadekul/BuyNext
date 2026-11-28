@@ -1,5 +1,5 @@
 import { json, laravelFile, readBody } from './http.js'
-import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, laravelSystemData } from './shop/adminSystem.js'
+import { CSV_REPORTS, REPORTS, SETTINGS_GROUPS, failed, isTimezoneName, laravelSystemData } from './shop/adminSystem.js'
 // Phase 11 §4: Settings → Reward points.
 import { REWARD_SETTING_RULES } from './adminPhase11Api.js'
 // Phase 13: the Bangla texts of pages and home blocks; Settings → General's language settings.
@@ -304,6 +304,17 @@ export function validateHome(body) {
   return Object.keys(errors).length > 0 ? { errors } : { values: { hero, banners, featuredProductIds, ...extra } }
 }
 
+/** Phase 21: a time zone this server's Intl knows ("UTC", "Asia/Dhaka"). */
+function isKnownTimezone(value) {
+  if (!isTimezoneName(value)) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return true
+  } catch {
+    return false
+  }
+}
+
 const SHIPPING_METHODS = ['standard', 'express', 'nextDay']
 // Phase 12: + sslcommerz (bKash, Nagad, cards).
 const PAYMENT_METHODS = ['card', 'paypal', 'sslcommerz', 'cod']
@@ -318,6 +329,8 @@ const SETTING_RULES = {
     address: (value) => (isText(value, { max: 500 }) ? null : 'Keep the address under 500 characters.'),
     // Phase 13.
     ...LANGUAGE_SETTING_RULES,
+    // Phase 21 §1: the reports' time zone (the API checks it against PHP's list).
+    storeTimezone: (value) => (isKnownTimezone(value) ? null : 'Choose a time zone from the list.'),
   },
   shipping: {
     standardPrice: moneyRule,

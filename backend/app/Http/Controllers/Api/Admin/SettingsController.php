@@ -75,6 +75,7 @@ class SettingsController extends Controller
             // Phase 10 (part A).
             'documents.paper_size.in' => 'Choose A4 or Letter.',
             'analytics.ga4_measurement_id.regex' => 'Enter a GA4 measurement ID like G-ABC123XYZ, or leave it empty.',
+            'general.store_timezone.in' => 'Choose a time zone from the list, such as Asia/Dhaka.', // phase 21
         ])->validate();
 
         $changes = [];

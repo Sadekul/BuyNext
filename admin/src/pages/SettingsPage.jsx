@@ -13,6 +13,9 @@ import { rewardSettingsValues } from '../utils/rewards'
 // Phase 12 §5: the store currency (read-only) and SSLCommerz.
 import { formatMoney, getStoreCurrency, storeCode } from '../utils/format'
 import { paymentProviderNote } from '../utils/payments'
+// Phase 21: the reports' time zone.
+import { rememberZone } from '../utils/reportRange'
+import { phase12Keys } from '../api/phase12'
 import StatusBadge from '../components/StatusBadge'
 // Phase 14 §3 and §4: delivery zones, the default country, cash on delivery.
 import { LuMapPinned, LuTruck } from 'react-icons/lu'
@@ -96,6 +99,12 @@ function SettingsGroup({ group, title, description, toValues, setErrors, childre
     mutationFn: (values) => updateSettings({ [group]: values }),
     onSuccess: (data) => {
       queryClient.setQueryData(adminKeys.settings, data)
+      // Phase 21: a new time zone moves every report's days.
+      if (group === 'general' && data?.general?.storeTimezone) {
+        rememberZone(data.general.storeTimezone)
+        queryClient.invalidateQueries({ queryKey: ['report'] })
+        queryClient.invalidateQueries({ queryKey: phase12Keys.store }) // the store info every page reads the zone from
+      }
       setErrors({})
       setNotice({ tone: 'success', text: `${title} saved.` })
       requestAnimationFrame(() => noticeRef.current?.focus())
@@ -155,6 +164,9 @@ function GeneralForm({ saved }) {
   // Phase 13 §1: the store's default language and Bangla digits (only when the API has them).
   const hasLanguage = saved.defaultLocale !== undefined || saved.banglaDigits !== undefined
   const [language, setLanguage] = useState({ defaultLocale: saved.defaultLocale === 'bn' ? 'bn' : 'en', banglaDigits: saved.banglaDigits !== false })
+  // Phase 21 §2: the reports' time zone (only when the API has it).
+  const hasTimezone = saved.storeTimezone !== undefined
+  const [timezone, setTimezone] = useState(saved.storeTimezone || 'UTC')
   const [errors, setErrors] = useState({})
   const set = (key) => (event) => setValues({ ...values, [key]: event.target.value })
   function toValues() {
@@ -162,7 +174,7 @@ function GeneralForm({ saved }) {
     if (!values.storeName.trim()) found.storeName = ['Enter the store name.']
     if (values.supportEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.supportEmail.trim())) found.supportEmail = ['Enter a valid email address.']
     const texts = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.trim()]))
-    return Object.keys(found).length > 0 ? { errors: found } : { values: hasLanguage ? { ...texts, ...language } : texts }
+    return Object.keys(found).length > 0 ? { errors: found } : { values: { ...texts, ...(hasLanguage && language), ...(hasTimezone && { storeTimezone: timezone }) } }
   }
   return (
     <SettingsGroup group="general" title="General" description="Shown to shoppers in the footer, emails, and on the contact page." toValues={toValues} errors={errors} setErrors={setErrors}>
@@ -212,8 +224,45 @@ function GeneralForm({ saved }) {
           {err(errors, 'banglaDigits') && <span className="field__error">{err(errors, 'banglaDigits')}</span>}
         </fieldset>
       )}
+      {hasTimezone && (
+        <Field
+          label="Time zone"
+          error={err(errors, 'storeTimezone')}
+          hint="Reports count whole days in this time zone. In Bangladesh choose Asia/Dhaka (UTC+6): with UTC, “today” starts at 6 a.m. in Dhaka."
+        >
+          {(a11y) => (
+            <select {...a11y} value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+              {timezoneOptions(timezone).map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.zones.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone === 'Asia/Dhaka' ? 'Asia/Dhaka (Bangladesh, UTC+6)' : zone === 'UTC' ? 'UTC (no offset)' : zone.replaceAll('_', ' ')}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          )}
+        </Field>
+      )}
     </SettingsGroup>
   )
+}
+
+/** Phase 21: Asia/Dhaka and UTC first, then every zone this browser knows (and the saved one, whatever it is). */
+const FIRST_ZONES = ['Asia/Dhaka', 'UTC']
+function timezoneOptions(current) {
+  let all = []
+  try {
+    all = Intl.supportedValuesOf('timeZone')
+  } catch {
+    // an older browser: the two common zones and the saved one
+  }
+  const rest = [...new Set([...all, ...(FIRST_ZONES.includes(current) ? [] : [current])])].filter((zone) => !FIRST_ZONES.includes(zone)).sort()
+  return [
+    { label: 'Common', zones: FIRST_ZONES },
+    { label: 'All time zones', zones: rest },
+  ]
 }
 
 /** Checkbox list → the chosen ids, in the list's order. */

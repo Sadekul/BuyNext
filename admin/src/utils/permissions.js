@@ -42,6 +42,10 @@ import {
   LuPackageSearch,
   // Phase 19.
   LuBadgePercent,
+  // Phase 21.
+  LuBanknote,
+  LuHandCoins,
+  LuWallet,
 } from 'react-icons/lu'
 import { LIVE_DATA } from '../api/mode'
 
@@ -76,7 +80,8 @@ export const PERMISSION_LABELS = {
   'coupons.edit': 'Create and edit coupons',
   'content.view': 'View content pages and the home page',
   'content.edit': 'Edit content pages and the home page',
-  'reports.view': 'View reports',
+  // Phase 21: the API's wording (the CSV downloads come with it).
+  'reports.view': 'View and download reports',
   'settings.view': 'View store settings',
   'settings.edit': 'Change store settings',
   'admins.manage': 'Manage admin users and roles',
@@ -95,6 +100,8 @@ export const PERMISSION_LABELS = {
   'gift_cards.manage': 'Create gift cards, adjust their balance, and disable them',
   // Phase 11.
   'rewards.manage': "Adjust customers' reward point balances",
+  // Phase 21.
+  'cash.manage': 'Record courier payments',
 }
 export const permissionLabel = (key) => PERMISSION_LABELS[key] ?? key
 
@@ -166,7 +173,16 @@ const LIVE_NAV = [
       { to: '/redirects', label: 'URL redirects', icon: LuSignpost, permission: 'seo.manage' },
     ],
   },
-  { to: '/reports', label: 'Reports', icon: LuChartColumn, permission: 'reports.view' },
+  // Phase 21 §2: a group; `end` so Sales and products isn't also marked on its sibling pages.
+  {
+    heading: 'Reports',
+    items: [
+      { to: '/reports', label: 'Sales and products', icon: LuChartColumn, end: true, permission: 'reports.view' },
+      { to: '/reports/payments', label: 'Money in', icon: LuWallet, permission: 'reports.view' },
+      { to: '/reports/cod', label: 'Cash on delivery', icon: LuHandCoins, permission: 'reports.view' },
+      { to: '/reports/courier-payments', label: 'Courier payments', icon: LuBanknote, permission: 'reports.view' },
+    ],
+  },
   // `end`: Settings → Shipping → Table rates (phase 10) has its own entry.
   { to: '/settings', label: 'Settings', icon: LuSettings, end: true, permission: 'settings.view' },
   { to: '/settings/shipping-rates', label: 'Shipping table rates', icon: LuTable2, permission: 'settings.edit' },

@@ -64,6 +64,10 @@ final class Permissions
         'reports' => ['label' => 'Reports', 'permissions' => [
             'reports.view' => 'View and download reports',
         ]],
+        // Phase 21: courier payments received (Owner only by default; can be ticked for other roles).
+        'cash' => ['label' => 'Cash', 'permissions' => [
+            'cash.manage' => 'Record courier payments',
+        ]],
         'settings' => ['label' => 'Settings', 'permissions' => [
             'settings.view' => 'View store settings',
             'settings.edit' => 'Change store settings',

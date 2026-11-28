@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ADMIN, mockFetch, withSession } from '../test/mockFetch'
 import { renderApp } from '../test/renderApp'
+
+/**
+ * The query of the newest request to `path`, once it has been sent. Not simply the newest request: the layout loads
+ * other things (store info, notifications, grid preferences) at the same time, so that one is often something else.
+ */
+async function lastQueryTo(fetchMock, path, check) {
+  await waitFor(() => {
+    const last = fetchMock.mock.calls.map(([url]) => new URL(url)).filter((url) => url.pathname === path).at(-1)
+    check(last.searchParams)
+  })
+}
 
 // Products and orders from BuyNest's API (VITE_API_PROVIDER=laravel with Laravel accounts).
 vi.mock('../api/mode', () => ({ LIVE_DATA: true }))
@@ -38,8 +49,7 @@ describe('real products', () => {
     expect(screen.queryByText(/Demo data from DummyJSON/)).not.toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText('Status'), 'archived')
-    const last = new URL(fetchMock.mock.calls.at(-1)[0])
-    expect(last.searchParams.get('status')).toBe('archived')
+    await lastQueryTo(fetchMock, '/api/admin/products', (query) => expect(query.get('status')).toBe('archived'))
   })
 
   it('creates a product with a status, then opens it for editing', async () => {
@@ -81,9 +91,10 @@ describe('real orders', () => {
     await user.selectOptions(screen.getByLabelText('Payment'), 'paid')
     await user.type(screen.getByLabelText('Search orders'), 'ava')
     await user.click(screen.getByRole('button', { name: 'Search' }))
-    const params = new URL(fetchMock.mock.calls.at(-1)[0]).searchParams
-    expect(params.get('paymentStatus')).toBe('paid')
-    expect(params.get('q')).toBe('ava')
+    await lastQueryTo(fetchMock, '/api/admin/orders', (query) => {
+      expect(query.get('paymentStatus')).toBe('paid')
+      expect(query.get('q')).toBe('ava')
+    })
   })
 
   it('offers Invoice, Ship, and Cancel (no phase 2 shortcuts), and ships with a carrier and tracking number', async () => {
@@ -246,7 +257,7 @@ describe('sales documents and coupons', () => {
     expect(within(row).getByText('$22.87')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Search invoices'), 'BN-100001')
     await user.click(screen.getByRole('button', { name: 'Search' }))
-    expect(new URL(fetchMock.mock.calls.at(-1)[0]).searchParams.get('q')).toBe('BN-100001')
+    await lastQueryTo(fetchMock, '/api/admin/invoices', (query) => expect(query.get('q')).toBe('BN-100001'))
 
     await user.click(screen.getByRole('link', { name: 'INV-100001' }))
     expect(await screen.findByRole('heading', { name: 'Invoice INV-100001' })).toBeInTheDocument()
@@ -290,7 +301,7 @@ describe('sales documents and coupons', () => {
     expect(within(screen.getByRole('link', { name: 'OLD' }).closest('tr')).getByText('Expired')).toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText('Status'), 'expired')
-    expect(new URL(fetchMock.mock.calls.at(-1)[0]).searchParams.get('status')).toBe('expired')
+    await lastQueryTo(fetchMock, '/api/admin/coupons', (query) => expect(query.get('status')).toBe('expired'))
 
     await user.click(screen.getByRole('button', { name: 'Delete WINTER5' }))
     const dialog = screen.getByRole('dialog', { name: 'Delete WINTER5?' })

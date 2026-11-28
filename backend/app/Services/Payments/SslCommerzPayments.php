@@ -248,6 +248,24 @@ class SslCommerzPayments
         };
     }
 
+    /**
+     * Phase 21: the code of the wallet or card methodLabel() names, for reports: bkash, nagad, rocket, upay,
+     * card (Visa, Mastercard, American Express), internet_banking, or other (anything else); null when unknown.
+     */
+    public static function methodCode(Order $order): ?string
+    {
+        return match (self::methodLabel($order)) {
+            null => null,
+            'bKash' => 'bkash',
+            'Nagad' => 'nagad',
+            'Rocket' => 'rocket',
+            'Upay' => 'upay',
+            'Visa card', 'Mastercard', 'American Express' => 'card',
+            'Internet banking' => 'internet_banking',
+            default => 'other',
+        };
+    }
+
     /** Staff cancelled the order: forget its payment page (SSLCommerz sessions can't be closed; a late payment raises a notification). */
     public function expireOpenSession(Order $order): void
     {

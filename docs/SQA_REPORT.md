@@ -445,6 +445,26 @@ Also in this step: the admin's package list (`npm ci` works again) and short mon
 
 Checks: backend 682 feature tests (Pint clean); frontend 1,123 unit tests; admin 287; browser checks on the dev server: first full run 2,095 passed and 11 failed, with the sessions and admin suites not finished (FC1, FC3, FC5); second 2,128 passed and 3 failed, the admin suite not finished (FC2 and FC7; system and admin then passed alone, 40 and 53); production build: 2,176 of 2,176 (full run, every suite passed).
 
+## Phase 21 (sales and cash reports) — 2026-11-28
+
+Asked by the store owner ("you should start next phase", approving the proposed answers to Q1–Q5). Three read-only agents first surveyed the backend, the admin with its sign-in service, and the browser suites; their briefs found 12 places where the draft contract didn't match the code, fixed in [backend/PHASE21_CONTRACT.md](backend/PHASE21_CONTRACT.md) before building. Then a backend agent and an admin agent built in parallel (both cut off once by an internet drop and resumed from the files' real state; no file was left empty), and a third agent wrote the `reports.mjs` browser suite. **Read-only reports:** nothing to switch on; with the time zone left at UTC every older report answer is unchanged except the added fields.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| R1 | Medium | **Contract:** a cash collection recorded by staff always counted as "collected by staff", so a courier booked by hand (RedX, Paperfly, Sundarban) never had collected cash, and recording its payment showed "Paid more than recorded" (found by the backend agent) | Cash recorded by staff on an order whose latest shipment is a courier's counts for that courier (its rider collected it); "staff" only for the shop's own delivery. The backfill applies the same rule (4 dev invoices moved from staff to a courier) |
+| R2 | Medium | A parcel that came back (returned, or cancelled by the courier) stayed in "Still to collect" for good, inflating the shop's outstanding cash (found by the browser suite) | Left out of Still to collect and its total; counted as returned or cancelled |
+| R3 | Medium | A courier whose fees (returned parcels included) were more than the cash it collected showed "Paid more than recorded — check the payments" although no payment was recorded | A new note `fees_more_than_collected`: the card says "You owe Pathao ৳40" and why; "Paid more than recorded" only when payments are recorded |
+| R4 | Low | axe `landmark-unique` on Money in and Cash on delivery: each table's scroll area repeated its section's name, so screen readers listed the same area twice (found by the browser suite) | Each table area has its own name ("Amounts by channel", "Orders still to collect", …) |
+| R5 | Low | The admin learned the store time zone only from a loaded report: before that it assumed UTC, so between midnight and 6 a.m. in Dhaka the payment dialog could refuse today's date | The public store info (`GET /api/v1/store`) names the time zone; every admin page reads it; saving a new zone refreshes it |
+| R6 | Test | The 409 duplicate warning's `duplicate_of` was dropped twice on the way to the screen (the sign-in service's `failed()` and the admin's `ApiError`), found by the survey | Kept as `duplicateOf` in both, with proxy tests |
+| R7 | Test | Admin unit tests failed at random on a busy computer (2–11 per run: 1 s waits for the screen, 5 s per test); some LiveData checks also read "the newest request", which was sometimes the layout's store-info or notifications request | As in the storefront: 5 s waits, 15 s per test, half the cores; the LiveData checks wait for the newest request *to the list being filtered*. 311/311 three runs in a row |
+| R8 | Test | The system suite's sidebar check looked for a link named "Products" without `exact`, so it also matched the new "Sales and products" and stopped (strict mode) | Sidebar links are matched by their exact names (the new Reports links included) |
+| R9 | Test | In the first full dev run the orders suite stopped once: a product page's on-demand code failed to load ("Couldn't load preload assets" in the dev server's log at that minute), after an hour of edits and dev-server restarts while the phase was built | Development server only (the production build serves fixed files); orders then passed alone, 41/41 |
+
+Not automated: real courier payout statements (no courier API is asked; a later step after sandbox checks with the owner's accounts); "Fees not reported" on a real database (unit-tested; the dev data has fees from every courier). The admin pages are English only, as before.
+
+Checks: backend 696 feature tests (Pint clean); frontend 1,143 unit tests (20 new proxy tests); admin 311 (24 new); browser checks on the dev server: 2,215 passed and 2 failed, with the orders and system suites not finished (R8, R9; both then passed alone, 41 and 40); on the production build 2,289 of 2,289 (full run, every suite passed; new `reports` suite: 113 checks, its own API with a Steadfast and a Pathao stand-in).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

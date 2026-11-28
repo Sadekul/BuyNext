@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process'
 import { isProductionBuild, preserveStock } from './lib.mjs'
 
-const suites = ['storefront', 'accounts', 'sessions', 'signup', 'orders', 'documents', 'system', 'catalog', 'customers', 'marketing', 'payments', 'launch', 'extras', 'loyalty', 'taka', 'bangla', 'delivery', 'slider', 'configurable', 'marketplace', 'courier', 'welcome', 'sms', 'security', 'motion', 'admin']
+const suites = ['storefront', 'accounts', 'sessions', 'signup', 'orders', 'documents', 'system', 'catalog', 'customers', 'marketing', 'payments', 'launch', 'extras', 'loyalty', 'taka', 'bangla', 'delivery', 'slider', 'configurable', 'marketplace', 'courier', 'welcome', 'sms', 'reports', 'security', 'motion', 'admin']
 // Laravel mode starts its own dev server, so it runs only in the dev run.
 if (!isProductionBuild) suites.push('laravel')
 

@@ -56,6 +56,10 @@ import WelcomeCouponPage from './pages/WelcomeCouponPage'
 // Phase 20: Settings → SMS, Sales → SMS log.
 import SmsSettingsPage from './pages/SmsSettingsPage'
 import SmsLogPage from './pages/SmsLogPage'
+// Phase 21: Reports → Money in, Cash on delivery, Courier payments.
+import MoneyInPage from './pages/MoneyInPage'
+import CashOnDeliveryPage from './pages/CashOnDeliveryPage'
+import CourierPaymentsPage from './pages/CourierPaymentsPage'
 
 /** The dashboard, or the first screen the role may open (e.g. Sales staff without dashboard.view). */
 function Home() {
@@ -148,6 +152,10 @@ export function AdminRoutes() {
             {/* Phase 20: SMS notifications (settings.view, changed with settings.edit) and the SMS log (orders.view, Retry with orders.edit). */}
             <Route path="settings/sms" element={guarded('settings.view', <SmsSettingsPage />)} />
             <Route path="sms" element={guarded('orders.view', <SmsLogPage />)} />
+            {/* Phase 21: sales and cash reports (reports.view; recording courier payments needs cash.manage). */}
+            <Route path="reports/payments" element={guarded('reports.view', <MoneyInPage />)} />
+            <Route path="reports/cod" element={guarded('reports.view', <CashOnDeliveryPage />)} />
+            <Route path="reports/courier-payments" element={guarded('reports.view', <CourierPaymentsPage />)} />
           </>
         )}
         <Route path="*" element={<NotFoundPage />} />

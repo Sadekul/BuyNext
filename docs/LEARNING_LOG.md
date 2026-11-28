@@ -374,3 +374,11 @@
 - When failures move to a different place on every run, log the network: the admin's requests answered 429 "Too Many Requests", which looked like "no search results" and "the page never loaded"
 - An interrupted test run leaves its test data behind (its clean-up never ran): check for leftovers before trusting the next run, and remove them the way the suite's own clean-up would
 - An accessibility check that runs mid-fade measures half-transparent text: wait for running animations to finish before measuring contrast
+
+## Phase 21: sales and cash reports (2026-11-28)
+
+- Survey before you build: three read-only agents mapped the code first and found 12 places where the plan didn't match it (a helper that returns labels, not codes; an error field dropped twice on its way to the screen; a time zone sent in `meta`, not `data`), all fixed in the plan before any code was written
+- Reports are only as honest as their definitions: "who has the cash" had to follow how the money really moves (a courier's rider collects it, even when staff type it in), a returned parcel is not money "still to collect", and a negative balance needs the right reason ("paid more than recorded" only when payments were recorded)
+- Time zones: store whole UTC instants, filter with UTC start/end of the local day, and group by local day in code; "today" in Dhaka starts at 18:00 UTC the day before
+- Agents can be cut off (here by an internet drop): they keep their context, so check the working tree for empty or half-written files, then tell them to resume from the files' real state
+- A browser suite that shares a database with others checks changes ("+1 order") and rules that must always hold (the parts add up to the total), never absolute numbers

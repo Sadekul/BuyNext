@@ -27,7 +27,8 @@ class Settings
     /** The groups the admin shows (GET/PATCH /api/admin/v1/settings) and their keys. */
     public const GROUPS = [
         // Phase 13: default_locale (en|bn: the language a first visit gets) and bangla_digits (০–৯ in Bangla).
-        'general' => ['store_name', 'support_email', 'support_phone', 'address', 'default_locale', 'bangla_digits'],
+        // Phase 21: store_timezone (the reports' days; UTC until the owner picks Asia/Dhaka).
+        'general' => ['store_name', 'support_email', 'support_phone', 'address', 'default_locale', 'bangla_digits', 'store_timezone'],
         // Phase 10 (part B): default_weight_grams (products without a weight, for table rates).
         'shipping' => ['standard_price', 'free_shipping_threshold', 'express_price', 'next_day_price', 'enabled_methods', 'default_weight_grams'],
         'tax' => ['tax_enabled', 'tax_rates', 'prices_include_tax'],
@@ -82,6 +83,7 @@ class Settings
         'address' => null,
         'default_locale' => 'en', // phase 13
         'bangla_digits' => true, // phase 13
+        'store_timezone' => 'UTC', // phase 21
         'standard_price' => '4.99',
         'free_shipping_threshold' => '50.00',
         'express_price' => '12.99',
@@ -162,6 +164,14 @@ class Settings
     public function get(string $key, mixed $default = null): mixed
     {
         return array_key_exists($key, $this->all()) ? $this->all()[$key] : $default;
+    }
+
+    /** Phase 21: the store time zone (reports and the dashboard chart count days in it); UTC when unset or unknown. */
+    public function timezone(): string
+    {
+        $zone = $this->get('store_timezone');
+
+        return is_string($zone) && in_array($zone, timezone_identifiers_list(), true) ? $zone : 'UTC';
     }
 
     /** A money setting in cents ("4.99" → 499). */
@@ -280,6 +290,7 @@ class Settings
             'general.address' => ['nullable', 'string', 'max:300'],
             'general.default_locale' => ['string', Rule::in(Locale::SUPPORTED)], // phase 13
             'general.bangla_digits' => ['boolean'],
+            'general.store_timezone' => ['string', Rule::in(timezone_identifiers_list())], // phase 21
             'shipping.standard_price' => $money,
             'shipping.free_shipping_threshold' => $money,
             'shipping.express_price' => $money,

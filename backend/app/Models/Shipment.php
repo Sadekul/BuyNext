@@ -39,6 +39,9 @@ class Shipment extends Model
         'sundarban' => ['Sundarban Courier', null],
     ];
 
+    /** Phase 21: the Bangladeshi couriers (they collect cash on delivery and pay it to the shop). */
+    public const COURIERS = ['steadfast', 'pathao', 'redx', 'paperfly', 'sundarban'];
+
     /**
      * Phase 18: our normalised delivery status (each courier's own statuses map onto these).
      * "shipped" = a manual shipment without courier updates (every shipment before phase 18).

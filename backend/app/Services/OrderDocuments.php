@@ -100,10 +100,11 @@ class OrderDocuments
      * Phase 14: the advance of a COD order (delivery charge + fee) was paid
      * online: an invoice for it, pending_payment → processing, and
      * partially_paid (paid when nothing is left to collect).
+     * Phase 21: the invoice's kind is "advance".
      */
     public function recordAdvance(Order $order, int $cents, string $note): Invoice
     {
-        $invoice = $this->createInvoice($order, null, $cents, $note, true, null);
+        $invoice = $this->createInvoice($order, null, $cents, $note, true, null, kind: ['kind' => 'advance']);
         $order->forceFill(['advance_paid' => Pricing::format($cents)])->save();
 
         return $invoice;
@@ -118,8 +119,13 @@ class OrderDocuments
      * Phase 18: $admin is null when a courier reported the cash (a delivered
      * COD parcel); $actor ("Steadfast") then names who did it in the history,
      * and the audit entry has no admin (actor "system").
+     *
+     * Phase 21: the invoice's kind is "cod_collection", and $via says who
+     * has the cash: the courier's code ("steadfast") when the order went with
+     * a courier (it reported the cash, or staff recorded it), else "staff".
      */
-    public function collect(Order $order, ?Admin $admin, int $cents, ?string $note, string $errorKey = 'collected_amount', ?string $actor = null): ?Invoice
+    public function collect(Order $order, ?Admin $admin, int $cents, ?string $note, string $errorKey = 'collected_amount', ?string $actor = null,
+        ?string $via = null): ?Invoice
     {
         $due = $order->codDueCents();
         $problem = match (true) {
@@ -141,10 +147,12 @@ class OrderDocuments
         $lines = 'Cash collected on delivery: '.$order->money(Pricing::format($cents)).'.'
             .($advance > 0 ? ' Advance paid online: '.$order->money(Pricing::format($advance)).'.' : '');
         $invoice = null;
+        $kind = ['kind' => 'cod_collection', 'collected_via' => $via ?? ($admin ? 'staff' : null)];
         if ($cents === $due) {
-            $invoice = $this->createInvoice($order, $admin, Pricing::toCents($order->grand_total) - $order->paidCents(), trim($lines.' '.($note ?? '')), false, null, $actor);
+            $invoice = $this->createInvoice($order, $admin, Pricing::toCents($order->grand_total) - $order->paidCents(), trim($lines.' '.($note ?? '')), false, null, $actor,
+                $kind);
         } elseif ($cents > 0) {
-            $invoice = $this->createInvoice($order, $admin, $cents, trim($lines.' '.$note), false, 'partially_paid', $actor);
+            $invoice = $this->createInvoice($order, $admin, $cents, trim($lines.' '.$note), false, 'partially_paid', $actor, $kind);
         }
         $order->forceFill(['cod_due' => Pricing::format($due - $cents), 'cod_collected' => Pricing::format($collected)])->save();
 
@@ -173,11 +181,14 @@ class OrderDocuments
     /**
      * An invoice of $cents: the order becomes paid when the invoices reach the
      * grand total (or $paymentStatus), and pending_payment → processing.
+     * Phase 21: $kind = ['kind' => ..., 'collected_via' => ...] for advances and cash collections.
      */
-    private function createInvoice(Order $order, ?Admin $admin, int $cents, ?string $note, bool $notify, ?string $paymentStatus, ?string $actor = null): Invoice
+    private function createInvoice(Order $order, ?Admin $admin, int $cents, ?string $note, bool $notify, ?string $paymentStatus, ?string $actor = null,
+        array $kind = []): Invoice
     {
         $paymentBefore = $order->payment_status;
         $invoice = $order->invoices()->create([
+            ...$kind,
             'amount' => Pricing::format($cents),
             'admin_id' => $admin?->id,
             'note' => $note,

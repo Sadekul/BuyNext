@@ -20,6 +20,8 @@ export class ApiError extends Error {
     this.report = data?.report && typeof data.report === 'object' ? data.report : null
     // An order the server refused line by line (out of stock, options needed…): [{ productId, variantId, code, message }].
     this.problems = Array.isArray(data?.problems) ? data.problems : null
+    // Phase 21: a 409 "this looks like a duplicate" (a courier payment): the record that already exists ({ id, … }).
+    this.duplicateOf = data?.duplicateOf && typeof data.duplicateOf === 'object' && !Array.isArray(data.duplicateOf) ? data.duplicateOf : null
   }
 }
 

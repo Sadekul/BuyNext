@@ -57,5 +57,10 @@ export default defineConfig({
     restoreMocks: true,
     // Demo accounts in unit tests, whatever ../frontend/.env.local says.
     env: { VITE_ACCOUNTS_BACKEND: 'dummyjson', VITE_API_PROVIDER: 'dummyjson' },
+    // As in the storefront: page tests that click through several steps can pass the 5 s default on a busy
+    // computer (11 random timeouts on 8 cores with an editor and a browser open, 2026-11-28), so they get 15 s.
+    testTimeout: 15_000,
+    // Half the cores, so the computer's other work (editor, browser, dev servers) doesn't starve the tests.
+    maxWorkers: '50%',
   },
 })

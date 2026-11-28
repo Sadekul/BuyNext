@@ -41,6 +41,8 @@ export function storeInfo(raw) {
     cardPayments: word(data.card_payments),
     paypalPayments: word(data.paypal_payments),
     sslcommerzPayments: word(data.sslcommerz_payments),
+    // Phase 21: the store time zone ("Asia/Dhaka"), null from an older API.
+    timezone: word(data.timezone),
   }
 }
 

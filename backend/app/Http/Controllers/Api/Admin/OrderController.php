@@ -186,7 +186,10 @@ class OrderController extends Controller
                 if (! in_array($to, ['shipped', 'delivered'], true) || ! in_array($from, ['shipped', 'delivered'], true)) {
                     throw ValidationException::withMessages(['collected_amount' => 'Record the cash collected when the order is delivered.']);
                 }
-                $documents->collect($order, $admin, Pricing::toCents((string) $data['collected_amount']), $data['collection_note'] ?? null);
+                // Phase 21: cash on a parcel a courier delivered is with that courier (it pays the shop later); else staff have it.
+                $carrier = $order->shipments()->reorder()->latest('id')->value('carrier');
+                $documents->collect($order, $admin, Pricing::toCents((string) $data['collected_amount']), $data['collection_note'] ?? null,
+                    via: in_array($carrier, Shipment::COURIERS, true) ? $carrier : 'staff');
                 if ($to === $from && blank($note)) {
                     return [$order, false];
                 }

@@ -480,7 +480,8 @@ class Couriers
                     $cents = min($due, $shipment->collected_cents ?? $shipment->cod_amount_cents ?? $due);
                     if ($cents > 0) {
                         try {
-                            $this->documents->collect($order, null, $cents, $cents < $due ? "{$courier} reported this amount collected." : null, actor: $courier);
+                            $this->documents->collect($order, null, $cents, $cents < $due ? "{$courier} reported this amount collected." : null, actor: $courier,
+                                via: $shipment->carrier); // phase 21: the cash is with this courier
                         } catch (ValidationException $e) {
                             Log::warning('A courier-reported cash collection could not be recorded.', ['order' => $order->number, 'reason' => $e->getMessage()]);
                         }

@@ -82,10 +82,10 @@ describe('helpers', () => {
     expect(paymentProviderNote('card', { stripe: { status: 'live', message: null } })).toEqual({ tone: 'success', label: 'Live', text: '' })
     expect(paymentProviderNote('cod', providers)).toBeNull()
     expect(paymentProviderNote('card', undefined)).toBeNull()
-    expect(storeInfo(BDT_STORE.body.data)).toEqual({ currency: { code: 'BDT', symbol: '৳', decimals: 2 }, cardPayments: 'stripe', paypalPayments: 'unavailable', sslcommerzPayments: 'sslcommerz' })
+    expect(storeInfo(BDT_STORE.body.data)).toEqual({ currency: { code: 'BDT', symbol: '৳', decimals: 2 }, cardPayments: 'stripe', paypalPayments: 'unavailable', sslcommerzPayments: 'sslcommerz', timezone: null })
     // Before phase 12: the display currencies' base, else nothing (USD stays).
     expect(storeInfo({ currencies: { base: 'USD' } }).currency).toEqual({ code: 'USD', symbol: 'USD', decimals: 2 })
-    expect(storeInfo(null)).toEqual({ currency: null, cardPayments: null, paypalPayments: null, sslcommerzPayments: null })
+    expect(storeInfo(null)).toEqual({ currency: null, cardPayments: null, paypalPayments: null, sslcommerzPayments: null, timezone: null })
   })
 
   it('checks display currencies against the store currency', () => {
