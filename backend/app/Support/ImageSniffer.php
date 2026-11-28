@@ -17,6 +17,13 @@ final class ImageSniffer
 {
     public const MAX_DIMENSION = 6000;
 
+    /** The $problem sentences (phase 22: the review photo upload tells them apart). */
+    public const WRONG_TYPE = 'Only JPEG, PNG, or WebP images can be uploaded.';
+
+    public const NOT_AN_IMAGE = 'This file isn\'t a valid image.';
+
+    public const TOO_LARGE = 'Images can be at most '.self::MAX_DIMENSION.'×'.self::MAX_DIMENSION.' pixels.';
+
     private const TYPES = [
         'image/jpeg' => [IMAGETYPE_JPEG, 'jpg'],
         'image/png' => [IMAGETYPE_PNG, 'png'],
@@ -29,7 +36,7 @@ final class ImageSniffer
         $problem = null;
         $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path) ?: '';
         if (! isset(self::TYPES[$mime])) {
-            $problem = 'Only JPEG, PNG, or WebP images can be uploaded.';
+            $problem = self::WRONG_TYPE;
 
             return null;
         }
@@ -37,12 +44,12 @@ final class ImageSniffer
 
         $info = @getimagesize($path);
         if ($info === false || $info[2] !== $imageType || $info[0] < 1 || $info[1] < 1) {
-            $problem = 'This file isn\'t a valid image.';
+            $problem = self::NOT_AN_IMAGE;
 
             return null;
         }
         if ($info[0] > self::MAX_DIMENSION || $info[1] > self::MAX_DIMENSION) {
-            $problem = 'Images can be at most '.self::MAX_DIMENSION.'×'.self::MAX_DIMENSION.' pixels.';
+            $problem = self::TOO_LARGE;
 
             return null;
         }

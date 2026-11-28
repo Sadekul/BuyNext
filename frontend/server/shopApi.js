@@ -1,4 +1,4 @@
-import { json, readBody } from './http.js'
+import { json, multipartType, readBody, readLimitedBody } from './http.js'
 import { serverMessage } from './i18n.js'
 import { laravelShop } from './shop/laravel.js'
 import { laravelCustomer } from './shop/customer.js'
@@ -33,6 +33,10 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  *   GET  /api/shop/orders/:number/invoices/:invoice → printable invoice (customer session; own orders only)
  *   POST /api/shop/products/:id/reviews { rating, title?, comment } → 201 review (customer session; phase 5)
  *                                  422 { code: 'already_reviewed' } for a second review of the same product
+ *                                  Phase 22: also multipart/form-data (rating, title, comment, photos[] with 0–3 files),
+ *                                  passed through unparsed, at most 16 MB (over → 422 errors.photos); the review then
+ *                                  carries `photos: [{ id, url, width, height }]` and the API's `photos` / `photos.N`
+ *                                  errors and `code: 'photos_disabled'` go through
  *
  * Phase 6, customer session only (shop/customer.js):
  *   GET    /api/shop/me/addresses              → { addresses } (the address book)
@@ -129,6 +133,8 @@ const isReturnNumber = (value) => /^RMA-\d{1,12}$/.test(value ?? '')
 const isAlertId = isProductId
 const isWishlistId = isProductId
 const pageOf = (url) => Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
+// Phase 22: a review's photos are at most 3 × 5 MB; the rest is room for the form's other fields and framing.
+const REVIEW_UPLOAD_LIMIT = 16 * 1024 * 1024
 const reply = (result, status) => (result.ok ? json(result.data, status ?? result.status) : json(result.body, result.status))
 
 const ROUTES = {
@@ -158,6 +164,16 @@ const ROUTES = {
 
   async 'POST products/:id/reviews'({ request, cookies, param }) {
     if (!cookies[CUSTOMER.access]) return notSignedIn(request)
+    // Phase 22: a review with photos is a form upload, handed to the API as it came (never parsed here).
+    const contentType = multipartType(request)
+    if (contentType) {
+      const { bytes, tooLarge } = await readLimitedBody(request, REVIEW_UPLOAD_LIMIT)
+      if (tooLarge) {
+        const message = serverMessage(request, 'reviewPhotosTooLarge')
+        return json({ message, errors: { photos: [message] } }, 422)
+      }
+      return reply(await laravelShop.submitReviewWithPhotos(cookies[CUSTOMER.access], param, { contentType, bytes }, request), 201)
+    }
     return reply(await laravelShop.submitReview(cookies[CUSTOMER.access], param, await readBody(request), request), 201)
   },
 

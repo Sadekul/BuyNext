@@ -115,7 +115,15 @@
   },
   "reviews": {
     "empty": "এখনো কোনো রিভিউ নেই।",
-    "verified": "যাচাইকৃত ক্রয়"
+    "verified": "যাচাইকৃত ক্রয়",
+    "withPhotos": "ছবিসহ ({{count, number}})",
+    "anonymous": "একজন ক্রেতা",
+    "photosOf": "{{name}}-এর রিভিউয়ের ছবি",
+    "openPhoto": "{{name}}-এর রিভিউয়ের {{total, number}}টি ছবির মধ্যে {{number, number}} নম্বর ছবিটি খুলুন",
+    "photoAlt": "{{name}}-এর রিভিউয়ের {{total, number}}টি ছবির মধ্যে {{number, number}} নম্বর ছবি",
+    "photoCount": "{{total, number}}টির মধ্যে {{number, number}} নম্বর ছবি",
+    "previousPhoto": "আগের ছবি",
+    "nextPhoto": "পরের ছবি"
   },
   "reviewForm": {
     "pending": "ধন্যবাদ — অনুমোদনের পর আপনার রিভিউটি দেখানো হবে।",
@@ -134,7 +142,19 @@
     "yourReview": "আপনার রিভিউ",
     "hint": "{{product}}-এর কোন দিকটি আপনার ভালো বা খারাপ লেগেছে? {{min, number}} থেকে {{max, number}} অক্ষর (এখন পর্যন্ত {{length, number}})।",
     "sending": "পাঠানো হচ্ছে…",
-    "submit": "রিভিউ জমা দিন"
+    "submit": "রিভিউ জমা দিন",
+    "pendingPhotos_one": "ধন্যবাদ — অনুমোদনের পর আপনার রিভিউটি দেখানো হবে। আপনার ছবিটি আগে যাচাই করা হবে।",
+    "pendingPhotos_other": "ধন্যবাদ — অনুমোদনের পর আপনার রিভিউটি দেখানো হবে। আপনার ছবিগুলো আগে যাচাই করা হবে।",
+    "photosLabel": "ছবি যোগ করুন (ঐচ্ছিক)",
+    "photosHint": "সর্বোচ্চ {{max, number}}টি ছবি, JPEG, PNG বা WebP, প্রতিটি {{size, number}} MB পর্যন্ত।",
+    "photosTooMany": "আপনি সর্বোচ্চ {{max, number}}টি ছবি যোগ করতে পারবেন।",
+    "photoWrongType": "{{name}} কোনো JPEG, PNG বা WebP ছবি নয়।",
+    "photoTooLarge": "{{name}} {{size, number}} MB-এর চেয়ে বড়।",
+    "preparingPhotos": "ছবি প্রস্তুত করা হচ্ছে…",
+    "chosenPhotos": "বাছাই করা ছবি",
+    "photoPreview": "ছবি {{number, number}}: {{name}}",
+    "removePhoto": "{{number, number}} নম্বর ছবি সরান",
+    "photoError": "ছবি {{number, number}}: {{message}}"
   },
   "stockAlert": {
     "done": "পণ্যটি স্টকে ফিরলে আমরা আপনাকে ইমেইল করব।",

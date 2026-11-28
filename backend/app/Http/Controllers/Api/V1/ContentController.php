@@ -8,6 +8,8 @@ use App\Http\Resources\PageResource;
 use App\Http\Resources\ProductResource;
 use App\Models\CurrencyRate;
 use App\Models\Page;
+use App\Models\Review;
+use App\Models\ReviewPhoto;
 use App\Services\CashOnDelivery;
 use App\Services\HomeContent;
 use App\Services\Payments\PayPalPayments;
@@ -105,6 +107,12 @@ class ContentController extends Controller
             // Phase 19: the welcome coupon the newsletter and sign-up may promise ({ type, value, label, min_subtotal,
             // valid_days, first_order_only, triggers }), or null while it is off.
             'welcome_offer' => app(WelcomeCoupons::class)->offer(),
+            // Phase 22: whether the review form offers photos, how many, and how large each may be.
+            'review_photos' => [
+                'enabled' => (bool) $settings->get('review_photos_enabled'),
+                'max' => Review::MAX_PHOTOS,
+                'max_megabytes' => intdiv(ReviewPhoto::MAX_KILOBYTES, 1024),
+            ],
             // Phase 20: only while SMS order texts are on: checkout says "We'll text order updates to this number."
             ...(app(Sms::class)->enabled() ? ['sms_updates' => true] : []),
         ]]);

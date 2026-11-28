@@ -47,6 +47,8 @@ export const DEFAULT_STORE_SETTINGS = {
   welcomeOffer: null,
   // Phase 20: no order texts in the demo (or while the real settings load): checkout promises none.
   smsUpdates: false,
+  // Phase 22: no review photos in the demo (or while the real settings load): the field stays hidden.
+  reviewPhotos: { enabled: false, max: 3, maxMegabytes: 5 },
 }
 
 /**

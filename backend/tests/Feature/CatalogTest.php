@@ -178,7 +178,12 @@ class CatalogTest extends TestCase
         $this->assertSame(2, $apple->images()->count());
         $this->assertSame('/media/products/16/'.str_repeat('a', 32).'.png', $apple->fresh()->thumbnail_url);
 
+        // Phase 22: a review kept from an erased customer (customer_id null, not imported) survives a re-run;
+        // only the imported demo review is replaced.
+        $apple->reviews()->create(['author_name' => 'Nadia R.', 'rating' => 4, 'comment' => 'Kept after the account was erased.', 'status' => 'approved']);
         $this->artisan('buynest:import-catalog', ['--overwrite' => true])->assertSuccessful();
         $this->assertSame(7, $apple->fresh()->stock_quantity);
+        $this->assertEqualsCanonicalizing(['Lucas Gordon', 'Nadia R.'], $apple->reviews()->pluck('author_name')->all());
+        $this->assertTrue($apple->reviews()->where('author_name', 'Lucas Gordon')->value('imported'));
     }
 }

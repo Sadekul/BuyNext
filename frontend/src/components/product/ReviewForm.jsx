@@ -4,7 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LuStar } from 'react-icons/lu'
 import FormField from '../forms/FormField'
 import Button from '../ui/Button'
+import ReviewPhotoField from './ReviewPhotoField'
 import { useAuth } from '../../hooks/useAuth'
+import { useStoreSettings } from '../../hooks/useStoreSettings'
+import { useReviewPhotos } from '../../hooks/useReviewPhotos'
 import { submitReview } from '../../services/shopService'
 import { productKeys } from '../../queries/productQueries'
 import { ROUTES } from '../../constants/routes'
@@ -34,6 +37,17 @@ function validate({ rating, title, comment }, t) {
   }
 }
 
+// Phase 22: the server's photo errors (`photos`, `photos.0` … `photos.2`), numbered for the shopper.
+const PHOTO_ERROR = /^photos(?:\.(\d+))?$/
+function photoErrors(error, t) {
+  return Object.entries(error?.fieldErrors ?? {}).flatMap(([field, messages]) => {
+    const match = PHOTO_ERROR.exec(field)
+    const message = Array.isArray(messages) ? messages[0] : messages
+    if (!match || typeof message !== 'string') return []
+    return [match[1] === undefined ? message : t('reviewForm.photoError', { number: Number(match[1]) + 1, message })]
+  })
+}
+
 const isAlreadyReviewed = (error) =>
   error?.status === 422 &&
   (error.data?.code === 'already_reviewed' ||
@@ -45,6 +59,10 @@ const isAlreadyReviewed = (error) =>
  * characters. New reviews wait for a moderator unless the store publishes
  * them straight away; the server says which (`status`). Signed-out visitors
  * get a link to sign in and come back.
+ *
+ * Phase 22: while the store allows it (GET /store `review_photos.enabled`),
+ * up to 3 photos can be added (ReviewPhotoField). A review with photos is
+ * sent as a form upload and always waits for a moderator.
  */
 function ReviewForm({ productId, productTitle }) {
   const { t } = useTranslation('catalog')
@@ -55,10 +73,16 @@ function ReviewForm({ productId, productTitle }) {
   const [values, setValues] = useState({ rating: 0, title: '', comment: '' })
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [result, setResult] = useState(null) // the success message, once sent
+  const [sentPhotos, setSentPhotos] = useState(0)
+  const { settings } = useStoreSettings()
+  const photoSettings = settings.reviewPhotos ?? { enabled: false, max: 3, maxMegabytes: 5 }
+  const photosEnabled = photoSettings.enabled === true
+  const reviewPhotos = useReviewPhotos({ max: photoSettings.max, maxMegabytes: photoSettings.maxMegabytes })
 
   const mutation = useMutation({
     mutationFn: (input) => authorizedRequest(() => submitReview(productId, input)),
-    onSuccess: (review) => {
+    onSuccess: (review, input) => {
+      setSentPhotos(input.photos?.length ?? 0)
       setResult(review?.status === 'approved' ? 'published' : 'pending')
       // A published review changes the product's reviews and rating.
       if (review?.status === 'approved') queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) })
@@ -76,7 +100,7 @@ function ReviewForm({ productId, productTitle }) {
   if (result) {
     return (
       <p className="review-form__success" role="status">
-        {t(result === 'published' ? 'reviewForm.published' : 'reviewForm.pending')}
+        {result === 'published' ? t('reviewForm.published') : sentPhotos > 0 ? t('reviewForm.pendingPhotos', { count: sentPhotos }) : t('reviewForm.pending')}
       </p>
     )
   }
@@ -90,13 +114,21 @@ function ReviewForm({ productId, productTitle }) {
   let formError = null
   if (isAlreadyReviewed(mutation.error)) formError = t('reviewForm.already')
   // Errors without a field of this form (network, rate limit, an unknown field) are shown above the button.
-  else if (mutation.error && !['rating', 'title', 'comment'].some((field) => mutation.error.fieldErrors?.[field])) formError = mutation.error.message
+  else if (mutation.error && !['rating', 'title', 'comment'].some((field) => mutation.error.fieldErrors?.[field]) && photoErrors(mutation.error, t).length === 0) formError = mutation.error.message
+  const serverPhotoErrors = isAlreadyReviewed(mutation.error) ? [] : photoErrors(mutation.error, t)
 
   function handleSubmit(event) {
     event.preventDefault()
     setHasSubmitted(true)
-    if (errors.rating || errors.title || errors.comment) return
-    mutation.mutate({ rating: values.rating, title: values.title.trim(), comment: values.comment.trim() })
+    if (errors.rating || errors.title || errors.comment || reviewPhotos.preparing) return
+    const photos = photosEnabled ? reviewPhotos.photos.map((photo) => photo.file) : []
+    mutation.mutate({ rating: values.rating, title: values.title.trim(), comment: values.comment.trim(), photos })
+  }
+
+  // A new choice of photos replaces the server's answer about the old ones.
+  function changePhotos(change) {
+    if (serverPhotoErrors.length > 0) mutation.reset()
+    change()
   }
 
   const change = (field) => (event) => setValues((current) => ({ ...current, [field]: event.target.value }))
@@ -165,6 +197,20 @@ function ReviewForm({ productId, productTitle }) {
         )}
       </div>
 
+      {photosEnabled && (
+        <ReviewPhotoField
+          id={id}
+          photos={reviewPhotos.photos}
+          onAdd={(files) => changePhotos(() => reviewPhotos.add(files))}
+          onRemove={(key) => changePhotos(() => reviewPhotos.remove(key))}
+          error={reviewPhotos.error}
+          serverErrors={serverPhotoErrors}
+          preparing={reviewPhotos.preparing}
+          max={photoSettings.max}
+          maxMegabytes={photoSettings.maxMegabytes}
+        />
+      )}
+
       {formError && (
         <p className="review-form__error" role="alert">
           {formError}
@@ -172,7 +218,7 @@ function ReviewForm({ productId, productTitle }) {
       )}
 
       <div>
-        <Button type="submit" disabled={mutation.isPending || isAlreadyReviewed(mutation.error)}>
+        <Button type="submit" disabled={mutation.isPending || reviewPhotos.preparing || isAlreadyReviewed(mutation.error)}>
           {t(mutation.isPending ? 'reviewForm.sending' : 'reviewForm.submit')}
         </Button>
       </div>

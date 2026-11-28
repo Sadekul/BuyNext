@@ -382,3 +382,12 @@
 - Time zones: store whole UTC instants, filter with UTC start/end of the local day, and group by local day in code; "today" in Dhaka starts at 18:00 UTC the day before
 - Agents can be cut off (here by an internet drop): they keep their context, so check the working tree for empty or half-written files, then tell them to resume from the files' real state
 - A browser suite that shares a database with others checks changes ("+1 order") and rules that must always hold (the parts add up to the total), never absolute numbers
+
+## Phase 22: product reviews with photos (2026-11-28)
+
+- Private until approved: customer photos are stored where the web server can't reach them (Laravel's private disk), and the only way to fetch one checks that its review is approved and the photo isn't hidden. Product photos are different: the shop chose them, so they are public files
+- Phone photos carry hidden data, often the exact GPS spot where they were taken (a customer's home). Every photo is cleaned twice: the browser redraws it on a canvas (smaller, no hidden data), and the server re-encodes it again, because a browser step can always be skipped by someone sending the file directly
+- Never trust a file's name or type: the server reads the first bytes to decide what it is, and gives it a random name of its own
+- Caching has a cost: product photos can be cached for a year because they never change, but a review photo that staff hide must disappear, so it is cached for 5 minutes only
+- A test that fails can be the test's fault: here the Bangla check set the language cookie after signing in, but the store (by design, phase 13) lets the account's language win, so the test switched language the way a shopper does
+- Agents can stop on a usage limit as well as an internet drop: their work is saved, and once the limit resets a short message lets each one carry on

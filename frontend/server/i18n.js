@@ -71,6 +71,8 @@ const MESSAGES = {
     en: "This link isn't valid or has expired. You can still find your order with Track your order.",
     bn: 'এই লিংকটি সঠিক নয় বা এর মেয়াদ শেষ। "আপনার অর্ডার ট্র্যাক করুন" থেকে আপনি এখনও অর্ডারটি খুঁজে পাবেন।',
   },
+  // Phase 22: a review's photos, sent through the sign-in service in one request, over its 16 MB cap.
+  reviewPhotosTooLarge: { en: 'The photos are too large together (at most 16 MB).', bn: 'ছবিগুলো একসঙ্গে অনেক বড় (সর্বোচ্চ ১৬ MB)।' },
   demoOnly: { en: 'This needs the BuyNest backend; the demo accounts cannot do it.', bn: 'এর জন্য BuyNest-এর ব্যাকএন্ড দরকার; ডেমো অ্যাকাউন্ট দিয়ে এটি করা যায় না।' },
   usernamePassword: { en: 'Enter your username and password.', bn: 'আপনার ইউজারনেম ও পাসওয়ার্ড লিখুন।' },
 }

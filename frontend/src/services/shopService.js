@@ -37,8 +37,16 @@ const cartLines = (items) =>
  * or "approved" when the store publishes reviews straight away.
  * ApiError 422 with data.code "already_reviewed" for a second review.
  */
-export function submitReview(productId, { rating, title, comment }) {
-  return apiClient.post(`/api/shop/products/${encodeURIComponent(productId)}/reviews`, { rating, title: title || null, comment }, SHOP)
+export function submitReview(productId, { rating, title, comment, photos = [] }) {
+  const path = `/api/shop/products/${encodeURIComponent(productId)}/reviews`
+  if (photos.length === 0) return apiClient.post(path, { rating, title: title || null, comment }, SHOP)
+  // Phase 22: with photos, a form upload (rating, title, comment, photos[]); a slow mobile upload gets a minute.
+  const form = new FormData()
+  form.append('rating', String(rating))
+  form.append('title', title || '')
+  form.append('comment', comment)
+  for (const photo of photos) form.append('photos[]', photo, photo.name)
+  return apiClient.post(path, form, { ...SHOP, timeoutMs: 60_000 })
 }
 
 /**

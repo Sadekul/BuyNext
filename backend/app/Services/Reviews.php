@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Admin;
 use App\Models\Product;
 use App\Models\Review;
+use App\Models\ReviewPhoto;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Review moderation: changing a review's status (or deleting it) and keeping
@@ -35,9 +37,14 @@ class Reviews
         return true;
     }
 
+    /** Call inside a transaction. Phase 22: the photo files are deleted once the transaction commits (the rows cascade). */
     public function delete(Review $review, ?Admin $admin = null): void
     {
+        $photos = $review->photos()->get();
         $review->delete();
+        if ($photos->isNotEmpty()) {
+            DB::afterCommit(fn () => ReviewPhoto::deleteFiles($photos));
+        }
         $this->audit->record('review.deleted', "Review #{$review->id} on product {$review->product?->sku} deleted.", 'review', $review->id,
             ['before' => ['status' => $review->status, 'rating' => $review->rating, 'author_name' => $review->author_name, 'comment' => $review->comment], 'after' => []], $admin);
         if ($review->status === 'approved') {

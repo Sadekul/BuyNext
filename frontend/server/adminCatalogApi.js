@@ -40,12 +40,18 @@ import { checkBangla, optionBangla } from './adminPhase13Api.js'
  *   GET    /api/admin/products/export.csv?q&category&status → the CSV file, with the API's Content-Type and Content-Disposition
  *   POST   /api/admin/products/import?dryRun=true|false  multipart file (CSV, ≤ 2 MB)
  *                                                    → { dryRun, rows, created, updated, unchanged, errors: [{ row, column, message }] }
- *   GET    /api/admin/reviews?status&productId&rating&q&limit&skip → { reviews, total, counts: { pending, approved, rejected }, limit, skip }
+ *   GET    /api/admin/reviews?status&productId&rating&q&hasPhotos&limit&skip → { reviews, total, counts: { pending, approved, rejected }, limit, skip }
  *          review: { id, productId, productName, productSku, productThumbnail, authorName, authorEmail, rating, title, comment,
- *                    status, verifiedPurchase, createdAt, updatedAt }
+ *                    status, verifiedPurchase, createdAt, updatedAt,
+ *                    photos (phase 22): [{ id, hidden, width, height, sizeBytes, position, url: '/api/admin/reviews/:id/photos/:photoId' }] }
+ *          hasPhotos=true|1 (phase 22): only reviews with at least one photo (hidden or not)
  *   PATCH  /api/admin/reviews/:id                   { status } → { review }
  *   POST   /api/admin/reviews/bulk                  { ids, status } → { updated, skipped }
  *   DELETE /api/admin/reviews/:id                   → { deleted: true }
+ *
+ * Phase 22 (docs/backend/PHASE22_CONTRACT.md §3), a review's photos:
+ *   GET    /api/admin/reviews/:id/photos/:photoId   → the photo (image/jpeg | png | webp only, ≤ 10 MB), never cached, sandboxed
+ *   PATCH  /api/admin/reviews/:id/photos/:photoId   { hidden } → { review }
  */
 
 const realData = () => process.env.VITE_API_PROVIDER === 'laravel' && process.env.VITE_ACCOUNTS_BACKEND === 'laravel'
@@ -360,6 +366,8 @@ export const CATALOG_ROUTES = {
       productId: /^\d{1,9}$/.test(searchParams.get('productId') ?? '') ? searchParams.get('productId') : undefined,
       rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : undefined,
       q: searchParams.get('q')?.trim().slice(0, 100) || undefined,
+      // Phase 22.
+      hasPhotos: ['1', 'true'].includes(searchParams.get('hasPhotos')) || undefined,
       ...pageParams(ctx.url),
     }
     return fromLaravel(await laravelCatalogData.listReviews(ctx.token, filters, ctx.request))
@@ -378,9 +386,33 @@ export const CATALOG_ROUTES = {
     return fromLaravel(await laravelCatalogData.bulkReviews(ctx.token, { ids: body.ids, status: body.status }, ctx.request))
   }),
   'DELETE reviews/:id': live(async (ctx) => fromLaravel(await laravelCatalogData.deleteReview(ctx.token, ctx.id, ctx.request), 200)),
+
+  // Phase 22: a review's photo for staff (any status, hidden too). Never cached, and sandboxed like the store's photos.
+  'GET reviews/:id/photos/:sub': live(async (ctx) => {
+    const photo = await laravelCatalogData.reviewPhoto(ctx.token, ...ctxIds(ctx), ctx.request)
+    if (!photo.bytes) return json(failed(photo).body, photo.status)
+    return new Response(photo.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': photo.contentType,
+        'Content-Length': String(photo.bytes.byteLength),
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+      },
+    })
+  }),
+  'PATCH reviews/:id/photos/:sub': live(async (ctx) => {
+    const { hidden } = await readBody(ctx.request)
+    if (typeof hidden !== 'boolean') return invalid({ hidden: ['Choose whether the photo is hidden from the store.'] })
+    const [id, photoId] = ctxIds(ctx)
+    return fromLaravel(await laravelCatalogData.updateReviewPhoto(ctx.token, id, photoId, { hidden }, ctx.request))
+  }),
 }
 
 /** /api/admin/<resource>/<action> without an id (products/bulk, categories/reorder…). */
 export const NAMED_ACTIONS = ['products/bulk', 'products/import', 'products/export.csv', 'categories/reorder', 'reviews/bulk']
 /** /api/admin/products/:id/<part>[/<sub>]: sub-resources of a product. */
 export const PRODUCT_PARTS = { images: ['reorder'], options: [], variants: ['generate'] }
+/** Phase 22: /api/admin/reviews/:id/photos/:photoId, a review's photo. */
+export const REVIEW_PARTS = { photos: [] }

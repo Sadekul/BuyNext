@@ -75,7 +75,7 @@ export function clientIp(request) {
  * a header the browser (or Stripe) sent.
  */
 const laravelBase = () => (process.env.BUYNEST_LARAVEL_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
-function bffHeaders(request) {
+export function bffHeaders(request) {
   const key = process.env.BUYNEST_BFF_KEY
   if (!key) return {}
   const ip = clientIp(request)
@@ -260,6 +260,57 @@ export async function laravelPdf(path, { token, request, headers = {}, method = 
       contentLength: response.headers.get('content-length'),
       disposition: response.headers.get('content-disposition') ?? '',
     }
+  } catch {
+    return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
+  }
+}
+
+export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+/**
+ * Phase 22: a GET to the Laravel API whose answer is a photo (a review's
+ * photo for staff). Only JPEG, PNG and WebP answers count, and never more
+ * than `maxBytes`: a larger Content-Length is refused before reading, and a
+ * body without one stops being read as soon as it passes the cap.
+ * Success → { status, contentType, bytes }; anything else → { status, data } like laravel().
+ */
+export async function laravelImage(path, { token, request, maxBytes = 10 * 1024 * 1024 } = {}) {
+  try {
+    const response = await fetch(`${laravelBase()}${path}`, {
+      headers: { Accept: `${IMAGE_TYPES.join(', ')}, application/json`, ...(token && { Authorization: `Bearer ${token}` }), ...languageHeaders(request, path), ...bffHeaders(request) },
+      signal: AbortSignal.timeout(30_000),
+    })
+    const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    if (!response.ok || !IMAGE_TYPES.includes(contentType) || !response.body) {
+      const data = contentType === 'application/json' ? await response.json().catch(() => ({})) : (await response.body?.cancel(), {})
+      return { status: response.ok ? 502 : response.status, data }
+    }
+    const declared = Number(response.headers.get('content-length'))
+    const tooLarge = () => ({ status: 502, data: { message: serverMessage(request, 'fileTooLarge') } })
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      await response.body.cancel()
+      return tooLarge()
+    }
+    const reader = response.body.getReader()
+    const chunks = []
+    let size = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => {})
+        return tooLarge()
+      }
+      chunks.push(value)
+    }
+    const bytes = new Uint8Array(size)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return { status: response.status, contentType, bytes }
   } catch {
     return { status: 502, data: { message: serverMessage(request, 'unreachable') } }
   }

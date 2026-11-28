@@ -306,7 +306,7 @@ describe('reviews', () => {
     const calls = fakeLaravel({ 'GET /api/admin/v1/reviews': { body: { data: [REVIEW], meta: { total: 1, counts: { pending: 1, approved: '3' } } } } })
     const list = await (await admin('reviews?status=pending&productId=4&rating=4&q=day&evil=1&limit=10')).json()
     expect(list).toEqual({
-      reviews: [{ id: 5, productId: 4, productName: 'Mascara', productSku: 'BEA-1', productThumbnail: null, authorName: 'Ava', authorEmail: 'ava@example.com', rating: 4, title: 'Nice', comment: 'Lasts all day.', status: 'pending', verifiedPurchase: true, createdAt: 'T', updatedAt: null }],
+      reviews: [{ id: 5, productId: 4, productName: 'Mascara', productSku: 'BEA-1', productThumbnail: null, authorName: 'Ava', authorEmail: 'ava@example.com', rating: 4, title: 'Nice', comment: 'Lasts all day.', status: 'pending', verifiedPurchase: true, createdAt: 'T', updatedAt: null, photos: [] }],
       total: 1,
       counts: { pending: 1, approved: 3, rejected: 0 },
       limit: 10,

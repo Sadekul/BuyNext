@@ -115,7 +115,15 @@
   },
   "reviews": {
     "empty": "No reviews yet.",
-    "verified": "Verified purchase"
+    "verified": "Verified purchase",
+    "withPhotos": "With photos ({{count}})",
+    "anonymous": "a customer",
+    "photosOf": "Photos from {{name}}'s review",
+    "openPhoto": "Open photo {{number}} of {{total}} from {{name}}'s review",
+    "photoAlt": "Photo {{number}} of {{total}} from {{name}}'s review",
+    "photoCount": "Photo {{number}} of {{total}}",
+    "previousPhoto": "Previous photo",
+    "nextPhoto": "Next photo"
   },
   "reviewForm": {
     "pending": "Thanks — your review will appear after approval.",
@@ -134,7 +142,19 @@
     "yourReview": "Your review",
     "hint": "What did you like or dislike about {{product}}? {{min}} to {{max}} characters ({{length}} so far).",
     "sending": "Sending…",
-    "submit": "Submit review"
+    "submit": "Submit review",
+    "pendingPhotos_one": "Thanks — your review will appear after approval. Your photo will be checked first.",
+    "pendingPhotos_other": "Thanks — your review will appear after approval. Your photos will be checked first.",
+    "photosLabel": "Add photos (optional)",
+    "photosHint": "Up to {{max}} photos, JPEG, PNG or WebP, {{size}} MB each.",
+    "photosTooMany": "You can add up to {{max}} photos.",
+    "photoWrongType": "{{name}} isn't a JPEG, PNG or WebP photo.",
+    "photoTooLarge": "{{name}} is larger than {{size}} MB.",
+    "preparingPhotos": "Preparing photos…",
+    "chosenPhotos": "Chosen photos",
+    "photoPreview": "Photo {{number}}: {{name}}",
+    "removePhoto": "Remove photo {{number}}",
+    "photoError": "Photo {{number}}: {{message}}"
   },
   "stockAlert": {
     "done": "We'll email you when it's back in stock.",

@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
+use App\Models\ReviewPhoto;
 use App\Services\CatalogRules;
 use App\Services\Pricing;
 use App\Services\ProductLinks;
@@ -108,6 +109,10 @@ class ProductResource extends JsonResource
             'reviews' => $this->when($this->detail && $this->relationLoaded('reviews'), fn () => $this->reviews
                 ->filter(fn (Review $review) => $review->status === 'approved')
                 ->map(fn (Review $review) => self::publicReview($review))->values()),
+            // Phase 22: visible photos on approved reviews (for "With photos"), on the product page only.
+            'review_photo_count' => $this->when($this->detail && $this->relationLoaded('reviews'), fn () => $this->reviews
+                ->filter(fn (Review $review) => $review->status === 'approved')
+                ->sum(fn (Review $review) => $review->photos->where('hidden', false)->count())),
             'options' => $this->when($this->detail && $this->relationLoaded('options'), fn () => $this->has_variants ? $this->options
                 ->map(fn ($option) => [
                     'id' => $option->id,
@@ -194,7 +199,7 @@ class ProductResource extends JsonResource
             ])->values()->all();
     }
 
-    /** A review as shoppers see it. */
+    /** A review as shoppers see it. Phase 22: photos = the visible ones, in order ([] when none). */
     public static function publicReview(Review $review): array
     {
         return [
@@ -205,6 +210,12 @@ class ProductResource extends JsonResource
             'created_at' => $review->created_at?->toIso8601ZuluString(),
             'author_name' => $review->author_name,
             'verified_purchase' => $review->verified_purchase,
+            'photos' => $review->photos->where('hidden', false)->map(fn (ReviewPhoto $photo) => [
+                'id' => $photo->id,
+                'url' => $photo->url(),
+                'width' => $photo->width,
+                'height' => $photo->height,
+            ])->values()->all(),
         ];
     }
 }

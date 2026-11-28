@@ -50,3 +50,66 @@
   font-size: var(--text-base);
   font-weight: 600;
 }
+
+/* Phase 22: "With photos (n)" and the photo thumbnails. */
+.product-reviews__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.product-reviews__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+}
+
+.product-reviews__filter:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Pressed: white on emerald (5.5:1). */
+.product-reviews__filter--on,
+.product-reviews__filter--on:hover {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.product-reviews__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.product-reviews__photo {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+}
+
+.product-reviews__photo img {
+  display: block;
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+}
+
+.product-reviews__photo:hover {
+  border-color: var(--color-primary);
+}

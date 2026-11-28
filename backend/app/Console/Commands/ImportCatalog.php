@@ -140,13 +140,15 @@ class ImportCatalog extends Command
             if ($product->images()->whereNotNull('path')->exists()) {
                 $product->syncThumbnail(); // with uploads, the thumbnail follows the first image
             }
-            $product->reviews()->whereNull('customer_id')->delete();
+            // Only the demo reviews an import made: an erased customer's review also has no customer, and stays (phase 22).
+            $product->reviews()->where('imported', true)->delete();
             foreach ($item['reviews'] ?? [] as $review) {
                 $product->reviews()->create([
                     'author_name' => $review['reviewerName'],
                     'rating' => max(1, min(5, (int) $review['rating'])),
                     'comment' => $review['comment'],
                     'status' => 'approved', // DummyJSON's reviews are part of the demo catalog
+                    'imported' => true,
                     'created_at' => Carbon::parse($review['date']),
                 ]);
             }

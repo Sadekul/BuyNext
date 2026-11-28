@@ -54,6 +54,8 @@ export function normalizeProduct(raw) {
     metaTitle: typeof raw.meta_title === 'string' && raw.meta_title.trim() ? raw.meta_title.trim() : null,
     metaDescription: typeof raw.meta_description === 'string' && raw.meta_description.trim() ? raw.meta_description.trim() : null,
     reviews: (raw.reviews ?? []).map(normalizeReview),
+    // Phase 22: visible photos on approved reviews (the "With photos" filter shows when > 0).
+    reviewPhotoCount: Number.isInteger(raw.review_photo_count) && raw.review_photo_count > 0 ? raw.review_photo_count : 0,
     // Phase 5 configurable products. Listing items only say whether there are
     // variants (`has_variants`); the product page gets the options and variants.
     hasVariants: raw.has_variants === true || (raw.variants?.length ?? 0) > 0,
@@ -127,7 +129,22 @@ export function normalizeReview(review) {
     date: review.created_at,
     reviewerName: review.author_name,
     verifiedPurchase: review.verified_purchase === true,
+    photos: normalizeReviewPhotos(review.photos),
   }
+}
+
+/**
+ * Phase 22: a review's photos, allow-listed. A photo is only ever shown from
+ * the store's own /media/reviews/<32 hex>.<jpg|png|webp>; anything else is
+ * dropped. Width and height are positive whole numbers or null.
+ */
+const REVIEW_PHOTO_URL = /^\/media\/reviews\/[a-f0-9]{32}\.(jpg|png|webp)$/
+const positiveInt = (value) => (Number.isInteger(value) && value > 0 && value <= 100_000 ? value : null)
+export function normalizeReviewPhotos(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((photo) => photo && typeof photo.url === 'string' && REVIEW_PHOTO_URL.test(photo.url))
+    .slice(0, 3)
+    .map((photo) => ({ id: positiveInt(photo.id), url: photo.url, width: positiveInt(photo.width), height: positiveInt(photo.height) }))
 }
 
 /** Phase 16: a swatch colour, only as `#RRGGBB` (anything else → null, a neutral swatch). */

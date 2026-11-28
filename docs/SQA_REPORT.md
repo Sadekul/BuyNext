@@ -465,6 +465,25 @@ Not automated: real courier payout statements (no courier API is asked; a later 
 
 Checks: backend 696 feature tests (Pint clean); frontend 1,143 unit tests (20 new proxy tests); admin 311 (24 new); browser checks on the dev server: 2,215 passed and 2 failed, with the orders and system suites not finished (R8, R9; both then passed alone, 41 and 40); on the production build 2,289 of 2,289 (full run, every suite passed; new `reports` suite: 113 checks, its own API with a Steadfast and a Pathao stand-in).
 
+## Phase 22 (product reviews with photos) — 2026-11-28
+
+Started on the owner's "you should start next steps": the first idea on the list that needs none of the owner's outside accounts. Contract with proposed answers to Q1–Q5 (3 photos, reviews with photos always wait for approval, off by default, photos always cleaned, no extra points): [backend/PHASE22_CONTRACT.md](backend/PHASE22_CONTRACT.md). Four agents built in parallel: backend, storefront with its sign-in service, admin with its routes, and the `review-photos` browser suite. All four stopped once on the account's 5-hour usage limit and carried on after it reset; their files were checked first (no empty or half-written files). **Off by default** (`review_photos_enabled`): every older suite ran unchanged.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| P1 | High | The store's photo service (`/media/…`) fetched files without the sign-in service's shared key. Review photos come from an API route, so on a server that requires the key (production) every review photo would have been refused and shown as missing (found by the storefront agent) | The media service sends the key like every other call to the API, with a test |
+| P2 | Medium | Re-running `buynest:import-catalog` ("safe to run again") deleted every review without a customer to refresh the demo reviews, but a customer who erases their account keeps their reviews with no customer, so real reviews were lost and ratings changed (older bug, found by the backend agent) | Imported reviews are marked (`imported`, 582 demo reviews marked on the dev database by the migration; reviews written in the shop stay unmarked) and only they are replaced; tested |
+| P3 | Medium | Phone photos carry hidden data, often the exact GPS spot where they were taken | Cleaned twice: the browser redraws each photo (at most 1600 px), and the server re-encodes it and strips any metadata left (pure-PHP fallback when GD is missing). The browser suite checks that the served bytes contain neither `Exif` nor `GPS` |
+| P4 | Low | The development API (`php artisan serve`) used the computer's PHP defaults, 2 MB per file and 8 MB per request, while the live server allows 5 MB and 60 MB: in development a photo between 2 and 5 MB was refused as "at most 5 MB" | `./dev.sh` adds `backend/docker/php-dev/uploads.ini` (production upload sizes) through `PHP_INI_SCAN_DIR` |
+| P5 | Low | A photo error from the server would also have shown as the general form error above the button, so twice | Photo errors are shown only under the photo field |
+| P6 | Test | The suite's Bangla check put the language cookie after Ava had signed in, but the store lets the account's language win (phase 13, by design: she signed in on an English page), so the page stayed English | The suite switches to বাংলা with the header switch, as a shopper would; clean-up resets Ava's language |
+| P7 | Test | The admin "With photos" check read the list while the previous answer was still on screen | It waits until the review without photos has left the list |
+| P8 | Test | One admin unit test (forced two-step setup) timed out once while the backend tests ran at the same time | Passed alone and in a full rerun on a quiet computer (319/319); no change |
+
+Known limits (documented): Vercel and Netlify functions take at most about 4.5 MB and 6 MB per request, so on those hosts three large photos may be too much together (the browser's shrinking usually keeps them well under); a customer's "download my data" file does not include their review photos yet; iPhone HEIC photos are converted to JPEG by the phone's browser when chosen in the form (not tested on a real iPhone).
+
+Checks: backend 716 feature and unit tests (22 new, and the catalog import test now also proves P2; Pint clean); frontend 1,199 unit tests (was 1,143: storefront, proxy and admin-proxy tests); admin 319 (8 new); browser checks on the dev server 2,372 of 2,372 (29 suites, new `review-photos` suite: 76 checks); on the production build 2,365 of 2,365 (28 suites; every suite passed).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

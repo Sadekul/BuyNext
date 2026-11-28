@@ -36,7 +36,8 @@ class Settings
         'checkout' => ['allowed_countries', 'guest_checkout', 'enabled_payment_methods', 'default_country'],
         'inventory' => ['low_stock_threshold'],
         // Phase 5: Settings → Catalog. The contract calls it reviews.require_approval.
-        'catalog' => ['reviews_require_approval'],
+        // Phase 22: review_photos_enabled (customers can add photos to reviews; off by default).
+        'catalog' => ['reviews_require_approval', 'review_photos_enabled'],
         // Phase 6: Settings → Returns (RMA).
         'returns' => ['returns_enabled', 'return_window_days', 'return_reasons'],
         // Phase 9 (part A): Settings → Security (changing it needs the Owner role, see SettingsController).
@@ -98,6 +99,7 @@ class Settings
         'enabled_payment_methods' => ['card', 'paypal', 'cod'],
         'low_stock_threshold' => 10,
         'reviews_require_approval' => true, // false: new reviews are public at once
+        'review_photos_enabled' => false, // phase 22: reviews with photos always wait for approval
         'returns_enabled' => true,
         'return_window_days' => 30, // from the delivered date, or the last shipment without one
         'return_reasons' => ['Damaged', 'Wrong item', 'Not as described', 'No longer needed', 'Other'],
@@ -310,6 +312,7 @@ class Settings
             'checkout.enabled_payment_methods.*' => ['string', 'distinct', Rule::in(array_keys(config('buynest.store.payment_methods')))],
             'inventory.low_stock_threshold' => ['integer', 'min:0', 'max:100000'],
             'catalog.reviews_require_approval' => ['boolean'],
+            'catalog.review_photos_enabled' => ['boolean'], // phase 22
             'returns.returns_enabled' => ['boolean'],
             'returns.return_window_days' => ['integer', 'min:1', 'max:365'],
             'returns.return_reasons' => ['array', 'min:1', 'max:20'],
@@ -356,7 +359,7 @@ class Settings
             $key === 'cod_require_confirmation' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
             $key === 'cod_zones' => array_values(array_map('trim', $value)),
             in_array($key, ['tax_enabled', 'prices_include_tax', 'guest_checkout', 'reviews_require_approval', 'returns_enabled',
-                'require_admin_two_factor'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 9 (part A): the last one
+                'require_admin_two_factor', 'review_photos_enabled'], true) => filter_var($value, FILTER_VALIDATE_BOOLEAN), // phase 9 (part A) and 22: the last two
             in_array($key, ['low_stock_threshold', 'return_window_days', 'default_weight_grams'], true) => (int) $value, // phase 10 (part B): the last one
             $key === 'tax_rates' => array_values(array_map(fn ($rate) => [
                 'country' => trim($rate['country']),

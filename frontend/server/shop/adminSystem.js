@@ -400,8 +400,8 @@ const SETTINGS = {
   // Phase 14 §2: + the country new addresses start with (null = none).
   checkout: { allowed_countries: 'allowedCountries', guest_checkout: 'guestCheckout', enabled_payment_methods: 'enabledPaymentMethods', default_country: 'defaultCountry' },
   inventory: { low_stock_threshold: 'lowStockThreshold' },
-  // Phase 5: reviews wait for approval unless this is off.
-  catalog: { reviews_require_approval: 'reviewsRequireApproval' },
+  // Phase 5: reviews wait for approval unless this is off. Phase 22: + whether customers can add photos to reviews.
+  catalog: { reviews_require_approval: 'reviewsRequireApproval', review_photos_enabled: 'reviewPhotosEnabled' },
   // Phase 6: returns (RMA).
   returns: { returns_enabled: 'returnsEnabled', return_window_days: 'returnWindowDays', return_reasons: 'returnReasons' },
   // Phase 9: two-step sign-in for every admin (only the Owner may change it; the API checks).

@@ -126,7 +126,7 @@ class ImageResizer
     }
 
     /** EXIF orientation 1–8 of a JPEG (1 = as stored, or unknown). */
-    private function jpegOrientation(string $bytes): int
+    public function jpegOrientation(string $bytes): int
     {
         if (! function_exists('exif_read_data')) {
             return 1;
@@ -137,7 +137,7 @@ class ImageResizer
     }
 
     /** Turns the pixels so the copy looks like the original does in a browser (which applies the flag). */
-    private function orient(GdImage $image, int $orientation): GdImage
+    public function orient(GdImage $image, int $orientation): GdImage
     {
         if (in_array($orientation, [2, 4, 5, 7], true)) {
             imageflip($image, IMG_FLIP_HORIZONTAL);
@@ -159,7 +159,7 @@ class ImageResizer
     }
 
     /** A 6000×6000 photo needs about 150 MB decoded: raise the limit for this request if needed (at most 1 GB). */
-    private function ensureMemory(int $width, int $height): void
+    public function ensureMemory(int $width, int $height): void
     {
         $needed = memory_get_usage() + $width * $height * 5 + 32 * 1024 * 1024;
         $limit = $this->bytes((string) ini_get('memory_limit'));

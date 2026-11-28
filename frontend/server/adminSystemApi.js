@@ -361,6 +361,8 @@ const SETTING_RULES = {
   },
   catalog: {
     reviewsRequireApproval: isBoolean('Choose whether new reviews wait for approval.'),
+    // Phase 22.
+    reviewPhotosEnabled: isBoolean('Choose whether customers can add photos to reviews.'),
   },
   returns: {
     returnsEnabled: isBoolean('Choose whether customers can request returns.'),

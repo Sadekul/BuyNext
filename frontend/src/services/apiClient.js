@@ -97,6 +97,10 @@ async function request(
   const credentials = sameOrigin ? 'same-origin' : providerCredentials
   const xsrfToken = xsrfCookie && method !== 'GET' && !sameOrigin ? readCookie(xsrfCookie) : null
 
+  // Phase 22: a FormData body (a review's photos) is sent as it is: the browser writes the
+  // multipart Content-Type with its boundary itself, so none is set here.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
+
   let response
   try {
     response = await fetch(buildUrl(path, params, sameOrigin || providerSameOrigin), {
@@ -104,11 +108,11 @@ async function request(
       credentials,
       headers: {
         Accept: 'application/json',
-        ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...(body !== undefined && !isForm && { 'Content-Type': 'application/json' }),
         ...(xsrfToken && { 'X-XSRF-TOKEN': xsrfToken }),
         ...headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       signal: combinedSignal,
       keepalive, // true: the request finishes even if the page is closed or reloaded
     })

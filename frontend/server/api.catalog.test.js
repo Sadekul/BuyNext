@@ -86,7 +86,7 @@ describe('product reviews (POST /api/shop/products/:id/reviews)', () => {
     expect(calls[0].init.headers.Authorization).toBe('Bearer AT')
     expect(JSON.parse(calls[0].init.body)).toEqual({ rating: 5, title: 'Lovely', comment: 'Soft and fits well.' })
     const review = await response.json()
-    expect(review).toEqual({ id: 9, rating: 5, title: 'Lovely', comment: 'Soft and fits well.', status: 'pending', verifiedPurchase: true, reviewerName: 'Ava C.', date: '2026-11-16T10:00:00Z' })
+    expect(review).toEqual({ id: 9, rating: 5, title: 'Lovely', comment: 'Soft and fits well.', status: 'pending', verifiedPurchase: true, reviewerName: 'Ava C.', date: '2026-11-16T10:00:00Z', photos: [] })
   })
 
   it('passes "already reviewed" on as a code the page can explain', async () => {

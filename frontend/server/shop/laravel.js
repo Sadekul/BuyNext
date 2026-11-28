@@ -1,4 +1,4 @@
-import { laravel, laravelPdf, pick } from '../http.js'
+import { laravel, laravelMultipart, laravelPdf, pick } from '../http.js'
 import { serverMessage } from '../i18n.js'
 import { productCards } from './productCard.js'
 import { fromBangladeshAddress, fromCod, fromCodTotals, fromMethodDelivery, fromOrderDelivery, fromOrderEta, fromZone, isBangladesh, toBangladeshAddress, toPlaceIds } from './bangladesh.js'
@@ -457,6 +457,22 @@ export function failed({ status, data }) {
   return { ok: false, status, body }
 }
 
+/**
+ * Phase 22: a review photo's address is only ever the store's own
+ * /media/reviews/<32 hex>.<jpg|png|webp> (served by server/mediaApi.js after
+ * the API checks the review is approved and the photo isn't hidden).
+ */
+export const REVIEW_PHOTO_URL = /^\/media\/reviews\/[a-f0-9]{32}\.(jpg|png|webp)$/
+const positiveInt = (value) => (Number.isInteger(value) && value > 0 && value <= 100_000 ? value : null)
+
+/** `photos: [{ id, url, width, height }]` → the same, allow-listed: a photo with any other URL is dropped (at most 3). */
+export function fromReviewPhotos(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((photo) => photo && typeof photo === 'object' && typeof photo.url === 'string' && REVIEW_PHOTO_URL.test(photo.url))
+    .slice(0, 3)
+    .map((photo) => ({ id: positiveInt(photo.id), url: photo.url, width: positiveInt(photo.width), height: positiveInt(photo.height) }))
+}
+
 /** ReviewResource → the review the storefront shows (no customer id or email). */
 export const fromReview = (raw = {}) => ({
   id: raw.id ?? null,
@@ -467,6 +483,8 @@ export const fromReview = (raw = {}) => ({
   reviewerName: str(raw.author_name) ?? null,
   verifiedPurchase: raw.verified_purchase === true,
   status: ['pending', 'approved', 'rejected'].includes(raw.status) ? raw.status : 'pending',
+  // Phase 22: the review's photos (none → []).
+  photos: fromReviewPhotos(raw.photos),
 })
 
 /** Phase 14: the area (and its district) that prices a Bangladesh cart's delivery. */
@@ -580,6 +598,17 @@ export const laravelShop = {
       request,
       body: { rating: Number.isInteger(rating) ? rating : null, title: title || null, comment: comment ?? '' },
     })
+    return answer(result, [200, 201], (data) => fromReview(data.data))
+  },
+
+  /**
+   * Phase 22: a review with photos, as the browser sent it (multipart
+   * `rating`, `title`, `comment`, `photos[]`), passed through unparsed: the
+   * API checks every field and every file (type from the bytes, size, count),
+   * cleans the photos, and keeps the review pending until a moderator approves it.
+   */
+  async submitReviewWithPhotos(token, productId, { contentType, bytes }, request) {
+    const result = await laravelMultipart(`/api/v1/products/${productId}/reviews`, { token, request, contentType, bytes })
     return answer(result, [200, 201], (data) => fromReview(data.data))
   },
 

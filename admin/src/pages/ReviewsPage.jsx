@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuBadgeCheck, LuCheck, LuCircleCheck, LuCircleX, LuClock, LuSearch, LuStar, LuTrash2, LuX } from 'react-icons/lu'
-import { adminKeys, bulkReviews, deleteReview, getReviews, updateReview } from '../api/admin'
+import { adminKeys, bulkReviews, deleteReview, getReviews, updateReview, updateReviewPhoto } from '../api/admin'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/PageHeader'
+import ReviewPhotos from '../components/ReviewPhotos'
 import Pagination from '../components/Pagination'
 import StatusBadge from '../components/StatusBadge'
 import { Empty, ErrorState, Loading } from '../components/States'
@@ -27,6 +28,10 @@ const DONE = { approved: 'approved', rejected: 'rejected', pending: 'set back to
  * one, or approve/reject the ticked ones. Only approved reviews are shown in
  * the store, and the product's rating counts only those. Needs reviews.view;
  * changes reviews.moderate.
+ *
+ * Phase 22: a review's photos are shown as thumbnails (components/ReviewPhotos.jsx),
+ * each can be hidden from the store on its own, and "With photos" lists only
+ * reviews that have at least one (hidden or not).
  */
 function ReviewsPage() {
   const [params, setParams] = useSearchParams()
@@ -37,13 +42,14 @@ function ReviewsPage() {
   const rating = params.get('rating') ?? ''
   const productId = params.get('productId') ?? ''
   const q = params.get('q') ?? ''
+  const hasPhotos = params.get('hasPhotos') === '1'
   const skip = Number(params.get('skip')) || 0
   const [draft, setDraft] = useState(q)
   const [notice, setNotice] = useState(null)
   const [toDelete, setToDelete] = useState(null)
   const noticeRef = useRef(null)
 
-  const query = { status, rating, productId, q, skip, limit: LIMIT }
+  const query = { status, rating, productId, q, hasPhotos: hasPhotos ? 'true' : '', skip, limit: LIMIT }
   const pageKey = JSON.stringify(query)
   const [selection, setSelection] = useState({ pageKey, ids: [] })
   const selectedIds = selection.pageKey === pageKey ? selection.ids : []
@@ -88,6 +94,19 @@ function ReviewsPage() {
       finished(actionErrorMessage(error), 'error')
     },
   })
+  // Phase 22: hide one photo from the store, or show it again. The answer is the review as now saved.
+  const togglePhoto = useMutation({
+    mutationFn: ({ review, photo }) => updateReviewPhoto(review.id, photo.id, !photo.hidden),
+    onSuccess: (data, { review, photo, number }) => {
+      const saved = data?.review
+      if (saved?.id === review.id) {
+        queryClient.setQueriesData({ queryKey: ['reviews'] }, (old) => (old?.reviews ? { ...old, reviews: old.reviews.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)) } : old))
+      }
+      const who = review.authorName || 'a shopper'
+      finished(photo.hidden ? `Photo ${number} of the review by ${who} is shown in the store again.` : `Photo ${number} of the review by ${who} is hidden from the store.`)
+    },
+    onError: (error) => finished(actionErrorMessage(error), 'error'),
+  })
   const busy = setOne.isPending || setMany.isPending
 
   function update(changes) {
@@ -99,7 +118,7 @@ function ReviewsPage() {
     setParams(next)
   }
 
-  const filtered = Boolean(status || rating || productId || q)
+  const filtered = Boolean(status || rating || productId || q || hasPhotos)
   return (
     <>
       <title>Reviews | BuyNest Admin</title>
@@ -150,6 +169,13 @@ function ReviewsPage() {
                 {stars} {stars === 1 ? 'star' : 'stars'}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="toolbar__select">
+          <span>Photos</span>
+          <select value={hasPhotos ? '1' : ''} onChange={(event) => update({ hasPhotos: event.target.value, skip: 0 })}>
+            <option value="">Any</option>
+            <option value="1">With photos</option>
           </select>
         </label>
         <label className="toolbar__select">
@@ -238,6 +264,13 @@ function ReviewsPage() {
                     <td className="review-cell">
                       {review.title && <strong>{review.title}</strong>}
                       <p>{review.comment}</p>
+                      <ReviewPhotos
+                        photos={review.photos ?? []}
+                        who={who}
+                        moderate={moderate}
+                        busyId={togglePhoto.isPending && togglePhoto.variables?.review.id === review.id ? togglePhoto.variables.photo.id : null}
+                        onToggle={(photo, number) => togglePhoto.mutate({ review, photo, number })}
+                      />
                       <small className="muted">
                         {review.authorName || 'Shopper'}
                         {review.authorEmail && ` · ${review.authorEmail}`}

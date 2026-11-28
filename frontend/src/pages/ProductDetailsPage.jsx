@@ -369,7 +369,7 @@ function ProductDetails({ product }) {
 
       <section className="product-details__section" id="reviews" aria-labelledby="reviews-title">
         <h2 id="reviews-title">{t('details.customerReviews')}</h2>
-        <ProductReviews reviews={product.reviews} />
+        <ProductReviews reviews={product.reviews} reviewPhotoCount={product.reviewPhotoCount ?? 0} />
         {/* Writing reviews needs BuyNest's API and customer accounts. */}
         {REAL_SHOP && <ReviewForm productId={product.id} productTitle={product.title} />}
       </section>

@@ -59,7 +59,7 @@ class ReviewModerationTest extends TestCase
             ->assertJsonPath('data.comment', 'alert(1)Really solid mug.')
             ->assertJsonPath('data.author_name', 'Nadia R.')
             ->assertJsonPath('data.verified_purchase', false);
-        $this->assertSame(['id', 'rating', 'title', 'comment', 'created_at', 'author_name', 'verified_purchase', 'status'], array_keys($response->json('data')));
+        $this->assertSame(['id', 'rating', 'title', 'comment', 'created_at', 'author_name', 'verified_purchase', 'photos', 'status'], array_keys($response->json('data'))); // phase 22: photos
 
         // Not public yet, and the rating hasn't moved.
         $this->getJson("/api/v1/products/{$this->product->id}")->assertJsonPath('data.reviews', [])->assertJsonPath('data.review_count', 0)
@@ -160,7 +160,7 @@ class ReviewModerationTest extends TestCase
 
         $page = $this->asAdmin($admin, 'GET', '/api/admin/v1/reviews')->assertOk()->assertJsonPath('meta.total', 3)
             ->assertJsonPath('meta.counts', ['pending' => 1, 'approved' => 2, 'rejected' => 0]);
-        $this->assertSame(['id', 'status', 'rating', 'title', 'comment', 'author_name', 'verified_purchase', 'product', 'customer', 'created_at', 'updated_at'],
+        $this->assertSame(['id', 'status', 'rating', 'title', 'comment', 'author_name', 'verified_purchase', 'product', 'customer', 'created_at', 'updated_at', 'photos'], // phase 22: photos
             array_keys($page->json('data.0')));
 
         $this->asAdmin($admin, 'GET', '/api/admin/v1/reviews?status=pending')->assertJsonPath('meta.total', 1)

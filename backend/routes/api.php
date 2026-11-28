@@ -158,6 +158,8 @@ Route::prefix('v1')->group(function () {
         Route::get('products', [CatalogController::class, 'index']);
         Route::get('products/compare', [CatalogController::class, 'compare']); // phase 11
         Route::get('products/{id}', [CatalogController::class, 'show'])->whereNumber('id');
+        // Phase 22: a review photo, only once its review is approved and while staff haven't hidden it.
+        Route::get('review-photos/{name}', [ReviewController::class, 'photo'])->where('name', '[^/]+');
         Route::get('categories', [CatalogController::class, 'categories']);
         // Phase 4: the home page, content pages, and the store's rules (shipping, countries, payment, tax).
         Route::get('home', [ContentController::class, 'home']);
@@ -307,6 +309,9 @@ Route::prefix('admin/v1')->group(function () {
         Route::post('reviews/bulk', [AdminReviewController::class, 'bulk'])->middleware('can.admin:reviews.moderate');
         Route::patch('reviews/{id}', [AdminReviewController::class, 'update'])->whereNumber('id')->middleware('can.admin:reviews.moderate');
         Route::delete('reviews/{id}', [AdminReviewController::class, 'destroy'])->whereNumber('id')->middleware('can.admin:reviews.moderate');
+        // Phase 22: review photos (staff see them in every status; hiding one keeps the review).
+        Route::get('reviews/{id}/photos/{photo}', [AdminReviewController::class, 'photo'])->whereNumber(['id', 'photo'])->middleware('can.admin:reviews.view');
+        Route::patch('reviews/{id}/photos/{photo}', [AdminReviewController::class, 'updatePhoto'])->whereNumber(['id', 'photo'])->middleware('can.admin:reviews.moderate');
 
         Route::get('orders', [AdminOrderController::class, 'index'])->middleware('can.admin:orders.view');
         // Phase 6: phone orders, CSV export, mass actions (each action also checks its own permission), packing slips.

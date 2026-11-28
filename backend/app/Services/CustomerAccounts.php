@@ -7,6 +7,8 @@ use App\Models\CustomerCart;
 use App\Models\NewsletterSubscriber;
 use App\Models\OneTimeCode;
 use App\Models\Order;
+use App\Models\Review;
+use App\Models\ReviewPhoto;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -19,6 +21,10 @@ use Illuminate\Support\Facades\Schema;
  * addresses and notes (cascade), the saved cart, and stock alerts, and takes
  * the address off the newsletter. Orders, reviews (with the author name),
  * coupon uses, and returns stay, with customer_id null.
+ *
+ * Phase 22: the photos on the customer's reviews are deleted (rows, and the
+ * files once the transaction commits), because a photo can show who they are.
+ * The reviews themselves stay, as before.
  */
 class CustomerAccounts
 {
@@ -43,6 +49,12 @@ class CustomerAccounts
             if (Schema::hasTable('stock_alerts')) {
                 DB::table('stock_alerts')->where('customer_id', $customer->id)
                     ->orWhere(fn ($q) => $q->where('email', mb_strtolower($customer->email))->whereNull('notified_at'))->delete();
+            }
+            // Phase 22: review photos go with the account (the reviews stay).
+            $photos = ReviewPhoto::whereIn('review_id', Review::where('customer_id', $customer->id)->select('id'))->get();
+            if ($photos->isNotEmpty()) {
+                ReviewPhoto::whereKey($photos->modelKeys())->delete();
+                DB::afterCommit(fn () => ReviewPhoto::deleteFiles($photos));
             }
             // Addresses and notes cascade; orders, reviews, coupon uses, and returns keep their rows with customer_id null.
             $customer->delete();

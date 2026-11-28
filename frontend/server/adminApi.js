@@ -6,7 +6,7 @@ import { SYSTEM_ROUTES, isReportName } from './adminSystemApi.js'
 import { COUPON_KINDS, checkCouponRuleFields, matchMarketingRoute } from './adminMarketingApi.js'
 // Phase 7 (system): email templates, URL redirects, notifications, grid preferences.
 import { CONTENT_RESOURCES, matchContentRoute } from './adminContentApi.js'
-import { CATALOG_ROUTES, NAMED_ACTIONS, PRODUCT_PARTS } from './adminCatalogApi.js'
+import { CATALOG_ROUTES, NAMED_ACTIONS, PRODUCT_PARTS, REVIEW_PARTS } from './adminCatalogApi.js'
 import { laravelCatalogData } from './shop/adminCatalog.js'
 import {
   CUSTOMER_PARTS,
@@ -699,6 +699,10 @@ function matchRoute(method, segments) {
   // Phase 5: actions on a list (products/bulk) and a product's parts (products/1/images/2).
   if (document === undefined && [...NAMED_ACTIONS, ...SALES_NAMED_ACTIONS].includes(`${resource}/${id}`)) return { route: ROUTES[`${method} ${resource}/${id}`] }
   if (resource === 'products' && document !== undefined) return matchProductPart(method, id, document, rest)
+  // Phase 22: a review's photo (reviews/:id/photos/:photoId).
+  if (resource === 'reviews' && document !== undefined) {
+    return isId(id) && Object.hasOwn(REVIEW_PARTS, document) && rest.length === 1 && isId(rest[0]) ? { route: ROUTES[`${method} reviews/:id/${document}/:sub`], id, sub: rest[0] } : null
+  }
   // Phase 6: a customer's addresses[/:addressId], notes, password-reset.
   if (resource === 'customers' && document !== undefined) return matchCustomerPart(method, id, document, rest)
   if (rest.length > 0) return null

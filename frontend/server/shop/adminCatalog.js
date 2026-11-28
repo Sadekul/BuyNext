@@ -1,4 +1,4 @@
-import { laravel, laravelMultipart } from '../http.js'
+import { laravel, laravelImage, laravelMultipart } from '../http.js'
 import { camelPath } from './laravel.js'
 import { failed } from './adminSystem.js'
 // Phase 13: the Bangla texts of categories, option names and values.
@@ -254,7 +254,28 @@ export function adminReview(raw) {
     verifiedPurchase: raw.verified_purchase === true,
     createdAt: raw.created_at ?? null,
     updatedAt: raw.updated_at ?? null,
+    // Phase 22: the shopper's photos (hidden ones too), each loaded through the admin service.
+    photos: reviewPhotos(raw.photos, raw.id),
   }
+}
+
+const isId = (value) => Number.isInteger(value) && value > 0 && value < 1e9
+const count = (value) => (Number.isInteger(value) && value >= 0 ? value : null)
+
+/** Phase 22: [{ id, hidden, width, height, sizeBytes, position, url }]; entries without an integer id (or a review without one) are dropped. */
+export function reviewPhotos(raw, reviewId) {
+  if (!isId(reviewId)) return []
+  return list(raw)
+    .filter((photo) => isId(photo?.id))
+    .map((photo) => ({
+      id: photo.id,
+      hidden: photo.hidden === true,
+      width: count(photo.width),
+      height: count(photo.height),
+      sizeBytes: count(photo.size_bytes),
+      position: count(photo.position) ?? 0,
+      url: `/api/admin/reviews/${reviewId}/photos/${photo.id}`,
+    }))
 }
 
 /** ?page&per_page from the admin's limit/skip, plus any filters that have a value. */
@@ -332,8 +353,9 @@ export const laravelCatalogData = {
   },
 
   async listReviews(token, filters, request) {
-    const { q, productId, ...rest } = filters
-    const result = await call(`/reviews?${listParams({ ...rest, product_id: productId, search: q })}`, token, request)
+    const { q, productId, hasPhotos, ...rest } = filters
+    // Phase 22: has_photos=1 = reviews with at least one photo (hidden or not).
+    const result = await call(`/reviews?${listParams({ ...rest, product_id: productId, search: q, has_photos: hasPhotos ? 1 : undefined })}`, token, request)
     return answer(result, [200], (data) => ({
       reviews: listOf(data).map(adminReview),
       total: data?.meta?.total ?? listOf(data).length,
@@ -352,5 +374,13 @@ export const laravelCatalogData = {
   },
   async deleteReview(token, id, request) {
     return answer(await call(`/reviews/${id}`, token, request, { method: 'DELETE' }), [200, 204], done(id))
+  },
+  // Phase 22: hide or show one photo of a review; the answer is the whole review.
+  async updateReviewPhoto(token, id, photoId, { hidden }, request) {
+    return answer(await call(`/reviews/${id}/photos/${photoId}`, token, request, { method: 'PATCH', body: { hidden } }), [200], (data) => ({ review: adminReview(data?.data ?? {}), live: true }))
+  },
+  /** Phase 22: the photo's bytes (any status, hidden too): { status, contentType, bytes } or { status, data }. */
+  reviewPhoto(token, id, photoId, request) {
+    return laravelImage(`/api/admin/v1/reviews/${id}/photos/${photoId}`, { token, request })
   },
 }

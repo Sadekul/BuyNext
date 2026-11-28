@@ -212,7 +212,16 @@ export function normalizeStoreSettings(raw) {
     welcomeOffer: normalizeWelcomeOffer(data.welcome_offer),
     // Phase 20: the store texts order updates (SMS on): checkout says so next to the phone field. Only `true` counts.
     smsUpdates: data.sms_updates === true,
+    // Phase 22: whether shoppers may add photos to reviews, how many and how large (off when absent).
+    reviewPhotos: normalizeReviewPhotoSettings(data.review_photos),
   }
+}
+
+/** Phase 22: GET /store `review_photos: { enabled, max, max_megabytes }` → { enabled, max, maxMegabytes }. Only `true` turns it on. */
+export function normalizeReviewPhotoSettings(raw) {
+  const settings = raw && typeof raw === 'object' ? raw : {}
+  const whole = (value, fallback, top) => (Number.isInteger(value) && value > 0 && value <= top ? value : fallback)
+  return { enabled: settings.enabled === true, max: whole(settings.max, 3, 10), maxMegabytes: whole(settings.max_megabytes, 5, 20) }
 }
 
 const countriesOf = (data) => (data.allowed_countries ?? []).map((country) => (typeof country === 'string' ? country : country?.name)).filter(Boolean)

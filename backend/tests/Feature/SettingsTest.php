@@ -92,6 +92,8 @@ class SettingsTest extends TestCase
             'currencies' => ['base' => 'USD', 'display' => []],
             // Phase 14.
             'cod' => ['fee' => '0.00', 'max_order_total' => null, 'advance' => 'none', 'zones' => [], 'require_confirmation' => false],
+            // Phase 22: review photos (off by default).
+            'review_photos' => ['enabled' => false, 'max' => 3, 'max_megabytes' => 5],
         ]]);
     }
 

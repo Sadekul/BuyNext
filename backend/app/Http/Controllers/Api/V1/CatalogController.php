@@ -114,7 +114,7 @@ class CatalogController extends Controller
     public function show(int $id): ProductResource|JsonResponse
     {
         $product = Product::forSale()->with(['category', 'brand', 'images', 'options.values', 'variants', ...self::translationRelations(),
-            'reviews' => fn ($q) => $q->where('status', 'approved')])->find($id);
+            'reviews' => fn ($q) => $q->where('status', 'approved'), 'reviews.photos'])->find($id); // phase 22: the photos
 
         return $product
             ? (new ProductResource($product))->withDetail()->withRecommendations() // phase 11: related and upsells

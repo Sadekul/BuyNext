@@ -664,8 +664,12 @@ function InventoryForm({ saved }) {
 function CatalogForm({ saved }) {
   // Default on (docs/backend/PHASE5_CONTRACT.md §6): reviews wait for an admin.
   const [requireApproval, setRequireApproval] = useState(saved.reviewsRequireApproval !== false)
+  // Phase 22 (off by default): shown only when the API has the setting, so an older backend never gets a key it doesn't know.
+  const photosKnown = typeof saved.reviewPhotosEnabled === 'boolean'
+  const [photos, setPhotos] = useState(saved.reviewPhotosEnabled === true)
+  const toValues = () => ({ values: { reviewsRequireApproval: requireApproval, ...(photosKnown && { reviewPhotosEnabled: photos }) } })
   return (
-    <SettingsGroup group="catalog" title="Catalog" toValues={() => ({ values: { reviewsRequireApproval: requireApproval } })} setErrors={() => {}}>
+    <SettingsGroup group="catalog" title="Catalog" toValues={toValues} setErrors={() => {}}>
       <label className="checkbox">
         <input type="checkbox" checked={requireApproval} aria-describedby="catalog-approval-hint" onChange={(event) => setRequireApproval(event.target.checked)} />
         New reviews wait for approval
@@ -673,6 +677,17 @@ function CatalogForm({ saved }) {
       <p id="catalog-approval-hint" className="field__hint">
         When on, a shopper's review appears in the store only after someone approves it under Catalog → Reviews. When off, new reviews are shown right away.
       </p>
+      {photosKnown && (
+        <>
+          <label className="checkbox">
+            <input type="checkbox" checked={photos} aria-describedby="catalog-photos-hint" onChange={(event) => setPhotos(event.target.checked)} />
+            Customers can add photos to reviews
+          </label>
+          <p id="catalog-photos-hint" className="field__hint">
+            Reviews with photos always wait for approval. Photos are shrunk and their location data is removed.
+          </p>
+        </>
+      )}
     </SettingsGroup>
   )
 }

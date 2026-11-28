@@ -181,12 +181,14 @@ export function importProducts(file, { dryRun }) {
   return api.post(`/api/admin/products/import?dryRun=${dryRun ? 'true' : 'false'}`, form, { timeout: UPLOAD_TIMEOUT })
 }
 
-/** reviews.view: ?status&productId&rating&q&limit&skip → { reviews, total }. */
+/** reviews.view: ?status&productId&rating&q&hasPhotos&limit&skip → { reviews, total }. Phase 22: each review has photos: [{ id, hidden, width, height, sizeBytes, position, url }]. */
 export const getReviews = (params, { signal } = {}) => api.get('/api/admin/reviews', { params, signal })
 /** reviews.moderate: status = approved | rejected | pending. */
 export const updateReview = (id, status) => api.patch(`/api/admin/reviews/${id}`, { status })
 export const bulkReviews = (ids, status) => api.post('/api/admin/reviews/bulk', { ids, status })
 export const deleteReview = (id) => api.delete(`/api/admin/reviews/${id}`)
+/** Phase 22, reviews.moderate: hide one photo of a review from the store (or show it again) → { review }. */
+export const updateReviewPhoto = (id, photoId, hidden) => api.patch(`/api/admin/reviews/${id}/photos/${photoId}`, { hidden })
 
 /*
  * Phase 6 (docs/backend/PHASE6_CONTRACT.md), BuyNest's backend only:

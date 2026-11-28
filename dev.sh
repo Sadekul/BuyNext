@@ -45,7 +45,9 @@ start_mysql
 echo "API:   http://127.0.0.1:8000   (test inbox: http://127.0.0.1:8000/dev/mailbox)"
 # 4 workers: the storefront makes several API calls per page (catalog, menu,
 # photos), and PHP's built-in server handles one request at a time per worker.
-(cd "$ROOT/backend" && PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=127.0.0.1 --port=8000 --no-reload >/dev/null 2>&1) &
+# PHP_INI_SCAN_DIR (the leading ":" keeps the computer's own ini folder) adds
+# backend/docker/php-dev: the production upload sizes (5 MB per photo), phase 22.
+(cd "$ROOT/backend" && PHP_INI_SCAN_DIR=":$ROOT/backend/docker/php-dev" PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=127.0.0.1 --port=8000 --no-reload >/dev/null 2>&1) &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null' EXIT
 
