@@ -7,6 +7,7 @@ use App\Models\Admin;
 use App\Models\Customer;
 use App\Models\CustomerCart;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Tests\Feature\Concerns\PlacesOrders;
 use Tests\TestCase;
@@ -55,6 +56,29 @@ class AbandonedCartTest extends TestCase
 
         $this->validateCart([], $this->customerHeaders);
         $this->assertSame(0, CustomerCart::count());
+    }
+
+    public function test_two_price_checks_at_once_update_the_one_saved_cart(): void
+    {
+        // Phase 23's browser runs: checkout asks for prices again when the address or payment changes, and two
+        // requests at the same moment both found no saved cart. The second insert hit the unique customer_id
+        // and answered 500, so the order couldn't be placed. Here the "other request" adds its row just before ours.
+        $mug = $this->product(['price' => '10.00']);
+        $raced = false;
+        CustomerCart::creating(function (CustomerCart $cart) use (&$raced) {
+            if (! $raced) {
+                $raced = true;
+                DB::table('customer_carts')->insert(['customer_id' => $cart->customer_id, 'items' => json_encode([]), 'subtotal' => '0.00',
+                    'item_count' => 0, 'created_at' => now(), 'updated_at' => now()]);
+            }
+        });
+
+        $this->validateCart([['product_id' => $mug->id, 'quantity' => 2]], $this->customerHeaders);
+
+        $this->assertTrue($raced);
+        $cart = CustomerCart::sole(); // still one row, now with this request's items
+        $this->assertEquals([['product_id' => $mug->id, 'variant_id' => null, 'quantity' => 2]], $cart->items);
+        $this->assertSame(['20.00', 2], [$cart->subtotal, $cart->item_count]);
     }
 
     public function test_placing_an_order_converts_the_cart(): void

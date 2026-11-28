@@ -87,6 +87,25 @@ export function deleteStockAlert(id) {
 }
 
 /**
+ * Phase 23: GET /api/shop/me/reviews?page&productId → { reviews: [{ id, status (pending | approved | rejected),
+ * rating, title, comment, date, verifiedPurchase, product: { id, name, thumbnail, available } | null,
+ * photos: [{ id, url, width, height, hidden }] }], page, pages, total } (newest first, 10 a page).
+ */
+export function getMyReviews({ page = 1, productId, signal } = {}) {
+  return apiClient.get('/api/shop/me/reviews', { ...SHOP, params: { page, ...(productId && { productId }) }, signal })
+}
+
+/** Phase 23: DELETE /api/shop/me/reviews/:id → { deleted: true }. */
+export function deleteMyReview(id) {
+  return apiClient.delete(`/api/shop/me/reviews/${encodeURIComponent(id)}`, SHOP)
+}
+
+/** Phase 23: DELETE /api/shop/me/reviews/:id/photos/:photoId → { review } (the photos left). */
+export function deleteMyReviewPhoto(id, photoId) {
+  return apiClient.delete(`/api/shop/me/reviews/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`, SHOP)
+}
+
+/**
  * POST /api/shop/products/:id/stock-alerts { email?, variantId? } → 202 { message }.
  * Signed-in customers are recognised by the session (no email); guests give
  * one. The answer is the same whether or not the email was already listed.

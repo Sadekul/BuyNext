@@ -64,6 +64,7 @@ use App\Http\Controllers\Api\V1\DeliveryController;
 use App\Http\Controllers\Api\V1\GiftCardController;
 use App\Http\Controllers\Api\V1\InvoicePdfController;
 use App\Http\Controllers\Api\V1\MyAccountController;
+use App\Http\Controllers\Api\V1\MyReviewController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\OrderConfirmationLinkController;
 use App\Http\Controllers\Api\V1\OrderController;
@@ -134,6 +135,11 @@ Route::prefix('v1')->group(function () {
         Route::patch('me/wishlist/{id}', [WishlistController::class, 'update'])->whereNumber('id');
         Route::delete('me/wishlist/{id}', [WishlistController::class, 'destroy'])->whereNumber('id');
         Route::get('me/rewards', [RewardController::class, 'show']);
+        // Phase 23: My reviews (every status, own photos included); deletes count with writing reviews (throttle:reviews).
+        Route::get('me/reviews', [MyReviewController::class, 'index']);
+        Route::get('me/reviews/{id}/photos/{photo}', [MyReviewController::class, 'photo'])->whereNumber(['id', 'photo']);
+        Route::delete('me/reviews/{id}', [MyReviewController::class, 'destroy'])->whereNumber('id')->middleware('throttle:reviews');
+        Route::delete('me/reviews/{id}/photos/{photo}', [MyReviewController::class, 'destroyPhoto'])->whereNumber(['id', 'photo'])->middleware('throttle:reviews');
         // End of phase 9 part B store routes (signed in).
     });
 

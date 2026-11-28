@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Admin;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\ReviewPhoto;
@@ -37,16 +38,26 @@ class Reviews
         return true;
     }
 
-    /** Call inside a transaction. Phase 22: the photo files are deleted once the transaction commits (the rows cascade). */
-    public function delete(Review $review, ?Admin $admin = null): void
+    /**
+     * Call inside a transaction. Phase 22: the photo files are deleted once the transaction commits (the rows cascade).
+     * Phase 23: $author = the customer deleting their own review (audited as review.deleted_by_customer, no admin,
+     * their email in the entry).
+     */
+    public function delete(Review $review, ?Admin $admin = null, ?Customer $author = null): void
     {
         $photos = $review->photos()->get();
         $review->delete();
         if ($photos->isNotEmpty()) {
             DB::afterCommit(fn () => ReviewPhoto::deleteFiles($photos));
         }
-        $this->audit->record('review.deleted', "Review #{$review->id} on product {$review->product?->sku} deleted.", 'review', $review->id,
-            ['before' => ['status' => $review->status, 'rating' => $review->rating, 'author_name' => $review->author_name, 'comment' => $review->comment], 'after' => []], $admin);
+        $before = ['status' => $review->status, 'rating' => $review->rating, 'author_name' => $review->author_name, 'comment' => $review->comment];
+        if ($author) {
+            $this->audit->record('review.deleted_by_customer', "Review #{$review->id} on product {$review->product?->sku} deleted by its author.", 'review', $review->id,
+                ['before' => [...$before, 'photos' => $photos->count(), 'customer_email' => $author->email], 'after' => []]);
+        } else {
+            $this->audit->record('review.deleted', "Review #{$review->id} on product {$review->product?->sku} deleted.", 'review', $review->id,
+                ['before' => $before, 'after' => []], $admin);
+        }
         if ($review->status === 'approved') {
             $this->refresh($review->product_id);
         }

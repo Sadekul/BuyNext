@@ -332,6 +332,19 @@ async function runChecks() {
     }
   })
 
+  // ---------- 3a. The photo field in Bangla (before Ava's review: afterwards the page says she already reviewed it, phase 23) ----------
+  await part('Bangla photo field', async () => {
+    const page = await avaOnProduct('bn')
+    const form = page.locator('form.review-form')
+    await form.waitFor()
+    const field = await photoField(form).catch(() => '')
+    log(BENGALI.test(field) && !/Add photos|Up to 3 photos/.test(field), `the photo field is in Bangla ("${field.replace(/\s+/g, ' ').trim().slice(0, 80)}")`)
+    // Back to English for the next steps: the switch saved Bangla to Ava's account, which wins at her next sign-in.
+    await page.locator('.site-header').getByRole('button', { name: 'English', exact: true }).click()
+    await page.waitForFunction(() => document.documentElement.lang === 'en', null, { timeout: 15000 })
+    await page.context().close()
+  })
+
   // ---------- 3. Ava writes a 4-star review with photos ----------
   let avaShop = null
   await part("Ava's review with photos", async () => {
@@ -526,10 +539,10 @@ async function runChecks() {
   // ---------- 7. Bangla ----------
   await part('Bangla', async () => {
     const page = await avaOnProduct('bn')
-    const form = page.locator('form.review-form')
-    await form.waitFor()
-    const field = await photoField(form).catch(() => '')
-    log(BENGALI.test(field) && !/Add photos|Up to 3 photos/.test(field), `the photo field is in Bangla ("${field.replace(/\s+/g, ' ').trim().slice(0, 80)}")`)
+    await page.locator('#reviews').waitFor()
+    // Ava has reviewed this product: the form gives way to the "already reviewed" note (phase 23), in Bangla too.
+    const note = (await page.locator('#reviews a[href="/account/reviews"]').first().locator('xpath=..').innerText().catch(() => '')).trim()
+    log(BENGALI.test(note) && !/already reviewed/.test(note), `the "already reviewed" note is in Bangla ("${note.replace(/\s+/g, ' ').slice(0, 80)}")`)
     const filter = page.locator('#reviews button[aria-pressed]').first()
     const filterText = (await filter.innerText().catch(() => '')).trim()
     log(BENGALI.test(filterText) && !/With photos/.test(filterText), `the filter button is in Bangla ("${filterText}")`)

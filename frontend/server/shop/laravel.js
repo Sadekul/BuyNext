@@ -1,4 +1,4 @@
-import { laravel, laravelMultipart, laravelPdf, pick } from '../http.js'
+import { laravel, laravelImage, laravelMultipart, laravelPdf, pick } from '../http.js'
 import { serverMessage } from '../i18n.js'
 import { productCards } from './productCard.js'
 import { fromBangladeshAddress, fromCod, fromCodTotals, fromMethodDelivery, fromOrderDelivery, fromOrderEta, fromZone, isBangladesh, toBangladeshAddress, toPlaceIds } from './bangladesh.js'
@@ -712,3 +712,69 @@ export const fromGiftCardBalance = (raw = {}) => ({
   expiresAt: str(raw.expires_at) ?? null,
   status: ['active', 'disabled', 'expired'].includes(raw.status) ? raw.status : 'active',
 })
+
+// ---- phase 23: My reviews (docs/backend/PHASE23_CONTRACT.md §2), customer session ----
+
+/** The author's own photo address on this site (server/shopApi.js serves it); nothing else gets through. */
+export const MY_REVIEW_PHOTO_URL = /^\/api\/shop\/me\/reviews\/\d+\/photos\/\d+$/
+// Only the store's own /media/… photos or https addresses (the same rule as stock alerts).
+const thumbnailUrl = (value) => (typeof value === 'string' && /^(https:\/\/\S+|\/media\/\S+)$/.test(value) ? value : null)
+const recordId = (value) => (Number.isInteger(value) && value > 0 && value < 1e9 ? value : null)
+const wholeNumber = (value, min = 1) => (Number.isInteger(value) && value >= min ? value : null)
+
+/** `photos: [{ id, url, width, height, hidden, position }]` → `[{ id, url, width, height, hidden }]`, in position order. */
+export function fromMyReviewPhotos(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((photo) => photo && typeof photo === 'object' && recordId(photo.id) && typeof photo.url === 'string' && MY_REVIEW_PHOTO_URL.test(photo.url))
+    .map((photo, index) => ({ photo, order: wholeNumber(photo.position, 0) ?? 1000 + index }))
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 10)
+    .map(({ photo }) => ({ id: photo.id, url: photo.url, width: positiveInt(photo.width), height: positiveInt(photo.height), hidden: photo.hidden === true }))
+}
+
+/** One of my reviews, allow-listed: { id, status, rating, title, comment, date, verifiedPurchase, product | null, photos }. */
+export function fromMyReview(raw = {}) {
+  const product = raw.product && typeof raw.product === 'object' && recordId(raw.product.id) ? raw.product : null
+  return {
+    id: recordId(raw.id),
+    status: ['pending', 'approved', 'rejected'].includes(raw.status) ? raw.status : 'pending',
+    rating: Number.isInteger(raw.rating) && raw.rating >= 1 && raw.rating <= 5 ? raw.rating : null,
+    title: str(raw.title) || null,
+    comment: str(raw.comment) ?? '',
+    date: str(raw.created_at) ?? null,
+    verifiedPurchase: raw.verified_purchase === true,
+    product: product && { id: product.id, name: str(product.name) ?? '', thumbnail: thumbnailUrl(product.thumbnail_url), available: product.available === true },
+    photos: fromMyReviewPhotos(raw.photos),
+  }
+}
+
+/** Laravel's paginated list → { reviews, page, pages, total }. */
+export function fromMyReviewList(data = {}) {
+  const reviews = (Array.isArray(data.data) ? data.data : []).map(fromMyReview).filter((review) => review.id !== null)
+  const meta = data.meta && typeof data.meta === 'object' ? data.meta : {}
+  const page = wholeNumber(meta.current_page) ?? 1
+  return { reviews, page, pages: Math.max(wholeNumber(meta.last_page) ?? 1, page), total: wholeNumber(meta.total, 0) ?? reviews.length }
+}
+
+export const laravelMyReviews = {
+  /** GET /api/v1/me/reviews?page[&product_id] → { reviews, page, pages, total } (newest first, 10 a page). */
+  async list(token, { page = 1, productId } = {}, request) {
+    const params = new URLSearchParams({ page: String(page) })
+    if (productId) params.set('product_id', String(productId))
+    return answer(await laravel(`/api/v1/me/reviews?${params}`, { token, request }), [200], fromMyReviewList)
+  },
+
+  /** The author's own photo (any status, hidden too): { status, contentType, bytes } or { status, data }. */
+  photo(token, id, photoId, request) {
+    return laravelImage(`/api/v1/me/reviews/${id}/photos/${photoId}`, { token, request })
+  },
+
+  async remove(token, id, request) {
+    return answer(await laravel(`/api/v1/me/reviews/${id}`, { method: 'DELETE', token, request }), [200, 204], () => ({ deleted: true }))
+  },
+
+  /** → { review } (the photos left, renumbered; the status unchanged). */
+  async removePhoto(token, id, photoId, request) {
+    return answer(await laravel(`/api/v1/me/reviews/${id}/photos/${photoId}`, { method: 'DELETE', token, request }), [200], (data) => ({ review: fromMyReview(data?.data ?? {}) }))
+  },
+}

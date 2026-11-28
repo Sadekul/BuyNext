@@ -1,6 +1,6 @@
 # BuyNest — instructions for Claude
 
-BuyNest is a Bangladesh-focused online store, built phase by phase: `frontend/` (React storefront + the sign-in service / BFF in `frontend/server`), `admin/` (React admin at `/admin/`), `backend/` (Laravel 13, PHP 8.5, MySQL), `e2e/` (Playwright browser suites), `docs/`. Setup (`./setup.sh` once on a new computer, then `./dev.sh`) and demo accounts: [README.md](README.md#getting-started). Where things stand: the Progress table in README (B1–B26) and [docs/SQA_REPORT.md](docs/SQA_REPORT.md).
+BuyNest is a Bangladesh-focused online store, built phase by phase: `frontend/` (React storefront + the sign-in service / BFF in `frontend/server`), `admin/` (React admin at `/admin/`), `backend/` (Laravel 13, PHP 8.5, MySQL), `e2e/` (Playwright browser suites), `docs/`. Setup (`./setup.sh` once on a new computer, then `./dev.sh`) and demo accounts: [README.md](README.md#getting-started). Where things stand: the Progress table in README (B1–B27) and [docs/SQA_REPORT.md](docs/SQA_REPORT.md).
 
 The owner is learning professional development: explain in plain language what you did and why, and keep the docs teaching (LEARNING_LOG).
 

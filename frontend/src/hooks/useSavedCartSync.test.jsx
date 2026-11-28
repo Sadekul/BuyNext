@@ -67,6 +67,8 @@ describe('saved cart: right after signing in', () => {
     expect(readStore(baselineKey)).toEqual({ 1: 1, 2: 1, 3: 2, 4: 1 })
     expect(window.localStorage.getItem('buynest.cartMerging.user-5')).toBeNull() // the cross-tab lock is released
     // A line the server priced on sale (a catalog rule) keeps that price, shown as a discount; local lines keep their brand.
+    // The screen can show the merged cart a moment before it is written to this browser's storage: wait for it.
+    await waitFor(() => expect(readStore(accountCartKey).items.some((item) => item.productId === 4)).toBe(true), SLOW)
     const saved = readStore(accountCartKey).items
     expect(saved.find((item) => item.productId === 4).discountPercentage).toBeCloseTo(25)
     expect(saved.find((item) => item.productId === 1).brand).toBe('Nest')

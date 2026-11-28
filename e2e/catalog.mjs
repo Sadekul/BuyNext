@@ -420,11 +420,18 @@ try {
   log(!(await pendingView.getByText(reviewText).isVisible()), 'a pending review is not shown in the store')
   await pendingView.context().close()
   await shop.reload({ waitUntil: 'networkidle' })
-  await writeReview()
-  // The store also allows 10 review attempts per customer per hour, so many runs in a row may hit that limit first.
-  const secondRefusal = shop.getByRole('alert').filter({ hasText: /You've already reviewed this product|too many|try again/i })
-  const refusalText = (await visible(secondRefusal)) ? (await secondRefusal.first().innerText()).trim() : ''
-  log(refusalText !== '', `a second review by the same customer is refused ("${refusalText}")`)
+  // Phase 23: the product page now says so instead of showing the form again (with a link to My reviews) ...
+  const already = shop.locator('#reviews').getByText(/You.ve already reviewed this product/)
+  log(await visible(already), 'a second visit: "You\'ve already reviewed this product" instead of the form')
+  // ... and the server still refuses a second review sent directly (422 already_reviewed; or 429 if the hourly limit was hit first).
+  const again = await shop.evaluate(async ({ id, text }) => {
+    const response = await fetch(`/api/shop/products/${id}/reviews`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ rating: 5, title: 'Again', comment: text }),
+    })
+    return { status: response.status, body: await response.json().catch(() => ({})) }
+  }, { id: productId, text: reviewText })
+  log((again.status === 422 && again.body?.code === 'already_reviewed') || again.status === 429, `a second review by the same customer is refused (${again.status} ${again.body?.code ?? again.body?.message ?? ''})`)
   const pending = (await api(`/api/admin/v1/reviews?search=${marker}`, { token: owner })).body?.data ?? []
   log(pending.length === 1 && pending[0].status === 'pending' && pending[0].verified_purchase === true, `one pending review, marked as a verified purchase (${pending[0]?.author_name})`)
 

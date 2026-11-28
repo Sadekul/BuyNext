@@ -15,6 +15,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
+use App\Models\ReviewPhoto;
 use App\Models\RewardTransaction;
 use App\Models\WishlistItem;
 use App\Services\Audit;
@@ -160,14 +161,22 @@ class MyAccountController extends Controller
             ])->values(),
             'orders' => $customer->orders()->with(['items', 'history', 'invoices', 'shipments', 'creditMemos', 'returns.items.orderItem'])
                 ->orderBy('id')->get()->map(fn (Order $order) => $this->exportOrder($order))->values(),
-            'reviews' => Review::where('customer_id', $customer->id)->with('product:id,name')->orderBy('id')->get()->map(fn (Review $review) => [
+            'reviews' => Review::where('customer_id', $customer->id)->with(['product:id,name', 'photos'])->orderBy('id')->get()->map(fn (Review $review) => [
                 'product' => $review->product?->name,
                 'rating' => $review->rating,
                 'title' => $review->title,
                 'comment' => $review->comment,
                 'status' => $review->status,
                 'created_at' => self::date($review->created_at),
+                // Phase 23: what each photo is (the files themselves are in My reviews, see photos_note).
+                'photos' => $review->photos->map(fn (ReviewPhoto $photo) => [
+                    'width' => $photo->width,
+                    'height' => $photo->height,
+                    'hidden' => $photo->hidden,
+                    'added_at' => self::date($photo->created_at),
+                ])->values(),
             ])->values(),
+            'photos_note' => 'Your review photos can be seen and downloaded in My account → My reviews.',
             'saved_cart' => $this->exportCart($customer),
             'stock_alerts' => $this->exportStockAlerts($customer),
             // Phase 11: the wishlist kept on the server and the reward point history.

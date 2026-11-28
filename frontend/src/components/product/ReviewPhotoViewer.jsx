@@ -10,8 +10,11 @@ import './ReviewPhotoViewer.css'
  * "Photo 1 of 2" says where you are; with a single photo there is nothing to
  * move to, so those buttons aren't shown. The parent puts the focus back on
  * the thumbnail that opened it.
+ *
+ * Phase 23 (My reviews): `title` and `photoAlt(number, total)` replace the
+ * "from {name}'s review" wording when the author looks at their own photos.
  */
-function ReviewPhotoViewer({ photos, index, name, onIndexChange, onClose, onPhotoError }) {
+function ReviewPhotoViewer({ photos, index, name, title, photoAlt, onIndexChange, onClose, onPhotoError }) {
   const { t } = useTranslation('catalog')
   const total = photos.length
   const photo = photos[index]
@@ -28,12 +31,12 @@ function ReviewPhotoViewer({ photos, index, name, onIndexChange, onClose, onPhot
   }
 
   return (
-    <Modal isOpen onClose={onClose} title={t('reviews.photosOf', { name })} className="photo-viewer" onKeyDown={handleKeyDown}>
+    <Modal isOpen onClose={onClose} title={title ?? t('reviews.photosOf', { name })} className="photo-viewer" onKeyDown={handleKeyDown}>
       <div className="photo-viewer__frame">
         <img
           key={photo.url}
           src={photo.url}
-          alt={t('reviews.photoAlt', { number: index + 1, total, name })}
+          alt={photoAlt ? photoAlt(index + 1, total) : t('reviews.photoAlt', { number: index + 1, total, name })}
           width={photo.width ?? undefined}
           height={photo.height ?? undefined}
           className="photo-viewer__image"

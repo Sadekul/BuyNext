@@ -1,6 +1,6 @@
 import { json, multipartType, readBody, readLimitedBody } from './http.js'
 import { serverMessage } from './i18n.js'
-import { laravelShop } from './shop/laravel.js'
+import { failed, laravelMyReviews, laravelShop } from './shop/laravel.js'
 import { laravelCustomer } from './shop/customer.js'
 import { laravelNewsletter } from './shop/newsletter.js'
 import { laravelCart } from './shop/cart.js'
@@ -120,6 +120,17 @@ import { CUSTOMER, clearedCookies, notSignedIn } from './session.js'
  *                                              (+ `message` when the API sends one). The API's 404 (expired / unknown
  *                                              link), 422 (can't be cancelled any more) and 429 (throttle) go through.
  *
+ * Phase 23 (docs/backend/PHASE23_CONTRACT.md §2; shop/laravel.js `laravelMyReviews`), customer session:
+ *   GET    /api/shop/me/reviews?page&productId          → { reviews: [{ id, status, rating, title, comment, date, verifiedPurchase,
+ *                                                        product: { id, name, thumbnail, available } | null,
+ *                                                        photos: [{ id, url, width, height, hidden }] }], page, pages, total }
+ *                                                        (my reviews in every status, newest first, 10 a page)
+ *   GET    /api/shop/me/reviews/:id/photos/:photoId     → the photo (image/jpeg | png | webp only, ≤ 10 MB), private, never
+ *                                                        cached, sandboxed: the author sees their own photos in every status
+ *   DELETE /api/shop/me/reviews/:id                     → { deleted: true }
+ *   DELETE /api/shop/me/reviews/:id/photos/:photoId     → { review } (the photos left; the status unchanged)
+ * Someone else's review or photo is the API's 404, passed on as it is.
+ *
  * Orders carry their documents (phase 3): shipments (carrier, tracking
  * number and link), invoices, and credit memos (refunds).
  */
@@ -132,6 +143,7 @@ const isInvoicePdf = (value) => /^INV-\d{1,12}\.pdf$/.test(value ?? '')
 const isReturnNumber = (value) => /^RMA-\d{1,12}$/.test(value ?? '')
 const isAlertId = isProductId
 const isWishlistId = isProductId
+const isReviewId = isProductId
 const pageOf = (url) => Math.min(Math.max(Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1, 1), 10_000)
 // Phase 22: a review's photos are at most 3 × 5 MB; the rest is room for the form's other fields and framing.
 const REVIEW_UPLOAD_LIMIT = 16 * 1024 * 1024
@@ -382,6 +394,41 @@ const ROUTES = {
     if (!cookies[CUSTOMER.access]) return notSignedIn(request)
     return reply(await laravelRewards.get(cookies[CUSTOMER.access], pageOf(url), request))
   },
+
+  // ---- phase 23: My reviews (only the customer's own; someone else's is the API's 404) ----
+
+  async 'GET me/reviews'({ request, cookies, url }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
+    const productId = url.searchParams.get('productId')
+    return reply(await laravelMyReviews.list(cookies[CUSTOMER.access], { page: pageOf(url), productId: isProductId(productId) ? productId : undefined }, request))
+  },
+
+  async 'DELETE me/reviews/:id'({ request, cookies, param }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
+    return reply(await laravelMyReviews.remove(cookies[CUSTOMER.access], param, request), 200)
+  },
+
+  // The author's photo in any status: private to them, so never kept by the browser or a proxy.
+  async 'GET me/reviews/:id/photos/:photoId'({ request, cookies, param, photoId }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
+    const photo = await laravelMyReviews.photo(cookies[CUSTOMER.access], param, photoId, request)
+    if (!photo.bytes) return json(failed(photo).body, photo.status)
+    return new Response(photo.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': photo.contentType,
+        'Content-Length': String(photo.bytes.byteLength),
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+      },
+    })
+  },
+
+  async 'DELETE me/reviews/:id/photos/:photoId'({ request, cookies, param, photoId }) {
+    if (!cookies[CUSTOMER.access]) return notSignedIn(request)
+    return reply(await laravelMyReviews.removePhoto(cookies[CUSTOMER.access], param, photoId, request))
+  },
 }
 
 /** The API's PDF, passed on as it streams in: never parsed or rebuilt here. */
@@ -421,6 +468,12 @@ function matchRoute(method, segments) {
   if (segments.length === 2 && segments[0] === 'order-confirmations' && segments[1].length <= 200) {
     return { route: ROUTES[`${method} order-confirmations/:token`], param: segments[1] }
   }
+  if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'reviews' && isReviewId(segments[2])) {
+    return { route: ROUTES[`${method} me/reviews/:id`], param: segments[2] }
+  }
+  if (segments.length === 5 && segments[0] === 'me' && segments[1] === 'reviews' && isReviewId(segments[2]) && segments[3] === 'photos' && isReviewId(segments[4])) {
+    return { route: ROUTES[`${method} me/reviews/:id/photos/:photoId`], param: segments[2], photoId: segments[4] }
+  }
   if (segments.length === 3 && segments[0] === 'me' && segments[1] === 'stock-alerts' && isAlertId(segments[2])) {
     return { route: ROUTES[`${method} me/stock-alerts/:id`], param: segments[2] }
   }
@@ -451,5 +504,5 @@ function matchRoute(method, segments) {
 export async function handleShopRequest(request, segments, cookies) {
   const match = matchRoute(request.method, segments)
   if (!match?.route) return json({ message: serverMessage(request, 'notFound') }, 404)
-  return match.route({ request, cookies, url: new URL(request.url), param: match.param, invoice: match.invoice })
+  return match.route({ request, cookies, url: new URL(request.url), param: match.param, invoice: match.invoice, photoId: match.photoId })
 }

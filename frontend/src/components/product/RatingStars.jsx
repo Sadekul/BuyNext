@@ -10,8 +10,9 @@ const formatRating = (rating) => formatNumber(rating, { minimumFractionDigits: 1
 /**
  * Shows a 0–5 rating as stars, rounded to the nearest half star.
  * Screen readers get the exact value from `aria-label`; the icons are decorative.
+ * Phase 23: `label` replaces that name where the page says it its own way ("4 out of 5 stars").
  */
-function RatingStars({ rating, showValue = true }) {
+function RatingStars({ rating, showValue = true, label }) {
   const { t } = useTranslation('catalog')
   const roundedRating = Math.round(rating * 2) / 2
 
@@ -24,7 +25,7 @@ function RatingStars({ rating, showValue = true }) {
   })
 
   return (
-    <div className="rating-stars" role="img" aria-label={t('rating.label', { rating: formatRating(rating), max: formatNumber(MAX_RATING) })}>
+    <div className="rating-stars" role="img" aria-label={label ?? t('rating.label', { rating: formatRating(rating), max: formatNumber(MAX_RATING) })}>
       {/* Index keys are safe here: the list is fixed-length and never reordered. */}
       {stars.map((type, index) => {
         if (type === 'full') return <FaStar key={index} aria-hidden="true" />

@@ -154,7 +154,14 @@
     "chosenPhotos": "Chosen photos",
     "photoPreview": "Photo {{number}}: {{name}}",
     "removePhoto": "Remove photo {{number}}",
-    "photoError": "Photo {{number}}: {{message}}"
+    "photoError": "Photo {{number}}: {{message}}",
+    "alreadyReviewed": "You've already reviewed this product. <page>See it in My reviews</page>.",
+    "yourReviewStatus": "Your review:"
+  },
+  "reviewStatus": {
+    "pending": "Waiting for approval",
+    "approved": "Published",
+    "rejected": "Not published"
   },
   "stockAlert": {
     "done": "We'll email you when it's back in stock.",

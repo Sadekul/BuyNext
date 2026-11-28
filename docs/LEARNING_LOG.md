@@ -391,3 +391,12 @@
 - Caching has a cost: product photos can be cached for a year because they never change, but a review photo that staff hide must disappear, so it is cached for 5 minutes only
 - A test that fails can be the test's fault: here the Bangla check set the language cookie after signing in, but the store (by design, phase 13) lets the account's language win, so the test switched language the way a shopper does
 - Agents can stop on a usage limit as well as an internet drop: their work is saved, and once the limit resets a short message lets each one carry on
+
+## Phase 23: My reviews (2026-11-28)
+
+- "Not found", not "forbidden": when someone asks for another customer's review or photo, the answer is 404, exactly as if it didn't exist. A 403 would confirm that the review exists, which is already a small leak
+- Two addresses for one photo: the public one works only while the review is approved and the photo isn't hidden (and may be cached for 5 minutes); the author's own one works in every status but is never cached (`private, no-store`) and needs their session
+- After deleting an item from a paged list, the server's pages shift up by one: reload the pages already shown, or "Show more" skips an item
+- Translation texts can hold tags for links (`<page>See it in My reviews</page>`), but not names that are real HTML tags: `<link>` is an empty element, so the words fell outside the link
+- A test that reads saved data the moment the screen changes can fail at random: the screen may update a moment before the data is written, so the test waits for the data itself
+- "Random" test failures are worth chasing: two suites failed with the same symptom (an order never confirmed), and the API's error log had a "duplicate entry" at exactly those minutes. Two requests at the same moment both saw "no saved cart yet" and both tried to add one (a race condition). The fix: when the database says the row already exists, update it. The test makes the race happen on purpose, and it failed before the fix and passed after

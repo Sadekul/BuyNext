@@ -7,6 +7,7 @@ use App\Models\CustomerCart;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CategoryTree;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 
 /**
@@ -33,13 +34,25 @@ class CustomerCarts
             return;
         }
 
-        $cart = CustomerCart::firstOrNew(['customer_id' => $customer->id]);
-        $cart->fill([
+        $values = [
             'items' => $items,
             'subtotal' => Pricing::format($subtotalCents),
             'item_count' => array_sum(array_column($items, 'quantity')),
             'converted_at' => null, // a cart with items after an order is a new cart
-        ]);
+        ];
+        try {
+            $this->write(CustomerCart::firstOrNew(['customer_id' => $customer->id]), $values);
+        } catch (UniqueConstraintViolationException) {
+            // Two price checks at the same moment (checkout asks again when the address or payment changes):
+            // both found no saved cart and both tried to add one. The other request's row is there now: update it.
+            // (Found in phase 23's browser runs: the losing request answered 500, so the order couldn't be placed.)
+            $this->write(CustomerCart::where('customer_id', $customer->id)->firstOrFail(), $values);
+        }
+    }
+
+    private function write(CustomerCart $cart, array $values): void
+    {
+        $cart->fill($values);
         $cart->updated_at = now(); // moves even when nothing changed: the customer is still shopping
         $cart->save();
     }

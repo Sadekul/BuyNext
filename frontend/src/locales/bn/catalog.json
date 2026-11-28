@@ -154,7 +154,14 @@
     "chosenPhotos": "বাছাই করা ছবি",
     "photoPreview": "ছবি {{number, number}}: {{name}}",
     "removePhoto": "{{number, number}} নম্বর ছবি সরান",
-    "photoError": "ছবি {{number, number}}: {{message}}"
+    "photoError": "ছবি {{number, number}}: {{message}}",
+    "alreadyReviewed": "আপনি এই পণ্যের রিভিউ আগেই দিয়েছেন। <page>আমার রিভিউ-তে দেখুন</page>।",
+    "yourReviewStatus": "আপনার রিভিউ:"
+  },
+  "reviewStatus": {
+    "pending": "অনুমোদনের অপেক্ষায়",
+    "approved": "প্রকাশিত",
+    "rejected": "প্রকাশ করা হয়নি"
   },
   "stockAlert": {
     "done": "পণ্যটি স্টকে ফিরলে আমরা আপনাকে ইমেইল করব।",

@@ -34,6 +34,7 @@ const ReturnDetailsPage = lazy(() => import('../pages/ReturnDetailsPage'))
 const CmsPage = lazy(() => import('../pages/CmsPage'))
 const NewsletterPage = lazy(() => import('../pages/NewsletterPage'))
 const StockAlertsPage = lazy(() => import('../pages/StockAlertsPage'))
+const MyReviewsPage = lazy(() => import('../pages/MyReviewsPage'))
 const PrivacyPage = lazy(() => import('../pages/PrivacyPage'))
 const AccountDeletedPage = lazy(() => import('../pages/AccountDeletedPage'))
 const StockAlertUnsubscribePage = lazy(() => import('../pages/StockAlertUnsubscribePage'))
@@ -113,6 +114,8 @@ function AppRoutes() {
             {REAL_SHOP && <Route path="returns/:returnNumber" element={<ReturnDetailsPage />} />}
             {/* Phase 9: back-in-stock alerts, and the privacy page (my data, delete my account). */}
             {REAL_SHOP && <Route path="stock-alerts" element={<StockAlertsPage />} />}
+            {/* Phase 23: the reviews I wrote (every status), with their photos; delete either. */}
+            {REAL_SHOP && <Route path="reviews" element={<MyReviewsPage />} />}
             {REAL_SHOP && <Route path="privacy" element={<PrivacyPage />} />}
             {/* Phase 11: reward points balance and history. */}
             {REAL_SHOP && <Route path="rewards" element={<RewardsPage />} />}

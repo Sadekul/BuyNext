@@ -1,6 +1,6 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { getAddresses, getReturn, getReturns } from '../services/customerService'
-import { getStockAlerts } from '../services/accountService'
+import { getMyReviews, getStockAlerts } from '../services/accountService'
 import { getRewards } from '../services/rewardsService'
 
 /*
@@ -15,6 +15,10 @@ export const customerKeys = {
   returnDetail: (userId, number) => ['account', userId, 'returns', 'detail', number],
   stockAlerts: (userId) => ['account', userId, 'stock-alerts'],
   rewards: (userId, page) => ['account', userId, 'rewards', page],
+  // Phase 23: everything about my reviews (the list, and "have I reviewed this product?") is under one key.
+  reviews: (userId) => ['account', userId, 'reviews'],
+  reviewList: (userId) => ['account', userId, 'reviews', 'list'],
+  reviewOf: (userId, productId) => ['account', userId, 'reviews', 'product', String(productId)],
 }
 
 /** The address book; `authorizedRequest` (useAuth) renews the session on 401. */
@@ -55,4 +59,23 @@ export const rewardsQuery = (userId, authorizedRequest, page = 1) =>
     queryFn: ({ signal }) => authorizedRequest(() => getRewards({ page, signal })),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+  })
+
+/** Phase 23: my reviews, newest first; "Show more reviews" appends the next page (10 a page). */
+export const myReviewsQuery = (userId, authorizedRequest) =>
+  infiniteQueryOptions({
+    queryKey: customerKeys.reviewList(userId),
+    queryFn: ({ pageParam, signal }) => authorizedRequest(() => getMyReviews({ page: pageParam, signal })),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page < last.pages ? last.page + 1 : undefined),
+    staleTime: 30_000,
+  })
+
+/** Phase 23: my review of one product (the product page's "You've already reviewed this product"), or null. */
+export const myReviewOfQuery = (userId, productId, authorizedRequest) =>
+  queryOptions({
+    queryKey: customerKeys.reviewOf(userId, productId),
+    queryFn: async ({ signal }) => (await authorizedRequest(() => getMyReviews({ productId, signal }))).reviews?.[0] ?? null,
+    staleTime: 30_000,
+    retry: false,
   })

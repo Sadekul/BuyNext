@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import { LuBell, LuCoins, LuHeart, LuLogOut, LuMapPin, LuPackage, LuShieldCheck, LuUndo2, LuUser } from 'react-icons/lu'
+import { LuBell, LuCoins, LuHeart, LuLogOut, LuMapPin, LuMessageSquareText, LuPackage, LuShieldCheck, LuUndo2, LuUser } from 'react-icons/lu'
 import { useAuth } from '../hooks/useAuth'
 import { useStoreSettings } from '../hooks/useStoreSettings'
 import { ROUTES } from '../constants/routes'
@@ -8,7 +8,7 @@ import { cn } from '../utils/classNames'
 import './AccountLayout.css'
 import { useTranslation } from 'react-i18next'
 
-// The address book, returns, stock alerts, and privacy need BuyNest's API (REAL_SHOP); the demo has none.
+// The address book, returns, stock alerts, my reviews, and privacy need BuyNest's API (REAL_SHOP); the demo has none.
 const ACCOUNT_LINKS = [
   { labelKey: 'nav.profile', to: ROUTES.account, icon: LuUser, end: true },
   { labelKey: 'nav.orders', to: ROUTES.orders, icon: LuPackage },
@@ -17,6 +17,8 @@ const ACCOUNT_LINKS = [
         { labelKey: 'nav.addresses', to: ROUTES.addresses, icon: LuMapPin },
         { labelKey: 'nav.returns', to: ROUTES.returns, icon: LuUndo2 },
         { labelKey: 'nav.stockAlerts', to: ROUTES.stockAlerts, icon: LuBell },
+        // Phase 23: the reviews I wrote.
+        { labelKey: 'nav.myReviews', to: ROUTES.myReviews, icon: LuMessageSquareText },
       ]
     : []),
   { labelKey: 'nav.wishlist', to: ROUTES.wishlist, icon: LuHeart },

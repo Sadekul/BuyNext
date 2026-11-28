@@ -484,6 +484,27 @@ Known limits (documented): Vercel and Netlify functions take at most about 4.5 M
 
 Checks: backend 716 feature and unit tests (22 new, and the catalog import test now also proves P2; Pint clean); frontend 1,199 unit tests (was 1,143: storefront, proxy and admin-proxy tests); admin 319 (8 new); browser checks on the dev server 2,372 of 2,372 (29 suites, new `review-photos` suite: 76 checks); on the production build 2,365 of 2,365 (28 suites; every suite passed).
 
+## Phase 23 (My reviews) — 2026-11-28
+
+Chosen by the owner from the next-step options ("My reviews page"); contract with proposed answers to Q1–Q4 (customers may delete, no editing, rejected shown as "Not published", hidden photos shown to the author only): [backend/PHASE23_CONTRACT.md](backend/PHASE23_CONTRACT.md). Three agents built in parallel: backend, storefront with its sign-in service, and the `my-reviews` browser suite. No admin change. Nothing to switch on: the page is in every BuyNest account; with no reviews it shows an empty state.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| M1 | Medium | Before this phase a customer couldn't see a review that wasn't published, delete it, or remove a photo; the product page offered a form that the server would then refuse ("already reviewed") | My reviews page; the product page says "You've already reviewed this product" with a link |
+| M2 | Low | The translated sentence "See it in My reviews" used `<link>` as the tag for its link, and `<link>` is an empty HTML element, so the link had no text and the words sat outside it (found by the storefront agent) | Renamed to `<page>`; a unit test checks the link's name |
+| M3 | Low | After deleting a review, "Show more reviews" would have skipped one: the server's pages move up by one | Every page already shown is fetched again after a delete; unit-tested |
+| M4 | Test | A cart unit test (signing in merges the saved cart) failed now and then: it read the browser's storage the moment the screen showed the merged cart, a moment before it was written (older test, no cart code changed) | It waits for the saved cart itself; 1,231/1,231 on the rerun |
+| M5 | Test | The account deletion unit test timed out once while the whole storefront set ran beside the admin set | Passed alone and in the full rerun; no change |
+| M6 | Test | The catalog suite tested "a second review is refused" by filling in the form again; the product page now shows "You've already reviewed this product" instead of a form, so the suite stopped (expected change, found by the full dev run) | It checks the note, and sends the second review straight to the sign-in service: 422 `already_reviewed`; 117/117 alone |
+| M7 | Test | The review-photos suite (phase 22) checked the Bangla photo field after Ava had already reviewed the product, so there was no form any more (same expected change) | The Bangla photo field is checked before her review; the later Bangla step checks the "already reviewed" note in Bangla; 77/77 alone |
+| M8 | High | **Checkout could fail at random for a signed-in customer (older bug, phase 7).** Each price check saves the customer's cart; when two checks came at the same moment (checkout asks again when the address or payment changes) and the customer had no saved cart yet, both tried to add one, the second hit the "one cart per customer" rule and answered 500, and the order couldn't be placed. Found because the sms suite (full dev run: order not confirmed within 45 s) and then the extras suite (production run: a gift-card order within 30 s) stopped this way; the API log had the same error at exactly those minutes, and 97 times in all on this computer | The losing request now updates the cart the other one just added. A new backend test makes "the other request" add the row first: without the fix it answers 500 with the same error, with it 200 and one cart. After the fix: sms 95/95 and extras 164/164 (production build) and no new error in the log |
+
+Known limits: a photo shown on My reviews can't renew an expired sign-in by itself (the list request just before normally has), so after a very long idle time a thumbnail may show "couldn't be loaded" until the page is reloaded; "Download my data" is limited to 3 per hour per customer and the browser suite uses one of Ava's per run (a dev run, a production run and one rerun fit in an hour); "Show more reviews" is covered by unit tests only (the browser suite would need 11 reviews by Ava).
+
+Checks: backend 730 (14 new: 13 for My reviews, 1 for M8; Pint clean); frontend 1,231 unit tests (32 new: 17 proxy, 15 page and form); admin 319 (unchanged); browser checks on the dev server: 2,369 passed and 6 failed (M6, M7, M8; the three suites then passed alone: catalog 117, review-photos 77, sms 95; new `my-reviews` suite 88/88); on the production build 2,406 passed and 4 failed, all in extras' gift-card order (M8, before the fix), then extras alone 164/164 with the fix: with the other 28 suites (2,291), 2,455 checks passed on the production build.
+
+Other "add it if it's missing" spots were checked: staff brands, preferences and email templates, the newsletter, and the catalog import are single actions, not repeated at the same moment by shoppers; left as they are.
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.

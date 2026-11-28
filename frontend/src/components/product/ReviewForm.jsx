@@ -1,15 +1,17 @@
 import { useId, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LuStar } from 'react-icons/lu'
 import FormField from '../forms/FormField'
 import Button from '../ui/Button'
 import ReviewPhotoField from './ReviewPhotoField'
+import ReviewStatusBadge from './ReviewStatusBadge'
 import { useAuth } from '../../hooks/useAuth'
 import { useStoreSettings } from '../../hooks/useStoreSettings'
 import { useReviewPhotos } from '../../hooks/useReviewPhotos'
 import { submitReview } from '../../services/shopService'
 import { productKeys } from '../../queries/productQueries'
+import { customerKeys, myReviewOfQuery } from '../../queries/customerQueries'
 import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/classNames'
 import './ReviewForm.css'
@@ -63,10 +65,16 @@ const isAlreadyReviewed = (error) =>
  * Phase 22: while the store allows it (GET /store `review_photos.enabled`),
  * up to 3 photos can be added (ReviewPhotoField). A review with photos is
  * sent as a form upload and always waits for a moderator.
+ *
+ * Phase 23: signed in, it first asks for the customer's own review of this
+ * product (GET /api/shop/me/reviews?productId=…). When there is one, the form
+ * is replaced by "You've already reviewed this product. See it in My reviews"
+ * with the review's status. While that runs, or if it fails, the form shows
+ * as before (the server still refuses a second review).
  */
 function ReviewForm({ productId, productTitle }) {
   const { t } = useTranslation('catalog')
-  const { isAuthenticated, authorizedRequest } = useAuth()
+  const { isAuthenticated, user, authorizedRequest } = useAuth()
   const location = useLocation()
   const queryClient = useQueryClient()
   const id = useId()
@@ -79,11 +87,16 @@ function ReviewForm({ productId, productTitle }) {
   const photosEnabled = photoSettings.enabled === true
   const reviewPhotos = useReviewPhotos({ max: photoSettings.max, maxMegabytes: photoSettings.maxMegabytes })
 
+  const signedIn = isAuthenticated && user?.id != null
+  const mine = useQuery({ ...myReviewOfQuery(user?.id, productId, authorizedRequest), enabled: signedIn })
+
   const mutation = useMutation({
     mutationFn: (input) => authorizedRequest(() => submitReview(productId, input)),
     onSuccess: (review, input) => {
       setSentPhotos(input.photos?.length ?? 0)
       setResult(review?.status === 'approved' ? 'published' : 'pending')
+      // My reviews (and this product's "already reviewed") now include it.
+      queryClient.invalidateQueries({ queryKey: customerKeys.reviews(user?.id) })
       // A published review changes the product's reviews and rating.
       if (review?.status === 'approved') queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) })
     },
@@ -102,6 +115,20 @@ function ReviewForm({ productId, productTitle }) {
       <p className="review-form__success" role="status">
         {result === 'published' ? t('reviewForm.published') : sentPhotos > 0 ? t('reviewForm.pendingPhotos', { count: sentPhotos }) : t('reviewForm.pending')}
       </p>
+    )
+  }
+
+  // Phase 23: one review per product; the one already written is in My reviews.
+  if (signedIn && mine.data) {
+    return (
+      <div className="review-form__already">
+        <p>
+          <Trans t={t} i18nKey="reviewForm.alreadyReviewed" components={{ page: <Link to={ROUTES.myReviews} /> }} />
+        </p>
+        <p className="review-form__already-status">
+          <span>{t('reviewForm.yourReviewStatus')}</span> <ReviewStatusBadge status={mine.data.status} />
+        </p>
+      </div>
     )
   }
 

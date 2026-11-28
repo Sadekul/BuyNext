@@ -20,6 +20,7 @@ export const ROUTES = {
   returns: '/account/returns', // returns (REAL_SHOP)
   returnDetails: (returnNumber) => `/account/returns/${returnNumber}`,
   stockAlerts: '/account/stock-alerts', // "email me when it's back" (REAL_SHOP)
+  myReviews: '/account/reviews', // the reviews I wrote, in every status (REAL_SHOP, phase 23)
   rewards: '/account/rewards', // reward points balance and history (REAL_SHOP, phase 11)
   privacy: '/account/privacy', // download my data, delete my account (REAL_SHOP)
   accountDeleted: '/goodbye', // after deleting the account (REAL_SHOP)
