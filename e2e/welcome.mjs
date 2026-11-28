@@ -570,7 +570,7 @@ try {
   const settingsBack = JSON.stringify(settingsAfter) === JSON.stringify(settingsBefore) && JSON.stringify(rowsAfter) === JSON.stringify(rowsBefore)
   log(
     problems.length === 0 && settingsBack && open.length === 0 && !leftCustomer && leftSubscribers === 0 && leftCodes.length === 0,
-    `cleanup: welcome coupon settings put back, test orders cancelled, the throwaway customer, subscribers, grants and unused codes removed, carts and stock put back${problems.length || !settingsBack || open.length || leftCustomer || leftSubscribers || leftCodes.length ? ` — left: ${[...problems, settingsBack ? '' : `settings ${JSON.stringify(settingsAfter)} rows ${JSON.stringify(rowsAfter)}`, ...open, leftCustomer ? 'customer' : '', leftSubscribers ? `${leftSubscribers} subscribers` : '', ...leftCodes.map((item) => item.code)].filter(Boolean).join('; ')}` : ''}`,
+    `cleanup: welcome coupon settings put back, test orders cancelled, the throwaway customer, subscribers, grants and unused codes removed, carts and stock put back${problems.length || !settingsBack || open.length || leftCustomer || leftSubscribers || leftCodes.length ? ` — left: ${[...problems, settingsBack ? '' : `settings ${JSON.stringify(settingsAfter)} rows ${JSON.stringify(rowsAfter)} (before: settings ${JSON.stringify(settingsBefore)} rows ${JSON.stringify(rowsBefore)})`, ...open, leftCustomer ? 'customer' : '', leftSubscribers ? `${leftSubscribers} subscribers` : '', ...leftCodes.map((item) => item.code)].filter(Boolean).join('; ')}` : ''}`,
   )
 }
 

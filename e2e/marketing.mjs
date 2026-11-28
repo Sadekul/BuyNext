@@ -27,6 +27,7 @@ import {
   launch,
   preserveStock,
   reporter,
+  overflowCulprits,
   sidewaysOverflow,
   storefrontSignIn,
   visible,
@@ -888,7 +889,7 @@ try {
       await phone.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
       await phone.waitForTimeout(300)
       const overflow = await sidewaysOverflow(phone)
-      log(overflow <= 0, `390px store ${path}: no sideways page scroll (${overflow}px)`)
+      log(overflow <= 0, `390px store ${path}: no sideways page scroll (${overflow}px)${overflow > 0 ? ` — sticks out: ${await overflowCulprits(phone)}` : ''}`)
     }
     log(await visible(phone.locator('section.newsletter').getByRole('button', { name: 'Subscribe' })), '390px: the newsletter form is shown in the footer')
     await phone.goto(`${BASE}/newsletter/confirm?token=e2e-not-a-token`, { waitUntil: 'networkidle' })

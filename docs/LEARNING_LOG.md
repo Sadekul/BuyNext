@@ -359,3 +359,18 @@
 - Store only a hash of a link token, make it single-purpose and short-lived, and rate-limit the endpoint
 - SMS length is part of the design: Bangla switches the whole text to Unicode (70 characters per part instead of 160), so the admin shows a live parts counter and English money is written "Tk" to stay in the cheaper encoding
 - A dev "SMS inbox" (like the email test inbox) lets the browser suite read real messages without any provider
+
+## Setting up on any computer from a fresh clone (2026-11-28)
+
+- A project isn't really "in git" until a fresh clone runs: try it the way a newcomer would (a new folder, the computer's default tools), not on the machine that already works
+- Secrets never go in git, even in a private repo (keys stay in its history for good); instead commit `.env.example` with empty names and a script that makes each computer's own `.env` with new random keys, without printing them
+- Set-up scripts should be idempotent (safe to run again): each step checks whether it's already done, and existing settings files are never overwritten
+- Don't depend on the system's defaults when they're too old: link the right versions in a project folder (`.tools/bin`) and put it first on `PATH`; after changing what a command points to in a running script, `hash -r` makes bash look again
+- Ubuntu's AppArmor confines programs by their path: the system `mysqld` may only use the system's folders, so a private database copies the program; MySQL also limits the socket file path to 107 characters
+- `npm ci` installs exactly what the lock file says and refuses when `package.json` and the lock disagree; that refusal is a useful early warning, so fix the lock file rather than switching to `npm install`
+- Number formatting comes from the runtime's built-in rules (ICU), which change between versions: give `Intl.NumberFormat` both the minimum and the maximum number of decimals, or a newer browser may show `৳12.0K` where an older one showed `৳12K`
+- Tests that time out under heavy CPU load (other apps running) are a load problem, not a code problem: rerun with fewer workers before changing anything
+- A fresh clone also shows which settings lived only on the old computer: the browser suites passed there because its `.env` had relaxed request limits (SQA report, phase 5, S6), which no file in git recorded; the set-up script now writes them, and the example file explains why
+- When failures move to a different place on every run, log the network: the admin's requests answered 429 "Too Many Requests", which looked like "no search results" and "the page never loaded"
+- An interrupted test run leaves its test data behind (its clean-up never ran): check for leftovers before trusting the next run, and remove them the way the suite's own clean-up would
+- An accessibility check that runs mid-fade measures half-transparent text: wait for running animations to finish before measuring contrast

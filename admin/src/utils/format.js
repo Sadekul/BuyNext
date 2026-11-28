@@ -34,14 +34,15 @@ function formatter(code, compact) {
   if (!formatters.has(key)) {
     // narrowSymbol: ৳1,250.00 (not "BDT 1,250.00"), $1,250.00 as before.
     const options = { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }
-    if (compact) Object.assign(options, { notation: 'compact', maximumFractionDigits: 1 })
+    // minimumFractionDigits 0: newer browsers keep the currency's 2-digit minimum (cut to 1) and show ৳12.0K.
+    if (compact) Object.assign(options, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })
     else if (currency === storeCurrency.code && storeCurrency.decimals !== undefined) Object.assign(options, { minimumFractionDigits: storeCurrency.decimals, maximumFractionDigits: storeCurrency.decimals })
     let made
     try {
       made = new Intl.NumberFormat('en-US', options)
     } catch {
       // A code this browser doesn't know: the amount with the code in front.
-      made = { format: (value) => `${currency} ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, ...(compact && { notation: 'compact', maximumFractionDigits: 1 }) }).format(value)}` }
+      made = { format: (value) => `${currency} ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, ...(compact && { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 }) }).format(value)}` }
     }
     formatters.set(key, made)
   }

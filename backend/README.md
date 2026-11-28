@@ -306,7 +306,7 @@ php artisan serve --port=8000
 
 The catalog comes from DummyJSON: `php artisan buynest:import-catalog` downloads it and adds or updates every product by SKU, keeping DummyJSON's ids. Run it again whenever you like: the shop's own fields (price, discount, stock, status) are kept, so staff edits and stock taken by orders survive. `--overwrite` resets those too. `db:seed` runs it in local development when there are no products yet.
 
-Or start everything from the repository root with `./dev.sh`.
+Or do all of this at once from the repository root with `./setup.sh` (once), then start everything with `./dev.sh`.
 
 Local demo accounts (`php artisan db:seed`, local only):
 

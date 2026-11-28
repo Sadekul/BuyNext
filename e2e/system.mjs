@@ -183,7 +183,7 @@ try {
   // The staff admin is deactivated: signed out everywhere
   await api(`/api/admin/v1/admins/${created.body.data.id}`, { method: 'PATCH', token: owner, body: { is_active: false } })
   await staff.goto(`${BASE}/admin/orders`, { waitUntil: 'networkidle' })
-  log(/\/admin\/login/.test(staff.url()) || (await visible(staff.getByRole('heading', { name: /No admin access|BuyNest Admin/ }), 5000)), 'a deactivated admin is signed out')
+  log(/\/admin\/login/.test(staff.url()) || (await visible(staff.getByRole('heading', { name: /No admin access|BuyNest Admin/ }))), 'a deactivated admin is signed out')
 } finally {
   // Put everything back
   await api('/api/admin/v1/settings', { method: 'PATCH', token: owner, body: { checkout: settingsBefore.checkout, tax: settingsBefore.tax } })

@@ -56,6 +56,13 @@ export async function clearSavedCart(account) {
       ...init,
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
     })
+    // Sign-in limit for this email reached (see storefrontSignIn): wait as long as the API asks, once.
+    if (response.status === 429 && !init.retried) {
+      const seconds = Number(response.headers.get('retry-after')) || 60
+      console.log(`(sign-in limit for ${account.email} reached: waiting ${seconds} s, as the API asks)`)
+      await new Promise((resolve) => setTimeout(resolve, (seconds + 1) * 1000))
+      return call(path, { ...init, retried: true })
+    }
     if (!response.ok) throw new Error(`clearSavedCart: ${path} answered ${response.status}`)
     return response.status === 204 ? null : response.json()
   }
@@ -107,6 +114,10 @@ export const visible = (locator, timeout = 15000) => locator.first().waitFor({ t
 export async function axeViolations(page) {
   await page.addScriptTag({ path: AXE_PATH })
   return page.evaluate(async () => {
+    // Let running fades and slides finish first (up to 2 s; endless ones such as spinners are skipped): mid-fade
+    // text is half transparent, so axe reported low contrast on the language buttons right after a click (sms suite).
+    const finite = document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+    await Promise.race([Promise.all(finite.map((animation) => animation.finished.catch(() => {}))), new Promise((resolve) => setTimeout(resolve, 2000))])
     const result = await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'] })
     return result.violations.map((violation) => `${violation.id}(${violation.nodes.length})`)
   })
@@ -114,12 +125,20 @@ export async function axeViolations(page) {
 
 /** Signs in on the storefront's /login page; `remember` sets "Keep me signed in". */
 export async function storefrontSignIn(page, account, { remember = true } = {}) {
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
-  await page.getByLabel(ID_LABEL).fill(idOf(account))
-  await page.getByLabel('Password', { exact: true }).fill(account.password)
-  const box = page.getByLabel('Keep me signed in')
-  if ((await box.isChecked()) !== remember) await box.click()
-  await page.getByRole('button', { name: /^sign in$/i }).click()
+  // The API allows 10 sign-ins per email address a minute (BUYNEST_AUTH_PER_EMAIL_PER_MINUTE). Suites that sign the
+  // same demo account in many times (sessions) wait out that minute when told "too many" (429), then try again.
+  for (let attempt = 1; ; attempt++) {
+    await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+    await page.getByLabel(ID_LABEL).fill(idOf(account))
+    await page.getByLabel('Password', { exact: true }).fill(account.password)
+    const box = page.getByLabel('Keep me signed in')
+    if ((await box.isChecked()) !== remember) await box.click()
+    const answer = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/auth/login' && response.request().method() === 'POST', { timeout: 15000 }).catch(() => null)
+    await page.getByRole('button', { name: /^sign in$/i }).click()
+    if ((await answer)?.status() !== 429 || attempt === 3) break
+    console.log('(sign-in limit for this email reached: waiting a minute, as the API asks)')
+    await page.waitForTimeout(61_000)
+  }
   // Usually /account, or the page the shopper was sent to sign in from (e.g. /checkout).
   await page.waitForURL((url) => url.pathname !== '/login', { timeout: 15000 })
 }
@@ -163,6 +182,17 @@ export const headerCounts = (page) =>
 
 /** Pixels the page scrolls sideways (0 = fits the viewport). */
 export const sidewaysOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+
+/** The outermost elements that stick out past the right edge, e.g. "div.promo-bar (right 560px)", to explain an overflow. */
+export const overflowCulprits = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('body *')]
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .filter((element) => element.parentElement.getBoundingClientRect().right <= window.innerWidth + 1)
+      .slice(0, 3)
+      .map((element) => `${element.tagName.toLowerCase()}${element.className && typeof element.className === 'string' ? `.${element.className.trim().split(/\s+/).join('.')}` : ''} "${(element.textContent ?? '').trim().slice(0, 40)}" (right ${Math.round(element.getBoundingClientRect().right)}px)`)
+      .join('; '),
+  )
 
 /**
  * Fills the checkout address fields that are still empty, like a shopper would.

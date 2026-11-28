@@ -12,6 +12,7 @@ buynest/
 ├── admin/      # React admin dashboard for shop staff, served at /admin
 ├── backend/    # Laravel 13 API + MySQL: customer and admin accounts (phase 1 of the backend)
 ├── e2e/        # Real-browser checks for the storefront, sign-up, and the admin dashboard
+├── setup.sh    # One-time set-up on a new computer (packages, settings files, private MySQL, demo data)
 ├── dev.sh      # Starts MySQL, the API, the store, and the admin in one terminal
 └── docs/       # Phase lessons, learning log, backend contract, deployment guide, SQA report
 ```
@@ -31,14 +32,40 @@ Admin pages ─┘   frontend/server                                       backe
 
 ## Getting started
 
-First time: set up the API ([backend/README.md](backend/README.md#run-it)), then:
+### On a new computer (once)
+
+Install these first:
+
+| Program | Version | Ubuntu example |
+| --- | --- | --- |
+| PHP with mbstring, xml, curl, mysql, sqlite3, bcmath, intl, zip, gd | 8.3 or newer | `sudo apt install php8.3-cli php8.3-{mbstring,xml,curl,mysql,sqlite3,bcmath,intl,zip,gd}` |
+| Composer | 2 | [getcomposer.org/download](https://getcomposer.org/download/) |
+| MySQL server | 8 | `sudo apt install mysql-server` (it doesn't need to be running) |
+| Node | 22.12 or newer | [nvm](https://github.com/nvm-sh/nvm) or `n`; the script installs it with `n` when `n` is there |
+| Google Chrome | any recent | only for the browser test suites in `e2e/` |
+
+Then:
 
 ```bash
-cd admin && npm install && cd ..
-cd frontend && npm install && cp .env.example .env.local && cd ..
-# in frontend/.env.local: VITE_API_PROVIDER=laravel, VITE_ACCOUNTS_BACKEND=laravel, BUYNEST_BFF_KEY (= BFF_SHARED_KEY in backend/.env)
-./dev.sh           # MySQL + API + store + admin
+git clone git@github.com:Sadekul/BuyNext.git BuyNest
+cd BuyNest
+./setup.sh         # once: packages, settings files, database, demo data (a few minutes)
+./dev.sh           # every day: MySQL + API + store + admin (Ctrl+C stops it)
 ```
+
+What [setup.sh](setup.sh) does, and why:
+
+- **Uses a new enough PHP and Node** even when the computer's default ones are older: it links them in `.tools/bin` (not committed), and `dev.sh` and `demo.sh` use that folder first.
+- **Makes its own private MySQL** in `.tools/mysql` on port 3307, so you don't need `sudo` or to touch a MySQL you already have. It copies the MySQL program there because Ubuntu's AppArmor only lets the system copy use the system's folders. To use your own MySQL instead, create a database and user and run `DB_HOST=… DB_PORT=… DB_DATABASE=… DB_USERNAME=… DB_PASSWORD=… ./setup.sh`.
+- **Creates `backend/.env` and `frontend/.env.local`** from the `.env.example` files with new random keys (never printed). These hold secrets, so they are never committed; each computer has its own. Payments, couriers and SMS stay off until you add your own keys. The new `backend/.env` also **relaxes the request limits for development** (sign-ins, orders, reviews and API requests a minute), because the browser suites make far more requests than a real visitor; a live store keeps the stricter values from `.env.example`. A `backend/.env` made before 2026-11-28 may still have the strict ones: set `BUYNEST_AUTH_PER_MINUTE=300`, `BUYNEST_AUTH_PER_EMAIL_PER_MINUTE=100`, `BUYNEST_ORDERS_PER_MINUTE=100`, `BUYNEST_REVIEWS_PER_HOUR=100` and `BUYNEST_API_PER_MINUTE=2000` in it, then restart `./dev.sh` (the running API reads `backend/.env` only when it starts).
+- **Creates the tables and demo data**: the demo accounts below, and the catalog downloaded once from DummyJSON.
+- **Is safe to run again**: it skips everything that's already done and never overwrites your settings files.
+
+For `php artisan`, `npm` and the browser suites in your own terminal, use the same PHP and Node: `export PATH="$PWD/.tools/bin:$PATH"` (from the repository folder). Clone into a short path such as `~/BuyNest`: MySQL's socket file path has a 107-character limit.
+
+A fresh clone gets the standard demo store (prices in US dollars, Bangladesh delivery off), because the browser test suites expect it. Your own store's settings, orders and uploaded photos live in your database and `backend/storage`, not in git; switch to taka and Bangladesh as described in [docs/CURRENCY.md](docs/CURRENCY.md) and [docs/BANGLADESH.md](docs/BANGLADESH.md).
+
+### Addresses
 
 | What | Address |
 | --- | --- |
@@ -57,7 +84,7 @@ Local demo accounts (created by `php artisan db:seed`):
 
 Or create your own customer at http://localhost:5173/register and read the code in the test inbox.
 
-Tests: `php artisan test` in backend/ (39), `npm test` in frontend/ (168) and admin/ (12), and the browser suites in e2e/.
+Tests: `php artisan test` in backend/ (682), `npx vitest run` in frontend/ (1,123) and admin/ (287), and the browser suites in e2e/ (`node e2e/run-all.mjs` with `./dev.sh` running).
 Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/README.md) · [backend/README.md](backend/README.md) · Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · Browser checks: [e2e/README.md](e2e/README.md).
 
 ## Progress
@@ -103,6 +130,7 @@ Details: [frontend/README.md](frontend/README.md) · [admin/README.md](admin/REA
 | B21 | Phase 19: welcome coupon | Done (off until switched on): Marketing → Welcome coupon (earned on account sign-up and/or newsletter confirmation; percentage or fixed amount, optional minimum, days valid, first order only; live preview; issued / used / active / expired figures and the list of codes sent); each customer gets a personal one-time code by email in English or Bangla, shown on their account with Copy; one code per email address ever, only to confirmed addresses, only for that email; the newsletter and sign-up pages promise the offer only while it is on; welcome codes have their own tab on the Coupons page; "First order only" also available on staff coupons; see [docs/backend/PHASE19_CONTRACT.md](docs/backend/PHASE19_CONTRACT.md) |
 | B22 | Phase 20: SMS notifications for orders | Done (off until switched on): Settings → SMS (provider: test mode, SSL Wireless or BulkSMSBD; which texts to send; editable English and Bangla texts with a live SMS-parts counter; send a test SMS; sent / failed figures), SMS log with search, filters and Retry, and an SMS panel on each order; texts for order placed, confirmed, shipped (courier and tracking link), delivered and cancelled, following the same "notify the customer" choice as emails; cash on delivery orders that need confirmation get a one-tap link (`/c/…`) where the customer confirms or cancels, which updates the To confirm list; checkout says "We'll text order updates to this number" only while it is on; no real SMS until a provider account is added, and each provider must be checked with a test SMS before going live; see [docs/backend/PHASE20_CONTRACT.md](docs/backend/PHASE20_CONTRACT.md) and [docs/BANGLADESH.md](docs/BANGLADESH.md) |
 | B23 | Private online demo | Ready: `./demo.sh` (with `./dev.sh` running) shares the production build through a free Cloudflare quick tunnel at a temporary `https://….trycloudflare.com` address, behind a demo password on every page (the demo accounts' passwords are public in this repository), only tunnel host names accepted, not indexed by search engines; Ctrl+C stops it; needs `cloudflared` installed once; see [docs/DEMO.md](docs/DEMO.md) |
+| B24 | Set up on any computer from a fresh clone | Done: `./setup.sh` checks PHP 8.3+ and Node 22.12+ (and links newer ones in `.tools/bin` when the defaults are older), installs every package, makes a private MySQL without `sudo` (or uses yours), creates both settings files with new random keys (and request limits relaxed for development), and loads the demo data; safe to run again; tried on a fresh clone with the computer's old default PHP 8.1 and Node 20. Also: the admin's package list fixed so `npm ci` works, and short money amounts in the admin show `৳12K` in up-to-date browsers (they showed `৳12.0K`); see [Getting started](#getting-started) |
 
 The concepts covered in each phase are listed in [docs/LEARNING_LOG.md](docs/LEARNING_LOG.md). Detailed lessons per phase are in [docs/phases/](docs/phases/).
 # BuyNext

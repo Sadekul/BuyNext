@@ -1,6 +1,6 @@
 # BuyNest — instructions for Claude
 
-BuyNest is a Bangladesh-focused online store, built phase by phase: `frontend/` (React storefront + the sign-in service / BFF in `frontend/server`), `admin/` (React admin at `/admin/`), `backend/` (Laravel 13, PHP 8.5, MySQL), `e2e/` (Playwright browser suites), `docs/`. Setup and demo accounts: [README.md](README.md#getting-started). Where things stand: the Progress table in README (B1–B23) and [docs/SQA_REPORT.md](docs/SQA_REPORT.md).
+BuyNest is a Bangladesh-focused online store, built phase by phase: `frontend/` (React storefront + the sign-in service / BFF in `frontend/server`), `admin/` (React admin at `/admin/`), `backend/` (Laravel 13, PHP 8.5, MySQL), `e2e/` (Playwright browser suites), `docs/`. Setup (`./setup.sh` once on a new computer, then `./dev.sh`) and demo accounts: [README.md](README.md#getting-started). Where things stand: the Progress table in README (B1–B24) and [docs/SQA_REPORT.md](docs/SQA_REPORT.md).
 
 The owner is learning professional development: explain in plain language what you did and why, and keep the docs teaching (LEARNING_LOG).
 
@@ -27,7 +27,10 @@ The owner is learning professional development: explain in plain language what y
 
 ## Gotchas learned the hard way
 
+- **Use the project's PHP and Node:** when the computer's defaults are too old, `setup.sh` links newer ones in `.tools/bin`; `dev.sh` and `demo.sh` use it on their own, but artisan, npm, vitest and the browser suites need `export PATH="$PWD/.tools/bin:$PATH"` first (from the repository root).
 - **Never run two browser suites or two `run-all` runs at once** (they share the database and demo accounts).
+- **Browser suites need the development request limits** that `./setup.sh` writes into a new `backend/.env` (a strict `.env` gives random 429s: empty grids, "no results", admin pages that never load). The running API reads `.env` only at start: after the owner changes it, restart `./dev.sh`, and check the live value in the `X-RateLimit-Limit` response header, not with tinker.
+- **An interrupted browser run leaves its test data behind** (products, customers, settings such as reward points switched on): before the next run, find the leftovers and remove them the way that suite's own clean-up does.
 - Run artisan with `env -u AI_AGENT` (Laravel compacts its output when it sees that variable). Migrations on the shared dev DB: forward `migrate` only, never `fresh`/`refresh`/`rollback`.
 - The BFF maps API answers through allow-lists: a new API field must be added there too, with a proxy test (phase 17 lost `has_sales` this way).
 - Read-only screenshots: `playwright-core` with `chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] })` in a temporary script under `e2e/` (delete it afterwards); `lib.launch()` clears the demo accounts' saved carts.

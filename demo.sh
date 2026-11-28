@@ -11,6 +11,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PORT=4173
+# PHP / Node linked by ./setup.sh when the computer's default ones are too old.
+[ -d "$ROOT/.tools/bin" ] && export PATH="$ROOT/.tools/bin:$PATH"
 
 if ! command -v cloudflared >/dev/null 2>&1; then
   cat >&2 <<'EOF'

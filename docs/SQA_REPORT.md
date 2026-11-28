@@ -427,6 +427,24 @@ Known and accepted: the one-tap link is visible in the SMS log to staff who can 
 
 Checks: backend 682 feature tests (Pint clean); frontend 1,118 unit tests; admin 287; browser checks 2,124 of 2,129 on the dev server (full run; customers and courier then passed alone: 161, 113; S1 and S2 fixed) and 2,175 of 2,176 on the production build (full run; the one failure is S3, then the SMS suite passed on both: 95, 95).
 
+## Fresh-clone setup (README B24) — 2026-11-28
+
+Asked by the store owner ("is this project run any one clone from my git?"). `./setup.sh` was tried on a fresh clone with the computer's old default PHP 8.1 and Node 20 (it links PHP 8.5 and Node 22 in `.tools/bin`), run twice (safe to repeat) and with a too-long folder path (a clear error). Then every check ran on the new computer, where the first full browser runs failed in many places. Each failure was rerun alone and traced to its cause before anything was changed.
+
+| # | Severity | Problem | Fix |
+|---|---|---|---|
+| FC1 | Medium | **The fresh-clone setup made the browser suites fail.** Phase 5 (S6) relaxed the request limits only in the old computer's `backend/.env`, which git never had; `setup.sh` copied the production limits from `.env.example`. The admin's requests then got 429 "Too Many Attempts" (240 a minute per staff account): a shipment search showed no rows, a new customer's page never loaded, and the admin showed neither its pages nor the sign-in page (this looked like "a deactivated admin is not signed out", but the API refuses a deactivated admin on every request, as `AdminUsersTest` proves). Ten sign-ins a minute per email stopped the sessions suite, which signs Ava in 17 times | `setup.sh` writes development limits into a **new** `backend/.env` (sign-ins 300 / 100 per email, orders 100, reviews 100 per hour, API 2,000 a minute); `.env.example` keeps the production values and explains this; backend tests pin the production values in `phpunit.xml`. README tells owners of an older `.env` which five values to set |
+| FC2 | Test | After the owner changed `backend/.env`, the failures went on: `dev.sh` starts the API so that it reads `.env` only once, so it kept the old limits (tinker showed the new ones, because it reads the file again) | Restarted `./dev.sh`; the live limit was confirmed in the `X-RateLimit-Limit` response header. README and CLAUDE.md say to restart after changing `.env` |
+| FC3 | Test | The run stopped the night before had left its test data behind: 8 test products, 2 test categories, a throwaway customer with an order, and reward points switched on. The storefront suite then counted 201 products instead of 194, and the loyalty suite found reward points on before it began | Removed the way the suites' own clean-up does (through the admin API: products parked as drafts and deleted, the order moved on to Delivered, the customer deleted, reward points off). CLAUDE.md now says to check for leftovers after an interrupted run |
+| FC4 | Test | The sessions suite signs the same demo account in 17 times; even with relaxed limits a strict computer refuses some | The shared sign-in helper waits out the minute when the API answers 429 and tries again (at most twice); the cart helper waits as long as `Retry-After` says. Any other sign-in failure still fails |
+| FC5 | Test | Under the full run, axe reported low contrast on the Bangla one-tap order page: it checked the two language buttons halfway through their 150 ms colour fade, when the text was half transparent | Every accessibility check (all 23 suites) now waits up to 2 s for running fades and slides to finish |
+| FC6 | Test | "A deactivated admin is signed out" allowed the screen 5 s, a third of the suite's usual wait | 15 s, like the rest of the suite |
+| FC7 | Low | Once, in the full dev run, the home page scrolled 170 px sideways at 390 px wide in the marketing suite. It did not happen again: the home page measured 0 px over 4 s in three fresh loads, marketing passed alone (187/187) and in the production run | Not reproduced; the check now names the element that sticks out (`overflowCulprits`), so a repeat explains itself |
+
+Also in this step: the admin's package list (`npm ci` works again) and short money amounts in the admin (`৳12K`, not `৳12.0K`, on newer browsers). The customers and welcome suites now print what they saw when a check fails (rows found; settings before and after).
+
+Checks: backend 682 feature tests (Pint clean); frontend 1,123 unit tests; admin 287; browser checks on the dev server: first full run 2,095 passed and 11 failed, with the sessions and admin suites not finished (FC1, FC3, FC5); second 2,128 passed and 3 failed, the admin suite not finished (FC2 and FC7; system and admin then passed alone, 40 and 53); production build: 2,176 of 2,176 (full run, every suite passed).
+
 ## Known limits (by design, documented)
 
 - In the DummyJSON demo mode, orders, payment, and stock are still simulated in the browser.
